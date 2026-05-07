@@ -26,7 +26,7 @@
     <!-- Tabs -->
     <TabView v-model:activeIndex="tabActivo">
 
-      <!-- ══ Tab Panel General (tabla plana) ══ -->
+      <!-- ══ Tab Panel General ══ -->
       <TabPanel header="Panel General">
         <ProgressSpinner v-if="loadingVista" class="block mx-auto my-8" />
         <div v-else class="rounded-xl shadow-sm overflow-hidden" style="background:#FDFAF7">
@@ -54,18 +54,40 @@
               <tbody>
                 <template v-for="fila in filasDetalle" :key="fila.key">
 
-                  <!-- Separador proyecto / período — clickeable para colapsar/expandir -->
-                  <tr v-if="fila.separador"
-                    style="background:#915BD8; cursor:pointer"
-                    @click="toggleProy(fila.proyKey)">
+                  <!-- nivel proyecto -->
+                  <tr v-if="fila.separador && fila.nivel === 'proyecto'"
+                    style="background:#2C2039; cursor:pointer"
+                    @click="toggleNivel(expandidosProyecto, fila.proyKey)">
                     <td colspan="12" class="px-4 py-2 font-bold text-[11px] tracking-widest text-white uppercase select-none">
-                      <i :class="expandidosProyectos[fila.proyKey] ? 'pi pi-chevron-down' : 'pi pi-chevron-right'"
+                      <i :class="expandidosProyecto[fila.proyKey] ? 'pi pi-chevron-down' : 'pi pi-chevron-right'"
+                        class="mr-2 text-[10px]" />
+                      {{ fila.label }}
+                    </td>
+                  </tr>
+
+                  <!-- nivel año -->
+                  <tr v-else-if="fila.separador && fila.nivel === 'anio' && expandidosProyecto[fila.proyKey]"
+                    style="background:#3d2d52; cursor:pointer"
+                    @click="toggleNivel(expandidosAnio, fila.anioKey)">
+                    <td colspan="12" class="px-4 py-1.5 font-semibold text-[11px] text-white select-none pl-8">
+                      <i :class="expandidosAnio[fila.anioKey] ? 'pi pi-chevron-down' : 'pi pi-chevron-right'"
+                        class="mr-2 text-[10px]" />
+                      {{ fila.label }}
+                    </td>
+                  </tr>
+
+                  <!-- nivel mes -->
+                  <tr v-else-if="fila.separador && fila.nivel === 'mes' && expandidosProyecto[fila.proyKey] && expandidosAnio[fila.anioKey]"
+                    style="background:#915BD8; cursor:pointer"
+                    @click="toggleNivel(expandidosMes, fila.mesKey)">
+                    <td colspan="12" class="px-4 py-1 font-bold text-[11px] tracking-widest text-white uppercase select-none pl-12">
+                      <i :class="expandidosMes[fila.mesKey] ? 'pi pi-chevron-down' : 'pi pi-chevron-right'"
                         class="mr-2 text-[10px]" />
                       {{ fila.label }}
                       <span class="ml-4 font-normal text-purple-200 normal-case tracking-normal">
                         {{ fila.sublabel }}
                       </span>
-                      <a v-if="fila.erUrl" :href="fila.erUrl" target="_blank"
+                      <a v-if="fila.erUrl" :href="fila.erUrl" target="_blank" rel="noopener noreferrer"
                         class="ml-4 inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold normal-case tracking-normal hover:opacity-80"
                         style="background:#F6FF72; color:#2C2039"
                         @click.stop>
@@ -74,29 +96,21 @@
                     </td>
                   </tr>
 
-                  <!-- Fila de datos — solo visible si el proyecto está expandido -->
-                  <tr v-else-if="expandidosProyectos[fila.proyKey]"
+                  <!-- fila datos -->
+                  <tr v-else-if="!fila.separador && expandidosProyecto[fila.proyKey] && expandidosAnio[fila.anioKey] && expandidosMes[fila.mesKey]"
                     :style="estiloFila(fila)"
                     class="border-b transition-colors duration-100"
                     style="border-color:rgba(44,32,57,0.07)">
-
-                    <td class="px-3 py-1.5 text-[11px]" style="color:#2C2039; opacity:0.65">
-                      {{ fila.proyecto }}
-                    </td>
+                    <td class="px-3 py-1.5 text-[11px]" style="color:#2C2039; opacity:0.65">{{ fila.proyecto }}</td>
                     <td class="px-3 py-1.5 font-medium text-[11px]"
-                      :style="fila.inversionista === 'Total'
-                        ? 'color:#915BD8; font-weight:700'
-                        : 'color:#2C2039'">
+                      :style="fila.inversionista === 'Total' ? 'color:#915BD8; font-weight:700' : 'color:#2C2039'">
                       {{ fila.inversionista }}
                       <span v-if="fila.inversionista === 'Total'"
                         class="ml-1 px-1 py-0.5 rounded text-[8px] font-semibold tracking-wide"
-                        style="background:rgba(145,91,216,0.15); color:#915BD8">
-                        100%
-                      </span>
+                        style="background:rgba(145,91,216,0.15); color:#915BD8">100%</span>
                     </td>
                     <td class="px-3 py-1.5">
-                      <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold"
-                        :style="badgeDoc(fila.doc)">
+                      <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold" :style="badgeDoc(fila.doc)">
                         {{ fila.doc }}
                       </span>
                     </td>
@@ -109,7 +123,7 @@
                       <span v-else>{{ fila.total != null ? fmt(fila.total) : '—' }}</span>
                     </td>
                     <td class="px-3 py-1.5 text-[11px] whitespace-nowrap">
-                      <a v-if="fila.soporteUrl" :href="fila.soporteUrl" target="_blank"
+                      <a v-if="fila.soporteUrl" :href="fila.soporteUrl" target="_blank" rel="noopener noreferrer"
                         class="flex items-center gap-1 hover:underline" style="color:#915BD8">
                         <i class="pi pi-file-pdf text-red-500 text-xs" />{{ fila.refFactura || 'Ver' }}
                       </a>
@@ -124,15 +138,10 @@
                         @click="verDetalle(fila)">
                         <i class="pi pi-eye text-gray-500 text-xs" />
                       </button>
-                      <button v-if="fila.inversionista === 'Total' && fila.doc === 'Factura' && fila.facturaId"
-                        class="inline-flex items-center justify-center w-6 h-6 rounded hover:bg-red-100 transition-colors ml-1"
-                        title="Eliminar factura"
-                        @click="eliminarFactura(fila)">
-                        <i class="pi pi-trash text-red-500 text-xs" />
-                      </button>
                     </td>
                     <td class="px-3 py-1.5" v-else></td>
                   </tr>
+
                 </template>
               </tbody>
             </table>
@@ -167,17 +176,41 @@
               </thead>
               <tbody>
                 <template v-for="fila in filasIngresos" :key="fila.key">
-                  <tr v-if="fila.separador"
-                    style="background:#915BD8; cursor:pointer"
-                    @click="toggleProy(fila.proyKey)">
+
+                  <!-- nivel proyecto -->
+                  <tr v-if="fila.separador && fila.nivel === 'proyecto'"
+                    style="background:#2C2039; cursor:pointer"
+                    @click="toggleNivel(expandidosProyecto, fila.proyKey)">
                     <td colspan="12" class="px-4 py-2 font-bold text-[11px] tracking-widest text-white uppercase select-none">
-                      <i :class="expandidosProyectos[fila.proyKey] ? 'pi pi-chevron-down' : 'pi pi-chevron-right'"
+                      <i :class="expandidosProyecto[fila.proyKey] ? 'pi pi-chevron-down' : 'pi pi-chevron-right'"
+                        class="mr-2 text-[10px]" />
+                      {{ fila.label }}
+                    </td>
+                  </tr>
+
+                  <!-- nivel año -->
+                  <tr v-else-if="fila.separador && fila.nivel === 'anio' && expandidosProyecto[fila.proyKey]"
+                    style="background:#3d2d52; cursor:pointer"
+                    @click="toggleNivel(expandidosAnio, fila.anioKey)">
+                    <td colspan="12" class="px-4 py-1.5 font-semibold text-[11px] text-white select-none pl-8">
+                      <i :class="expandidosAnio[fila.anioKey] ? 'pi pi-chevron-down' : 'pi pi-chevron-right'"
+                        class="mr-2 text-[10px]" />
+                      {{ fila.label }}
+                    </td>
+                  </tr>
+
+                  <!-- nivel mes -->
+                  <tr v-else-if="fila.separador && fila.nivel === 'mes' && expandidosProyecto[fila.proyKey] && expandidosAnio[fila.anioKey]"
+                    style="background:#915BD8; cursor:pointer"
+                    @click="toggleNivel(expandidosMes, fila.mesKey)">
+                    <td colspan="12" class="px-4 py-1 font-bold text-[11px] tracking-widest text-white uppercase select-none pl-12">
+                      <i :class="expandidosMes[fila.mesKey] ? 'pi pi-chevron-down' : 'pi pi-chevron-right'"
                         class="mr-2 text-[10px]" />
                       {{ fila.label }}
                       <span class="ml-4 font-normal text-purple-200 normal-case tracking-normal">
                         {{ fila.sublabel }}
                       </span>
-                      <a v-if="fila.erUrl" :href="fila.erUrl" target="_blank"
+                      <a v-if="fila.erUrl" :href="fila.erUrl" target="_blank" rel="noopener noreferrer"
                         class="ml-4 inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold normal-case tracking-normal hover:opacity-80"
                         style="background:#F6FF72; color:#2C2039"
                         @click.stop>
@@ -185,7 +218,9 @@
                       </a>
                     </td>
                   </tr>
-                  <tr v-else-if="expandidosProyectos[fila.proyKey]"
+
+                  <!-- fila datos -->
+                  <tr v-else-if="!fila.separador && expandidosProyecto[fila.proyKey] && expandidosAnio[fila.anioKey] && expandidosMes[fila.mesKey]"
                     :style="estiloFila(fila)"
                     class="border-b transition-colors duration-100"
                     style="border-color:rgba(44,32,57,0.07)">
@@ -209,7 +244,7 @@
                       <span v-else>{{ fila.total != null ? fmt(fila.total) : '—' }}</span>
                     </td>
                     <td class="px-3 py-1.5 text-[11px] whitespace-nowrap">
-                      <a v-if="fila.soporteUrl" :href="fila.soporteUrl" target="_blank"
+                      <a v-if="fila.soporteUrl" :href="fila.soporteUrl" target="_blank" rel="noopener noreferrer"
                         class="flex items-center gap-1 hover:underline" style="color:#915BD8">
                         <i class="pi pi-file-pdf text-red-500 text-xs" />{{ fila.refFactura || 'Ver' }}
                       </a>
@@ -224,9 +259,16 @@
                         @click="verDetalle(fila)">
                         <i class="pi pi-eye text-gray-500 text-xs" />
                       </button>
+                      <button v-if="fila.doc === 'Mandato' && fila.mandatoId && fila.lineaId"
+                        class="inline-flex items-center justify-center w-6 h-6 rounded hover:bg-red-100 transition-colors ml-1"
+                        title="Eliminar línea"
+                        @click="eliminarMandatoLinea(fila)">
+                        <i class="pi pi-trash text-red-500 text-xs" />
+                      </button>
                     </td>
                     <td class="px-3 py-1.5" v-else></td>
                   </tr>
+
                 </template>
               </tbody>
             </table>
@@ -266,17 +308,41 @@
               </thead>
               <tbody>
                 <template v-for="fila in filasCostos" :key="fila.key">
-                  <tr v-if="fila.separador"
-                    style="background:#915BD8; cursor:pointer"
-                    @click="toggleProy(fila.proyKey)">
+
+                  <!-- nivel proyecto -->
+                  <tr v-if="fila.separador && fila.nivel === 'proyecto'"
+                    style="background:#2C2039; cursor:pointer"
+                    @click="toggleNivel(expandidosProyecto, fila.proyKey)">
                     <td colspan="12" class="px-4 py-2 font-bold text-[11px] tracking-widest text-white uppercase select-none">
-                      <i :class="expandidosProyectos[fila.proyKey] ? 'pi pi-chevron-down' : 'pi pi-chevron-right'"
+                      <i :class="expandidosProyecto[fila.proyKey] ? 'pi pi-chevron-down' : 'pi pi-chevron-right'"
+                        class="mr-2 text-[10px]" />
+                      {{ fila.label }}
+                    </td>
+                  </tr>
+
+                  <!-- nivel año -->
+                  <tr v-else-if="fila.separador && fila.nivel === 'anio' && expandidosProyecto[fila.proyKey]"
+                    style="background:#3d2d52; cursor:pointer"
+                    @click="toggleNivel(expandidosAnio, fila.anioKey)">
+                    <td colspan="12" class="px-4 py-1.5 font-semibold text-[11px] text-white select-none pl-8">
+                      <i :class="expandidosAnio[fila.anioKey] ? 'pi pi-chevron-down' : 'pi pi-chevron-right'"
+                        class="mr-2 text-[10px]" />
+                      {{ fila.label }}
+                    </td>
+                  </tr>
+
+                  <!-- nivel mes -->
+                  <tr v-else-if="fila.separador && fila.nivel === 'mes' && expandidosProyecto[fila.proyKey] && expandidosAnio[fila.anioKey]"
+                    style="background:#915BD8; cursor:pointer"
+                    @click="toggleNivel(expandidosMes, fila.mesKey)">
+                    <td colspan="12" class="px-4 py-1 font-bold text-[11px] tracking-widest text-white uppercase select-none pl-12">
+                      <i :class="expandidosMes[fila.mesKey] ? 'pi pi-chevron-down' : 'pi pi-chevron-right'"
                         class="mr-2 text-[10px]" />
                       {{ fila.label }}
                       <span class="ml-4 font-normal text-purple-200 normal-case tracking-normal">
                         {{ fila.sublabel }}
                       </span>
-                      <a v-if="fila.erUrl" :href="fila.erUrl" target="_blank"
+                      <a v-if="fila.erUrl" :href="fila.erUrl" target="_blank" rel="noopener noreferrer"
                         class="ml-4 inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold normal-case tracking-normal hover:opacity-80"
                         style="background:#F6FF72; color:#2C2039"
                         @click.stop>
@@ -284,7 +350,9 @@
                       </a>
                     </td>
                   </tr>
-                  <tr v-else-if="expandidosProyectos[fila.proyKey]"
+
+                  <!-- fila datos -->
+                  <tr v-else-if="!fila.separador && expandidosProyecto[fila.proyKey] && expandidosAnio[fila.anioKey] && expandidosMes[fila.mesKey]"
                     :style="estiloFila(fila)"
                     class="border-b transition-colors duration-100"
                     style="border-color:rgba(44,32,57,0.07)">
@@ -308,7 +376,7 @@
                       <span v-else>{{ fila.total != null ? fmt(fila.total) : '—' }}</span>
                     </td>
                     <td class="px-3 py-1.5 text-[11px] whitespace-nowrap">
-                      <a v-if="fila.soporteUrl" :href="fila.soporteUrl" target="_blank"
+                      <a v-if="fila.soporteUrl" :href="fila.soporteUrl" target="_blank" rel="noopener noreferrer"
                         class="flex items-center gap-1 hover:underline" style="color:#915BD8">
                         <i class="pi pi-file-pdf text-red-500 text-xs" />{{ fila.refFactura || 'Ver' }}
                       </a>
@@ -323,15 +391,16 @@
                         @click="verDetalle(fila)">
                         <i class="pi pi-eye text-gray-500 text-xs" />
                       </button>
-                      <button v-if="fila.inversionista === 'Total' && fila.doc === 'Factura' && fila.facturaId"
+                      <button v-if="(fila.doc === 'Costos' && fila.mandatoId && fila.lineaId) || (fila.doc === 'Factura' && fila.facturaId)"
                         class="inline-flex items-center justify-center w-6 h-6 rounded hover:bg-red-100 transition-colors ml-1"
-                        title="Eliminar factura"
-                        @click="eliminarFactura(fila)">
+                        title="Eliminar"
+                        @click="fila.doc === 'Factura' ? eliminarFactura(fila) : eliminarMandatoLinea(fila)">
                         <i class="pi pi-trash text-red-500 text-xs" />
                       </button>
                     </td>
                     <td class="px-3 py-1.5" v-else></td>
                   </tr>
+
                 </template>
               </tbody>
             </table>
@@ -409,15 +478,14 @@ const dialogNueva = ref(false)
 const creando = ref(false)
 const nueva = ref({ proyecto_id: null, periodo: null, tipo_venta: 'bolsa' })
 
-// BUG 3: colapso por proyecto — objeto reactivo, vacío = todos colapsados
-const expandidosProyectos = reactive({})
+// 3 niveles de colapso independientes
+const expandidosProyecto = reactive({})  // key: proyecto_id (string)
+const expandidosAnio     = reactive({})  // key: proyId_año
+const expandidosMes      = reactive({})  // key: proyId_liqId
 
-function toggleProy(key) {
-  if (expandidosProyectos[key]) {
-    delete expandidosProyectos[key]
-  } else {
-    expandidosProyectos[key] = true
-  }
+function toggleNivel(store, key) {
+  if (store[key]) delete store[key]
+  else store[key] = true
 }
 
 // ─── Etiquetas de líneas ──────────────────────────────────────────────────────
@@ -470,7 +538,6 @@ const LABEL_FACTURA = {
 
 const OMITIR_LINEAS = new Set(['ajuste_xm'])
 
-// BUG 1: mapeo tipo_linea → tipo_costo para cruzar con costos_proyecto[]
 const TIPO_LINEA_TO_COSTO = {
   mantenimiento:              'mantenimiento',
   servicio_internet:          'internet',
@@ -507,167 +574,197 @@ function badgeDoc(doc) {
   }[doc] || { background: '#e5e7eb', color: '#374151' }
 }
 
-// ─── Filas planas ─────────────────────────────────────────────────────────────
+// ─── Filas planas con agrupación Proyecto → Año → Mes ─────────────────────────
 const filasDetalle = computed(() => {
   const rows = []
 
   for (const proy of vistaProyectos.value) {
-    for (const liq of proy.liquidaciones) {
-      const proyNombre = proy.proyecto_nombre
-      const proyKey = `${proy.proyecto_id}_${liq.liquidacion_id}`
-      const liqId = liq.liquidacion_id
-      const comprobante = liq.comprobante_contable_ref || ''
-      const consIng0 = liq.consecutivo_inicial_ingresos != null ? String(liq.consecutivo_inicial_ingresos) : ''
-      const consCos0 = liq.consecutivo_inicial_costos != null ? String(liq.consecutivo_inicial_costos) : ''
+    const proyId  = String(proy.proyecto_id)
+    const proyNombre = proy.proyecto_nombre
 
+    // Separador nivel proyecto
+    rows.push({
+      key: `sep_proy_${proyId}`,
+      separador: true, nivel: 'proyecto',
+      proyKey: proyId,
+      label: proyNombre,
+    })
+
+    // Agrupar liquidaciones por año
+    const byAnio = {}
+    for (const liq of (proy.liquidaciones || [])) {
+      const year = (liq.periodo || '').split('-')[0]
+      if (!byAnio[year]) byAnio[year] = []
+      byAnio[year].push(liq)
+    }
+
+    for (const year of Object.keys(byAnio).sort()) {
+      const anioKey = `${proyId}_${year}`
+
+      // Separador nivel año
       rows.push({
-        key: `sep_${liq.liquidacion_id}`,
-        separador: true,
-        proyKey,
-        label: `${proyNombre}  —  ${formatPeriodo(liq.periodo)}`,
-        sublabel: liq.estado,
-        erUrl: liq.estado_resultados_url || null,
+        key: `sep_anio_${proyId}_${year}`,
+        separador: true, nivel: 'anio',
+        proyKey: proyId, anioKey,
+        label: year,
       })
 
-      // Fila Total — Información (100%)
-      rows.push(_f(`${liq.liquidacion_id}_t_info`, {
-        proyKey, liqId,
-        proyecto: proyNombre, inversionista: 'Total', doc: 'Información',
-        contacto1: '', contacto2: '',
-        concepto: 'Porcentaje de Participación',
-        isPercent: true, pctLabel: '100.00%',
-        conseIngresos: consIng0, conseCostos: consCos0, comprobante,
-      }))
+      for (const liq of byAnio[year]) {
+        const mesKey    = `${proyId}_${liq.liquidacion_id}`
+        const liqId     = liq.liquidacion_id
+        const comprobante = liq.comprobante_contable_ref || ''
+        const consIng0  = liq.consecutivo_inicial_ingresos != null ? String(liq.consecutivo_inicial_ingresos) : ''
+        const consCos0  = liq.consecutivo_inicial_costos   != null ? String(liq.consecutivo_inicial_costos)   : ''
 
-      // BUG 1: mapa de soporte_url por tipo_costo desde costos_proyecto[]
-      const costosSoporteMap = new Map()
-      for (const c of (liq.costos_proyecto || [])) {
-        costosSoporteMap.set(c.tipo_costo, c.soporte_url || null)
-      }
+        // Separador nivel mes
+        rows.push({
+          key: `sep_mes_${liqId}`,
+          separador: true, nivel: 'mes',
+          proyKey: proyId, anioKey, mesKey,
+          label: formatPeriodo(liq.periodo),
+          sublabel: liq.estado,
+          erUrl: liq.estado_resultados_url || null,
+        })
 
-      // Agregar desde inversionistas con Map de deduplicación
-      const totalIng = new Map()
-      const totalCos = new Map()
-      for (const inv of (liq.inversionistas || [])) {
-        for (const m of (inv.mandatos_ingresos || [])) {
-          for (const l of (m.lineas || [])) {
-            if (OMITIR_LINEAS.has(l.tipo_linea)) continue
-            if (TIPOS_FACTURA_SET.has(l.tipo_linea)) continue
-            const k = `${l.tipo_linea}|${l.referencia_factura || ''}`
-            if (!totalIng.has(k)) totalIng.set(k, {
-              tipo_linea: l.tipo_linea,
-              concepto: ETIQUETAS_LISTA[l.tipo_linea] || l.concepto,
-              valor: 0,
-              refFactura: l.referencia_factura || '',
-            })
-            totalIng.get(k).valor += l.valor_cop
-          }
-        }
-        for (const m of (inv.mandatos_costos || [])) {
-          for (const l of (m.lineas || [])) {
-            if (OMITIR_LINEAS.has(l.tipo_linea)) continue
-            const k = `${l.tipo_linea}|${l.referencia_factura || ''}`
-            if (!totalCos.has(k)) totalCos.set(k, {
-              tipo_linea: l.tipo_linea,
-              // BUG 1: guardar la clave de tipo_costo para cruzar con costosSoporteMap
-              tipo_costo_key: TIPO_LINEA_TO_COSTO[l.tipo_linea] || 'otro',
-              concepto: ETIQUETAS_LISTA[l.tipo_linea] || l.concepto,
-              valor: 0,
-              refFactura: l.referencia_factura || '',
-            })
-            totalCos.get(k).valor += l.valor_cop
-          }
-        }
-      }
-
-      for (const r of totalIng.values()) {
-        rows.push(_f(`${liq.liquidacion_id}_t_ing_${r.tipo_linea}`, {
-          proyKey, liqId,
-          proyecto: proyNombre, inversionista: 'Total', doc: 'Mandato',
-          contacto1: '', contacto2: '',
-          concepto: r.concepto, total: r.valor,
-          negativo: COSTOS_NEG.has(r.tipo_linea),
-          refFactura: r.refFactura,
-          conseIngresos: consIng0, conseCostos: '', comprobante,
-        }))
-      }
-
-      for (const r of totalCos.values()) {
-        rows.push(_f(`${liq.liquidacion_id}_t_cos_${r.tipo_linea}`, {
-          proyKey, liqId,
-          proyecto: proyNombre, inversionista: 'Total', doc: 'Costos',
-          contacto1: '', contacto2: '',
-          concepto: r.concepto, total: r.valor, negativo: true,
-          refFactura: r.refFactura,
-          // BUG 1: recuperar soporte_url cruzando con costos_proyecto
-          soporteUrl: costosSoporteMap.get(r.tipo_costo_key) || null,
-          conseIngresos: '', conseCostos: consCos0, comprobante,
-        }))
-      }
-
-      // Filas Total — Facturas de servicio (nivel proyecto)
-      for (const f of (liq.facturas_servicio || [])) {
-        rows.push(_f(`${liq.liquidacion_id}_t_fac_${f.id}`, {
-          proyKey, liqId, facturaId: f.id,
-          proyecto: proyNombre, inversionista: 'Total', doc: 'Factura',
-          contacto1: LABEL_FACTURA[f.tipo_servicio] || f.tipo_servicio,
-          contacto2: f.numero_factura || '',
-          concepto: LABEL_FACTURA[f.tipo_servicio] || f.tipo_servicio,
-          total: f.valor_cop, negativo: false,
-          refFactura: f.nro_soporte || '', soporteUrl: f.soporte_url || null,
-          conseIngresos: '', conseCostos: '', comprobante,
-        }))
-      }
-
-      // ── Por inversionista ─────────────────────────────────────────────────
-      for (const inv of (liq.inversionistas || [])) {
-        const pctLabel = inv.porcentaje_participacion != null
-          ? (inv.porcentaje_participacion * 100).toFixed(4) + '%' : '—'
-
-        rows.push(_f(`${liq.liquidacion_id}_${inv.inversionista_id}_info`, {
-          proyKey, liqId,
-          proyecto: proyNombre, inversionista: inv.inversionista_nombre, doc: 'Información',
+        // Fila Total — Información (100%)
+        rows.push(_f(`${liqId}_t_info`, {
+          proyKey: proyId, anioKey, mesKey, liqId,
+          proyecto: proyNombre, inversionista: 'Total', doc: 'Información',
           contacto1: '', contacto2: '',
           concepto: 'Porcentaje de Participación',
-          isPercent: true, pctLabel,
+          isPercent: true, pctLabel: '100.00%',
           conseIngresos: consIng0, conseCostos: consCos0, comprobante,
         }))
 
-        for (const m of (inv.mandatos_ingresos || [])) {
-          const consIng = m.consecutivo != null ? String(m.consecutivo) : consIng0
-          for (const l of (m.lineas || [])) {
-            if (OMITIR_LINEAS.has(l.tipo_linea)) continue
-            if (TIPOS_FACTURA_SET.has(l.tipo_linea)) continue
-            rows.push(_f(`${liq.liquidacion_id}_${inv.inversionista_id}_ing_${l.id}`, {
-              proyKey, liqId,
-              proyecto: proyNombre, inversionista: inv.inversionista_nombre, doc: 'Mandato',
-              contacto1: m.numero_mandato || '',
-              contacto2: m.beneficiario_nombre || '',
-              concepto: ETIQUETAS_LISTA[l.tipo_linea] || l.concepto,
-              total: l.valor_cop, negativo: COSTOS_NEG.has(l.tipo_linea),
-              // BUG 2: soporte_url no existe en líneas de mandato → null → muestra refFactura como texto
-              refFactura: l.referencia_factura || '',
-              soporteUrl: l.soporte_url || null,
-              conseIngresos: consIng, conseCostos: '', comprobante,
-            }))
+        // Mapa soporte_url por tipo_costo desde costos_proyecto[]
+        const costosSoporteMap = new Map()
+        for (const c of (liq.costos_proyecto || [])) {
+          costosSoporteMap.set(c.tipo_costo, c.soporte_url || null)
+        }
+
+        // Totales de ingresos y costos (agregados)
+        const totalIng = new Map()
+        const totalCos = new Map()
+        for (const inv of (liq.inversionistas || [])) {
+          for (const m of (inv.mandatos_ingresos || [])) {
+            for (const l of (m.lineas || [])) {
+              if (OMITIR_LINEAS.has(l.tipo_linea)) continue
+              if (TIPOS_FACTURA_SET.has(l.tipo_linea)) continue
+              const k = `${l.tipo_linea}|${l.referencia_factura || ''}`
+              if (!totalIng.has(k)) totalIng.set(k, {
+                tipo_linea: l.tipo_linea,
+                concepto: ETIQUETAS_LISTA[l.tipo_linea] || l.concepto,
+                valor: 0,
+                refFactura: l.referencia_factura || '',
+              })
+              totalIng.get(k).valor += l.valor_cop
+            }
+          }
+          for (const m of (inv.mandatos_costos || [])) {
+            for (const l of (m.lineas || [])) {
+              if (OMITIR_LINEAS.has(l.tipo_linea)) continue
+              const k = `${l.tipo_linea}|${l.referencia_factura || ''}`
+              if (!totalCos.has(k)) totalCos.set(k, {
+                tipo_linea: l.tipo_linea,
+                tipo_costo_key: TIPO_LINEA_TO_COSTO[l.tipo_linea] || 'otro',
+                concepto: ETIQUETAS_LISTA[l.tipo_linea] || l.concepto,
+                valor: 0,
+                refFactura: l.referencia_factura || '',
+              })
+              totalCos.get(k).valor += l.valor_cop
+            }
           }
         }
 
-        for (const m of (inv.mandatos_costos || [])) {
-          const consCos = m.consecutivo != null ? String(m.consecutivo) : consCos0
-          for (const l of (m.lineas || [])) {
-            if (OMITIR_LINEAS.has(l.tipo_linea)) continue
-            rows.push(_f(`${liq.liquidacion_id}_${inv.inversionista_id}_cos_${l.id}`, {
-              proyKey, liqId,
-              proyecto: proyNombre, inversionista: inv.inversionista_nombre, doc: 'Costos',
-              contacto1: m.numero_mandato || '',
-              contacto2: m.beneficiario_nombre || '',
-              concepto: ETIQUETAS_LISTA[l.tipo_linea] || l.concepto,
-              total: l.valor_cop, negativo: true,
-              refFactura: l.referencia_factura || '',
-              soporteUrl: l.soporte_url || null,
-              conseIngresos: '', conseCostos: consCos, comprobante,
-            }))
+        for (const r of totalIng.values()) {
+          rows.push(_f(`${liqId}_t_ing_${r.tipo_linea}`, {
+            proyKey: proyId, anioKey, mesKey, liqId,
+            proyecto: proyNombre, inversionista: 'Total', doc: 'Mandato',
+            contacto1: '', contacto2: '',
+            concepto: r.concepto, total: r.valor,
+            negativo: COSTOS_NEG.has(r.tipo_linea),
+            refFactura: r.refFactura,
+            conseIngresos: consIng0, conseCostos: '', comprobante,
+          }))
+        }
+
+        for (const r of totalCos.values()) {
+          rows.push(_f(`${liqId}_t_cos_${r.tipo_linea}`, {
+            proyKey: proyId, anioKey, mesKey, liqId,
+            proyecto: proyNombre, inversionista: 'Total', doc: 'Costos',
+            contacto1: '', contacto2: '',
+            concepto: r.concepto, total: r.valor, negativo: true,
+            refFactura: r.refFactura,
+            soporteUrl: costosSoporteMap.get(r.tipo_costo_key) || null,
+            conseIngresos: '', conseCostos: consCos0, comprobante,
+          }))
+        }
+
+        // Filas Total — Facturas de servicio
+        for (const f of (liq.facturas_servicio || [])) {
+          rows.push(_f(`${liqId}_t_fac_${f.id}`, {
+            proyKey: proyId, anioKey, mesKey, liqId, facturaId: f.id,
+            proyecto: proyNombre, inversionista: 'Total', doc: 'Factura',
+            contacto1: LABEL_FACTURA[f.tipo_servicio] || f.tipo_servicio,
+            contacto2: f.numero_factura || '',
+            concepto: LABEL_FACTURA[f.tipo_servicio] || f.tipo_servicio,
+            total: f.valor_cop, negativo: false,
+            refFactura: f.nro_soporte || '', soporteUrl: f.soporte_url || null,
+            conseIngresos: '', conseCostos: '', comprobante,
+          }))
+        }
+
+        // ── Por inversionista ─────────────────────────────────────────────────
+        for (const inv of (liq.inversionistas || [])) {
+          const pctLabel = inv.porcentaje_participacion != null
+            ? (inv.porcentaje_participacion * 100).toFixed(4) + '%' : '—'
+
+          rows.push(_f(`${liqId}_${inv.inversionista_id}_info`, {
+            proyKey: proyId, anioKey, mesKey, liqId,
+            proyecto: proyNombre, inversionista: inv.inversionista_nombre, doc: 'Información',
+            contacto1: '', contacto2: '',
+            concepto: 'Porcentaje de Participación',
+            isPercent: true, pctLabel,
+            conseIngresos: consIng0, conseCostos: consCos0, comprobante,
+          }))
+
+          for (const m of (inv.mandatos_ingresos || [])) {
+            const consIng = m.consecutivo != null ? String(m.consecutivo) : consIng0
+            for (const l of (m.lineas || [])) {
+              if (OMITIR_LINEAS.has(l.tipo_linea)) continue
+              if (TIPOS_FACTURA_SET.has(l.tipo_linea)) continue
+              rows.push(_f(`${liqId}_${inv.inversionista_id}_ing_${l.id}`, {
+                proyKey: proyId, anioKey, mesKey, liqId,
+                mandatoId: m.id, lineaId: l.id,
+                proyecto: proyNombre, inversionista: inv.inversionista_nombre, doc: 'Mandato',
+                contacto1: m.numero_mandato || '',
+                contacto2: m.beneficiario_nombre || '',
+                concepto: ETIQUETAS_LISTA[l.tipo_linea] || l.concepto,
+                total: l.valor_cop, negativo: COSTOS_NEG.has(l.tipo_linea),
+                refFactura: l.referencia_factura || '',
+                soporteUrl: l.soporte_url || null,
+                conseIngresos: consIng, conseCostos: '', comprobante,
+              }))
+            }
+          }
+
+          for (const m of (inv.mandatos_costos || [])) {
+            const consCos = m.consecutivo != null ? String(m.consecutivo) : consCos0
+            for (const l of (m.lineas || [])) {
+              if (OMITIR_LINEAS.has(l.tipo_linea)) continue
+              rows.push(_f(`${liqId}_${inv.inversionista_id}_cos_${l.id}`, {
+                proyKey: proyId, anioKey, mesKey, liqId,
+                mandatoId: m.id, lineaId: l.id,
+                proyecto: proyNombre, inversionista: inv.inversionista_nombre, doc: 'Costos',
+                contacto1: m.numero_mandato || '',
+                contacto2: m.beneficiario_nombre || '',
+                concepto: ETIQUETAS_LISTA[l.tipo_linea] || l.concepto,
+                total: l.valor_cop, negativo: true,
+                refFactura: l.referencia_factura || '',
+                soporteUrl: l.soporte_url || null,
+                conseIngresos: '', conseCostos: consCos, comprobante,
+              }))
+            }
           }
         }
       }
@@ -711,29 +808,34 @@ function _f(key, d) {
   return {
     key,
     separador: false,
+    nivel: null,
     erUrl: null,
-    proyKey: d.proyKey ?? '',
-    liqId: d.liqId ?? null,
-    facturaId: d.facturaId ?? null,
-    proyecto: d.proyecto ?? '',
-    inversionista: d.inversionista ?? '',
-    doc: d.doc ?? '',
-    contacto1: d.contacto1 ?? '',
-    contacto2: d.contacto2 ?? '',
-    concepto: d.concepto ?? '',
-    total: d.total ?? null,
-    isPercent: d.isPercent ?? false,
-    pctLabel: d.pctLabel ?? '',
-    negativo: d.negativo ?? false,
-    refFactura: d.refFactura ?? '',
-    soporteUrl: d.soporteUrl ?? null,
-    conseIngresos: d.conseIngresos ?? '',
-    conseCostos: d.conseCostos ?? '',
-    comprobante: d.comprobante ?? '',
+    proyKey:    d.proyKey    ?? '',
+    anioKey:    d.anioKey    ?? '',
+    mesKey:     d.mesKey     ?? '',
+    liqId:      d.liqId      ?? null,
+    facturaId:  d.facturaId  ?? null,
+    mandatoId:  d.mandatoId  ?? null,
+    lineaId:    d.lineaId    ?? null,
+    proyecto:       d.proyecto       ?? '',
+    inversionista:  d.inversionista  ?? '',
+    doc:            d.doc            ?? '',
+    contacto1:      d.contacto1      ?? '',
+    contacto2:      d.contacto2      ?? '',
+    concepto:       d.concepto       ?? '',
+    total:          d.total          ?? null,
+    isPercent:      d.isPercent      ?? false,
+    pctLabel:       d.pctLabel       ?? '',
+    negativo:       d.negativo       ?? false,
+    refFactura:     d.refFactura     ?? '',
+    soporteUrl:     d.soporteUrl     ?? null,
+    conseIngresos:  d.conseIngresos  ?? '',
+    conseCostos:    d.conseCostos    ?? '',
+    comprobante:    d.comprobante    ?? '',
   }
 }
 
-// ─── Acciones BUG 4 ──────────────────────────────────────────────────────────
+// ─── Acciones ────────────────────────────────────────────────────────────────
 function verDetalle(fila) {
   router.push(`/liquidaciones/${fila.liqId}`)
 }
@@ -746,6 +848,17 @@ async function eliminarFactura(fila) {
     loadVistas()
   } catch {
     toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo eliminar la factura', life: 3000 })
+  }
+}
+
+async function eliminarMandatoLinea(fila) {
+  if (!window.confirm('¿Eliminar esta línea? Esta acción no se puede deshacer.')) return
+  try {
+    await api.delete(`/liquidaciones/${fila.liqId}/mandatos/${fila.mandatoId}/lineas/${fila.lineaId}`)
+    toast.add({ severity: 'success', summary: 'Eliminada', life: 2000 })
+    loadVistas()
+  } catch {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo eliminar la línea', life: 3000 })
   }
 }
 
@@ -820,11 +933,6 @@ function fmt(v) {
   return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 2 }).format(v)
 }
 
-function pct(v) {
-  if (v == null) return '—'
-  return (v * 100).toFixed(4) + '%'
-}
-
 function formatPeriodo(p) {
   if (!p) return ''
   const [y, m] = p.split('-')
@@ -837,13 +945,6 @@ function estadoSeverity(e) {
     iniciada: 'secondary', costos_registrados: 'info', xm_procesado: 'info',
     mandatos_emitidos: 'warn', en_contabilidad: 'warn', en_revisoria: 'warn',
     facturado: 'success', entregado: 'contrast',
-  }[e] || 'secondary'
-}
-
-function estadoProySeverity(e) {
-  return {
-    en_operacion: 'success', en_desarrollo: 'info',
-    suspendido: 'warn', cancelado: 'secondary',
   }[e] || 'secondary'
 }
 
