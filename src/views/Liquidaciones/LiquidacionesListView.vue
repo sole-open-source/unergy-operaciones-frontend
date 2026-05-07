@@ -34,7 +34,7 @@
             No hay liquidaciones para los filtros seleccionados.
           </div>
           <div v-else class="overflow-x-auto">
-            <table class="w-full text-xs border-collapse" style="min-width:1400px">
+            <table class="w-full text-xs border-collapse" style="min-width:1500px">
               <thead>
                 <tr class="text-white text-[11px] uppercase tracking-wide" style="background:#2C2039">
                   <th class="px-3 py-2.5 text-left whitespace-nowrap font-semibold">Proyecto</th>
@@ -48,75 +48,66 @@
                   <th class="px-3 py-2.5 text-left whitespace-nowrap font-semibold">Consec. Ingresos</th>
                   <th class="px-3 py-2.5 text-left whitespace-nowrap font-semibold">Consec. Costos</th>
                   <th class="px-3 py-2.5 text-left whitespace-nowrap font-semibold">Comprobante Contable</th>
+                  <th class="px-3 py-2.5 text-center whitespace-nowrap font-semibold">Acciones</th>
                 </tr>
               </thead>
               <tbody>
                 <template v-for="fila in filasDetalle" :key="fila.key">
 
-                  <!-- Separador proyecto / período -->
-                  <tr v-if="fila.separador" style="background:#915BD8">
-                    <td colspan="11" class="px-4 py-2 font-bold text-[11px] tracking-widest text-white uppercase">
+                  <!-- Separador proyecto / período — clickeable para colapsar/expandir -->
+                  <tr v-if="fila.separador"
+                    style="background:#915BD8; cursor:pointer"
+                    @click="toggleProy(fila.proyKey)">
+                    <td colspan="12" class="px-4 py-2 font-bold text-[11px] tracking-widest text-white uppercase select-none">
+                      <i :class="expandidosProyectos[fila.proyKey] ? 'pi pi-chevron-down' : 'pi pi-chevron-right'"
+                        class="mr-2 text-[10px]" />
                       {{ fila.label }}
                       <span class="ml-4 font-normal text-purple-200 normal-case tracking-normal">
                         {{ fila.sublabel }}
                       </span>
                       <a v-if="fila.erUrl" :href="fila.erUrl" target="_blank"
                         class="ml-4 inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold normal-case tracking-normal hover:opacity-80"
-                        style="background:#F6FF72; color:#2C2039">
+                        style="background:#F6FF72; color:#2C2039"
+                        @click.stop>
                         <i class="pi pi-chart-line text-[9px]" />E.R.
                       </a>
                     </td>
                   </tr>
 
-                  <!-- Fila de datos -->
-                  <tr v-else :style="estiloFila(fila)"
+                  <!-- Fila de datos — solo visible si el proyecto está expandido -->
+                  <tr v-else-if="expandidosProyectos[fila.proyKey]"
+                    :style="estiloFila(fila)"
                     class="border-b transition-colors duration-100"
                     style="border-color:rgba(44,32,57,0.07)">
 
-                    <!-- Proyecto -->
                     <td class="px-3 py-1.5 text-[11px]" style="color:#2C2039; opacity:0.65">
                       {{ fila.proyecto }}
                     </td>
-
-                    <!-- Inversionista -->
                     <td class="px-3 py-1.5 font-medium text-[11px]"
                       :style="fila.inversionista === 'Total'
                         ? 'color:#915BD8; font-weight:700'
                         : 'color:#2C2039'">
                       {{ fila.inversionista }}
-                      <!-- Bug 5: indicar que Total = consolidado 100% del proyecto -->
                       <span v-if="fila.inversionista === 'Total'"
                         class="ml-1 px-1 py-0.5 rounded text-[8px] font-semibold tracking-wide"
                         style="background:rgba(145,91,216,0.15); color:#915BD8">
                         100%
                       </span>
                     </td>
-
-                    <!-- Documento contable -->
                     <td class="px-3 py-1.5">
                       <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold"
                         :style="badgeDoc(fila.doc)">
                         {{ fila.doc }}
                       </span>
                     </td>
-
-                    <!-- Contacto 1 -->
                     <td class="px-3 py-1.5 text-[11px] text-gray-500">{{ fila.contacto1 }}</td>
-
-                    <!-- Contacto 2 -->
                     <td class="px-3 py-1.5 text-[11px] text-gray-500">{{ fila.contacto2 }}</td>
-
-                    <!-- Concepto -->
                     <td class="px-3 py-1.5 text-[11px]" style="color:#2C2039">{{ fila.concepto }}</td>
-
-                    <!-- Total -->
                     <td class="px-3 py-1.5 text-right font-mono text-[11px]"
                       :style="fila.negativo ? 'color:#dc2626' : 'color:#2C2039'">
                       <span v-if="fila.isPercent" class="font-semibold" style="color:#915BD8">{{ fila.pctLabel }}</span>
                       <span v-else>{{ fila.total != null ? fmt(fila.total) : '—' }}</span>
                     </td>
-
-                    <!-- Ref. Factura / Soporte -->
                     <td class="px-3 py-1.5 text-[11px] whitespace-nowrap">
                       <a v-if="fila.soporteUrl" :href="fila.soporteUrl" target="_blank"
                         class="flex items-center gap-1 hover:underline" style="color:#915BD8">
@@ -124,21 +115,23 @@
                       </a>
                       <span v-else style="color:#2C2039; opacity:0.7">{{ fila.refFactura }}</span>
                     </td>
-
-                    <!-- Consecutivo Ingresos -->
-                    <td class="px-3 py-1.5 text-[11px]" style="color:#2C2039; opacity:0.6">
-                      {{ fila.conseIngresos }}
+                    <td class="px-3 py-1.5 text-[11px]" style="color:#2C2039; opacity:0.6">{{ fila.conseIngresos }}</td>
+                    <td class="px-3 py-1.5 text-[11px]" style="color:#2C2039; opacity:0.6">{{ fila.conseCostos }}</td>
+                    <td class="px-3 py-1.5 text-[11px] font-mono" style="color:#2C2039; opacity:0.7">{{ fila.comprobante }}</td>
+                    <td class="px-3 py-1.5 text-center whitespace-nowrap" v-if="!fila.isPercent">
+                      <button class="inline-flex items-center justify-center w-6 h-6 rounded hover:bg-gray-200 transition-colors"
+                        title="Ver detalle"
+                        @click="verDetalle(fila)">
+                        <i class="pi pi-eye text-gray-500 text-xs" />
+                      </button>
+                      <button v-if="fila.inversionista === 'Total' && fila.doc === 'Factura' && fila.facturaId"
+                        class="inline-flex items-center justify-center w-6 h-6 rounded hover:bg-red-100 transition-colors ml-1"
+                        title="Eliminar factura"
+                        @click="eliminarFactura(fila)">
+                        <i class="pi pi-trash text-red-500 text-xs" />
+                      </button>
                     </td>
-
-                    <!-- Consecutivo Costos -->
-                    <td class="px-3 py-1.5 text-[11px]" style="color:#2C2039; opacity:0.6">
-                      {{ fila.conseCostos }}
-                    </td>
-
-                    <!-- Comprobante Contable -->
-                    <td class="px-3 py-1.5 text-[11px] font-mono" style="color:#2C2039; opacity:0.7">
-                      {{ fila.comprobante }}
-                    </td>
+                    <td class="px-3 py-1.5" v-else></td>
                   </tr>
                 </template>
               </tbody>
@@ -155,7 +148,7 @@
             No hay liquidaciones para los filtros seleccionados.
           </div>
           <div v-else class="overflow-x-auto">
-            <table class="w-full text-xs border-collapse" style="min-width:1400px">
+            <table class="w-full text-xs border-collapse" style="min-width:1500px">
               <thead>
                 <tr class="text-white text-[11px] uppercase tracking-wide" style="background:#2C2039">
                   <th class="px-3 py-2.5 text-left whitespace-nowrap font-semibold">Proyecto</th>
@@ -169,24 +162,31 @@
                   <th class="px-3 py-2.5 text-left whitespace-nowrap font-semibold">Consec. Ingresos</th>
                   <th class="px-3 py-2.5 text-left whitespace-nowrap font-semibold">Consec. Costos</th>
                   <th class="px-3 py-2.5 text-left whitespace-nowrap font-semibold">Comprobante Contable</th>
+                  <th class="px-3 py-2.5 text-center whitespace-nowrap font-semibold">Acciones</th>
                 </tr>
               </thead>
               <tbody>
                 <template v-for="fila in filasIngresos" :key="fila.key">
-                  <tr v-if="fila.separador" style="background:#915BD8">
-                    <td colspan="11" class="px-4 py-2 font-bold text-[11px] tracking-widest text-white uppercase">
+                  <tr v-if="fila.separador"
+                    style="background:#915BD8; cursor:pointer"
+                    @click="toggleProy(fila.proyKey)">
+                    <td colspan="12" class="px-4 py-2 font-bold text-[11px] tracking-widest text-white uppercase select-none">
+                      <i :class="expandidosProyectos[fila.proyKey] ? 'pi pi-chevron-down' : 'pi pi-chevron-right'"
+                        class="mr-2 text-[10px]" />
                       {{ fila.label }}
                       <span class="ml-4 font-normal text-purple-200 normal-case tracking-normal">
                         {{ fila.sublabel }}
                       </span>
                       <a v-if="fila.erUrl" :href="fila.erUrl" target="_blank"
                         class="ml-4 inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold normal-case tracking-normal hover:opacity-80"
-                        style="background:#F6FF72; color:#2C2039">
+                        style="background:#F6FF72; color:#2C2039"
+                        @click.stop>
                         <i class="pi pi-chart-line text-[9px]" />E.R.
                       </a>
                     </td>
                   </tr>
-                  <tr v-else :style="estiloFila(fila)"
+                  <tr v-else-if="expandidosProyectos[fila.proyKey]"
+                    :style="estiloFila(fila)"
                     class="border-b transition-colors duration-100"
                     style="border-color:rgba(44,32,57,0.07)">
                     <td class="px-3 py-1.5 text-[11px]" style="color:#2C2039; opacity:0.65">{{ fila.proyecto }}</td>
@@ -218,6 +218,14 @@
                     <td class="px-3 py-1.5 text-[11px]" style="color:#2C2039; opacity:0.6">{{ fila.conseIngresos }}</td>
                     <td class="px-3 py-1.5 text-[11px]" style="color:#2C2039; opacity:0.6">{{ fila.conseCostos }}</td>
                     <td class="px-3 py-1.5 text-[11px] font-mono" style="color:#2C2039; opacity:0.7">{{ fila.comprobante }}</td>
+                    <td class="px-3 py-1.5 text-center whitespace-nowrap" v-if="!fila.isPercent">
+                      <button class="inline-flex items-center justify-center w-6 h-6 rounded hover:bg-gray-200 transition-colors"
+                        title="Ver detalle"
+                        @click="verDetalle(fila)">
+                        <i class="pi pi-eye text-gray-500 text-xs" />
+                      </button>
+                    </td>
+                    <td class="px-3 py-1.5" v-else></td>
                   </tr>
                 </template>
               </tbody>
@@ -239,7 +247,7 @@
             No hay liquidaciones para los filtros seleccionados.
           </div>
           <div v-else class="overflow-x-auto">
-            <table class="w-full text-xs border-collapse" style="min-width:1400px">
+            <table class="w-full text-xs border-collapse" style="min-width:1500px">
               <thead>
                 <tr class="text-white text-[11px] uppercase tracking-wide" style="background:#2C2039">
                   <th class="px-3 py-2.5 text-left whitespace-nowrap font-semibold">Proyecto</th>
@@ -253,24 +261,31 @@
                   <th class="px-3 py-2.5 text-left whitespace-nowrap font-semibold">Consec. Ingresos</th>
                   <th class="px-3 py-2.5 text-left whitespace-nowrap font-semibold">Consec. Costos</th>
                   <th class="px-3 py-2.5 text-left whitespace-nowrap font-semibold">Comprobante Contable</th>
+                  <th class="px-3 py-2.5 text-center whitespace-nowrap font-semibold">Acciones</th>
                 </tr>
               </thead>
               <tbody>
                 <template v-for="fila in filasCostos" :key="fila.key">
-                  <tr v-if="fila.separador" style="background:#915BD8">
-                    <td colspan="11" class="px-4 py-2 font-bold text-[11px] tracking-widest text-white uppercase">
+                  <tr v-if="fila.separador"
+                    style="background:#915BD8; cursor:pointer"
+                    @click="toggleProy(fila.proyKey)">
+                    <td colspan="12" class="px-4 py-2 font-bold text-[11px] tracking-widest text-white uppercase select-none">
+                      <i :class="expandidosProyectos[fila.proyKey] ? 'pi pi-chevron-down' : 'pi pi-chevron-right'"
+                        class="mr-2 text-[10px]" />
                       {{ fila.label }}
                       <span class="ml-4 font-normal text-purple-200 normal-case tracking-normal">
                         {{ fila.sublabel }}
                       </span>
                       <a v-if="fila.erUrl" :href="fila.erUrl" target="_blank"
                         class="ml-4 inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold normal-case tracking-normal hover:opacity-80"
-                        style="background:#F6FF72; color:#2C2039">
+                        style="background:#F6FF72; color:#2C2039"
+                        @click.stop>
                         <i class="pi pi-chart-line text-[9px]" />E.R.
                       </a>
                     </td>
                   </tr>
-                  <tr v-else :style="estiloFila(fila)"
+                  <tr v-else-if="expandidosProyectos[fila.proyKey]"
+                    :style="estiloFila(fila)"
                     class="border-b transition-colors duration-100"
                     style="border-color:rgba(44,32,57,0.07)">
                     <td class="px-3 py-1.5 text-[11px]" style="color:#2C2039; opacity:0.65">{{ fila.proyecto }}</td>
@@ -302,6 +317,20 @@
                     <td class="px-3 py-1.5 text-[11px]" style="color:#2C2039; opacity:0.6">{{ fila.conseIngresos }}</td>
                     <td class="px-3 py-1.5 text-[11px]" style="color:#2C2039; opacity:0.6">{{ fila.conseCostos }}</td>
                     <td class="px-3 py-1.5 text-[11px] font-mono" style="color:#2C2039; opacity:0.7">{{ fila.comprobante }}</td>
+                    <td class="px-3 py-1.5 text-center whitespace-nowrap" v-if="!fila.isPercent">
+                      <button class="inline-flex items-center justify-center w-6 h-6 rounded hover:bg-gray-200 transition-colors"
+                        title="Ver detalle"
+                        @click="verDetalle(fila)">
+                        <i class="pi pi-eye text-gray-500 text-xs" />
+                      </button>
+                      <button v-if="fila.inversionista === 'Total' && fila.doc === 'Factura' && fila.facturaId"
+                        class="inline-flex items-center justify-center w-6 h-6 rounded hover:bg-red-100 transition-colors ml-1"
+                        title="Eliminar factura"
+                        @click="eliminarFactura(fila)">
+                        <i class="pi pi-trash text-red-500 text-xs" />
+                      </button>
+                    </td>
+                    <td class="px-3 py-1.5" v-else></td>
                   </tr>
                 </template>
               </tbody>
@@ -349,7 +378,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
@@ -380,6 +409,17 @@ const dialogNueva = ref(false)
 const creando = ref(false)
 const nueva = ref({ proyecto_id: null, periodo: null, tipo_venta: 'bolsa' })
 
+// BUG 3: colapso por proyecto — objeto reactivo, vacío = todos colapsados
+const expandidosProyectos = reactive({})
+
+function toggleProy(key) {
+  if (expandidosProyectos[key]) {
+    delete expandidosProyectos[key]
+  } else {
+    expandidosProyectos[key] = true
+  }
+}
+
 // ─── Etiquetas de líneas ──────────────────────────────────────────────────────
 const ETIQUETAS_LISTA = {
   ingreso_bruto: 'Ingreso Bruto',
@@ -394,7 +434,7 @@ const ETIQUETAS_LISTA = {
   mantenimiento: 'Mantenimiento',
   arriendo: 'Arriendo',
   servicio_internet: 'Servicio de Internet',
-  iva_internet: 'IVA Internet',   // Bug 2
+  iva_internet: 'IVA Internet',
   poliza_cumplimiento: 'Póliza de Cumplimiento',
   servicios_publicos_consumo: 'Servicios Públicos Consumo de energía',
   cambio_equipos_medida: 'Cambio Equipos de Medida',
@@ -412,7 +452,6 @@ const ETIQUETAS_LISTA = {
   valor_a_pagar: 'Valor a Pagar',
 }
 
-// Bug 1: conceptos que pertenecen solo a la sección Factura
 const TIPOS_FACTURA_SET = new Set(['representacion', 'cgm', 'administracion', 'administracion_operacion'])
 
 const COSTOS_NEG = new Set([
@@ -430,6 +469,17 @@ const LABEL_FACTURA = {
 }
 
 const OMITIR_LINEAS = new Set(['ajuste_xm'])
+
+// BUG 1: mapeo tipo_linea → tipo_costo para cruzar con costos_proyecto[]
+const TIPO_LINEA_TO_COSTO = {
+  mantenimiento:              'mantenimiento',
+  servicio_internet:          'internet',
+  iva_internet:               'internet',
+  arriendo:                   'arriendo',
+  poliza_cumplimiento:        'polizas',
+  servicios_publicos_consumo: 'servicios_publicos',
+  cambio_equipos_medida:      'cambio_equipos_medida',
+}
 
 // ─── Colores ──────────────────────────────────────────────────────────────────
 const COLORES_FILA = {
@@ -464,6 +514,8 @@ const filasDetalle = computed(() => {
   for (const proy of vistaProyectos.value) {
     for (const liq of proy.liquidaciones) {
       const proyNombre = proy.proyecto_nombre
+      const proyKey = `${proy.proyecto_id}_${liq.liquidacion_id}`
+      const liqId = liq.liquidacion_id
       const comprobante = liq.comprobante_contable_ref || ''
       const consIng0 = liq.consecutivo_inicial_ingresos != null ? String(liq.consecutivo_inicial_ingresos) : ''
       const consCos0 = liq.consecutivo_inicial_costos != null ? String(liq.consecutivo_inicial_costos) : ''
@@ -471,6 +523,7 @@ const filasDetalle = computed(() => {
       rows.push({
         key: `sep_${liq.liquidacion_id}`,
         separador: true,
+        proyKey,
         label: `${proyNombre}  —  ${formatPeriodo(liq.periodo)}`,
         sublabel: liq.estado,
         erUrl: liq.estado_resultados_url || null,
@@ -478,6 +531,7 @@ const filasDetalle = computed(() => {
 
       // Fila Total — Información (100%)
       rows.push(_f(`${liq.liquidacion_id}_t_info`, {
+        proyKey, liqId,
         proyecto: proyNombre, inversionista: 'Total', doc: 'Información',
         contacto1: '', contacto2: '',
         concepto: 'Porcentaje de Participación',
@@ -485,9 +539,13 @@ const filasDetalle = computed(() => {
         conseIngresos: consIng0, conseCostos: consCos0, comprobante,
       }))
 
-      // Filas Total — Mandato e Costos: agregar desde inversionistas con Map de
-      // deduplicación (tipo_linea|ref como clave). Esto preserva todas las líneas
-      // IVA que existen en los inversionistas pero no en el mandato Total de la DB.
+      // BUG 1: mapa de soporte_url por tipo_costo desde costos_proyecto[]
+      const costosSoporteMap = new Map()
+      for (const c of (liq.costos_proyecto || [])) {
+        costosSoporteMap.set(c.tipo_costo, c.soporte_url || null)
+      }
+
+      // Agregar desde inversionistas con Map de deduplicación
       const totalIng = new Map()
       const totalCos = new Map()
       for (const inv of (liq.inversionistas || [])) {
@@ -496,7 +554,12 @@ const filasDetalle = computed(() => {
             if (OMITIR_LINEAS.has(l.tipo_linea)) continue
             if (TIPOS_FACTURA_SET.has(l.tipo_linea)) continue
             const k = `${l.tipo_linea}|${l.referencia_factura || ''}`
-            if (!totalIng.has(k)) totalIng.set(k, { tipo_linea: l.tipo_linea, concepto: ETIQUETAS_LISTA[l.tipo_linea] || l.concepto, valor: 0, refFactura: l.referencia_factura || '' })
+            if (!totalIng.has(k)) totalIng.set(k, {
+              tipo_linea: l.tipo_linea,
+              concepto: ETIQUETAS_LISTA[l.tipo_linea] || l.concepto,
+              valor: 0,
+              refFactura: l.referencia_factura || '',
+            })
             totalIng.get(k).valor += l.valor_cop
           }
         }
@@ -504,13 +567,22 @@ const filasDetalle = computed(() => {
           for (const l of (m.lineas || [])) {
             if (OMITIR_LINEAS.has(l.tipo_linea)) continue
             const k = `${l.tipo_linea}|${l.referencia_factura || ''}`
-            if (!totalCos.has(k)) totalCos.set(k, { tipo_linea: l.tipo_linea, concepto: ETIQUETAS_LISTA[l.tipo_linea] || l.concepto, valor: 0, refFactura: l.referencia_factura || '' })
+            if (!totalCos.has(k)) totalCos.set(k, {
+              tipo_linea: l.tipo_linea,
+              // BUG 1: guardar la clave de tipo_costo para cruzar con costosSoporteMap
+              tipo_costo_key: TIPO_LINEA_TO_COSTO[l.tipo_linea] || 'otro',
+              concepto: ETIQUETAS_LISTA[l.tipo_linea] || l.concepto,
+              valor: 0,
+              refFactura: l.referencia_factura || '',
+            })
             totalCos.get(k).valor += l.valor_cop
           }
         }
       }
+
       for (const r of totalIng.values()) {
         rows.push(_f(`${liq.liquidacion_id}_t_ing_${r.tipo_linea}`, {
+          proyKey, liqId,
           proyecto: proyNombre, inversionista: 'Total', doc: 'Mandato',
           contacto1: '', contacto2: '',
           concepto: r.concepto, total: r.valor,
@@ -519,12 +591,16 @@ const filasDetalle = computed(() => {
           conseIngresos: consIng0, conseCostos: '', comprobante,
         }))
       }
+
       for (const r of totalCos.values()) {
         rows.push(_f(`${liq.liquidacion_id}_t_cos_${r.tipo_linea}`, {
+          proyKey, liqId,
           proyecto: proyNombre, inversionista: 'Total', doc: 'Costos',
           contacto1: '', contacto2: '',
           concepto: r.concepto, total: r.valor, negativo: true,
           refFactura: r.refFactura,
+          // BUG 1: recuperar soporte_url cruzando con costos_proyecto
+          soporteUrl: costosSoporteMap.get(r.tipo_costo_key) || null,
           conseIngresos: '', conseCostos: consCos0, comprobante,
         }))
       }
@@ -532,6 +608,7 @@ const filasDetalle = computed(() => {
       // Filas Total — Facturas de servicio (nivel proyecto)
       for (const f of (liq.facturas_servicio || [])) {
         rows.push(_f(`${liq.liquidacion_id}_t_fac_${f.id}`, {
+          proyKey, liqId, facturaId: f.id,
           proyecto: proyNombre, inversionista: 'Total', doc: 'Factura',
           contacto1: LABEL_FACTURA[f.tipo_servicio] || f.tipo_servicio,
           contacto2: f.numero_factura || '',
@@ -547,8 +624,8 @@ const filasDetalle = computed(() => {
         const pctLabel = inv.porcentaje_participacion != null
           ? (inv.porcentaje_participacion * 100).toFixed(4) + '%' : '—'
 
-        // Fila Inversionista — Información (% participación)
         rows.push(_f(`${liq.liquidacion_id}_${inv.inversionista_id}_info`, {
+          proyKey, liqId,
           proyecto: proyNombre, inversionista: inv.inversionista_nombre, doc: 'Información',
           contacto1: '', contacto2: '',
           concepto: 'Porcentaje de Participación',
@@ -556,19 +633,19 @@ const filasDetalle = computed(() => {
           conseIngresos: consIng0, conseCostos: consCos0, comprobante,
         }))
 
-        // Filas Inversionista — Mandato (ingresos)
         for (const m of (inv.mandatos_ingresos || [])) {
           const consIng = m.consecutivo != null ? String(m.consecutivo) : consIng0
           for (const l of (m.lineas || [])) {
             if (OMITIR_LINEAS.has(l.tipo_linea)) continue
-            // Bug 1: excluir conceptos de Factura que no pertenecen a Mandato
             if (TIPOS_FACTURA_SET.has(l.tipo_linea)) continue
             rows.push(_f(`${liq.liquidacion_id}_${inv.inversionista_id}_ing_${l.id}`, {
+              proyKey, liqId,
               proyecto: proyNombre, inversionista: inv.inversionista_nombre, doc: 'Mandato',
               contacto1: m.numero_mandato || '',
               contacto2: m.beneficiario_nombre || '',
               concepto: ETIQUETAS_LISTA[l.tipo_linea] || l.concepto,
               total: l.valor_cop, negativo: COSTOS_NEG.has(l.tipo_linea),
+              // BUG 2: soporte_url no existe en líneas de mandato → null → muestra refFactura como texto
               refFactura: l.referencia_factura || '',
               soporteUrl: l.soporte_url || null,
               conseIngresos: consIng, conseCostos: '', comprobante,
@@ -576,12 +653,12 @@ const filasDetalle = computed(() => {
           }
         }
 
-        // Filas Inversionista — Costos (Bug 2: iva_internet tiene etiqueta propia en ETIQUETAS_LISTA)
         for (const m of (inv.mandatos_costos || [])) {
           const consCos = m.consecutivo != null ? String(m.consecutivo) : consCos0
           for (const l of (m.lineas || [])) {
             if (OMITIR_LINEAS.has(l.tipo_linea)) continue
             rows.push(_f(`${liq.liquidacion_id}_${inv.inversionista_id}_cos_${l.id}`, {
+              proyKey, liqId,
               proyecto: proyNombre, inversionista: inv.inversionista_nombre, doc: 'Costos',
               contacto1: m.numero_mandato || '',
               contacto2: m.beneficiario_nombre || '',
@@ -635,6 +712,9 @@ function _f(key, d) {
     key,
     separador: false,
     erUrl: null,
+    proyKey: d.proyKey ?? '',
+    liqId: d.liqId ?? null,
+    facturaId: d.facturaId ?? null,
     proyecto: d.proyecto ?? '',
     inversionista: d.inversionista ?? '',
     doc: d.doc ?? '',
@@ -650,6 +730,22 @@ function _f(key, d) {
     conseIngresos: d.conseIngresos ?? '',
     conseCostos: d.conseCostos ?? '',
     comprobante: d.comprobante ?? '',
+  }
+}
+
+// ─── Acciones BUG 4 ──────────────────────────────────────────────────────────
+function verDetalle(fila) {
+  router.push(`/liquidaciones/${fila.liqId}`)
+}
+
+async function eliminarFactura(fila) {
+  if (!window.confirm('¿Eliminar esta factura? Esta acción no se puede deshacer.')) return
+  try {
+    await api.delete(`/liquidaciones/${fila.liqId}/facturas/${fila.facturaId}`)
+    toast.add({ severity: 'success', summary: 'Eliminada', life: 2000 })
+    loadVistas()
+  } catch {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo eliminar la factura', life: 3000 })
   }
 }
 
