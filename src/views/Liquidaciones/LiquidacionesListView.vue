@@ -40,11 +40,35 @@
 
         <!-- ══ Panel General ══ -->
         <TabPanel header="Panel General">
-          <DataTable :value="filasGeneral" :loading="loadingVista" :rows="20" paginator rowHover class="text-sm">
+          <DataTable
+            :value="filasGeneral"
+            :loading="loadingVista"
+            :rows="20"
+            paginator
+            rowHover
+            class="text-sm"
+            rowGroupMode="subheader"
+            groupRowsBy="proyecto"
+            sortField="proyecto"
+            :sortOrder="1"
+            :expandableRowGroups="true"
+            :expandedRowGroups="expandedGroupsGeneral"
+            @rowgroup-expand="(e) => onGroupExpand(e, expandedGroupsGeneral)"
+            @rowgroup-collapse="(e) => onGroupCollapse(e, expandedGroupsGeneral)"
+          >
             <template #empty>
               <div class="text-center py-8 text-sm text-gray-400">No hay liquidaciones para los filtros seleccionados.</div>
             </template>
-            <Column field="proyecto" header="Proyecto" sortable />
+            <template #groupheader="{ data }">
+              <div class="flex items-center gap-2 py-1">
+                <span class="font-semibold text-gray-700">{{ data.proyecto }}</span>
+                <span
+                  v-if="grupoInfoGeneral[data.proyecto]?.tipo_venta"
+                  :class="badgeTipoVenta(grupoInfoGeneral[data.proyecto].tipo_venta)"
+                >{{ grupoInfoGeneral[data.proyecto].tipo_venta }}</span>
+                <span class="text-xs text-gray-400">({{ grupoInfoGeneral[data.proyecto]?.count ?? 0 }})</span>
+              </div>
+            </template>
             <Column field="periodoLabel" header="Período" />
             <Column header="Estado">
               <template #body="{ data }">
@@ -77,11 +101,35 @@
 
         <!-- ══ Ingresos ══ -->
         <TabPanel header="Ingresos">
-          <DataTable :value="filasIngresosTab" :loading="loadingVista" :rows="20" paginator rowHover class="text-sm">
+          <DataTable
+            :value="filasIngresosTab"
+            :loading="loadingVista"
+            :rows="20"
+            paginator
+            rowHover
+            class="text-sm"
+            rowGroupMode="subheader"
+            groupRowsBy="proyecto"
+            sortField="proyecto"
+            :sortOrder="1"
+            :expandableRowGroups="true"
+            :expandedRowGroups="expandedGroupsIngresos"
+            @rowgroup-expand="(e) => onGroupExpand(e, expandedGroupsIngresos)"
+            @rowgroup-collapse="(e) => onGroupCollapse(e, expandedGroupsIngresos)"
+          >
             <template #empty>
               <div class="text-center py-8 text-sm text-gray-400">No hay liquidaciones para los filtros seleccionados.</div>
             </template>
-            <Column field="proyecto" header="Proyecto" sortable />
+            <template #groupheader="{ data }">
+              <div class="flex items-center gap-2 py-1">
+                <span class="font-semibold text-gray-700">{{ data.proyecto }}</span>
+                <span
+                  v-if="grupoInfoIngresos[data.proyecto]?.tipo_venta"
+                  :class="badgeTipoVenta(grupoInfoIngresos[data.proyecto].tipo_venta)"
+                >{{ grupoInfoIngresos[data.proyecto].tipo_venta }}</span>
+                <span class="text-xs text-gray-400">({{ grupoInfoIngresos[data.proyecto]?.count ?? 0 }})</span>
+              </div>
+            </template>
             <Column field="periodoLabel" header="Período" />
             <Column header="Estado">
               <template #body="{ data }">
@@ -109,11 +157,35 @@
 
         <!-- ══ Costos ══ -->
         <TabPanel header="Costos">
-          <DataTable :value="filasCostosTab" :loading="loadingVista" :rows="20" paginator rowHover class="text-sm">
+          <DataTable
+            :value="filasCostosTab"
+            :loading="loadingVista"
+            :rows="20"
+            paginator
+            rowHover
+            class="text-sm"
+            rowGroupMode="subheader"
+            groupRowsBy="proyecto"
+            sortField="proyecto"
+            :sortOrder="1"
+            :expandableRowGroups="true"
+            :expandedRowGroups="expandedGroupsCostos"
+            @rowgroup-expand="(e) => onGroupExpand(e, expandedGroupsCostos)"
+            @rowgroup-collapse="(e) => onGroupCollapse(e, expandedGroupsCostos)"
+          >
             <template #empty>
               <div class="text-center py-8 text-sm text-gray-400">No hay liquidaciones para los filtros seleccionados.</div>
             </template>
-            <Column field="proyecto" header="Proyecto" sortable />
+            <template #groupheader="{ data }">
+              <div class="flex items-center gap-2 py-1">
+                <span class="font-semibold text-gray-700">{{ data.proyecto }}</span>
+                <span
+                  v-if="grupoInfoCostos[data.proyecto]?.tipo_venta"
+                  :class="badgeTipoVenta(grupoInfoCostos[data.proyecto].tipo_venta)"
+                >{{ grupoInfoCostos[data.proyecto].tipo_venta }}</span>
+                <span class="text-xs text-gray-400">({{ grupoInfoCostos[data.proyecto]?.count ?? 0 }})</span>
+              </div>
+            </template>
             <Column field="periodoLabel" header="Período" />
             <Column header="Estado">
               <template #body="{ data }">
@@ -206,6 +278,20 @@ const estadosOpciones = [
 ]
 const tiposVentaOpciones = ['bolsa', 'ppa', 'interno', 'autoconsumo']
 
+// ─── RowGroup state — vacío = todos colapsados por defecto ────────────────────
+const expandedGroupsGeneral  = ref([])
+const expandedGroupsIngresos = ref([])
+const expandedGroupsCostos   = ref([])
+
+function onGroupExpand(event, groups) {
+  groups.push(event.data)
+}
+
+function onGroupCollapse(event, groups) {
+  const idx = groups.indexOf(event.data)
+  if (idx !== -1) groups.splice(idx, 1)
+}
+
 const dialogNueva = ref(false)
 const creando = ref(false)
 const nueva = ref({ proyecto_id: null, periodo: null, tipo_venta: 'bolsa' })
@@ -257,6 +343,25 @@ const filasResumenFiltradas = computed(() => {
 const filasGeneral     = computed(() => filasResumenFiltradas.value)
 const filasIngresosTab = computed(() => filasResumenFiltradas.value.filter(f => f.doc === 'Mandato'))
 const filasCostosTab   = computed(() => filasResumenFiltradas.value.filter(f => f.doc === 'Costos' || f.doc === 'Factura'))
+
+// ─── Info por grupo (count + tipo_venta único si aplica) ─────────────────────
+function buildGrupoInfo(rows) {
+  const map = {}
+  for (const r of rows) {
+    if (!map[r.proyecto]) map[r.proyecto] = { count: 0, tipos: new Set() }
+    map[r.proyecto].count++
+    if (r.tipo_venta) map[r.proyecto].tipos.add(r.tipo_venta)
+  }
+  const result = {}
+  for (const [k, v] of Object.entries(map)) {
+    result[k] = { count: v.count, tipo_venta: v.tipos.size === 1 ? [...v.tipos][0] : null }
+  }
+  return result
+}
+
+const grupoInfoGeneral  = computed(() => buildGrupoInfo(filasGeneral.value))
+const grupoInfoIngresos = computed(() => buildGrupoInfo(filasIngresosTab.value))
+const grupoInfoCostos   = computed(() => buildGrupoInfo(filasCostosTab.value))
 
 // ─── Helpers de estilo ────────────────────────────────────────────────────────
 function badgeDocClass(doc) {
