@@ -35,7 +35,7 @@
         <p class="step-title">Proyectos e identificación</p>
         <div class="space-y-4">
           <div class="flex flex-col gap-1">
-            <label class="field-label">Proyectos asociados <span class="text-red-400">*</span></label>
+            <label class="field-label">Proyectos asociados <span class="text-gray-400">(opcional)</span></label>
             <MultiSelect
               v-model="proyectosSeleccionados"
               :options="todosProyectos"
@@ -48,7 +48,6 @@
               class="w-full"
               display="chip"
             />
-            <p v-if="errores.proyectos" class="text-xs text-red-400 mt-0.5">{{ errores.proyectos }}</p>
           </div>
           <div class="grid grid-cols-2 gap-4">
             <div class="flex flex-col gap-1">
@@ -482,17 +481,7 @@ function onPasteEnergia(e) {
 
 // ── Navegación ───────────────────────────────────────────────────────────────
 
-function validarPaso0() {
-  errores.proyectos = null
-  if (!proyectosSeleccionados.value.length) {
-    errores.proyectos = 'Selecciona al menos un proyecto'
-    return false
-  }
-  return true
-}
-
 function avanzar() {
-  if (step.value === 0 && !validarPaso0()) return
   step.value++
 }
 
@@ -507,7 +496,6 @@ function formatFecha(v) {
 // ── Guardar ──────────────────────────────────────────────────────────────────
 
 async function guardar() {
-  if (!validarPaso0()) { step.value = 0; return }
   guardando.value = true
   try {
     const payload = { ...form }
