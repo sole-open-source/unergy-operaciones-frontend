@@ -74,21 +74,37 @@
           <div class="space-y-3">
             <div class="flex flex-col gap-1">
               <label class="field-label">Nombre / Razón social</label>
-              <InputText v-model="form.comprador_nombre" class="w-full" />
+              <AutoComplete
+                v-model="form.comprador_nombre"
+                :suggestions="compradoresFiltrados"
+                @complete="buscarComprador"
+                @item-select="seleccionarComprador"
+                placeholder="Buscar o escribir nuevo…"
+                class="w-full"
+                inputClass="w-full"
+              />
             </div>
             <div class="flex flex-col gap-1">
               <label class="field-label">NIT</label>
-              <InputText v-model="form.comprador_nit" class="w-full" />
+              <InputText v-model="form.comprador_nit" class="w-full" placeholder="Ej: 900123456-7" />
             </div>
           </div>
           <div class="space-y-3">
             <div class="flex flex-col gap-1">
               <label class="field-label">Nombre / Razón social</label>
-              <InputText v-model="form.vendedor_nombre" class="w-full" />
+              <AutoComplete
+                v-model="form.vendedor_nombre"
+                :suggestions="vendedoresFiltrados"
+                @complete="buscarVendedor"
+                @item-select="seleccionarVendedor"
+                placeholder="Buscar o escribir nuevo…"
+                class="w-full"
+                inputClass="w-full"
+              />
             </div>
             <div class="flex flex-col gap-1">
               <label class="field-label">NIT</label>
-              <InputText v-model="form.vendedor_nit" class="w-full" />
+              <InputText v-model="form.vendedor_nit" class="w-full" placeholder="Ej: 900123456-7" />
             </div>
           </div>
         </div>
@@ -316,6 +332,7 @@ import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import Select from 'primevue/select'
 import MultiSelect from 'primevue/multiselect'
+import AutoComplete from 'primevue/autocomplete'
 import DatePicker from 'primevue/datepicker'
 import Textarea from 'primevue/textarea'
 import api from '@/api/client'
@@ -352,6 +369,36 @@ const guardando = ref(false)
 const todosProyectos = ref([])
 const proyectosSeleccionados = ref([])
 const errores = reactive({})
+
+// Partes registradas (compradores/vendedores de contratos anteriores)
+const partesCompradores = ref([])
+const partesVendedores = ref([])
+const compradoresFiltrados = ref([])
+const vendedoresFiltrados = ref([])
+
+function buscarComprador(event) {
+  const q = event.query.toLowerCase()
+  compradoresFiltrados.value = partesCompradores.value
+    .filter(p => p.nombre.toLowerCase().includes(q))
+    .map(p => p.nombre)
+}
+
+function buscarVendedor(event) {
+  const q = event.query.toLowerCase()
+  vendedoresFiltrados.value = partesVendedores.value
+    .filter(p => p.nombre.toLowerCase().includes(q))
+    .map(p => p.nombre)
+}
+
+function seleccionarComprador(event) {
+  const found = partesCompradores.value.find(p => p.nombre === event.value)
+  if (found?.nit) form.comprador_nit = found.nit
+}
+
+function seleccionarVendedor(event) {
+  const found = partesVendedores.value.find(p => p.nombre === event.value)
+  if (found?.nit) form.vendedor_nit = found.nit
+}
 
 // Paste state — tarifas
 const tarifasPaste = ref('')
@@ -496,8 +543,13 @@ async function guardar() {
 
 onMounted(async () => {
   try {
-    const { data } = await api.get('/proyectos', { params: { size: 500 } })
-    todosProyectos.value = data.items
+    const [{ data: proy }, { data: partes }] = await Promise.all([
+      api.get('/proyectos', { params: { size: 500 } }),
+      api.get('/ppa/partes'),
+    ])
+    todosProyectos.value = proy.items
+    partesCompradores.value = partes.compradores
+    partesVendedores.value = partes.vendedores
   } catch { /* silencioso */ }
 })
 </script>
