@@ -24,13 +24,48 @@
         <div class="space-y-6 p-2">
           <!-- Partes -->
           <div>
-            <p class="text-xs font-semibold text-amber-600 uppercase tracking-wide mb-3">Partes del contrato</p>
-            <div class="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+            <div class="flex items-center justify-between mb-3">
+              <p class="text-xs font-semibold text-amber-600 uppercase tracking-wide">Partes del contrato</p>
+              <Button v-if="!editandoPartes" icon="pi pi-pencil" label="Editar" size="small" text severity="secondary"
+                @click="iniciarEdicionPartes" />
+              <div v-else class="flex gap-2">
+                <Button label="Cancelar" size="small" text severity="secondary" @click="cancelarEdicionPartes" />
+                <Button label="Guardar" icon="pi pi-check" size="small" :loading="guardandoPartes"
+                  @click="guardarPartes" />
+              </div>
+            </div>
+            <!-- Modo lectura -->
+            <div v-if="!editandoPartes" class="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
               <InfoField label="Comprador" :value="contrato.comprador_nombre" />
               <InfoField label="NIT comprador" :value="contrato.comprador_nit" />
               <div />
               <InfoField label="Vendedor" :value="contrato.vendedor_nombre" />
               <InfoField label="NIT vendedor" :value="contrato.vendedor_nit" />
+            </div>
+            <!-- Modo edición -->
+            <div v-else class="grid grid-cols-2 gap-4 p-4 rounded-lg bg-gray-50">
+              <div class="space-y-3">
+                <span class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Comprador</span>
+                <div class="flex flex-col gap-1">
+                  <label class="text-xs font-medium text-gray-600">Nombre / Razón social</label>
+                  <InputText v-model="formPartes.comprador_nombre" class="w-full" />
+                </div>
+                <div class="flex flex-col gap-1">
+                  <label class="text-xs font-medium text-gray-600">NIT</label>
+                  <InputText v-model="formPartes.comprador_nit" class="w-full" />
+                </div>
+              </div>
+              <div class="space-y-3">
+                <span class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Vendedor</span>
+                <div class="flex flex-col gap-1">
+                  <label class="text-xs font-medium text-gray-600">Nombre / Razón social</label>
+                  <InputText v-model="formPartes.vendedor_nombre" class="w-full" />
+                </div>
+                <div class="flex flex-col gap-1">
+                  <label class="text-xs font-medium text-gray-600">NIT</label>
+                  <InputText v-model="formPartes.vendedor_nit" class="w-full" />
+                </div>
+              </div>
             </div>
           </div>
 
@@ -276,7 +311,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
@@ -287,6 +322,7 @@ import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Divider from 'primevue/divider'
 import SelectButton from 'primevue/selectbutton'
+import InputText from 'primevue/inputtext'
 import InfoField from '@/components/InfoField.vue'
 import api from '@/api/client'
 
@@ -297,6 +333,37 @@ const route = useRoute()
 const toast = useToast()
 const contrato = ref(null)
 const loading = ref(true)
+
+// Edición inline de partes
+const editandoPartes = ref(false)
+const guardandoPartes = ref(false)
+const formPartes = reactive({ comprador_nombre: null, comprador_nit: null, vendedor_nombre: null, vendedor_nit: null })
+
+function iniciarEdicionPartes() {
+  formPartes.comprador_nombre = contrato.value.comprador_nombre
+  formPartes.comprador_nit = contrato.value.comprador_nit
+  formPartes.vendedor_nombre = contrato.value.vendedor_nombre
+  formPartes.vendedor_nit = contrato.value.vendedor_nit
+  editandoPartes.value = true
+}
+
+function cancelarEdicionPartes() {
+  editandoPartes.value = false
+}
+
+async function guardarPartes() {
+  guardandoPartes.value = true
+  try {
+    const { data } = await api.patch(`/ppa/${contrato.value.id}`, formPartes)
+    contrato.value = { ...contrato.value, ...data }
+    editandoPartes.value = false
+    toast.add({ severity: 'success', summary: 'Guardado', detail: 'Partes del contrato actualizadas', life: 3000 })
+  } catch (e) {
+    toast.add({ severity: 'error', summary: 'Error', detail: e.response?.data?.detail || e.message, life: 4000 })
+  } finally {
+    guardandoPartes.value = false
+  }
+}
 const vistaCantidades = ref('mensual')
 const vistaTarifas = ref('mensual')
 const asicRows = ref([])
