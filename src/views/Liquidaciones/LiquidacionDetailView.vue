@@ -916,10 +916,10 @@ const resumenAuto = computed(() => {
   ].reduce((s, c) => s + (c.valor_cop || 0), 0)
 
   return {
-    ingresos:         liq.value?.ingresos_energia_cop          ?? ingBruto,
-    comercializacion: liq.value?.costos_comercializacion_xm_cop ?? comercializacion,
-    costos_op:        liq.value?.costos_operativos_cop          ?? costosOp,
-    neto:             liq.value?.ingreso_neto_cop
+    ingresos:         (liq.value?.ingresos_energia_cop          || null) ?? ingBruto,
+    comercializacion: (liq.value?.costos_comercializacion_xm_cop || null) ?? comercializacion,
+    costos_op:        (liq.value?.costos_operativos_cop          || null) ?? costosOp,
+    neto:             (liq.value?.ingreso_neto_cop               || null)
                         ?? (ingBruto - comercializacion - costosOp),
   }
 })
