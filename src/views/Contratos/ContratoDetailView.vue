@@ -1,47 +1,19 @@
 <template>
   <div v-if="contrato" class="space-y-6">
     <!-- Header -->
-    <div class="flex items-start justify-between">
+    <div class="flex items-center gap-2">
+      <Button icon="pi pi-arrow-left" text @click="$router.back()" class="-ml-2" />
       <div>
-        <Button icon="pi pi-arrow-left" text @click="$router.back()" class="-ml-2 mb-1" />
-        <!-- Modo lectura -->
-        <template v-if="!editandoId">
-          <h2 class="text-xl font-bold text-gray-800">
-            {{ contrato.nombre_interno || contrato.numero_codigo_contrato || 'Contrato PPA' }}
-          </h2>
-          <div class="flex items-center gap-2 mt-1">
-            <span v-if="contrato.numero_codigo_contrato" class="text-xs text-gray-400 font-mono">
-              {{ contrato.numero_codigo_contrato }}
-            </span>
-            <Tag value="PPA" severity="warning" class="text-xs" />
-            <span class="text-xs text-gray-400">{{ contrato.proyectos?.length || 0 }} proyectos</span>
-          </div>
-        </template>
-        <!-- Modo edición -->
-        <template v-else>
-          <div class="flex flex-col gap-2 mt-1">
-            <div class="flex flex-col gap-1">
-              <label class="text-xs font-medium text-gray-500">Nombre interno</label>
-              <InputText v-model="formId.nombre_interno" placeholder="Ej: Terpel 1" class="w-72" />
-            </div>
-            <div class="flex flex-col gap-1">
-              <label class="text-xs font-medium text-gray-500">Número de contrato</label>
-              <InputText v-model="formId.numero_codigo_contrato" placeholder="Ej: UNERGY 001-2023" class="w-72" />
-            </div>
-          </div>
-        </template>
-      </div>
-      <!-- Botones edición identificación -->
-      <div class="flex gap-2 mt-1">
-        <template v-if="!editandoId">
-          <Button icon="pi pi-pencil" label="Editar" size="small" text severity="secondary"
-            @click="iniciarEdicionId" />
-        </template>
-        <template v-else>
-          <Button label="Cancelar" size="small" text severity="secondary" @click="cancelarEdicionId" />
-          <Button label="Guardar" icon="pi pi-check" size="small" :loading="guardandoId"
-            @click="guardarId" />
-        </template>
+        <h2 class="text-xl font-bold text-gray-800">
+          {{ contrato.nombre_interno || contrato.numero_codigo_contrato || 'Contrato PPA' }}
+        </h2>
+        <div class="flex items-center gap-2 mt-0.5">
+          <span v-if="contrato.numero_codigo_contrato" class="text-xs text-gray-400 font-mono">
+            {{ contrato.numero_codigo_contrato }}
+          </span>
+          <Tag value="PPA" severity="warning" class="text-xs" />
+          <span class="text-xs text-gray-400">{{ contrato.proyectos?.length || 0 }} proyectos</span>
+        </div>
       </div>
     </div>
 
@@ -50,6 +22,39 @@
       <!-- ══ DATOS ══ -->
       <TabPanel header="Datos">
         <div class="space-y-6 p-2">
+
+          <!-- Identificación -->
+          <div>
+            <div class="flex items-center justify-between mb-3">
+              <p class="text-xs font-semibold text-amber-600 uppercase tracking-wide">Identificación</p>
+              <Button v-if="!editandoId" icon="pi pi-pencil" label="Editar" size="small" text severity="secondary"
+                @click="iniciarEdicionId" />
+              <div v-else class="flex gap-2">
+                <Button label="Cancelar" size="small" text severity="secondary" @click="cancelarEdicionId" />
+                <Button label="Guardar" icon="pi pi-check" size="small" :loading="guardandoId"
+                  @click="guardarId" />
+              </div>
+            </div>
+            <!-- Modo lectura -->
+            <div v-if="!editandoId" class="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+              <InfoField label="Nombre interno" :value="contrato.nombre_interno" />
+              <InfoField label="Número de contrato" :value="contrato.numero_codigo_contrato" />
+            </div>
+            <!-- Modo edición -->
+            <div v-else class="grid grid-cols-2 gap-4 max-w-xl">
+              <div class="flex flex-col gap-1">
+                <label class="text-xs font-medium text-gray-600">Nombre interno</label>
+                <InputText v-model="formId.nombre_interno" placeholder="Ej: Terpel 1" class="w-full" />
+              </div>
+              <div class="flex flex-col gap-1">
+                <label class="text-xs font-medium text-gray-600">Número de contrato</label>
+                <InputText v-model="formId.numero_codigo_contrato" placeholder="Ej: UNERGY 001-2023" class="w-full" />
+              </div>
+            </div>
+          </div>
+
+          <Divider />
+
           <!-- Partes -->
           <div>
             <div class="flex items-center justify-between mb-3">
