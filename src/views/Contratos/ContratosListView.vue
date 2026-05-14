@@ -6,14 +6,18 @@
       <p class="text-xs text-gray-400 mt-0.5">Gestión de contratos y servicios por tipo</p>
     </div>
 
-    <!-- Acción principal -->
+    <!-- Botón nuevo contrato -->
     <div class="flex justify-end">
       <Button v-if="servicioActivo === 'ppa'" label="Nuevo contrato PPA" icon="pi pi-plus"
         class="bg-amber-500 border-amber-500 hover:bg-amber-600" @click="showWizard = true" />
+      <Button v-else-if="servicioActivo !== 'ppa'" :label="`Nuevo contrato ${servicioInfo?.label}`"
+        icon="pi pi-plus"
+        :style="`background:${servicioInfo?.color}; border-color:${servicioInfo?.color}`"
+        @click="showServicioWizard = true" />
     </div>
 
     <!-- Tarjetas de servicio -->
-    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
       <div
         v-for="srv in SERVICIOS" :key="srv.key"
         class="flex flex-col items-center gap-3 rounded-xl border-2 p-5 cursor-pointer transition-all hover:shadow-md hover:-translate-y-0.5 select-none"
@@ -34,28 +38,24 @@
           :style="servicioActivo === srv.key ? `color:${srv.color}` : 'color:#6b7280'">
           {{ srv.label }}
         </span>
-        <span v-if="srv.key === 'ppa' && contratos.length > 0 && servicioActivo === srv.key"
+        <span v-if="conteoServicio(srv.key) > 0 && servicioActivo === srv.key"
           class="text-xs font-medium px-2 py-0.5 rounded-full"
           :style="`background:${srv.color}20; color:${srv.color}`">
-          {{ contratos.length }}
+          {{ conteoServicio(srv.key) }}
         </span>
       </div>
     </div>
 
-    <!-- Contenido por servicio -->
+    <!-- ── PPA ─────────────────────────────────────────────────────── -->
     <template v-if="servicioActivo === 'ppa'">
-      <!-- Filtros -->
       <div class="flex gap-3 items-center">
         <IconField class="flex-1 max-w-sm">
           <InputIcon class="pi pi-search" />
           <InputText v-model="filtroQ" placeholder="Buscar por proyecto, nombre, comprador…"
             class="w-full" @input="buscar" />
         </IconField>
-        <Select v-model="filtroTipo" :options="TIPOS_CONTRATO" optionLabel="label" optionValue="value"
-          placeholder="Todos los tipos" showClear class="w-44" @change="buscar" />
       </div>
 
-      <!-- Tabla PPA -->
       <DataTable
         :value="contratosFiltrados"
         :loading="loading"
@@ -84,10 +84,10 @@
         <Column header="Vendedor">
           <template #body="{ data }">{{ data.vendedor_nombre || '—' }}</template>
         </Column>
-        <Column header="Inicio" sortable sortField="fecha_inicio" style="width:100px">
+        <Column header="Inicio" style="width:100px">
           <template #body="{ data }">{{ formatFecha(data.fecha_inicio) }}</template>
         </Column>
-        <Column header="Fin" sortable sortField="fecha_fin" style="width:100px">
+        <Column header="Fin" style="width:100px">
           <template #body="{ data }">{{ formatFecha(data.fecha_fin) }}</template>
         </Column>
         <Column style="width:50px">
@@ -99,18 +99,75 @@
       </DataTable>
     </template>
 
-    <!-- Wizard nuevo contrato -->
+    <!-- ── REPRESENTACIÓN / OPERACIÓN / REC ───────────────────────── -->
+    <template v-else>
+      <div class="flex gap-3 items-center">
+        <IconField class="flex-1 max-w-sm">
+          <InputIcon class="pi pi-search" />
+          <InputText v-model="filtroServicio" placeholder="Buscar por número, contratante, prestador…"
+            class="w-full" @input="buscarServicio" />
+        </IconField>
+      </div>
+
+      <DataTable
+        :value="contratosServicioFiltrados"
+        :loading="loadingServicio"
+        stripedRows
+        class="text-sm"
+        paginator
+        :rows="20"
+        :rowsPerPageOptions="[10, 20, 50]"
+        paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown"
+        :emptyMessage="`No hay contratos de ${servicioInfo?.label} registrados.`"
+        rowHover
+      >
+        <Column field="numero_contrato" header="N° contrato" sortable style="width:160px">
+          <template #body="{ data }">
+            <span class="font-mono text-xs text-gray-500">{{ data.numero_contrato || '—' }}</span>
+          </template>
+        </Column>
+        <Column header="Contratante">
+          <template #body="{ data }">{{ data.contratante_nombre || '—' }}</template>
+        </Column>
+        <Column header="Prestador">
+          <template #body="{ data }">{{ data.prestador_nombre || '—' }}</template>
+        </Column>
+        <Column header="Inicio" style="width:100px">
+          <template #body="{ data }">{{ formatFecha(data.fecha_inicio) }}</template>
+        </Column>
+        <Column header="Fin" style="width:100px">
+          <template #body="{ data }">{{ formatFecha(data.fecha_fin) }}</template>
+        </Column>
+        <Column header="Estado" style="width:120px">
+          <template #body="{ data }">
+            <Tag :value="ESTADO_LABELS[data.estado] || data.estado" :severity="ESTADO_SEVERITY[data.estado]" />
+          </template>
+        </Column>
+        <Column v-if="servicioActivo === 'representacion'" header="CGM" style="width:60px">
+          <template #body="{ data }">
+            <i v-if="data.tiene_cgm" class="pi pi-check-circle text-green-500" v-tooltip="'Incluye CGM'" />
+            <i v-else class="pi pi-minus text-gray-300" />
+          </template>
+        </Column>
+        <Column v-if="servicioActivo === 'representacion'" header="Promotor" style="width:70px">
+          <template #body="{ data }">
+            <i v-if="data.tiene_promotor" class="pi pi-check-circle text-blue-400" v-tooltip="'Incluye Promotor'" />
+            <i v-else class="pi pi-minus text-gray-300" />
+          </template>
+        </Column>
+      </DataTable>
+    </template>
+
+    <!-- Wizards -->
     <PPAContratoWizard v-if="showWizard" :visible="showWizard"
       @cerrar="showWizard = false" @creado="onContratoCreado" />
 
-    <!-- Próximamente para otros servicios -->
-    <template v-else>
-      <div class="flex flex-col items-center py-16 gap-3 text-gray-400">
-        <i :class="servicioInfo?.icon" class="text-4xl" :style="`color:${servicioInfo?.color}60`" />
-        <p class="text-sm font-medium text-gray-500">{{ servicioInfo?.label }}</p>
-        <p class="text-xs">Módulo en desarrollo</p>
-      </div>
-    </template>
+    <ContratoServicioWizard
+      v-if="showServicioWizard"
+      :visible="showServicioWizard"
+      :tipo="servicioActivo"
+      @cerrar="showServicioWizard = false"
+      @creado="onServicioCreado" />
   </div>
 </template>
 
@@ -123,10 +180,10 @@ import Column from 'primevue/column'
 import Tag from 'primevue/tag'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
-import Select from 'primevue/select'
 import IconField from 'primevue/iconfield'
 import InputIcon from 'primevue/inputicon'
 import PPAContratoWizard from './PPAContratoWizard.vue'
+import ContratoServicioWizard from './ContratoServicioWizard.vue'
 import api from '@/api/client'
 
 const router = useRouter()
@@ -135,32 +192,62 @@ const toast = useToast()
 const SERVICIOS = [
   { key: 'ppa',           label: 'PPA',           icon: 'pi pi-bolt',      color: '#f59e0b', bg: '#fffbeb' },
   { key: 'representacion',label: 'Representación', icon: 'pi pi-file-edit', color: '#3b82f6', bg: '#eff6ff' },
-  { key: 'cgm',           label: 'CGM',           icon: 'pi pi-chart-bar', color: '#10b981', bg: '#f0fdf4' },
-  { key: 'promotor',      label: 'Promotor',      icon: 'pi pi-briefcase', color: '#8b5cf6', bg: '#f5f3ff' },
-  { key: 'rec',           label: 'REC',           icon: 'pi pi-verified',  color: '#14b8a6', bg: '#f0fdfa' },
+  { key: 'operacion',     label: 'Operación',      icon: 'pi pi-chart-bar', color: '#10b981', bg: '#f0fdf4' },
+  { key: 'rec',           label: 'REC',            icon: 'pi pi-verified',  color: '#14b8a6', bg: '#f0fdfa' },
 ]
 
-const TIPOS_CONTRATO = [
-  { label: 'Venta', value: 'venta' },
-  { label: 'Compra', value: 'compra' },
-]
+const ESTADO_LABELS = {
+  vigente:      'Vigente',
+  vencido:      'Vencido',
+  terminado:    'Terminado',
+  en_renovacion:'En renovación',
+}
+const ESTADO_SEVERITY = {
+  vigente:      'success',
+  vencido:      'danger',
+  terminado:    'secondary',
+  en_renovacion:'warn',
+}
 
 const servicioActivo = ref('ppa')
 const showWizard = ref(false)
+const showServicioWizard = ref(false)
+
 const servicioInfo = computed(() => SERVICIOS.find(s => s.key === servicioActivo.value))
+
+// PPA
 const contratos = ref([])
 const loading = ref(false)
 const filtroQ = ref('')
-const filtroTipo = ref(null)
 
-const contratosFiltrados = computed(() => {
-  if (!filtroTipo.value) return contratos.value
-  return contratos.value.filter(c => c.tipo_contrato === filtroTipo.value)
+const contratosFiltrados = computed(() => contratos.value)
+
+// Otros servicios
+const contratosServicio = ref([])
+const loadingServicio = ref(false)
+const filtroServicio = ref('')
+
+const contratosServicioFiltrados = computed(() => {
+  const q = filtroServicio.value.toLowerCase()
+  if (!q) return contratosServicio.value
+  return contratosServicio.value.filter(c =>
+    (c.numero_contrato ?? '').toLowerCase().includes(q) ||
+    (c.contratante_nombre ?? '').toLowerCase().includes(q) ||
+    (c.prestador_nombre ?? '').toLowerCase().includes(q)
+  )
 })
+
+function conteoServicio(key) {
+  if (key === 'ppa') return contratos.value.length
+  if (key === servicioActivo.value) return contratosServicio.value.length
+  return 0
+}
 
 function seleccionarServicio(key) {
   servicioActivo.value = key
+  filtroServicio.value = ''
   if (key === 'ppa') cargar()
+  else cargarServicio(key)
 }
 
 function formatFecha(f) {
@@ -178,8 +265,18 @@ function buscar() {
   buscarTimeout = setTimeout(cargar, 350)
 }
 
+let buscarServicioTimeout = null
+function buscarServicio() {
+  clearTimeout(buscarServicioTimeout)
+  // client-side filter — no debounce needed, but keep consistent
+}
+
 function onContratoCreado() {
   cargar()
+}
+
+function onServicioCreado() {
+  cargarServicio(servicioActivo.value)
 }
 
 async function cargar() {
@@ -193,6 +290,18 @@ async function cargar() {
     toast.add({ severity: 'error', summary: 'Error al cargar contratos', detail: e.message, life: 3000 })
   } finally {
     loading.value = false
+  }
+}
+
+async function cargarServicio(tipo) {
+  loadingServicio.value = true
+  try {
+    const { data } = await api.get('/contratos-servicio', { params: { tipo } })
+    contratosServicio.value = data
+  } catch (e) {
+    toast.add({ severity: 'error', summary: 'Error al cargar contratos', detail: e.message, life: 3000 })
+  } finally {
+    loadingServicio.value = false
   }
 }
 
