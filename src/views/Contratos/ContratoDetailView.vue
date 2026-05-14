@@ -1,19 +1,47 @@
 <template>
   <div v-if="contrato" class="space-y-6">
     <!-- Header -->
-    <div class="flex items-center justify-between">
+    <div class="flex items-start justify-between">
       <div>
         <Button icon="pi pi-arrow-left" text @click="$router.back()" class="-ml-2 mb-1" />
-        <h2 class="text-xl font-bold text-gray-800">
-          {{ contrato.nombre_interno || contrato.numero_codigo_contrato || 'Contrato PPA' }}
-        </h2>
-        <div class="flex items-center gap-2 mt-1">
-          <span v-if="contrato.numero_codigo_contrato" class="text-xs text-gray-400 font-mono">
-            {{ contrato.numero_codigo_contrato }}
-          </span>
-          <Tag value="PPA" severity="warning" class="text-xs" />
-          <span class="text-xs text-gray-400">{{ contrato.proyectos?.length || 0 }} proyectos</span>
-        </div>
+        <!-- Modo lectura -->
+        <template v-if="!editandoId">
+          <h2 class="text-xl font-bold text-gray-800">
+            {{ contrato.nombre_interno || contrato.numero_codigo_contrato || 'Contrato PPA' }}
+          </h2>
+          <div class="flex items-center gap-2 mt-1">
+            <span v-if="contrato.numero_codigo_contrato" class="text-xs text-gray-400 font-mono">
+              {{ contrato.numero_codigo_contrato }}
+            </span>
+            <Tag value="PPA" severity="warning" class="text-xs" />
+            <span class="text-xs text-gray-400">{{ contrato.proyectos?.length || 0 }} proyectos</span>
+          </div>
+        </template>
+        <!-- Modo edición -->
+        <template v-else>
+          <div class="flex flex-col gap-2 mt-1">
+            <div class="flex flex-col gap-1">
+              <label class="text-xs font-medium text-gray-500">Nombre interno</label>
+              <InputText v-model="formId.nombre_interno" placeholder="Ej: Terpel 1" class="w-72" />
+            </div>
+            <div class="flex flex-col gap-1">
+              <label class="text-xs font-medium text-gray-500">Número de contrato</label>
+              <InputText v-model="formId.numero_codigo_contrato" placeholder="Ej: UNERGY 001-2023" class="w-72" />
+            </div>
+          </div>
+        </template>
+      </div>
+      <!-- Botones edición identificación -->
+      <div class="flex gap-2 mt-1">
+        <template v-if="!editandoId">
+          <Button icon="pi pi-pencil" label="Editar" size="small" text severity="secondary"
+            @click="iniciarEdicionId" />
+        </template>
+        <template v-else>
+          <Button label="Cancelar" size="small" text severity="secondary" @click="cancelarEdicionId" />
+          <Button label="Guardar" icon="pi pi-check" size="small" :loading="guardandoId"
+            @click="guardarId" />
+        </template>
       </div>
     </div>
 
@@ -333,6 +361,38 @@ const route = useRoute()
 const toast = useToast()
 const contrato = ref(null)
 const loading = ref(true)
+
+// Edición inline de identificación
+const editandoId = ref(false)
+const guardandoId = ref(false)
+const formId = reactive({ nombre_interno: null, numero_codigo_contrato: null })
+
+function iniciarEdicionId() {
+  formId.nombre_interno = contrato.value.nombre_interno
+  formId.numero_codigo_contrato = contrato.value.numero_codigo_contrato
+  editandoId.value = true
+}
+
+function cancelarEdicionId() {
+  editandoId.value = false
+}
+
+async function guardarId() {
+  guardandoId.value = true
+  try {
+    const { data } = await api.patch(`/ppa/${contrato.value.id}`, {
+      nombre_interno: formId.nombre_interno || null,
+      numero_codigo_contrato: formId.numero_codigo_contrato || null,
+    })
+    contrato.value = { ...contrato.value, ...data }
+    editandoId.value = false
+    toast.add({ severity: 'success', summary: 'Guardado', detail: 'Identificación actualizada', life: 2500 })
+  } catch (e) {
+    toast.add({ severity: 'error', summary: 'Error', detail: e.response?.data?.detail || e.message, life: 4000 })
+  } finally {
+    guardandoId.value = false
+  }
+}
 
 // Edición inline de partes
 const editandoPartes = ref(false)
