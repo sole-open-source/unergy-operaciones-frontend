@@ -889,31 +889,38 @@ function abrirDialogLinea(mandatoId, mandatoTipo, l = null) {
 const resumenAuto = computed(() => {
   const mandatos = liq.value?.mandatos || []
 
-  const lineasTotal = mandatos
-    .filter(m => !m.inversionista || m.inversionista.id == null)
+  const lineasIngresos = mandatos
+    .filter(m => m.tipo === 'ingresos')
     .flatMap(m => m.lineas || [])
 
-  const ingBruto = lineasTotal
+  const tieneTotal = mandatos.some(
+    m => m.tipo === 'ingresos' && !m.inversionista?.id
+  )
+  const lineasFiltradas = tieneTotal
+    ? mandatos
+        .filter(m => m.tipo === 'ingresos' && !m.inversionista?.id)
+        .flatMap(m => m.lineas || [])
+    : lineasIngresos
+
+  const ingBruto = lineasFiltradas
     .filter(l => l.tipo_linea === 'ingreso_bruto')
     .reduce((s, l) => s + (l.valor_cop || 0), 0)
 
-  const comercializacion = lineasTotal
+  const comercializacion = lineasFiltradas
     .filter(l => ['ajuste_comercializacion', 'ajuste_xm'].includes(l.tipo_linea))
     .reduce((s, l) => s + Math.abs(l.valor_cop || 0), 0)
 
-  const costos = (liq.value?.costos || [])
-    .reduce((s, c) => s + (c.valor_cop || 0), 0)
-
-  const facturas = (liq.value?.facturas || [])
-    .reduce((s, f) => s + (f.valor_cop || 0), 0)
-
-  const costosOp = costos + facturas
+  const costosOp = [
+    ...(liq.value?.costos || []),
+    ...(liq.value?.facturas || []),
+  ].reduce((s, c) => s + (c.valor_cop || 0), 0)
 
   return {
-    ingresos:        liq.value?.ingresos_energia_cop      ?? ingBruto,
+    ingresos:         liq.value?.ingresos_energia_cop          ?? ingBruto,
     comercializacion: liq.value?.costos_comercializacion_xm_cop ?? comercializacion,
-    costos_op:       liq.value?.costos_operativos_cop     ?? costosOp,
-    neto:            liq.value?.ingreso_neto_cop           ?? (ingBruto - comercializacion - costosOp),
+    costos_op:        liq.value?.costos_operativos_cop          ?? costosOp,
+    neto:             liq.value?.ingreso_neto_cop
+                        ?? (ingBruto - comercializacion - costosOp),
   }
 })
 
