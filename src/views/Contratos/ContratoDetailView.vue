@@ -148,84 +148,192 @@
 
       <!-- ══ CANTIDADES ══ -->
       <TabPanel :header="`Cantidades (${contrato.compromisos_energia?.length || 0})`">
-        <div class="flex justify-end mb-3">
-          <SelectButton v-model="vistaCantidades" :options="VISTAS" optionLabel="label" optionValue="value" />
+        <div class="flex justify-between items-center mb-3">
+          <SelectButton v-if="!editandoCantidades" v-model="vistaCantidades" :options="VISTAS" optionLabel="label" optionValue="value" />
+          <span v-else />
+          <div class="flex gap-2">
+            <template v-if="!editandoCantidades">
+              <Button icon="pi pi-pencil" label="Editar" size="small" text severity="secondary"
+                @click="editandoCantidades = true" />
+            </template>
+            <template v-else>
+              <Button label="Cancelar" size="small" text severity="secondary"
+                @click="editandoCantidades = false; energiaPaste = ''; energiaRows = []; energiaError = ''" />
+              <Button label="Guardar" icon="pi pi-check" size="small" :loading="guardandoCantidades"
+                :disabled="!energiaRows.length" @click="guardarCantidades" />
+            </template>
+          </div>
         </div>
-        <DataTable
-          :value="vistaCantidades === 'anual' ? cantidadesAnuales : cantidadesMensuales"
-          stripedRows
-          class="text-sm"
-          paginator
-          :rows="24"
-          :rowsPerPageOptions="[12, 24, 60, 120]"
-          paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown"
-          emptyMessage="Sin compromisos de energía registrados."
-        >
-          <Column field="año" header="Año" style="width:70px" />
-          <Column v-if="vistaCantidades === 'mensual'" header="Mes" style="width:130px">
-            <template #body="{ data }">{{ MESES[data.mes - 1] }}</template>
-          </Column>
-          <Column :header="vistaCantidades === 'anual' ? 'Mín (MWh/año)' : 'Mín (MWh/mes)'">
-            <template #body="{ data }">
-              {{ data.energia_minima != null ? Number(data.energia_minima).toLocaleString('es-CO', { maximumFractionDigits: 1 }) : '—' }}
-            </template>
-          </Column>
-          <Column :header="vistaCantidades === 'anual' ? 'Máx (MWh/año)' : 'Máx (MWh/mes)'">
-            <template #body="{ data }">
-              {{ data.energia_maxima != null ? Number(data.energia_maxima).toLocaleString('es-CO', { maximumFractionDigits: 1 }) : '—' }}
-            </template>
-          </Column>
-          <Column header="Rango">
-            <template #body="{ data }">
-              <div v-if="data.energia_minima != null && data.energia_maxima != null" class="text-xs text-gray-400">
-                {{ ((data.energia_maxima / data.energia_minima - 1) * 100).toFixed(0) }}% flex
-              </div>
-            </template>
-          </Column>
-        </DataTable>
+
+        <!-- Modo edición cantidades -->
+        <template v-if="editandoCantidades">
+          <p class="text-xs text-gray-400 mb-2">
+            Copia las columnas <strong>Año · Mes · Mín · Máx</strong> desde Excel y pégalas aquí (valores en MWh/mes).
+            Esto <strong>reemplazará</strong> todos los compromisos actuales.
+          </p>
+          <Textarea v-model="energiaPaste" rows="7"
+            placeholder="2024&#9;Enero&#9;90&#9;180&#10;2024&#9;Febrero&#9;90&#9;180"
+            class="w-full font-mono text-xs" @paste="onPasteEnergia" />
+          <div class="flex items-center gap-2 mt-2">
+            <Button label="Procesar" icon="pi pi-refresh" size="small" severity="secondary" outlined @click="parseEnergia" />
+            <Button v-if="energiaRows.length" label="Limpiar" icon="pi pi-times" size="small" severity="danger" text
+              @click="energiaRows = []; energiaPaste = ''; energiaError = ''" />
+            <span v-if="energiaRows.length" class="text-xs text-green-600 font-medium">{{ energiaRows.length }} filas listas</span>
+            <span v-if="energiaError" class="text-xs text-red-400">{{ energiaError }}</span>
+          </div>
+          <div v-if="energiaRows.length" class="mt-3 border border-gray-100 rounded-lg overflow-hidden">
+            <table class="w-full text-xs">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-3 py-1.5 text-left text-gray-500 font-medium">Año</th>
+                  <th class="px-3 py-1.5 text-left text-gray-500 font-medium">Mes</th>
+                  <th class="px-3 py-1.5 text-right text-gray-500 font-medium">Mín (MWh)</th>
+                  <th class="px-3 py-1.5 text-right text-gray-500 font-medium">Máx (MWh)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(r, i) in energiaRows.slice(0, 8)" :key="i" class="border-t border-gray-50">
+                  <td class="px-3 py-1 text-gray-700">{{ r.año }}</td>
+                  <td class="px-3 py-1 text-gray-700">{{ MESES[r.mes - 1] }}</td>
+                  <td class="px-3 py-1 text-right text-gray-700">{{ r.energia_minima }}</td>
+                  <td class="px-3 py-1 text-right text-gray-700">{{ r.energia_maxima }}</td>
+                </tr>
+                <tr v-if="energiaRows.length > 8" class="border-t border-gray-50">
+                  <td colspan="4" class="px-3 py-1 text-gray-300 italic">… y {{ energiaRows.length - 8 }} filas más</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </template>
+
+        <!-- Modo lectura cantidades -->
+        <template v-else>
+          <DataTable
+            :value="vistaCantidades === 'anual' ? cantidadesAnuales : cantidadesMensuales"
+            stripedRows class="text-sm" paginator :rows="24"
+            :rowsPerPageOptions="[12, 24, 60, 120]"
+            paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown"
+            emptyMessage="Sin compromisos de energía registrados."
+          >
+            <Column field="año" header="Año" style="width:70px" />
+            <Column v-if="vistaCantidades === 'mensual'" header="Mes" style="width:130px">
+              <template #body="{ data }">{{ MESES[data.mes - 1] }}</template>
+            </Column>
+            <Column :header="vistaCantidades === 'anual' ? 'Mín (MWh/año)' : 'Mín (MWh/mes)'">
+              <template #body="{ data }">
+                {{ data.energia_minima != null ? Number(data.energia_minima).toLocaleString('es-CO', { maximumFractionDigits: 1 }) : '—' }}
+              </template>
+            </Column>
+            <Column :header="vistaCantidades === 'anual' ? 'Máx (MWh/año)' : 'Máx (MWh/mes)'">
+              <template #body="{ data }">
+                {{ data.energia_maxima != null ? Number(data.energia_maxima).toLocaleString('es-CO', { maximumFractionDigits: 1 }) : '—' }}
+              </template>
+            </Column>
+            <Column header="Rango">
+              <template #body="{ data }">
+                <div v-if="data.energia_minima != null && data.energia_maxima != null" class="text-xs text-gray-400">
+                  {{ ((data.energia_maxima / data.energia_minima - 1) * 100).toFixed(0) }}% flex
+                </div>
+              </template>
+            </Column>
+          </DataTable>
+        </template>
       </TabPanel>
 
       <!-- ══ TARIFAS ══ -->
       <TabPanel :header="`Tarifas (${contrato.tarifas?.length || 0})`">
-        <div class="flex justify-end mb-3">
-          <SelectButton v-model="vistaTarifas" :options="VISTAS" optionLabel="label" optionValue="value" />
+        <div class="flex justify-between items-center mb-3">
+          <SelectButton v-if="!editandoTarifas" v-model="vistaTarifas" :options="VISTAS" optionLabel="label" optionValue="value" />
+          <span v-else />
+          <div class="flex gap-2">
+            <template v-if="!editandoTarifas">
+              <Button icon="pi pi-pencil" label="Editar" size="small" text severity="secondary"
+                @click="editandoTarifas = true" />
+            </template>
+            <template v-else>
+              <Button label="Cancelar" size="small" text severity="secondary"
+                @click="editandoTarifas = false; tarifasPaste = ''; tarifasRows = []; tarifasError = ''" />
+              <Button label="Guardar" icon="pi pi-check" size="small" :loading="guardandoTarifas"
+                :disabled="!tarifasRows.length" @click="guardarTarifas" />
+            </template>
+          </div>
         </div>
-        <DataTable
-          :value="vistaTarifas === 'anual' ? tarifasAnuales : tarifasMensuales"
-          stripedRows
-          class="text-sm"
-          paginator
-          :rows="24"
-          :rowsPerPageOptions="[12, 24, 60, 120]"
-          paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown"
-          emptyMessage="Sin tarifas registradas."
-        >
-          <Column field="año" header="Año" style="width:70px" />
-          <Column v-if="vistaTarifas === 'mensual'" header="Mes" style="width:130px">
-            <template #body="{ data }">{{ MESES[data.mes - 1] }}</template>
-          </Column>
-          <Column :header="vistaTarifas === 'anual' ? 'Tarifa (COP/kWh)' : 'Tarifa (COP/kWh)'">
-            <template #body="{ data }">
-              <span class="font-mono font-medium text-amber-700">
-                {{ data.tarifa != null ? `$${Number(data.tarifa).toLocaleString('es-CO', { maximumFractionDigits: 2 })}` : '—' }}
-              </span>
-              <span v-if="vistaTarifas === 'anual' && !data._uniforme" class="text-xs text-gray-400 ml-1">prom.</span>
-            </template>
-          </Column>
-          <Column header="Variación">
-            <template #body="{ data, index }">
-              <template v-if="index > 0">
-                <span
-                  v-if="currentTarifas[index - 1]?.tarifa != null && data.tarifa != null"
-                  class="text-xs font-medium"
-                  :class="data.tarifa < currentTarifas[index-1].tarifa ? 'text-green-600' : data.tarifa > currentTarifas[index-1].tarifa ? 'text-red-500' : 'text-gray-400'"
-                >
-                  {{ variacion(currentTarifas[index-1].tarifa, data.tarifa) }}
+
+        <!-- Modo edición tarifas -->
+        <template v-if="editandoTarifas">
+          <p class="text-xs text-gray-400 mb-2">
+            Copia las columnas <strong>Año · Mes · Tarifa</strong> desde Excel y pégalas aquí.
+            Esto <strong>reemplazará</strong> todas las tarifas actuales.
+          </p>
+          <Textarea v-model="tarifasPaste" rows="7"
+            placeholder="2024&#9;Enero&#9;460&#10;2024&#9;Febrero&#9;460"
+            class="w-full font-mono text-xs" @paste="onPasteTarifas" />
+          <div class="flex items-center gap-2 mt-2">
+            <Button label="Procesar" icon="pi pi-refresh" size="small" severity="secondary" outlined @click="parseTarifas" />
+            <Button v-if="tarifasRows.length" label="Limpiar" icon="pi pi-times" size="small" severity="danger" text
+              @click="tarifasRows = []; tarifasPaste = ''; tarifasError = ''" />
+            <span v-if="tarifasRows.length" class="text-xs text-green-600 font-medium">{{ tarifasRows.length }} filas listas</span>
+            <span v-if="tarifasError" class="text-xs text-red-400">{{ tarifasError }}</span>
+          </div>
+          <div v-if="tarifasRows.length" class="mt-3 border border-gray-100 rounded-lg overflow-hidden">
+            <table class="w-full text-xs">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-3 py-1.5 text-left text-gray-500 font-medium">Año</th>
+                  <th class="px-3 py-1.5 text-left text-gray-500 font-medium">Mes</th>
+                  <th class="px-3 py-1.5 text-right text-gray-500 font-medium">Tarifa ($/kWh)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(r, i) in tarifasRows.slice(0, 8)" :key="i" class="border-t border-gray-50">
+                  <td class="px-3 py-1 text-gray-700">{{ r.año }}</td>
+                  <td class="px-3 py-1 text-gray-700">{{ MESES[r.mes - 1] }}</td>
+                  <td class="px-3 py-1 text-right text-gray-700">{{ r.tarifa }}</td>
+                </tr>
+                <tr v-if="tarifasRows.length > 8" class="border-t border-gray-50">
+                  <td colspan="3" class="px-3 py-1 text-gray-300 italic">… y {{ tarifasRows.length - 8 }} filas más</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </template>
+
+        <!-- Modo lectura tarifas -->
+        <template v-else>
+          <DataTable
+            :value="vistaTarifas === 'anual' ? tarifasAnuales : tarifasMensuales"
+            stripedRows class="text-sm" paginator :rows="24"
+            :rowsPerPageOptions="[12, 24, 60, 120]"
+            paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown"
+            emptyMessage="Sin tarifas registradas."
+          >
+            <Column field="año" header="Año" style="width:70px" />
+            <Column v-if="vistaTarifas === 'mensual'" header="Mes" style="width:130px">
+              <template #body="{ data }">{{ MESES[data.mes - 1] }}</template>
+            </Column>
+            <Column header="Tarifa (COP/kWh)">
+              <template #body="{ data }">
+                <span class="font-mono font-medium text-amber-700">
+                  {{ data.tarifa != null ? `$${Number(data.tarifa).toLocaleString('es-CO', { maximumFractionDigits: 2 })}` : '—' }}
                 </span>
+                <span v-if="vistaTarifas === 'anual' && !data._uniforme" class="text-xs text-gray-400 ml-1">prom.</span>
               </template>
-            </template>
-          </Column>
-        </DataTable>
+            </Column>
+            <Column header="Variación">
+              <template #body="{ data, index }">
+                <template v-if="index > 0">
+                  <span
+                    v-if="currentTarifas[index - 1]?.tarifa != null && data.tarifa != null"
+                    class="text-xs font-medium"
+                    :class="data.tarifa < currentTarifas[index-1].tarifa ? 'text-green-600' : data.tarifa > currentTarifas[index-1].tarifa ? 'text-red-500' : 'text-gray-400'"
+                  >
+                    {{ variacion(currentTarifas[index-1].tarifa, data.tarifa) }}
+                  </span>
+                </template>
+              </template>
+            </Column>
+          </DataTable>
+        </template>
       </TabPanel>
 
       <!-- ══ CONTRATOS ASIC ══ -->
@@ -351,6 +459,7 @@ import Column from 'primevue/column'
 import Divider from 'primevue/divider'
 import SelectButton from 'primevue/selectbutton'
 import InputText from 'primevue/inputtext'
+import Textarea from 'primevue/textarea'
 import InfoField from '@/components/InfoField.vue'
 import api from '@/api/client'
 
@@ -426,6 +535,102 @@ async function guardarPartes() {
 }
 const vistaCantidades = ref('mensual')
 const vistaTarifas = ref('mensual')
+
+// Edición tarifas
+const editandoTarifas = ref(false)
+const guardandoTarifas = ref(false)
+const tarifasPaste = ref('')
+const tarifasRows = ref([])
+const tarifasError = ref('')
+
+// Edición cantidades
+const editandoCantidades = ref(false)
+const guardandoCantidades = ref(false)
+const energiaPaste = ref('')
+const energiaRows = ref([])
+const energiaError = ref('')
+
+const MESES_ES = {
+  enero:1, febrero:2, marzo:3, abril:4, mayo:5, junio:6,
+  julio:7, agosto:8, septiembre:9, octubre:10, noviembre:11, diciembre:12,
+}
+
+function splitRow(line) {
+  return line.includes('\t') ? line.split('\t') : line.split(',')
+}
+
+function parseMes(raw) {
+  const s = String(raw).trim()
+  const num = parseInt(s, 10)
+  if (!isNaN(num) && num >= 1 && num <= 12) return num
+  return MESES_ES[s.toLowerCase()] ?? null
+}
+
+function parseTarifas() {
+  tarifasError.value = ''
+  const lines = tarifasPaste.value.split('\n').map(l => l.trim()).filter(Boolean)
+  const rows = []
+  for (const [i, line] of lines.entries()) {
+    const cols = splitRow(line)
+    if (cols.length < 3) { tarifasError.value = `Fila ${i + 1}: se esperan 3 columnas`; tarifasRows.value = []; return }
+    const año = parseInt(cols[0].trim(), 10)
+    const mes = parseMes(cols[1].trim())
+    const tarifa = parseFloat(cols[2].trim().replace(',', '.'))
+    if (isNaN(año) || !mes || isNaN(tarifa)) { tarifasError.value = `Fila ${i + 1}: datos inválidos`; tarifasRows.value = []; return }
+    rows.push({ año, mes, tarifa })
+  }
+  tarifasRows.value = rows
+}
+
+function parseEnergia() {
+  energiaError.value = ''
+  const lines = energiaPaste.value.split('\n').map(l => l.trim()).filter(Boolean)
+  const rows = []
+  for (const [i, line] of lines.entries()) {
+    const cols = splitRow(line)
+    if (cols.length < 4) { energiaError.value = `Fila ${i + 1}: se esperan 4 columnas`; energiaRows.value = []; return }
+    const año = parseInt(cols[0].trim(), 10)
+    const mes = parseMes(cols[1].trim())
+    const min = parseFloat(cols[2].trim().replace(',', '.'))
+    const max = parseFloat(cols[3].trim().replace(',', '.'))
+    if (isNaN(año) || !mes || isNaN(min) || isNaN(max)) { energiaError.value = `Fila ${i + 1}: datos inválidos`; energiaRows.value = []; return }
+    rows.push({ año, mes, energia_minima: min, energia_maxima: max })
+  }
+  energiaRows.value = rows
+}
+
+function onPasteTarifas() { setTimeout(parseTarifas, 50) }
+function onPasteEnergia() { setTimeout(parseEnergia, 50) }
+
+async function guardarTarifas() {
+  guardandoTarifas.value = true
+  try {
+    const { data } = await api.put(`/ppa/${contrato.value.id}/tarifas`, tarifasRows.value)
+    contrato.value = { ...contrato.value, tarifas: data }
+    editandoTarifas.value = false
+    tarifasPaste.value = ''; tarifasRows.value = []
+    toast.add({ severity: 'success', summary: 'Guardado', detail: `${data.length} tarifas actualizadas`, life: 2500 })
+  } catch (e) {
+    toast.add({ severity: 'error', summary: 'Error', detail: e.response?.data?.detail || e.message, life: 4000 })
+  } finally {
+    guardandoTarifas.value = false
+  }
+}
+
+async function guardarCantidades() {
+  guardandoCantidades.value = true
+  try {
+    const { data } = await api.put(`/ppa/${contrato.value.id}/compromisos`, energiaRows.value)
+    contrato.value = { ...contrato.value, compromisos_energia: data }
+    editandoCantidades.value = false
+    energiaPaste.value = ''; energiaRows.value = []
+    toast.add({ severity: 'success', summary: 'Guardado', detail: `${data.length} compromisos actualizados`, life: 2500 })
+  } catch (e) {
+    toast.add({ severity: 'error', summary: 'Error', detail: e.response?.data?.detail || e.message, life: 4000 })
+  } finally {
+    guardandoCantidades.value = false
+  }
+}
 const asicRows = ref([])
 const loadingAsic = ref(false)
 const vistaAsic = ref('vigentes')
