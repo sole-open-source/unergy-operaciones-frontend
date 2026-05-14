@@ -39,53 +39,53 @@
       <DataTable
         :value="filasResumenFiltradas"
         :loading="loadingVista"
-        rowHover
         scrollable
         scrollHeight="calc(100vh - 260px)"
-        class="text-sm cursor-pointer"
-        rowGroupMode="subheader"
-        groupRowsBy="proyecto"
-        sortField="proyecto"
-        :sortOrder="1"
-        :expandableRowGroups="true"
-        :expandedRowGroups="expandedGroupsGeneral"
-        @rowgroup-expand="(e) => expandedGroupsGeneral.push(e.data)"
-        @rowgroup-collapse="(e) => expandedGroupsGeneral.splice(expandedGroupsGeneral.indexOf(e.data), 1)"
-        @row-click="(e) => router.push(`/liquidaciones/${e.data.liq_id}`)"
+        class="text-sm"
       >
         <template #empty>
-          <div class="text-center py-8 text-sm text-gray-400">No hay liquidaciones para los filtros seleccionados.</div>
-        </template>
-        <template #groupheader="{ data }">
-          <div class="flex items-center gap-2 py-1">
-            <span class="font-semibold text-gray-700">{{ data.proyecto }}</span>
-            <span
-              v-if="grupoInfo[data.proyecto]?.tipo_venta"
-              :class="badgeTipoVenta(grupoInfo[data.proyecto].tipo_venta)"
-            >{{ grupoInfo[data.proyecto].tipo_venta }}</span>
-            <span class="text-xs text-gray-400">({{ grupoInfo[data.proyecto]?.count ?? 0 }})</span>
+          <div class="text-center py-8 text-sm text-gray-400">
+            No hay liquidaciones para los filtros seleccionados.
           </div>
         </template>
-        <Column field="periodoLabel" header="Período" />
-        <Column header="Estado">
+
+        <Column style="width:100%; padding:0">
           <template #body="{ data }">
-            <Tag :value="data.estado" :severity="estadoSeverity(data.estado)" />
-          </template>
-        </Column>
-        <Column header="Tipo venta" style="width:130px">
-          <template #body="{ data }">
-            <span :class="badgeTipoVenta(data.tipo_venta)">{{ data.tipo_venta || '—' }}</span>
-          </template>
-        </Column>
-        <Column header="Ingreso Neto" bodyStyle="text-align:right">
-          <template #body="{ data }">
-            <span class="font-mono text-gray-800">{{ data.ingreso_neto != null ? fmt(data.ingreso_neto) : '—' }}</span>
-          </template>
-        </Column>
-        <Column style="width:60px">
-          <template #body="{ data }">
-            <Button icon="pi pi-eye" text rounded size="small" v-tooltip="'Ver detalle'"
-              @click.stop="router.push(`/liquidaciones/${data.liq_id}`)" />
+
+            <!-- PROYECTO -->
+            <div v-if="data.tipo === 'proyecto'"
+              class="flex items-center gap-2 px-3 py-2 cursor-pointer select-none bg-gray-100 hover:bg-gray-200"
+              @click="toggleProy(data.proyKey)">
+              <i :class="expandedProyectos.has(data.proyKey)
+                ? 'pi pi-chevron-down' : 'pi pi-chevron-right'"
+                class="text-xs text-gray-500" />
+              <span class="font-semibold text-gray-800 text-sm">{{ data.proyecto }}</span>
+            </div>
+
+            <!-- AÑO -->
+            <div v-else-if="data.tipo === 'anio'"
+              class="flex items-center gap-2 px-6 py-1.5 cursor-pointer select-none bg-gray-50 hover:bg-gray-100"
+              @click="toggleAnio(data.anioKey)">
+              <i :class="expandedAnios.has(data.anioKey)
+                ? 'pi pi-chevron-down' : 'pi pi-chevron-right'"
+                class="text-xs text-gray-400" />
+              <span class="text-sm font-medium text-gray-500">{{ data.anio }}</span>
+            </div>
+
+            <!-- MES -->
+            <div v-else
+              class="flex items-center gap-4 px-10 py-2 cursor-pointer hover:bg-purple-50 border-b border-gray-100"
+              @click="router.push(`/liquidaciones/${data.liq_id}`)">
+              <span class="w-20 text-gray-700 text-sm">{{ data.periodoLabel }}</span>
+              <Tag :value="data.estado" :severity="estadoSeverity(data.estado)" class="text-[10px]" />
+              <span :class="badgeTipoVenta(data.tipo_venta)">{{ data.tipo_venta || '—' }}</span>
+              <span class="ml-auto font-mono text-gray-800 text-sm">
+                {{ data.ingreso_neto != null ? fmt(data.ingreso_neto) : '—' }}
+              </span>
+              <Button icon="pi pi-eye" text rounded size="small"
+                @click.stop="router.push(`/liquidaciones/${data.liq_id}`)" />
+            </div>
+
           </template>
         </Column>
       </DataTable>
@@ -148,55 +148,86 @@ const estadosOpciones = [
 ]
 const tiposVentaOpciones = ['bolsa', 'ppa', 'interno', 'autoconsumo']
 
-const expandedGroupsGeneral = ref([])
+const expandedProyectos = ref(new Set())
+const expandedAnios = ref(new Set())
 
 const dialogNueva = ref(false)
 const creando = ref(false)
 const nueva = ref({ proyecto_id: null, periodo: null, tipo_venta: 'bolsa' })
 
-// ─── Una fila por liquidación, sin filtros ────────────────────────────────────
+// ─── Estructura 3 niveles: proyecto → año → mes ───────────────────────────────
 const filasResumen = computed(() => {
   const filas = []
   for (const proy of vistaProyectos.value) {
+    const proyKey = String(proy.proyecto_id)
+    filas.push({ tipo: 'proyecto', proyKey, proyecto: proy.proyecto_nombre })
+
+    const porAnio = {}
     for (const liq of proy.liquidaciones) {
-      const mandatoTotal = (liq.mandatos_total_ingresos || [])[0]
-      filas.push({
-        proyecto_id:  proy.proyecto_id,
-        proyecto:     proy.proyecto_nombre,
-        liq_id:       liq.liquidacion_id,
-        periodo:      liq.periodo,
-        periodoLabel: formatPeriodo(liq.periodo),
-        estado:       liq.estado,
-        tipo_venta:   liq.tipo_venta,
-        ingreso_neto: mandatoTotal?.valor_neto_cop ?? null,
-      })
+      const anio = liq.periodo?.split('-')[0] || '?'
+      if (!porAnio[anio]) porAnio[anio] = []
+      porAnio[anio].push(liq)
+    }
+    for (const anio of Object.keys(porAnio).sort().reverse()) {
+      const anioKey = `${proyKey}_${anio}`
+      filas.push({ tipo: 'anio', proyKey, anioKey, anio })
+      for (const liq of porAnio[anio]) {
+        const mandatoTotal = (liq.mandatos_total_ingresos || [])[0]
+        filas.push({
+          tipo:         'mes',
+          proyKey,
+          anioKey,
+          liq_id:       liq.liquidacion_id,
+          proyecto:     proy.proyecto_nombre,
+          periodo:      liq.periodo,
+          periodoLabel: formatPeriodo(liq.periodo),
+          estado:       liq.estado,
+          tipo_venta:   liq.tipo_venta,
+          ingreso_neto: mandatoTotal?.valor_neto_cop ?? null,
+        })
+      }
     }
   }
   return filas
 })
 
-// ─── Filtrado client-side (q + tipo_venta) ────────────────────────────────────
+// ─── Filtrado + visibilidad según expansión ───────────────────────────────────
 const filasResumenFiltradas = computed(() => {
   const q = (filtros.value.q || '').toLowerCase().trim()
-  return filasResumen.value
-    .filter(r => !q || r.proyecto.toLowerCase().includes(q))
-    .filter(r => !filtros.value.tipo_venta || r.tipo_venta === filtros.value.tipo_venta)
+  const tv = filtros.value.tipo_venta
+
+  const proyMatching = new Set(
+    filasResumen.value
+      .filter(f => f.tipo === 'mes'
+        && (!q || f.proyecto.toLowerCase().includes(q))
+        && (!tv || f.tipo_venta === tv))
+      .map(f => f.proyKey)
+  )
+
+  return filasResumen.value.filter(f => {
+    if (!proyMatching.has(f.proyKey)) return false
+    if (f.tipo === 'proyecto') return true
+    if (f.tipo === 'anio') return expandedProyectos.value.has(f.proyKey)
+    if (f.tipo === 'mes')  return expandedProyectos.value.has(f.proyKey)
+                               && expandedAnios.value.has(f.anioKey)
+    return false
+  })
 })
 
-// ─── Info por grupo (count + tipo_venta único si aplica) ─────────────────────
-const grupoInfo = computed(() => {
-  const map = {}
-  for (const r of filasResumenFiltradas.value) {
-    if (!map[r.proyecto]) map[r.proyecto] = { count: 0, tipos: new Set() }
-    map[r.proyecto].count++
-    if (r.tipo_venta) map[r.proyecto].tipos.add(r.tipo_venta)
-  }
-  const result = {}
-  for (const [k, v] of Object.entries(map)) {
-    result[k] = { count: v.count, tipo_venta: v.tipos.size === 1 ? [...v.tipos][0] : null }
-  }
-  return result
-})
+// ─── Toggle expansión ─────────────────────────────────────────────────────────
+function toggleProy(key) {
+  expandedProyectos.value.has(key)
+    ? expandedProyectos.value.delete(key)
+    : expandedProyectos.value.add(key)
+  expandedProyectos.value = new Set(expandedProyectos.value)
+}
+
+function toggleAnio(key) {
+  expandedAnios.value.has(key)
+    ? expandedAnios.value.delete(key)
+    : expandedAnios.value.add(key)
+  expandedAnios.value = new Set(expandedAnios.value)
+}
 
 // ─── Helpers de estilo ────────────────────────────────────────────────────────
 function badgeTipoVenta(tv) {

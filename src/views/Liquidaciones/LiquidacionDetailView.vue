@@ -31,19 +31,19 @@
       <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div class="bg-white rounded-xl shadow-sm p-4 text-center border-t-4" style="border-color:#22c55e">
           <div class="text-xs text-gray-500 mb-1">Ingresos brutos</div>
-          <div class="text-base font-semibold text-green-700">{{ fmt(liq.ingresos_energia_cop) }}</div>
+          <div class="text-base font-semibold text-green-700">{{ fmt(resumenAuto.ingresos) }}</div>
         </div>
         <div class="bg-white rounded-xl shadow-sm p-4 text-center border-t-4" style="border-color:#ef4444">
           <div class="text-xs text-gray-500 mb-1">Comercialización XM</div>
-          <div class="text-base font-semibold text-red-600">{{ fmt(liq.costos_comercializacion_xm_cop) }}</div>
+          <div class="text-base font-semibold text-red-600">{{ fmt(resumenAuto.comercializacion) }}</div>
         </div>
         <div class="bg-white rounded-xl shadow-sm p-4 text-center border-t-4" style="border-color:#ef4444">
           <div class="text-xs text-gray-500 mb-1">Costos operativos</div>
-          <div class="text-base font-semibold text-red-600">{{ fmt(liq.costos_operativos_cop) }}</div>
+          <div class="text-base font-semibold text-red-600">{{ fmt(resumenAuto.costos_op) }}</div>
         </div>
         <div class="bg-white rounded-xl shadow-sm p-4 text-center border-t-4" style="border-color:#915BD8">
           <div class="text-xs text-gray-500 mb-1">Ingreso neto</div>
-          <div class="text-base font-semibold" style="color:#915BD8">{{ fmt(liq.ingreso_neto_cop) }}</div>
+          <div class="text-base font-semibold" style="color:#915BD8">{{ fmt(resumenAuto.neto) }}</div>
         </div>
       </div>
 
@@ -63,12 +63,12 @@
 
       <!-- ══ INGRESOS ══ -->
       <div class="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div class="text-white px-4 py-2.5 flex items-center gap-3 cursor-pointer select-none"
-          style="background:#1e5c2e"
+        <div class="px-4 py-2.5 flex items-center gap-3 cursor-pointer select-none"
+          style="background:#f0fdf4; color:#166534; border-left:3px solid #22c55e"
           @click="toggleSeccion('ingresos')">
           <i :class="seccionesAbiertas.has('ingresos') ? 'pi pi-chevron-down' : 'pi pi-chevron-right'" class="text-xs" />
           <span class="font-semibold">Ingresos</span>
-          <span class="text-green-300 text-xs ml-auto">
+          <span class="text-xs ml-auto" style="color:#16a34a">
             {{ inversionistasConDetalle.length }} inversionista(s)
           </span>
         </div>
@@ -107,9 +107,7 @@
                     {{ inv.nombre }}
                   </td>
                   <td class="px-3 py-1.5 text-right text-gray-300 font-semibold">{{ pct(inv.porcentaje) }}</td>
-                  <td class="px-3 py-1.5" colspan="2" />
-                  <td class="px-3 py-1.5 text-gray-300">Porcentaje de Participación</td>
-                  <td class="px-3 py-1.5 text-right font-semibold">{{ pct(inv.porcentaje) }}</td>
+                  <td class="px-3 py-1.5" colspan="4" />
                   <td class="px-3 py-1.5" />
                   <td class="px-3 py-1.5 text-center">
                     <Button icon="pi pi-plus" text size="small" class="!text-green-300"
@@ -175,6 +173,15 @@
                       Sin líneas — usa el botón + para añadir
                     </td>
                   </tr>
+                  <tr v-if="m.valor_neto_cop != null"
+                    style="background:rgba(145,91,216,0.08); border-top: 1px solid rgba(145,91,216,0.2)">
+                    <td class="px-3 py-1.5" colspan="4" />
+                    <td class="px-3 py-1.5 font-semibold" style="color:#915BD8">Valor a Pagar</td>
+                    <td class="px-3 py-1.5 text-right font-mono font-semibold" style="color:#915BD8">
+                      {{ fmt(m.valor_neto_cop) }}
+                    </td>
+                    <td colspan="2" />
+                  </tr>
                 </template>
 
                 <tr v-if="!inv.mandatosIngresos.length" class="border-b border-gray-100">
@@ -197,14 +204,14 @@
 
       <!-- ══ COSTOS ══ -->
       <div class="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div class="text-white px-4 py-2.5 flex items-center gap-3 cursor-pointer select-none"
-          style="background:#7f1d1d"
+        <div class="px-4 py-2.5 flex items-center gap-3 cursor-pointer select-none"
+          style="background:#fff1f2; color:#991b1b; border-left:3px solid #ef4444"
           @click="toggleSeccion('costos')">
           <i :class="seccionesAbiertas.has('costos') ? 'pi pi-chevron-down' : 'pi pi-chevron-right'" class="text-xs" />
           <span class="font-semibold">Costos</span>
           <div class="ml-auto flex items-center gap-2">
             <Button icon="pi pi-plus" label="Agregar costo" text size="small"
-              class="!text-red-200 hover:!text-white"
+              style="color:#991b1b"
               @click.stop="abrirDialogCosto()" />
           </div>
         </div>
@@ -334,6 +341,15 @@
                         Sin líneas — usa el botón + para añadir
                       </td>
                     </tr>
+                    <tr v-if="m.valor_neto_cop != null"
+                      style="background:rgba(145,91,216,0.08); border-top: 1px solid rgba(145,91,216,0.2)">
+                      <td class="px-3 py-1.5" colspan="4" />
+                      <td class="px-3 py-1.5 font-semibold" style="color:#915BD8">Valor a Pagar</td>
+                      <td class="px-3 py-1.5 text-right font-mono font-semibold" style="color:#915BD8">
+                        {{ fmt(m.valor_neto_cop) }}
+                      </td>
+                      <td colspan="2" />
+                    </tr>
                   </template>
 
                   <tr v-if="!inv.mandatosCostos.length">
@@ -351,13 +367,13 @@
 
       <!-- ══ SERVICIOS ══ -->
       <div class="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div class="text-white px-4 py-2.5 flex items-center gap-3 cursor-pointer select-none"
-          style="background:#78350f"
+        <div class="px-4 py-2.5 flex items-center gap-3 cursor-pointer select-none"
+          style="background:#fffbeb; color:#92400e; border-left:3px solid #f59e0b"
           @click="toggleSeccion('servicios')">
           <i :class="seccionesAbiertas.has('servicios') ? 'pi pi-chevron-down' : 'pi pi-chevron-right'" class="text-xs" />
           <span class="font-semibold">Servicios (Facturas)</span>
           <Button icon="pi pi-plus" label="Agregar" text size="small"
-            class="ml-auto !text-yellow-200 hover:!text-white"
+            class="ml-auto" style="color:#92400e"
             @click.stop="abrirDialogFactura()" />
         </div>
 
@@ -870,6 +886,37 @@ function abrirDialogLinea(mandatoId, mandatoTipo, l = null) {
 }
 
 // ─── Computed ─────────────────────────────────────────────────────────────────
+const resumenAuto = computed(() => {
+  const mandatos = liq.value?.mandatos || []
+
+  const lineasTotal = mandatos
+    .filter(m => !m.inversionista || m.inversionista.id == null)
+    .flatMap(m => m.lineas || [])
+
+  const ingBruto = lineasTotal
+    .filter(l => l.tipo_linea === 'ingreso_bruto')
+    .reduce((s, l) => s + (l.valor_cop || 0), 0)
+
+  const comercializacion = lineasTotal
+    .filter(l => ['ajuste_comercializacion', 'ajuste_xm'].includes(l.tipo_linea))
+    .reduce((s, l) => s + Math.abs(l.valor_cop || 0), 0)
+
+  const costos = (liq.value?.costos || [])
+    .reduce((s, c) => s + (c.valor_cop || 0), 0)
+
+  const facturas = (liq.value?.facturas || [])
+    .reduce((s, f) => s + (f.valor_cop || 0), 0)
+
+  const costosOp = costos + facturas
+
+  return {
+    ingresos:        liq.value?.ingresos_energia_cop      ?? ingBruto,
+    comercializacion: liq.value?.costos_comercializacion_xm_cop ?? comercializacion,
+    costos_op:       liq.value?.costos_operativos_cop     ?? costosOp,
+    neto:            liq.value?.ingreso_neto_cop           ?? (ingBruto - comercializacion - costosOp),
+  }
+})
+
 const inversionistasConDetalle = computed(() => {
   if (!proyectoInversionistas.value.length) return []
   const mandatos = liq.value?.mandatos || []
