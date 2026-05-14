@@ -67,6 +67,8 @@
         paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown"
         emptyMessage="No hay contratos PPA registrados."
         rowHover
+        sortField="fecha_inicio"
+        :sortOrder="1"
       >
         <Column field="nombre_interno" header="Nombre interno" sortable>
           <template #body="{ data }">
@@ -84,10 +86,10 @@
         <Column header="Vendedor">
           <template #body="{ data }">{{ data.vendedor_nombre || '—' }}</template>
         </Column>
-        <Column header="Inicio" style="width:100px">
+        <Column field="fecha_inicio" header="Inicio" sortable style="width:100px">
           <template #body="{ data }">{{ formatFecha(data.fecha_inicio) }}</template>
         </Column>
-        <Column header="Fin" style="width:100px">
+        <Column field="fecha_fin" header="Fin" sortable style="width:100px">
           <template #body="{ data }">{{ formatFecha(data.fecha_fin) }}</template>
         </Column>
         <Column style="width:50px">
@@ -120,6 +122,8 @@
         paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown"
         :emptyMessage="`No hay contratos de ${servicioInfo?.label} registrados.`"
         rowHover
+        sortField="fecha_inicio"
+        :sortOrder="1"
       >
         <Column field="numero_contrato" header="N° contrato" sortable style="width:160px">
           <template #body="{ data }">
@@ -132,10 +136,10 @@
         <Column header="Prestador">
           <template #body="{ data }">{{ data.prestador_nombre || '—' }}</template>
         </Column>
-        <Column header="Inicio" style="width:100px">
+        <Column field="fecha_inicio" header="Inicio" sortable style="width:100px">
           <template #body="{ data }">{{ formatFecha(data.fecha_inicio) }}</template>
         </Column>
-        <Column header="Fin" style="width:100px">
+        <Column field="fecha_fin" header="Fin" sortable style="width:100px">
           <template #body="{ data }">{{ formatFecha(data.fecha_fin) }}</template>
         </Column>
         <Column header="Estado" style="width:120px">
