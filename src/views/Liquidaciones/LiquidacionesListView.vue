@@ -34,188 +34,61 @@
       <Button icon="pi pi-times" label="Limpiar" severity="secondary" text @click="limpiarFiltros" />
     </div>
 
-    <!-- Tabs -->
+    <!-- Tabla -->
     <div class="bg-white rounded-xl shadow-sm overflow-hidden">
-      <TabView v-model:activeIndex="tabActivo">
-
-        <!-- ══ Panel General ══ -->
-        <TabPanel header="Panel General">
-          <DataTable
-            :value="filasGeneral"
-            :loading="loadingVista"
-            :rows="20"
-            paginator
-            rowHover
-            class="text-sm"
-            rowGroupMode="subheader"
-            groupRowsBy="proyecto"
-            sortField="proyecto"
-            :sortOrder="1"
-            :expandableRowGroups="true"
-            :expandedRowGroups="expandedGroupsGeneral"
-            @rowgroup-expand="(e) => onGroupExpand(e, expandedGroupsGeneral)"
-            @rowgroup-collapse="(e) => onGroupCollapse(e, expandedGroupsGeneral)"
-          >
-            <template #empty>
-              <div class="text-center py-8 text-sm text-gray-400">No hay liquidaciones para los filtros seleccionados.</div>
-            </template>
-            <template #groupheader="{ data }">
-              <div class="flex items-center gap-2 py-1">
-                <span class="font-semibold text-gray-700">{{ data.proyecto }}</span>
-                <span
-                  v-if="grupoInfoGeneral[data.proyecto]?.tipo_venta"
-                  :class="badgeTipoVenta(grupoInfoGeneral[data.proyecto].tipo_venta)"
-                >{{ grupoInfoGeneral[data.proyecto].tipo_venta }}</span>
-                <span class="text-xs text-gray-400">({{ grupoInfoGeneral[data.proyecto]?.count ?? 0 }})</span>
-              </div>
-            </template>
-            <Column field="periodoLabel" header="Período" />
-            <Column header="Estado">
-              <template #body="{ data }">
-                <Tag :value="data.estado" :severity="estadoSeverity(data.estado)" />
-              </template>
-            </Column>
-            <Column header="Doc" style="width:110px">
-              <template #body="{ data }">
-                <span :class="badgeDocClass(data.doc)">{{ data.doc }}</span>
-              </template>
-            </Column>
-            <Column header="Tipo venta" style="width:130px">
-              <template #body="{ data }">
-                <span :class="badgeTipoVenta(data.tipo_venta)">{{ data.tipo_venta || '—' }}</span>
-              </template>
-            </Column>
-            <Column header="Ingreso Neto" bodyStyle="text-align:right">
-              <template #body="{ data }">
-                <span class="font-mono text-gray-800">{{ data.ingreso_neto != null ? fmt(data.ingreso_neto) : '—' }}</span>
-              </template>
-            </Column>
-            <Column style="width:60px">
-              <template #body="{ data }">
-                <Button icon="pi pi-eye" text rounded size="small" v-tooltip="'Ver detalle'"
-                  @click="router.push(`/liquidaciones/${data.liq_id}`)" />
-              </template>
-            </Column>
-          </DataTable>
-        </TabPanel>
-
-        <!-- ══ Ingresos ══ -->
-        <TabPanel header="Ingresos">
-          <DataTable
-            :value="filasIngresosTab"
-            :loading="loadingVista"
-            :rows="20"
-            paginator
-            rowHover
-            class="text-sm"
-            rowGroupMode="subheader"
-            groupRowsBy="proyecto"
-            sortField="proyecto"
-            :sortOrder="1"
-            :expandableRowGroups="true"
-            :expandedRowGroups="expandedGroupsIngresos"
-            @rowgroup-expand="(e) => onGroupExpand(e, expandedGroupsIngresos)"
-            @rowgroup-collapse="(e) => onGroupCollapse(e, expandedGroupsIngresos)"
-          >
-            <template #empty>
-              <div class="text-center py-8 text-sm text-gray-400">No hay liquidaciones para los filtros seleccionados.</div>
-            </template>
-            <template #groupheader="{ data }">
-              <div class="flex items-center gap-2 py-1">
-                <span class="font-semibold text-gray-700">{{ data.proyecto }}</span>
-                <span
-                  v-if="grupoInfoIngresos[data.proyecto]?.tipo_venta"
-                  :class="badgeTipoVenta(grupoInfoIngresos[data.proyecto].tipo_venta)"
-                >{{ grupoInfoIngresos[data.proyecto].tipo_venta }}</span>
-                <span class="text-xs text-gray-400">({{ grupoInfoIngresos[data.proyecto]?.count ?? 0 }})</span>
-              </div>
-            </template>
-            <Column field="periodoLabel" header="Período" />
-            <Column header="Estado">
-              <template #body="{ data }">
-                <Tag :value="data.estado" :severity="estadoSeverity(data.estado)" />
-              </template>
-            </Column>
-            <Column header="Tipo venta" style="width:130px">
-              <template #body="{ data }">
-                <span :class="badgeTipoVenta(data.tipo_venta)">{{ data.tipo_venta || '—' }}</span>
-              </template>
-            </Column>
-            <Column header="Ingreso Neto" bodyStyle="text-align:right">
-              <template #body="{ data }">
-                <span class="font-mono text-gray-800">{{ data.ingreso_neto != null ? fmt(data.ingreso_neto) : '—' }}</span>
-              </template>
-            </Column>
-            <Column style="width:60px">
-              <template #body="{ data }">
-                <Button icon="pi pi-eye" text rounded size="small" v-tooltip="'Ver detalle'"
-                  @click="router.push(`/liquidaciones/${data.liq_id}`)" />
-              </template>
-            </Column>
-          </DataTable>
-        </TabPanel>
-
-        <!-- ══ Costos ══ -->
-        <TabPanel header="Costos">
-          <DataTable
-            :value="filasCostosTab"
-            :loading="loadingVista"
-            :rows="20"
-            paginator
-            rowHover
-            class="text-sm"
-            rowGroupMode="subheader"
-            groupRowsBy="proyecto"
-            sortField="proyecto"
-            :sortOrder="1"
-            :expandableRowGroups="true"
-            :expandedRowGroups="expandedGroupsCostos"
-            @rowgroup-expand="(e) => onGroupExpand(e, expandedGroupsCostos)"
-            @rowgroup-collapse="(e) => onGroupCollapse(e, expandedGroupsCostos)"
-          >
-            <template #empty>
-              <div class="text-center py-8 text-sm text-gray-400">No hay liquidaciones para los filtros seleccionados.</div>
-            </template>
-            <template #groupheader="{ data }">
-              <div class="flex items-center gap-2 py-1">
-                <span class="font-semibold text-gray-700">{{ data.proyecto }}</span>
-                <span
-                  v-if="grupoInfoCostos[data.proyecto]?.tipo_venta"
-                  :class="badgeTipoVenta(grupoInfoCostos[data.proyecto].tipo_venta)"
-                >{{ grupoInfoCostos[data.proyecto].tipo_venta }}</span>
-                <span class="text-xs text-gray-400">({{ grupoInfoCostos[data.proyecto]?.count ?? 0 }})</span>
-              </div>
-            </template>
-            <Column field="periodoLabel" header="Período" />
-            <Column header="Estado">
-              <template #body="{ data }">
-                <Tag :value="data.estado" :severity="estadoSeverity(data.estado)" />
-              </template>
-            </Column>
-            <Column header="Doc" style="width:110px">
-              <template #body="{ data }">
-                <span :class="badgeDocClass(data.doc)">{{ data.doc }}</span>
-              </template>
-            </Column>
-            <Column header="Tipo venta" style="width:130px">
-              <template #body="{ data }">
-                <span :class="badgeTipoVenta(data.tipo_venta)">{{ data.tipo_venta || '—' }}</span>
-              </template>
-            </Column>
-            <Column header="Importe" bodyStyle="text-align:right">
-              <template #body="{ data }">
-                <span class="font-mono text-gray-800">{{ data.ingreso_neto != null ? fmt(data.ingreso_neto) : '—' }}</span>
-              </template>
-            </Column>
-            <Column style="width:60px">
-              <template #body="{ data }">
-                <Button icon="pi pi-eye" text rounded size="small" v-tooltip="'Ver detalle'"
-                  @click="router.push(`/liquidaciones/${data.liq_id}`)" />
-              </template>
-            </Column>
-          </DataTable>
-        </TabPanel>
-      </TabView>
+      <DataTable
+        :value="filasResumenFiltradas"
+        :loading="loadingVista"
+        rowHover
+        scrollable
+        scrollHeight="calc(100vh - 260px)"
+        class="text-sm cursor-pointer"
+        rowGroupMode="subheader"
+        groupRowsBy="proyecto"
+        sortField="proyecto"
+        :sortOrder="1"
+        :expandableRowGroups="true"
+        :expandedRowGroups="expandedGroupsGeneral"
+        @rowgroup-expand="(e) => expandedGroupsGeneral.push(e.data)"
+        @rowgroup-collapse="(e) => expandedGroupsGeneral.splice(expandedGroupsGeneral.indexOf(e.data), 1)"
+        @row-click="(e) => router.push(`/liquidaciones/${e.data.liq_id}`)"
+      >
+        <template #empty>
+          <div class="text-center py-8 text-sm text-gray-400">No hay liquidaciones para los filtros seleccionados.</div>
+        </template>
+        <template #groupheader="{ data }">
+          <div class="flex items-center gap-2 py-1">
+            <span class="font-semibold text-gray-700">{{ data.proyecto }}</span>
+            <span
+              v-if="grupoInfo[data.proyecto]?.tipo_venta"
+              :class="badgeTipoVenta(grupoInfo[data.proyecto].tipo_venta)"
+            >{{ grupoInfo[data.proyecto].tipo_venta }}</span>
+            <span class="text-xs text-gray-400">({{ grupoInfo[data.proyecto]?.count ?? 0 }})</span>
+          </div>
+        </template>
+        <Column field="periodoLabel" header="Período" />
+        <Column header="Estado">
+          <template #body="{ data }">
+            <Tag :value="data.estado" :severity="estadoSeverity(data.estado)" />
+          </template>
+        </Column>
+        <Column header="Tipo venta" style="width:130px">
+          <template #body="{ data }">
+            <span :class="badgeTipoVenta(data.tipo_venta)">{{ data.tipo_venta || '—' }}</span>
+          </template>
+        </Column>
+        <Column header="Ingreso Neto" bodyStyle="text-align:right">
+          <template #body="{ data }">
+            <span class="font-mono text-gray-800">{{ data.ingreso_neto != null ? fmt(data.ingreso_neto) : '—' }}</span>
+          </template>
+        </Column>
+        <Column style="width:60px">
+          <template #body="{ data }">
+            <Button icon="pi pi-eye" text rounded size="small" v-tooltip="'Ver detalle'"
+              @click.stop="router.push(`/liquidaciones/${data.liq_id}`)" />
+          </template>
+        </Column>
+      </DataTable>
     </div>
 
     <!-- Dialog nueva liquidación -->
@@ -252,8 +125,6 @@ import Column from 'primevue/column'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import Tag from 'primevue/tag'
-import TabView from 'primevue/tabview'
-import TabPanel from 'primevue/tabpanel'
 import Select from 'primevue/select'
 import DatePicker from 'primevue/datepicker'
 import IconField from 'primevue/iconfield'
@@ -268,7 +139,6 @@ const router = useRouter()
 const vistaProyectos = ref([])
 const loadingVista = ref(false)
 const proyectosOpciones = ref([])
-const tabActivo = ref(0)
 
 const filtros = ref({ q: '', desde: null, hasta: null, estado: null, tipo_venta: null })
 
@@ -278,30 +148,19 @@ const estadosOpciones = [
 ]
 const tiposVentaOpciones = ['bolsa', 'ppa', 'interno', 'autoconsumo']
 
-// ─── RowGroup state — vacío = todos colapsados por defecto ────────────────────
-const expandedGroupsGeneral  = ref([])
-const expandedGroupsIngresos = ref([])
-const expandedGroupsCostos   = ref([])
-
-function onGroupExpand(event, groups) {
-  groups.push(event.data)
-}
-
-function onGroupCollapse(event, groups) {
-  const idx = groups.indexOf(event.data)
-  if (idx !== -1) groups.splice(idx, 1)
-}
+const expandedGroupsGeneral = ref([])
 
 const dialogNueva = ref(false)
 const creando = ref(false)
 const nueva = ref({ proyecto_id: null, periodo: null, tipo_venta: 'bolsa' })
 
-// ─── Resumen por liquidación ──────────────────────────────────────────────────
+// ─── Una fila por liquidación, sin filtros ────────────────────────────────────
 const filasResumen = computed(() => {
   const filas = []
   for (const proy of vistaProyectos.value) {
     for (const liq of proy.liquidaciones) {
-      const base = {
+      const mandatoTotal = (liq.mandatos_total_ingresos || [])[0]
+      filas.push({
         proyecto_id:  proy.proyecto_id,
         proyecto:     proy.proyecto_nombre,
         liq_id:       liq.liquidacion_id,
@@ -309,45 +168,25 @@ const filasResumen = computed(() => {
         periodoLabel: formatPeriodo(liq.periodo),
         estado:       liq.estado,
         tipo_venta:   liq.tipo_venta,
-        er_url:       liq.estado_resultados_url,
-      }
-
-      // Fila Mandato (ingresos) — siempre presente
-      const mandatoTotal = (liq.mandatos_total_ingresos || [])[0]
-      filas.push({ ...base, doc: 'Mandato', ingreso_neto: mandatoTotal?.valor_neto_cop ?? null })
-
-      // Fila Costos — si algún inversionista tiene mandatos de costos
-      const hasCostos = (liq.inversionistas || []).some(inv => (inv.mandatos_costos || []).length > 0)
-      if (hasCostos) {
-        filas.push({ ...base, doc: 'Costos', ingreso_neto: null })
-      }
-
-      // Una fila por cada factura de servicio
-      for (const f of (liq.facturas_servicio || [])) {
-        filas.push({ ...base, doc: 'Factura', ingreso_neto: f.valor_cop ?? null })
-      }
+        ingreso_neto: mandatoTotal?.valor_neto_cop ?? null,
+      })
     }
   }
   return filas
 })
 
-// Filtrado client-side por búsqueda y tipo_venta (estado/periodo vienen del API)
+// ─── Filtrado client-side (q + tipo_venta) ────────────────────────────────────
 const filasResumenFiltradas = computed(() => {
-  let rows = filasResumen.value
   const q = (filtros.value.q || '').toLowerCase().trim()
-  if (q) rows = rows.filter(r => r.proyecto.toLowerCase().includes(q))
-  if (filtros.value.tipo_venta) rows = rows.filter(r => r.tipo_venta === filtros.value.tipo_venta)
-  return rows
+  return filasResumen.value
+    .filter(r => !q || r.proyecto.toLowerCase().includes(q))
+    .filter(r => !filtros.value.tipo_venta || r.tipo_venta === filtros.value.tipo_venta)
 })
 
-const filasGeneral     = computed(() => filasResumenFiltradas.value)
-const filasIngresosTab = computed(() => filasResumenFiltradas.value.filter(f => f.doc === 'Mandato'))
-const filasCostosTab   = computed(() => filasResumenFiltradas.value.filter(f => f.doc === 'Costos' || f.doc === 'Factura'))
-
 // ─── Info por grupo (count + tipo_venta único si aplica) ─────────────────────
-function buildGrupoInfo(rows) {
+const grupoInfo = computed(() => {
   const map = {}
-  for (const r of rows) {
+  for (const r of filasResumenFiltradas.value) {
     if (!map[r.proyecto]) map[r.proyecto] = { count: 0, tipos: new Set() }
     map[r.proyecto].count++
     if (r.tipo_venta) map[r.proyecto].tipos.add(r.tipo_venta)
@@ -357,19 +196,11 @@ function buildGrupoInfo(rows) {
     result[k] = { count: v.count, tipo_venta: v.tipos.size === 1 ? [...v.tipos][0] : null }
   }
   return result
-}
-
-const grupoInfoGeneral  = computed(() => buildGrupoInfo(filasGeneral.value))
-const grupoInfoIngresos = computed(() => buildGrupoInfo(filasIngresosTab.value))
-const grupoInfoCostos   = computed(() => buildGrupoInfo(filasCostosTab.value))
+})
 
 // ─── Helpers de estilo ────────────────────────────────────────────────────────
-function badgeDocClass(doc) {
-  return { Mandato: 'badge-mandato', Costos: 'badge-costos', Factura: 'badge-factura' }[doc] || 'badge-mandato'
-}
-
 function badgeTipoVenta(tv) {
-  return { ppa: 'badge-ppa', autoconsumo: 'badge-auto' }[tv] || 'badge-bolsa'
+  return { ppa: 'badge-ppa', autoconsumo: 'badge-auto', bolsa: 'badge-bolsa' }[tv] || 'badge-bolsa'
 }
 
 function estadoSeverity(e) {
@@ -464,11 +295,8 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.field-label   { @apply block text-xs font-medium text-gray-600 mb-1; }
-.badge-mandato { @apply bg-blue-100 text-blue-800 text-[10px] font-semibold px-1.5 py-0.5 rounded; }
-.badge-costos  { @apply bg-orange-100 text-orange-800 text-[10px] font-semibold px-1.5 py-0.5 rounded; }
-.badge-factura { @apply bg-yellow-100 text-yellow-700 text-[10px] font-semibold px-1.5 py-0.5 rounded; }
-.badge-ppa     { @apply bg-purple-100 text-purple-800 text-[10px] font-semibold px-1.5 py-0.5 rounded; }
-.badge-auto    { @apply bg-green-100 text-green-800 text-[10px] font-semibold px-1.5 py-0.5 rounded; }
-.badge-bolsa   { @apply bg-blue-50 text-blue-700 text-[10px] font-semibold px-1.5 py-0.5 rounded; }
+.field-label { @apply block text-xs font-medium text-gray-600 mb-1; }
+.badge-ppa   { @apply bg-purple-100 text-purple-800 text-[10px] font-semibold px-1.5 py-0.5 rounded; }
+.badge-auto  { @apply bg-green-100 text-green-800 text-[10px] font-semibold px-1.5 py-0.5 rounded; }
+.badge-bolsa { @apply bg-blue-50 text-blue-700 text-[10px] font-semibold px-1.5 py-0.5 rounded; }
 </style>
