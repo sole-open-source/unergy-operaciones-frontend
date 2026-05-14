@@ -70,36 +70,54 @@
           <span class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Vendedor</span>
         </div>
         <div class="grid grid-cols-2 gap-4 p-4 rounded-lg bg-gray-50">
+          <!-- Comprador -->
           <div class="space-y-3">
             <div class="flex flex-col gap-1">
               <label class="field-label">Nombre / Razón social</label>
-              <AutoComplete
-                v-model="form.comprador_nombre"
-                :suggestions="compradoresFiltrados"
-                @complete="buscarComprador"
-                @item-select="seleccionarComprador"
-                placeholder="Buscar o escribir nuevo…"
-                class="w-full"
-                inputClass="w-full"
-              />
+              <div class="flex gap-2">
+                <AutoComplete
+                  v-model="form.comprador_nombre"
+                  :suggestions="compradoresFiltrados"
+                  @complete="buscarCliente($event, 'comprador')"
+                  @item-select="seleccionarCliente($event, 'comprador')"
+                  @clear="limpiarParte('comprador')"
+                  placeholder="Buscar cliente existente…"
+                  class="flex-1"
+                  inputClass="w-full"
+                />
+                <Button icon="pi pi-plus" severity="secondary" outlined size="small"
+                  v-tooltip="'Crear nuevo cliente'" @click="abrirNuevoCliente('comprador')" />
+              </div>
+              <div v-if="form.comprador_id" class="flex items-center gap-1 text-xs text-green-600">
+                <i class="pi pi-link text-xs" /> Cliente vinculado (id {{ form.comprador_id }})
+              </div>
             </div>
             <div class="flex flex-col gap-1">
               <label class="field-label">NIT</label>
               <InputText v-model="form.comprador_nit" class="w-full" placeholder="Ej: 900123456-7" />
             </div>
           </div>
+          <!-- Vendedor -->
           <div class="space-y-3">
             <div class="flex flex-col gap-1">
               <label class="field-label">Nombre / Razón social</label>
-              <AutoComplete
-                v-model="form.vendedor_nombre"
-                :suggestions="vendedoresFiltrados"
-                @complete="buscarVendedor"
-                @item-select="seleccionarVendedor"
-                placeholder="Buscar o escribir nuevo…"
-                class="w-full"
-                inputClass="w-full"
-              />
+              <div class="flex gap-2">
+                <AutoComplete
+                  v-model="form.vendedor_nombre"
+                  :suggestions="vendedoresFiltrados"
+                  @complete="buscarCliente($event, 'vendedor')"
+                  @item-select="seleccionarCliente($event, 'vendedor')"
+                  @clear="limpiarParte('vendedor')"
+                  placeholder="Buscar cliente existente…"
+                  class="flex-1"
+                  inputClass="w-full"
+                />
+                <Button icon="pi pi-plus" severity="secondary" outlined size="small"
+                  v-tooltip="'Crear nuevo cliente'" @click="abrirNuevoCliente('vendedor')" />
+              </div>
+              <div v-if="form.vendedor_id" class="flex items-center gap-1 text-xs text-green-600">
+                <i class="pi pi-link text-xs" /> Cliente vinculado (id {{ form.vendedor_id }})
+              </div>
             </div>
             <div class="flex flex-col gap-1">
               <label class="field-label">NIT</label>
@@ -108,6 +126,12 @@
           </div>
         </div>
       </template>
+
+      <!-- Dialog nuevo cliente -->
+      <NuevoClienteDialog
+        v-model:visible="showNuevoCliente"
+        @creado="onClienteCreado"
+      />
 
       <!-- ── PASO 2: Condiciones comerciales ───────────────────────────── -->
       <template v-if="step === 2">
@@ -334,6 +358,7 @@ import MultiSelect from 'primevue/multiselect'
 import AutoComplete from 'primevue/autocomplete'
 import DatePicker from 'primevue/datepicker'
 import Textarea from 'primevue/textarea'
+import NuevoClienteDialog from '@/components/NuevoClienteDialog.vue'
 import api from '@/api/client'
 
 defineProps({ visible: Boolean })
@@ -369,34 +394,51 @@ const todosProyectos = ref([])
 const proyectosSeleccionados = ref([])
 const errores = reactive({})
 
-// Partes registradas (compradores/vendedores de contratos anteriores)
-const partesCompradores = ref([])
-const partesVendedores = ref([])
+// Clientes registrados
+const todosClientes = ref([])
 const compradoresFiltrados = ref([])
 const vendedoresFiltrados = ref([])
 
-function buscarComprador(event) {
+// Dialog nuevo cliente
+const showNuevoCliente = ref(false)
+const nuevoClienteRol = ref('comprador') // 'comprador' | 'vendedor'
+
+function buscarCliente(event, rol) {
   const q = event.query.toLowerCase()
-  compradoresFiltrados.value = partesCompradores.value
-    .filter(p => p.nombre.toLowerCase().includes(q))
-    .map(p => p.nombre)
+  const resultado = todosClientes.value
+    .filter(c => c.razon_social_nombre.toLowerCase().includes(q))
+    .map(c => c.razon_social_nombre)
+  if (rol === 'comprador') compradoresFiltrados.value = resultado
+  else vendedoresFiltrados.value = resultado
 }
 
-function buscarVendedor(event) {
-  const q = event.query.toLowerCase()
-  vendedoresFiltrados.value = partesVendedores.value
-    .filter(p => p.nombre.toLowerCase().includes(q))
-    .map(p => p.nombre)
+function seleccionarCliente(event, rol) {
+  const found = todosClientes.value.find(c => c.razon_social_nombre === event.value)
+  if (!found) return
+  if (rol === 'comprador') {
+    form.comprador_id = found.id
+    form.comprador_nombre = found.razon_social_nombre
+    form.comprador_nit = found.nit_cedula || ''
+  } else {
+    form.vendedor_id = found.id
+    form.vendedor_nombre = found.razon_social_nombre
+    form.vendedor_nit = found.nit_cedula || ''
+  }
 }
 
-function seleccionarComprador(event) {
-  const found = partesCompradores.value.find(p => p.nombre === event.value)
-  if (found?.nit) form.comprador_nit = found.nit
+function limpiarParte(rol) {
+  if (rol === 'comprador') { form.comprador_id = null; form.comprador_nit = '' }
+  else { form.vendedor_id = null; form.vendedor_nit = '' }
 }
 
-function seleccionarVendedor(event) {
-  const found = partesVendedores.value.find(p => p.nombre === event.value)
-  if (found?.nit) form.vendedor_nit = found.nit
+function abrirNuevoCliente(rol) {
+  nuevoClienteRol.value = rol
+  showNuevoCliente.value = true
+}
+
+function onClienteCreado(cliente) {
+  todosClientes.value.push(cliente)
+  seleccionarCliente({ value: cliente.razon_social_nombre }, nuevoClienteRol.value)
 }
 
 // Paste state — tarifas
@@ -413,8 +455,8 @@ const energiaPreview = computed(() => energiaRows.value.slice(0, PREVIEW_ROWS))
 
 const form = reactive({
   numero_codigo_contrato: null, nombre_interno: null,
-  comprador_nombre: null, comprador_nit: null,
-  vendedor_nombre: null, vendedor_nit: null,
+  comprador_id: null, comprador_nombre: null, comprador_nit: null,
+  vendedor_id: null, vendedor_nombre: null, vendedor_nit: null,
   fecha_inicio: null, fecha_fin: null,
   indice_indexacion: null, periodicidad_indexacion: null,
   periodo_indexacion_base: null, valor_indexacion_base: null,
@@ -531,13 +573,12 @@ async function guardar() {
 
 onMounted(async () => {
   try {
-    const [{ data: proy }, { data: partes }] = await Promise.all([
+    const [{ data: proy }, { data: clientes }] = await Promise.all([
       api.get('/proyectos', { params: { size: 500 } }),
-      api.get('/ppa/partes'),
+      api.get('/clientes', { params: { size: 500 } }),
     ])
     todosProyectos.value = proy.items
-    partesCompradores.value = partes.compradores
-    partesVendedores.value = partes.vendedores
+    todosClientes.value = clientes.items
   } catch { /* silencioso */ }
 })
 </script>
