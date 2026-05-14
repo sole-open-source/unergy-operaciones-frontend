@@ -284,6 +284,7 @@ import api from '@/api/client'
 const props = defineProps({
   visible: Boolean,
   tipo: { type: String, required: true }, // representacion | operacion | rec
+  proyectoIdDefault: { type: Number, default: null },
 })
 const emit = defineEmits(['update:visible', 'cerrar', 'creado'])
 
@@ -451,6 +452,7 @@ onMounted(async () => {
   ])
   todosProyectos.value = proyectos
   todosClientes.value = clientes
+  if (props.proyectoIdDefault) form.proyecto_id = props.proyectoIdDefault
 })
 </script>
 

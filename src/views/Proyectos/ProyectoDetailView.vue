@@ -209,35 +209,94 @@
 
       <!-- ══ SERVICIOS ══ -->
       <TabPanel header="Servicios">
-        <div class="p-6">
-          <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+        <div class="p-6 space-y-4">
+
+          <!-- Cards de servicio -->
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div
               v-for="srv in SERVICIOS_CARDS" :key="srv.key"
               class="relative flex flex-col items-center gap-3 rounded-xl border-2 p-5 cursor-pointer transition-all hover:shadow-md hover:-translate-y-0.5 select-none"
-              :class="srvFlags[srv.key]
-                ? 'border-transparent shadow-sm'
-                : 'border-gray-100 bg-gray-50 opacity-60 hover:opacity-80'"
-              :style="srvFlags[srv.key] ? `background:${srv.bg}18; border-color:${srv.color}40` : ''"
-              @click="$router.push(`/proyectos/${route.params.id}/${srv.route}`)"
+              :class="srvExpanded === srv.key ? 'ring-2 ring-offset-1 shadow-md' : (srvFlags[srv.key] ? 'shadow-sm' : '')"
+              :style="srvFlags[srv.key] || srvExpanded === srv.key
+                ? `background:${srv.bg}; border-color:${srv.color}40`
+                : 'background:#f9fafb; border-color:#e5e7eb'"
+              @click="clickServicio(srv)"
             >
               <div class="w-12 h-12 rounded-full flex items-center justify-center"
-                :style="srvFlags[srv.key] ? `background:${srv.color}20` : 'background:#e5e7eb'">
+                :style="`background:${(srvFlags[srv.key] || srvExpanded === srv.key) ? srv.color + '25' : '#e5e7eb'}`">
                 <i :class="srv.icon" class="text-2xl"
-                  :style="srvFlags[srv.key] ? `color:${srv.color}` : 'color:#9ca3af'" />
+                  :style="`color:${(srvFlags[srv.key] || srvExpanded === srv.key) ? srv.color : '#9ca3af'}`" />
               </div>
               <span class="text-sm font-semibold text-center"
-                :style="srvFlags[srv.key] ? `color:${srv.color}` : 'color:#6b7280'">
+                :style="`color:${(srvFlags[srv.key] || srvExpanded === srv.key) ? srv.color : '#6b7280'}`">
                 {{ srv.label }}
               </span>
               <span v-if="srvFlags[srv.key]"
                 class="absolute top-2 right-2 w-2 h-2 rounded-full"
                 :style="`background:${srv.color}`" />
+              <i v-if="srv.key === 'srv_ppa'" class="pi pi-external-link absolute bottom-2 right-2 text-xs text-gray-300" />
             </div>
           </div>
-          <div class="mt-6 pt-4 border-t border-gray-100">
+
+          <!-- Panel inline de contratos -->
+          <div v-if="srvExpanded" class="rounded-xl border border-gray-100 bg-white overflow-hidden">
+            <div class="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+              <div class="flex items-center gap-2">
+                <i :class="SERVICIOS_CARDS.find(s => s.key === srvExpanded)?.icon" class="text-sm"
+                  :style="`color:${SERVICIOS_CARDS.find(s => s.key === srvExpanded)?.color}`" />
+                <p class="text-sm font-semibold text-gray-700">
+                  Contratos · {{ SERVICIOS_CARDS.find(s => s.key === srvExpanded)?.label }}
+                </p>
+              </div>
+              <Button label="Nuevo contrato" icon="pi pi-plus" size="small"
+                :style="`background:${SERVICIOS_CARDS.find(s => s.key === srvExpanded)?.color}; border-color:${SERVICIOS_CARDS.find(s => s.key === srvExpanded)?.color}`"
+                @click="showContratoWizard = true" />
+            </div>
+            <DataTable
+              :value="contratosInline"
+              :loading="loadingInline"
+              stripedRows
+              class="text-sm"
+              rowHover
+              emptyMessage="Sin contratos registrados para este proyecto."
+              @row-click="(e) => $router.push(`/contratos/${e.data.id}`)"
+            >
+              <Column field="numero_contrato" header="N° contrato" style="width:140px">
+                <template #body="{ data }">
+                  <span class="font-mono text-xs text-gray-500">{{ data.numero_contrato || '—' }}</span>
+                </template>
+              </Column>
+              <Column header="Contratante">
+                <template #body="{ data }">{{ data.contratante_nombre || '—' }}</template>
+              </Column>
+              <Column header="Prestador">
+                <template #body="{ data }">{{ data.prestador_nombre || '—' }}</template>
+              </Column>
+              <Column field="fecha_inicio" header="Inicio" style="width:95px">
+                <template #body="{ data }">{{ formatFechaSrv(data.fecha_inicio) }}</template>
+              </Column>
+              <Column field="fecha_fin" header="Fin" style="width:95px">
+                <template #body="{ data }">{{ formatFechaSrv(data.fecha_fin) }}</template>
+              </Column>
+              <Column header="Estado" style="width:120px">
+                <template #body="{ data }">
+                  <Tag :value="ESTADO_LABELS_SRV[data.estado] || data.estado" :severity="ESTADO_SEVERITY_SRV[data.estado]" />
+                </template>
+              </Column>
+              <Column style="width:50px">
+                <template #body="{ data }">
+                  <Button icon="pi pi-arrow-right" text size="small" severity="secondary"
+                    @click.stop="$router.push(`/contratos/${data.id}`)" />
+                </template>
+              </Column>
+            </DataTable>
+          </div>
+
+          <!-- Activar / desactivar servicios -->
+          <div class="pt-2 border-t border-gray-100">
             <p class="text-xs text-gray-400 mb-3">Activar / desactivar servicios</p>
             <div class="flex flex-wrap gap-3">
-              <div v-for="srv in SERVICIOS_CARDS" :key="srv.key + '_toggle'"
+              <div v-for="srv in SERVICIOS_FLAGS" :key="srv.key + '_toggle'"
                 class="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2">
                 <ToggleSwitch v-model="srvFlags[srv.key]" @change="toggleServicio(srv.key, srvFlags[srv.key])" />
                 <span class="text-xs text-gray-600">{{ srv.label }}</span>
@@ -245,6 +304,16 @@
             </div>
           </div>
         </div>
+
+        <!-- Wizard nuevo contrato de servicio -->
+        <ContratoServicioWizard
+          v-if="showContratoWizard"
+          :visible="showContratoWizard"
+          :tipo="SERVICIOS_CARDS.find(s => s.key === srvExpanded)?.tipo ?? 'operacion'"
+          :proyecto-id-default="Number(route.params.id)"
+          @cerrar="showContratoWizard = false"
+          @creado="onContratoServicioCreado"
+        />
       </TabPanel>
     </TabView>
   </div>
@@ -279,6 +348,7 @@ import InputNumber from 'primevue/inputnumber'
 import Divider from 'primevue/divider'
 import { useToast } from 'primevue/usetoast'
 import api from '@/api/client'
+import ContratoServicioWizard from '@/views/Contratos/ContratoServicioWizard.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -291,13 +361,18 @@ const TIPOS_TECNOLOGIA = ['solar', 'eolica', 'hidraulica', 'biomasa', 'otra']
 const CLASIFICACIONES = ['AGP', 'AGPE', 'AGGE', 'GD', 'DER', 'otra']
 const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 const SERVICIOS_CARDS = [
-  { key: 'srv_ppa',           label: 'PPA',           icon: 'pi pi-bolt',       color: '#f59e0b', bg: '#fef3c7', route: 'ppa' },
-  { key: 'srv_representacion',label: 'Representación', icon: 'pi pi-file-edit',  color: '#3b82f6', bg: '#eff6ff', route: 'representacion' },
-  { key: 'srv_cgm',           label: 'CGM',           icon: 'pi pi-chart-bar',  color: '#10b981', bg: '#ecfdf5', route: 'cgm' },
-  { key: 'srv_promotor',      label: 'Promotor',      icon: 'pi pi-briefcase',  color: '#8b5cf6', bg: '#f5f3ff', route: 'promotor' },
-  { key: 'srv_rec',           label: 'REC',           icon: 'pi pi-verified',   color: '#14b8a6', bg: '#f0fdfa', route: 'rec' },
+  { key: 'srv_ppa',           label: 'PPA',           icon: 'pi pi-bolt',       color: '#f59e0b', bg: '#fef3c7', tipo: null },
+  { key: 'srv_operacion',     label: 'Operación',     icon: 'pi pi-wrench',     color: '#10b981', bg: '#ecfdf5', tipo: 'operacion' },
+  { key: 'srv_representacion',label: 'Representación', icon: 'pi pi-file-edit',  color: '#3b82f6', bg: '#eff6ff', tipo: 'representacion' },
+  { key: 'srv_rec',           label: 'REC',           icon: 'pi pi-verified',   color: '#14b8a6', bg: '#f0fdfa', tipo: 'rec' },
 ]
-const SERVICIOS = SERVICIOS_CARDS
+const SERVICIOS_FLAGS = [
+  ...SERVICIOS_CARDS,
+  { key: 'srv_cgm',     label: 'CGM',     icon: 'pi pi-chart-bar', color: '#10b981', bg: '#ecfdf5' },
+  { key: 'srv_promotor',label: 'Promotor',icon: 'pi pi-briefcase', color: '#8b5cf6', bg: '#f5f3ff' },
+]
+const ESTADO_LABELS_SRV = { vigente: 'Vigente', vencido: 'Vencido', terminado: 'Terminado', en_renovacion: 'En renovación' }
+const ESTADO_SEVERITY_SRV = { vigente: 'success', vencido: 'danger', terminado: 'secondary', en_renovacion: 'warn' }
 
 // ── Estado base ───────────────────────────────────────────────────────────────
 const proyecto = ref(null)
@@ -306,6 +381,10 @@ const loading = ref(true)
 const errorMsg = ref(null)
 const guardando = ref(false)
 const srvFlags = reactive({})
+const srvExpanded = ref(null)
+const contratosInline = ref([])
+const loadingInline = ref(false)
+const showContratoWizard = ref(false)
 
 // ── Modo edición ──────────────────────────────────────────────────────────────
 const isEditMode = computed(() => route.query.edit === 'true')
@@ -497,6 +576,43 @@ async function toggleServicio(key, value) {
   }
 }
 
+function clickServicio(srv) {
+  if (srv.key === 'srv_ppa') {
+    router.push(`/proyectos/${route.params.id}/ppa`)
+    return
+  }
+  if (!srv.tipo) return
+  if (srvExpanded.value === srv.key) {
+    srvExpanded.value = null
+    return
+  }
+  srvExpanded.value = srv.key
+  cargarContratosInline(srv.tipo)
+}
+
+async function cargarContratosInline(tipo) {
+  contratosInline.value = []
+  loadingInline.value = true
+  try {
+    const { data } = await api.get('/contratos-servicio', { params: { tipo, proyecto_id: route.params.id } })
+    contratosInline.value = data
+  } catch {
+    toast.add({ severity: 'error', summary: 'Error al cargar contratos', life: 3000 })
+  } finally {
+    loadingInline.value = false
+  }
+}
+
+function onContratoServicioCreado() {
+  const srv = SERVICIOS_CARDS.find(s => s.key === srvExpanded.value)
+  if (srv?.tipo) cargarContratosInline(srv.tipo)
+}
+
+function formatFechaSrv(f) {
+  if (!f) return '—'
+  return String(f).slice(0, 10)
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const estadoSeverity = (e) => (
   { en_operacion: 'success', en_desarrollo: 'info', suspendido: 'warn', cancelado: 'secondary' }[e] || 'secondary'
@@ -515,7 +631,7 @@ onMounted(async () => {
       inversionistas: Array.isArray(invRes.data) ? invRes.data : (invRes.data.items ?? []),
     }
     clientes.value = clientesRes.data.items
-    for (const s of SERVICIOS) srvFlags[s.key] = proyRes.data[s.key]
+    for (const s of SERVICIOS_FLAGS) srvFlags[s.key] = proyRes.data[s.key]
     if (isEditMode.value) populateEditForm()
   } catch (e) {
     errorMsg.value = e.response?.data?.detail || e.message || 'Error de conexión con el servidor'
