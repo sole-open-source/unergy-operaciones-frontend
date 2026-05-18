@@ -508,34 +508,35 @@ function render(t, dt, W, H, des, genTotal, diasMes, minV, maxV, fracMes, estado
   _drawSun(ctx, t, cxf(0.5), arcY(0.5, des))
 
   // ── Anotaciones de período ────────────────────────────────────────────────
-  const _fmt = v => (v ?? 0).toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' MWh'
-  const _pill = (text, cx2, cy2, bg, fg, border) => {
-    ctx.font = '600 11px system-ui, sans-serif'
-    const tw = ctx.measureText(text).width + 18, ph = 22
-    const px = Math.min(Math.max(cx2 - tw / 2, 4), W - tw - 4)
-    const py = Math.min(Math.max(cy2, 4), H - ph - 4)
-    ctx.fillStyle = bg
+  const _fmt   = v => (v ?? 0).toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' MWh'
+  const _labelAboveDot = (text, cx2, cy2) => {
+    ctx.font = '700 11px system-ui, sans-serif'
+    const tw  = ctx.measureText(text).width
+    const pad = 7, ph = 20
+    const px  = Math.min(Math.max(cx2 - tw / 2 - pad, 4), W - tw - pad * 2 - 4)
+    const py  = Math.max(cy2 - ph - 10, 4)
+    ctx.fillStyle = 'rgba(10,6,22,0.72)'
     ctx.beginPath()
-    ctx.roundRect ? ctx.roundRect(px, py, tw, ph, 5) : ctx.rect(px, py, tw, ph)
+    ctx.roundRect ? ctx.roundRect(px, py, tw + pad * 2, ph, 4) : ctx.rect(px, py, tw + pad * 2, ph)
     ctx.fill()
-    if (border) { ctx.strokeStyle = border; ctx.lineWidth = 1; ctx.setLineDash([]); ctx.stroke() }
-    ctx.fillStyle = fg; ctx.textAlign = 'left'
-    ctx.fillText(text, px + 9, py + 15)
-    return { px, tw, py, ph }
+    ctx.strokeStyle = 'rgba(246,255,114,0.55)'; ctx.lineWidth = 1; ctx.setLineDash([]); ctx.stroke()
+    ctx.fillStyle = '#F6FF72'; ctx.textAlign = 'center'
+    ctx.fillText(text, cx2, py + 14)
+    ctx.textAlign = 'left'
+    return py
   }
 
   if (fracMes > 0 && fracMes < 1) {
     const dayX   = cxf(fracMes)
     const dotY   = arcY(fracMes, des)
     const diaNum = Math.round(fracMes * diasMes)
-    const resta  = diasMes - diaNum
 
     // Línea del día (halo + línea blanca)
     ctx.save(); ctx.setLineDash([])
     ctx.strokeStyle = 'rgba(255,255,255,0.07)'; ctx.lineWidth = 8
-    ctx.beginPath(); ctx.moveTo(dayX, 14); ctx.lineTo(dayX, H - 4); ctx.stroke()
+    ctx.beginPath(); ctx.moveTo(dayX, 14); ctx.lineTo(dayX, H - 18); ctx.stroke()
     ctx.strokeStyle = 'rgba(255,255,255,0.52)'; ctx.lineWidth = 1.5
-    ctx.beginPath(); ctx.moveTo(dayX, 14); ctx.lineTo(dayX, H - 4); ctx.stroke()
+    ctx.beginPath(); ctx.moveTo(dayX, 14); ctx.lineTo(dayX, H - 18); ctx.stroke()
     ctx.restore()
 
     // Badge "Hoy · día X" en la parte superior de la línea
@@ -557,24 +558,8 @@ function render(t, dt, W, H, des, genTotal, diasMes, minV, maxV, fracMes, estado
     ctx.fillStyle = '#FFFFFF'; ctx.strokeStyle = '#F6FF72'; ctx.lineWidth = 2; ctx.setLineDash([])
     ctx.fill(); ctx.stroke()
 
-    // Pill con MWh generados (al lado del dot)
-    const genTxt = _fmt(genTotal)
-    ctx.font = '600 11px system-ui, sans-serif'
-    const gtw = ctx.measureText(genTxt).width + 18
-    const onRight = dayX + gtw + 20 < W
-    const gx = onRight ? dayX + 14 : dayX - gtw - 14
-    const { py: gy } = _pill(genTxt, gx + gtw / 2, dotY - 11,
-      'rgba(44,32,57,0.82)', '#F6FF72', 'rgba(246,255,114,0.50)')
-
-    // "X días restantes" en el tramo futuro
-    if (resta > 0 && fracMes < 0.86) {
-      const midF = fracMes + (1 - fracMes) * 0.46
-      const ry   = Math.min(arcY(midF, des) + 22, H - 10)
-      ctx.font = '400 10px system-ui, sans-serif'
-      ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(253,250,247,0.36)'
-      ctx.fillText(`${resta} días restantes`, cxf(midF), ry)
-      ctx.textAlign = 'left'
-    }
+    // MWh generados directo sobre el dot
+    _labelAboveDot(_fmt(genTotal), dayX, dotY)
 
     // Badge "Cierre est. X MWh" — esquina superior derecha
     const ciTxt = `Cierre est. ${_fmt(des)}`
@@ -588,11 +573,32 @@ function render(t, dt, W, H, des, genTotal, diasMes, minV, maxV, fracMes, estado
     ctx.fillStyle = 'rgba(246,255,114,0.88)'; ctx.fillText(ciTxt, cx3 + 8, 20)
 
   } else if (fracMes >= 1 && genTotal > 0) {
-    // Mes pasado: label con el total en la cresta del arco
-    const peakY = arcY(0.5, des)
-    _pill(_fmt(genTotal), cxf(0.5), peakY + 20,
-      'rgba(44,32,57,0.72)', '#F6FF72', 'rgba(246,255,114,0.38)')
+    // Mes pasado: label total en la cresta del arco
+    _labelAboveDot(_fmt(genTotal), cxf(0.5), arcY(0.5, des))
   }
+
+  // ── Eje de días en la base ────────────────────────────────────────────────
+  const axisY   = H - 16
+  const diaNum  = fracMes < 1 ? Math.round(fracMes * diasMes) : diasMes
+  // Ticks cada 5 días; siempre incluir día 1 y el último día del mes
+  const ticks = new Set([1])
+  for (let d = 5; d < diasMes; d += 5) ticks.add(d)
+  ticks.add(diasMes)
+
+  ctx.font = '400 9px system-ui, sans-serif'
+  ctx.textAlign = 'center'
+  for (const d of ticks) {
+    const fx   = cxf(d / diasMes)
+    const isHoy = d === diaNum
+    // Tick vertical
+    ctx.strokeStyle = isHoy ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.16)'
+    ctx.lineWidth = 1; ctx.setLineDash([])
+    ctx.beginPath(); ctx.moveTo(fx, axisY); ctx.lineTo(fx, axisY + 5); ctx.stroke()
+    // Número
+    ctx.fillStyle  = isHoy ? 'rgba(246,255,114,0.90)' : 'rgba(253,250,247,0.28)'
+    ctx.fillText(String(d), fx, axisY + 14)
+  }
+  ctx.textAlign = 'left'
 
   // ── Gradiente de suelo ────────────────────────────────────────────────────
   const gnd = ctx.createLinearGradient(0, H - 8, 0, H + GROUND)
