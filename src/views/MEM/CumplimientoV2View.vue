@@ -52,6 +52,25 @@
 
       <!-- Chart card -->
       <div class="rounded-xl border p-4" style="background: white; border-color: rgba(44,32,57,0.12);">
+
+        <!-- Mode toggle -->
+        <div class="flex justify-end mb-3">
+          <div class="flex gap-1 p-1 rounded-lg" style="background: rgba(44,32,57,0.07);">
+            <button
+              @click="viewMode = 'energia'"
+              :class="['mode-btn', viewMode === 'energia' ? 'mode-active' : 'mode-inactive']"
+            >
+              <i class="pi pi-bolt mr-1.5 text-xs" />Energía
+            </button>
+            <button
+              @click="viewMode = 'plantas'"
+              :class="['mode-btn', viewMode === 'plantas' ? 'mode-active' : 'mode-inactive']"
+            >
+              <i class="pi pi-sun mr-1.5 text-xs" />Plantas
+            </button>
+          </div>
+        </div>
+
         <div ref="chartBox" class="relative select-none" style="width: 100%; height: 360px;">
 
           <svg
@@ -190,9 +209,10 @@
           <div
             v-if="hovered !== null && anualData.meses[hovered]"
             class="absolute pointer-events-none z-10 rounded-xl shadow-lg text-sm"
-            style="background: #2C2039; color: #FDFAF7; padding: 10px 14px; min-width: 200px;"
-            :style="{ left: tooltipX + 'px', top: tooltipY + 'px', transform: 'translateY(-100%) translateX(0)' }"
+            style="background: #2C2039; color: #FDFAF7; padding: 10px 14px; min-width: 210px;"
+            :style="{ left: tooltipX + 'px', top: tooltipY + 'px', transform: 'translateY(-100%)' }"
           >
+            <!-- Header común -->
             <div class="font-bold mb-2" style="color: #F0C040;">
               {{ MESES[hovered] }} {{ selectedYear }}
               <span
@@ -201,45 +221,77 @@
                 style="color: rgba(253,250,247,0.55);"
               >proyección</span>
             </div>
-            <div class="space-y-1">
-              <div class="flex justify-between gap-6">
-                <span style="color: rgba(253,250,247,0.65);">Generación</span>
-                <span class="font-mono font-semibold">{{ fmtMwh(genVal(anualData.meses[hovered])) }}</span>
+
+            <!-- Modo Energía -->
+            <template v-if="viewMode === 'energia'">
+              <div class="space-y-1">
+                <div class="flex justify-between gap-6">
+                  <span style="color: rgba(253,250,247,0.65);">Generación</span>
+                  <span class="font-mono font-semibold">{{ fmtMwh(genVal(anualData.meses[hovered])) }}</span>
+                </div>
+                <div v-if="anualData.meses[hovered].min_mwh !== null" class="flex justify-between gap-6">
+                  <span style="color: rgba(253,250,247,0.65);">Mínimo</span>
+                  <span class="font-mono">{{ fmtMwh(anualData.meses[hovered].min_mwh) }}</span>
+                </div>
+                <div v-if="anualData.meses[hovered].max_mwh !== null" class="flex justify-between gap-6">
+                  <span style="color: rgba(253,250,247,0.65);">Máximo</span>
+                  <span class="font-mono">{{ fmtMwh(anualData.meses[hovered].max_mwh) }}</span>
+                </div>
+                <div
+                  v-if="anualData.meses[hovered].estado === 'deficit'"
+                  class="flex justify-between gap-6 mt-2 pt-2"
+                  style="border-top: 1px solid rgba(255,255,255,0.1);"
+                >
+                  <span style="color: #D64455;">Déficit</span>
+                  <span class="font-mono font-bold" style="color: #D64455;">
+                    {{ fmtMwh(anualData.meses[hovered].compras_bolsa_mwh) }}
+                  </span>
+                </div>
+                <div
+                  v-if="anualData.meses[hovered].estado === 'excedente'"
+                  class="flex justify-between gap-6 mt-2 pt-2"
+                  style="border-top: 1px solid rgba(255,255,255,0.1);"
+                >
+                  <span style="color: #F0C040;">Excedente</span>
+                  <span class="font-mono font-bold" style="color: #F0C040;">
+                    {{ fmtMwh(anualData.meses[hovered].excedentes_bolsa_mwh) }}
+                  </span>
+                </div>
               </div>
-              <div v-if="anualData.meses[hovered].min_mwh !== null" class="flex justify-between gap-6">
-                <span style="color: rgba(253,250,247,0.65);">Mínimo</span>
-                <span class="font-mono">{{ fmtMwh(anualData.meses[hovered].min_mwh) }}</span>
-              </div>
-              <div v-if="anualData.meses[hovered].max_mwh !== null" class="flex justify-between gap-6">
-                <span style="color: rgba(253,250,247,0.65);">Máximo</span>
-                <span class="font-mono">{{ fmtMwh(anualData.meses[hovered].max_mwh) }}</span>
-              </div>
-              <div
-                v-if="anualData.meses[hovered].estado === 'deficit'"
-                class="flex justify-between gap-6 mt-2 pt-2"
-                style="border-top: 1px solid rgba(255,255,255,0.1);"
-              >
-                <span style="color: #D64455;">Déficit</span>
-                <span class="font-mono font-bold" style="color: #D64455;">
-                  {{ fmtMwh(anualData.meses[hovered].compras_bolsa_mwh) }}
+              <div class="mt-2 pt-2" style="border-top: 1px solid rgba(255,255,255,0.1);">
+                <span :class="['text-xs font-bold px-2 py-0.5 rounded-full', estadoBadge(anualData.meses[hovered].estado)]">
+                  {{ estadoLabel(anualData.meses[hovered].estado) }}
                 </span>
               </div>
-              <div
-                v-if="anualData.meses[hovered].estado === 'excedente'"
-                class="flex justify-between gap-6 mt-2 pt-2"
-                style="border-top: 1px solid rgba(255,255,255,0.1);"
-              >
-                <span style="color: #F0C040;">Excedente</span>
-                <span class="font-mono font-bold" style="color: #F0C040;">
-                  {{ fmtMwh(anualData.meses[hovered].excedentes_bolsa_mwh) }}
-                </span>
+            </template>
+
+            <!-- Modo Plantas -->
+            <template v-else>
+              <div class="mb-2 font-semibold" style="color: rgba(253,250,247,0.8);">
+                {{ anualData.meses[hovered].n_plantas }}
+                {{ anualData.meses[hovered].n_plantas === 1 ? 'planta activa' : 'plantas activas' }}
+                <span class="text-xs font-normal" style="color: rgba(253,250,247,0.45);">en GESCON</span>
               </div>
-            </div>
-            <div class="mt-2 pt-2" style="border-top: 1px solid rgba(255,255,255,0.1);">
-              <span :class="['text-xs font-bold px-2 py-0.5 rounded-full', estadoBadge(anualData.meses[hovered].estado)]">
-                {{ estadoLabel(anualData.meses[hovered].estado) }}
-              </span>
-            </div>
+              <div
+                v-if="anualData.meses[hovered].plantas.length === 0"
+                class="text-xs"
+                style="color: rgba(253,250,247,0.45);"
+              >Sin plantas asignadas este mes</div>
+              <div
+                v-for="(p, pi) in anualData.meses[hovered].plantas"
+                :key="pi"
+                class="flex items-start justify-between gap-4 py-1"
+                :style="pi < anualData.meses[hovered].plantas.length - 1 ? 'border-bottom: 1px solid rgba(255,255,255,0.06)' : ''"
+              >
+                <div>
+                  <div class="text-xs font-semibold" style="color: #FDFAF7;">{{ p.nombre }}</div>
+                  <div v-if="p.sub_project" class="text-xs" style="color: rgba(253,250,247,0.45);">{{ p.sub_project }}</div>
+                </div>
+                <div class="text-xs font-mono shrink-0" style="color: #915BD8;">
+                  {{ (p.pct_despacho * 100).toFixed(0) }}%
+                </div>
+              </div>
+            </template>
           </div>
         </div>
 
@@ -377,11 +429,12 @@ const contratos         = ref([])
 const selectedYear      = ref(now.getFullYear())
 const selectedContratoId = ref(null)
 
-const anualData   = ref(null)
+const anualData    = ref(null)
 const chartLoading = ref(false)
-const chartError  = ref(null)
+const chartError   = ref(null)
+const viewMode     = ref('energia')   // 'energia' | 'plantas'
 
-const tableData   = ref([])
+const tableData    = ref([])
 const tableLoading = ref(false)
 
 const hovered  = ref(null)
@@ -570,8 +623,30 @@ onMounted(async () => {
   background: rgba(145,91,216,0.09) !important;
 }
 
-.estado-ok      { background: #1B5E20; color: #C8E6C9; padding: 2px 8px; border-radius: 999px; }
-.estado-deficit { background: #7F0E0E; color: #FFCDD2; padding: 2px 8px; border-radius: 999px; }
+.estado-ok        { background: #1B5E20; color: #C8E6C9; padding: 2px 8px; border-radius: 999px; }
+.estado-deficit   { background: #7F0E0E; color: #FFCDD2; padding: 2px 8px; border-radius: 999px; }
 .estado-excedente { background: #5D3A00; color: #FFE0B2; padding: 2px 8px; border-radius: 999px; }
-.estado-neutral { background: rgba(122,110,138,0.3); color: #FDFAF7; padding: 2px 8px; border-radius: 999px; }
+.estado-neutral   { background: rgba(122,110,138,0.3); color: #FDFAF7; padding: 2px 8px; border-radius: 999px; }
+
+.mode-btn {
+  padding: 4px 12px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  transition: all 0.15s;
+  border: none;
+  cursor: pointer;
+}
+.mode-active {
+  background: #2C2039;
+  color: #FDFAF7;
+  border: 1px solid #915BD8;
+}
+.mode-inactive {
+  background: transparent;
+  color: #7a6e8a;
+}
+.mode-inactive:hover {
+  color: #2C2039;
+}
 </style>
