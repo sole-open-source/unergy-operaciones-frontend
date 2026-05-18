@@ -359,7 +359,7 @@
         />
         <div
           class="fixed rounded-2xl shadow-2xl"
-          style="z-index: 50; background: #FDFAF7; width: 480px; max-height: 80vh; overflow-y: auto; border: 1px solid rgba(44,32,57,0.12); top: 50%; left: 50%; transform: translate(-50%, -50%);"
+          style="z-index: 50; background: #FDFAF7; width: 600px; max-height: 80vh; overflow-y: auto; border: 1px solid rgba(44,32,57,0.12); top: 50%; left: 50%; transform: translate(-50%, -50%);"
           @click.stop
         >
           <!-- Header -->
