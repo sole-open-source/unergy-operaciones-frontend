@@ -500,31 +500,37 @@ function render(t, dt, W, H, des, genTotal, diasMes, minV, maxV, fracMes, estado
   const _toY  = v => H - (v / totalMax) * (H - 28) / 0.85
   const genYh = _toY(genTotal)
   const _fmtN = v => Math.round(v).toLocaleString('es-CO')
-  const TK    = 8  // longitud del tick
 
-  ctx.setLineDash([]); ctx.textAlign = 'right'
-  ctx.font = '500 10px system-ui, sans-serif'
-
-  // Máximo
-  ctx.strokeStyle = 'rgba(167,126,224,0.40)'; ctx.lineWidth = 1
-  ctx.beginPath(); ctx.moveTo(W - TK - 2, maxYh); ctx.lineTo(W - 2, maxYh); ctx.stroke()
-  ctx.fillStyle = 'rgba(183,148,232,0.70)'; ctx.fillText(_fmtN(maxV), W - TK - 5, maxYh + 4)
-
-  // Mínimo
-  ctx.strokeStyle = 'rgba(224,85,103,0.40)'; ctx.lineWidth = 1
-  ctx.beginPath(); ctx.moveTo(W - TK - 2, minYh); ctx.lineTo(W - 2, minYh); ctx.stroke()
-  ctx.fillStyle = 'rgba(232,121,138,0.70)'; ctx.fillText(_fmtN(minV), W - TK - 5, minYh + 4)
-
-  // Generación actual — solo si no se superpone con min/max
-  if (genTotal > 0 && genYh > maxYh + 16 && genYh < minYh - 16) {
-    ctx.strokeStyle = 'rgba(246,255,114,0.55)'; ctx.lineWidth = 1
-    ctx.beginPath(); ctx.moveTo(W - TK - 2, genYh); ctx.lineTo(W - 2, genYh); ctx.stroke()
-    ctx.fillStyle = 'rgba(246,255,114,0.90)'; ctx.fillText(_fmtN(genTotal), W - TK - 5, genYh + 4)
+  // Dibuja pill + tick para cada entrada del eje
+  const _axPill = (y, prefix, numStr, pillBg, pillFg, tickColor) => {
+    ctx.font = '600 11px system-ui, sans-serif'
+    const label = `${prefix}  ${numStr}`
+    const tw    = ctx.measureText(label).width
+    const bw    = tw + 14, bh = 20
+    const bx    = W - bw - 18   // deja 18 px para el tick a la derecha
+    const by    = y - bh / 2
+    // Fondo semitransparente
+    ctx.fillStyle = pillBg
+    ctx.beginPath()
+    ctx.roundRect ? ctx.roundRect(bx, by, bw, bh, 4) : ctx.rect(bx, by, bw, bh)
+    ctx.fill()
+    // Texto
+    ctx.fillStyle = pillFg; ctx.textAlign = 'left'
+    ctx.fillText(label, bx + 7, by + 14)
+    // Tick de conexión al borde derecho
+    ctx.strokeStyle = tickColor; ctx.lineWidth = 1.5; ctx.setLineDash([])
+    ctx.beginPath(); ctx.moveTo(W - 16, y); ctx.lineTo(W - 2, y); ctx.stroke()
   }
 
-  // Unidad
-  ctx.font = '400 9px system-ui, sans-serif'
-  ctx.fillStyle = 'rgba(253,250,247,0.18)'; ctx.fillText('MWh', W - 2, maxYh - 10)
+  ctx.setLineDash([])
+  _axPill(maxYh, 'máx', _fmtN(maxV),
+    'rgba(30,14,50,0.82)', 'rgba(200,165,245,0.95)', '#a77ee0')
+  _axPill(minYh, 'mín', _fmtN(minV),
+    'rgba(40,10,14,0.82)', 'rgba(245,140,150,0.95)', '#e05567')
+  if (genTotal > 0 && genYh > maxYh + 22 && genYh < minYh - 22) {
+    _axPill(genYh, 'gen', _fmtN(genTotal),
+      'rgba(28,26,6,0.85)', '#F6FF72', 'rgba(246,255,114,0.80)')
+  }
   ctx.textAlign = 'left'
 
   // ── Sol ───────────────────────────────────────────────────────────────────
@@ -574,17 +580,26 @@ function render(t, dt, W, H, des, genTotal, diasMes, minV, maxV, fracMes, estado
 
   // Etiquetas de días en la barra
   const diaNum = fracMes < 1 ? Math.round(fracMes * diasMes) : diasMes
-  ctx.font = '400 9px system-ui, sans-serif'; ctx.textAlign = 'center'
+  ctx.textAlign = 'center'
   // "1" al inicio
-  ctx.fillStyle = 'rgba(253,250,247,0.22)'; ctx.fillText('1', barX0, barY + 13)
-  // día actual (sobre el dot, en amarillo)
-  if (fracMes < 1) {
-    ctx.fillStyle = 'rgba(246,255,114,0.80)'
-    ctx.fillText(String(diaNum), progX, barY + 13)
-  }
+  ctx.font = '400 9px system-ui, sans-serif'
+  ctx.fillStyle = 'rgba(253,250,247,0.28)'; ctx.fillText('1', barX0, barY + 13)
   // fin de mes
-  ctx.fillStyle = fracMes >= 1 ? 'rgba(246,255,114,0.80)' : 'rgba(253,250,247,0.22)'
+  ctx.fillStyle = fracMes >= 1 ? '#F6FF72' : 'rgba(253,250,247,0.28)'
   ctx.fillText(String(diasMes), barX1, barY + 13)
+  // Día actual: pill destacado bajo el dot
+  if (fracMes < 1) {
+    const dayLbl = `día ${diaNum}`
+    ctx.font = '700 11px system-ui, sans-serif'
+    const dlw = ctx.measureText(dayLbl).width + 14
+    const dlx = Math.min(Math.max(progX - dlw / 2, barX0), barX1 - dlw)
+    ctx.fillStyle = 'rgba(20,16,36,0.85)'
+    ctx.beginPath()
+    ctx.roundRect ? ctx.roundRect(dlx, barY + 4, dlw, 18, 4) : ctx.rect(dlx, barY + 4, dlw, 18)
+    ctx.fill()
+    ctx.strokeStyle = 'rgba(246,255,114,0.45)'; ctx.lineWidth = 1; ctx.setLineDash([]); ctx.stroke()
+    ctx.fillStyle = '#F6FF72'; ctx.fillText(dayLbl, progX, barY + 16)
+  }
   ctx.textAlign = 'left'
 
   // ── Gradiente de suelo ────────────────────────────────────────────────────
@@ -674,33 +689,6 @@ function _animSparks(ctx, t, dt, W, maxYh) {
 }
 
 function _animWave(ctx, t, dt, W, minYh, maxYh) {
-  const bandH = minYh - maxYh
-  const midY  = maxYh + bandH * 0.5
-
-  ctx.save()
-
-  // Onda 1 — dorada, lenta
-  ctx.beginPath()
-  for (let px = 0; px <= W; px += 3) {
-    const y = midY + Math.sin((px / W) * Math.PI * 6 + t * 0.9) * (bandH * 0.18)
-    px === 0 ? ctx.moveTo(px, y) : ctx.lineTo(px, y)
-  }
-  ctx.strokeStyle = 'rgba(246,255,114,0.05)'
-  ctx.lineWidth = 9; ctx.lineJoin = 'round'
-  ctx.stroke()
-
-  // Onda 2 — púrpura, contra-fase
-  ctx.beginPath()
-  for (let px = 0; px <= W; px += 3) {
-    const y = midY + Math.sin((px / W) * Math.PI * 4 - t * 0.6 + 1.6) * (bandH * 0.12)
-    px === 0 ? ctx.moveTo(px, y) : ctx.lineTo(px, y)
-  }
-  ctx.strokeStyle = 'rgba(145,91,216,0.04)'
-  ctx.lineWidth = 6
-  ctx.stroke()
-
-  ctx.restore()
-
   // Partículas flotantes en la zona
   ctx.save()
   for (const d of _dust) {
