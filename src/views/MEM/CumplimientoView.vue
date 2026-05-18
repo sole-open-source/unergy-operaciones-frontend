@@ -72,29 +72,29 @@
         <!-- Canvas + leyenda -->
         <div class="flex flex-col gap-3">
           <div ref="skyGeneralBox" class="relative rounded-2xl overflow-hidden"
-               style="height: 260px; background: #04020b; border: 1px solid rgba(145,91,216,0.3);">
+               style="height: 260px; background: #06080f; border: 1px solid rgba(90,110,195,0.28);">
             <canvas ref="cvGeneralRef" class="absolute inset-0 w-full h-full" />
             <!-- Suelo solar -->
             <div class="absolute bottom-0 left-0 right-0 h-9"
-                 style="background: #100b1e; border-top: 1px solid rgba(145,91,216,0.45);">
+                 style="background: #0c1422; border-top: 1px solid rgba(90,110,195,0.35);">
               <div class="flex gap-1.5 absolute left-1/2 -translate-x-1/2 top-1.5">
                 <div v-for="i in 9" :key="i" class="w-5 h-3 rounded-sm"
-                     style="background: #221440; border: 1px solid rgba(145,91,216,0.5);" />
+                     style="background: #182040; border: 1px solid rgba(90,110,195,0.42);" />
               </div>
             </div>
           </div>
 
           <div class="flex flex-wrap gap-5">
             <div class="flex items-center gap-2 text-xs" style="color:#7a6e8a;">
-              <svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" stroke="#F6FF72" stroke-width="2.5"/></svg>
+              <svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" stroke="#F0C040" stroke-width="2.5"/></svg>
               Generación total contratos
             </div>
             <div class="flex items-center gap-2 text-xs" style="color:#7a6e8a;">
-              <svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" stroke="#e05567" stroke-width="1.5" stroke-dasharray="5,3"/></svg>
+              <svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" stroke="#D64455" stroke-width="1.5" stroke-dasharray="5,3"/></svg>
               Mínimo agregado
             </div>
             <div class="flex items-center gap-2 text-xs" style="color:#7a6e8a;">
-              <svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" stroke="#a77ee0" stroke-width="1.5"/></svg>
+              <svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" stroke="#8870C8" stroke-width="1.5"/></svg>
               Máximo agregado
             </div>
           </div>
@@ -246,14 +246,14 @@
           <!-- Canvas -->
           <div class="flex flex-col gap-3">
             <div ref="skyContratoBox" class="relative rounded-2xl overflow-hidden"
-                 style="height: 300px; background: #04020b; border: 1px solid rgba(145,91,216,0.3);">
+                 style="height: 300px; background: #06080f; border: 1px solid rgba(90,110,195,0.28);">
               <canvas ref="cvContratoRef" class="absolute inset-0 w-full h-full" />
               <!-- Suelo solar -->
               <div class="absolute bottom-0 left-0 right-0 h-9"
-                   style="background: #100b1e; border-top: 1px solid rgba(145,91,216,0.45);">
+                   style="background: #0c1422; border-top: 1px solid rgba(90,110,195,0.35);">
                 <div class="flex gap-1.5 absolute left-1/2 -translate-x-1/2 top-1.5">
                   <div v-for="i in 9" :key="i" class="w-5 h-3 rounded-sm"
-                       style="background: #221440; border: 1px solid rgba(145,91,216,0.5);" />
+                       style="background: #182040; border: 1px solid rgba(90,110,195,0.42);" />
                 </div>
               </div>
             </div>
@@ -261,15 +261,15 @@
             <!-- Leyenda -->
             <div class="flex flex-wrap gap-5">
               <div class="flex items-center gap-2 text-xs" style="color:#7a6e8a;">
-                <svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" stroke="#F6FF72" stroke-width="2.5"/></svg>
+                <svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" stroke="#F0C040" stroke-width="2.5"/></svg>
                 Generación contrato
               </div>
               <div class="flex items-center gap-2 text-xs" style="color:#7a6e8a;">
-                <svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" stroke="#e05567" stroke-width="1.5" stroke-dasharray="5,3"/></svg>
+                <svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" stroke="#D64455" stroke-width="1.5" stroke-dasharray="5,3"/></svg>
                 Mínimo take-or-pay
               </div>
               <div class="flex items-center gap-2 text-xs" style="color:#7a6e8a;">
-                <svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" stroke="#a77ee0" stroke-width="1.5"/></svg>
+                <svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" stroke="#8870C8" stroke-width="1.5"/></svg>
                 Máximo give-or-take
               </div>
             </div>
@@ -518,9 +518,9 @@ function fmtMwh(val) {
 }
 
 function estadoLabel(estado) {
-  if (estado === 'deficit')          return 'Peligro compra en bolsa'
+  if (estado === 'deficit')          return 'Peligro de incumplimiento'
   if (estado === 'ok')               return 'Cumplimiento'
-  if (estado === 'excedente')        return 'Peligro venta en bolsa'
+  if (estado === 'excedente')        return 'Excedente contractual'
   if (estado === 'sin_compromisos')  return 'Sin compromisos'
   return estado
 }
@@ -536,31 +536,31 @@ let _dust   = []
 function rnd() { return Math.random() }
 
 function initParticles(estado, W, H, minYh, maxYh) {
-  _stars = Array.from({ length: 55 }, () => ({
+  _stars = Array.from({ length: 35 }, () => ({
     x: rnd() * W,
-    y: rnd() * H * 0.72,
-    r: 0.3 + rnd() * 1.0,
+    y: rnd() * H * 0.68,
+    r: 0.3 + rnd() * 0.9,
     phase: rnd() * Math.PI * 2,
-    freq:  0.3 + rnd() * 0.8,
+    freq:  0.25 + rnd() * 0.7,
   }))
 
   _drops = []; _sparks = []; _dust = []
 
   if (estado === 'deficit') {
-    for (let i = 0; i < 60; i++) {
+    for (let i = 0; i < 40; i++) {
       const x = 20 + rnd() * (W - 40)
-      _drops.push({ x, y: -rnd() * H * 0.9, speed: 75 + rnd() * 90, len: 9 + rnd() * 13, alpha: 0.35 + rnd() * 0.45, slant: 0.10 + rnd() * 0.12, baseX: x })
+      _drops.push({ x, y: -rnd() * H * 0.9, speed: 70 + rnd() * 85, len: 8 + rnd() * 11, alpha: 0.20 + rnd() * 0.28, slant: 0.08 + rnd() * 0.12, baseX: x })
     }
   } else if (estado === 'excedente') {
-    for (let i = 0; i < 55; i++) {
+    for (let i = 0; i < 35; i++) {
       const x = 20 + rnd() * (W - 40)
-      _sparks.push({ x, y: maxYh + rnd() * 12, vy: 25 + rnd() * 70, vx: (rnd() - 0.5) * 14, life: rnd() * 1.5, total: 1.5 + rnd() * 1.8, size: 1.5 + rnd() * 2.5, baseX: x, baseY: maxYh })
+      _sparks.push({ x, y: maxYh + rnd() * 12, vy: 22 + rnd() * 60, vx: (rnd() - 0.5) * 12, life: rnd() * 1.5, total: 1.5 + rnd() * 1.8, size: 1.3 + rnd() * 2.2, baseX: x, baseY: maxYh })
     }
   } else if (estado === 'ok') {
     const zoneH = Math.max(minYh - maxYh, 1)
-    for (let i = 0; i < 32; i++) {
+    for (let i = 0; i < 20; i++) {
       const y = maxYh + rnd() * zoneH
-      _dust.push({ x: 20 + rnd() * (W - 40), y, vy: 6 + rnd() * 20, life: rnd() * 4, total: 4 + rnd() * 5, size: 0.9 + rnd() * 1.8, baseY: maxYh, zoneH })
+      _dust.push({ x: 20 + rnd() * (W - 40), y, vy: 5 + rnd() * 18, life: rnd() * 4, total: 4 + rnd() * 5, size: 0.8 + rnd() * 1.6, baseY: maxYh, zoneH })
     }
   }
 }
@@ -639,39 +639,39 @@ function render(canvas, t, dt, W, H, des, genTotal, diasMes, minV, maxV, fracMes
 
   ctx.clearRect(0, 0, W, H + GROUND)
 
-  // Sky
+  // Sky — deep slate navy
   const sky = ctx.createLinearGradient(0, 0, 0, H)
-  sky.addColorStop(0,    '#04020b')
-  sky.addColorStop(0.45, '#0d0919')
-  sky.addColorStop(1,    '#19102a')
+  sky.addColorStop(0,    '#06080f')
+  sky.addColorStop(0.45, '#0c1422')
+  sky.addColorStop(1,    '#141e30')
   ctx.fillStyle = sky
   ctx.fillRect(0, 0, W, H)
 
-  // Stars
+  // Stars — fewer, cooler white
   for (const s of _stars) {
-    const a = 0.15 + 0.80 * ((Math.sin(t * s.freq + s.phase) + 1) * 0.5)
+    const a = 0.12 + 0.52 * ((Math.sin(t * s.freq + s.phase) + 1) * 0.5)
     ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2)
-    ctx.fillStyle = `rgba(253,250,247,${a.toFixed(2)})`; ctx.fill()
+    ctx.fillStyle = `rgba(210,220,240,${a.toFixed(2)})`; ctx.fill()
   }
 
-  // Zone band
+  // Zone band — subtle indigo
   const band = ctx.createLinearGradient(0, maxYh, 0, minYh)
-  band.addColorStop(0,   'rgba(145,91,216,0.14)')
-  band.addColorStop(0.5, 'rgba(246,255,114,0.06)')
-  band.addColorStop(1,   'rgba(145,91,216,0.14)')
+  band.addColorStop(0,   'rgba(90,110,195,0.12)')
+  band.addColorStop(0.5, 'rgba(255,255,255,0.04)')
+  band.addColorStop(1,   'rgba(90,110,195,0.12)')
   ctx.fillStyle = band
   ctx.fillRect(0, maxYh, W, minYh - maxYh)
 
-  // Estado tint
+  // Estado tint — muted
   if (estado === 'deficit') {
     const fog = ctx.createLinearGradient(0, minYh, 0, H)
-    fog.addColorStop(0, 'rgba(100,160,255,0.10)')
-    fog.addColorStop(1, 'rgba(80,120,200,0.04)')
+    fog.addColorStop(0, 'rgba(70,130,215,0.07)')
+    fog.addColorStop(1, 'rgba(50,95,175,0.03)')
     ctx.fillStyle = fog; ctx.fillRect(0, minYh, W, H - minYh)
   } else if (estado === 'excedente') {
     const glow = ctx.createLinearGradient(0, 0, 0, maxYh)
-    glow.addColorStop(0, 'rgba(246,255,114,0.06)')
-    glow.addColorStop(1, 'rgba(246,255,114,0)')
+    glow.addColorStop(0, 'rgba(240,192,64,0.05)')
+    glow.addColorStop(1, 'rgba(240,192,64,0)')
     ctx.fillStyle = glow; ctx.fillRect(0, 0, W, maxYh)
   }
 
@@ -680,7 +680,7 @@ function render(canvas, t, dt, W, H, des, genTotal, diasMes, minV, maxV, fracMes
   else if (estado === 'excedente') _animSparks(ctx, t, dt, W, maxYh)
   else if (estado === 'ok')        _animWave(ctx, t, dt, W, minYh, maxYh)
 
-  // Arc halo
+  // Arc — single soft halo + uniform warm-gold line
   const traceArc = (from = 0, to = 1) => {
     ctx.beginPath()
     const steps = Math.ceil(N * (to - from))
@@ -690,32 +690,20 @@ function render(canvas, t, dt, W, H, des, genTotal, diasMes, minV, maxV, fracMes
     }
   }
   ctx.setLineDash([])
-  traceArc(); ctx.strokeStyle = 'rgba(246,255,114,0.04)'; ctx.lineWidth = 22; ctx.stroke()
-  traceArc(); ctx.strokeStyle = 'rgba(246,255,114,0.10)'; ctx.lineWidth = 12; ctx.stroke()
-  traceArc(); ctx.strokeStyle = 'rgba(246,255,114,0.18)'; ctx.lineWidth = 5;  ctx.stroke()
+  traceArc(); ctx.strokeStyle = 'rgba(240,192,64,0.07)'; ctx.lineWidth = 18; ctx.stroke()
+  traceArc(); ctx.strokeStyle = 'rgba(240,192,64,0.13)'; ctx.lineWidth = 6;  ctx.stroke()
+  traceArc(); ctx.strokeStyle = '#F0C040';                ctx.lineWidth = 2.5; ctx.stroke()
 
-  // Arc: past (solid) + future (dashed)
-  const arcW = estado === 'ok' ? 2.0 + Math.sin(t * 1.4) * 0.6 : 2.5
-  if (fracMes > 0 && fracMes < 1) {
-    traceArc(0, fracMes)
-    ctx.strokeStyle = '#F6FF72'; ctx.lineWidth = arcW; ctx.setLineDash([]); ctx.stroke()
-    traceArc(fracMes, 1)
-    ctx.strokeStyle = 'rgba(246,255,114,0.32)'; ctx.lineWidth = 1.5; ctx.setLineDash([5, 4]); ctx.stroke()
-    ctx.setLineDash([])
-  } else {
-    traceArc(); ctx.strokeStyle = '#F6FF72'; ctx.lineWidth = arcW; ctx.setLineDash([]); ctx.stroke()
-  }
-
-  // Min/Max lines
+  // Min/Max reference lines
   ctx.beginPath(); ctx.moveTo(0, minYh); ctx.lineTo(W, minYh)
-  ctx.strokeStyle = '#e05567'; ctx.lineWidth = 1.5; ctx.setLineDash([6, 4]); ctx.stroke()
+  ctx.strokeStyle = '#D64455'; ctx.lineWidth = 1.5; ctx.setLineDash([6, 4]); ctx.stroke()
   ctx.setLineDash([])
   ctx.beginPath(); ctx.moveTo(0, maxYh); ctx.lineTo(W, maxYh)
-  ctx.strokeStyle = '#a77ee0'; ctx.lineWidth = 1.5; ctx.stroke()
+  ctx.strokeStyle = '#8870C8'; ctx.lineWidth = 1.5; ctx.stroke()
 
-  // Y-axis pills
+  // Y-axis pills — gen always shown
   const _toY  = v => H - (v / totalMax) * (H - 28) / 0.85
-  const genYh = _toY(genTotal)
+  const genYh = Math.max(10, Math.min(_toY(genTotal), H - 10))
   const _fmtN = v => Math.round(v).toLocaleString('es-CO')
 
   const _axPill = (y, prefix, numStr, pillBg, pillFg, tickColor) => {
@@ -736,97 +724,108 @@ function render(canvas, t, dt, W, H, des, genTotal, diasMes, minV, maxV, fracMes
   }
 
   ctx.setLineDash([])
-  _axPill(maxYh, 'máx', _fmtN(maxV), 'rgba(30,14,50,0.82)', 'rgba(200,165,245,0.95)', '#a77ee0')
-  _axPill(minYh, 'mín', _fmtN(minV), 'rgba(40,10,14,0.82)', 'rgba(245,140,150,0.95)', '#e05567')
-  if (genTotal > 0 && genYh > maxYh + 22 && genYh < minYh - 22) {
-    _axPill(genYh, 'gen', _fmtN(genTotal), 'rgba(28,26,6,0.85)', '#F6FF72', 'rgba(246,255,114,0.80)')
+  _axPill(maxYh, 'máx', _fmtN(maxV), 'rgba(18,10,36,0.88)', 'rgba(190,165,240,0.95)', '#8870C8')
+  _axPill(minYh, 'mín', _fmtN(minV), 'rgba(26,6,12,0.88)',  'rgba(238,120,135,0.95)', '#D64455')
+  if (genTotal > 0) {
+    _axPill(genYh, 'gen', _fmtN(genTotal), 'rgba(18,16,5,0.90)', '#F0C040', 'rgba(240,192,64,0.85)')
   }
   ctx.textAlign = 'left'
 
   // Sun at arc peak
   _drawSun(ctx, t, cxf(0.5), arcY(0.5, des))
 
-  // Current-day dot on arc
-  const barY = H - 12
-  if (fracMes > 0 && fracMes < 1) {
-    const dayX = cxf(fracMes)
-    const dotY = arcY(fracMes, des)
-    ctx.save(); ctx.setLineDash([3, 4])
-    ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 1
-    ctx.beginPath(); ctx.moveTo(dayX, dotY + 8); ctx.lineTo(dayX, barY - 4); ctx.stroke()
-    ctx.restore()
-    const dg = ctx.createRadialGradient(dayX, dotY, 0, dayX, dotY, 14)
-    dg.addColorStop(0, 'rgba(255,255,255,0.38)'); dg.addColorStop(1, 'rgba(255,255,255,0)')
-    ctx.beginPath(); ctx.arc(dayX, dotY, 14, 0, Math.PI * 2); ctx.fillStyle = dg; ctx.fill()
-    ctx.beginPath(); ctx.arc(dayX, dotY, 4.5, 0, Math.PI * 2)
-    ctx.fillStyle = '#FFFFFF'; ctx.strokeStyle = '#F6FF72'; ctx.lineWidth = 1.5; ctx.setLineDash([])
+  // Gen mark at current day — dot + value label on arc
+  if (fracMes > 0 && fracMes < 1 && genTotal > 0) {
+    const mx = cxf(fracMes)
+    const my = arcY(fracMes, des)
+    const mg = ctx.createRadialGradient(mx, my, 0, mx, my, 11)
+    mg.addColorStop(0, 'rgba(255,255,255,0.20)'); mg.addColorStop(1, 'rgba(255,255,255,0)')
+    ctx.beginPath(); ctx.arc(mx, my, 11, 0, Math.PI * 2); ctx.fillStyle = mg; ctx.fill()
+    ctx.beginPath(); ctx.arc(mx, my, 5, 0, Math.PI * 2)
+    ctx.fillStyle = '#FFFFFF'; ctx.strokeStyle = '#F0C040'; ctx.lineWidth = 2; ctx.setLineDash([])
     ctx.fill(); ctx.stroke()
+    const genLbl = `${_fmtN(genTotal)} MWh`
+    ctx.font = '600 11px system-ui, sans-serif'
+    const lw = ctx.measureText(genLbl).width + 14
+    const lx = mx + 12 + lw < W - 20 ? mx + 12 : mx - 12 - lw
+    const ly = my - 10
+    ctx.fillStyle = 'rgba(8,12,22,0.92)'
+    ctx.beginPath()
+    ctx.roundRect ? ctx.roundRect(lx, ly, lw, 20, 4) : ctx.rect(lx, ly, lw, 20)
+    ctx.fill()
+    ctx.strokeStyle = 'rgba(240,192,64,0.45)'; ctx.lineWidth = 1; ctx.stroke()
+    ctx.fillStyle = '#F0C040'; ctx.textAlign = 'left'
+    ctx.fillText(genLbl, lx + 7, ly + 14)
+    ctx.textAlign = 'left'
   }
 
   // Progress bar
+  const barY  = H - 12
   const barX0 = 30, barX1 = W - 30
   const progX  = barX0 + Math.min(fracMes, 1) * (barX1 - barX0)
   ctx.beginPath(); ctx.moveTo(barX0, barY); ctx.lineTo(barX1, barY)
-  ctx.strokeStyle = 'rgba(255,255,255,0.10)'; ctx.lineWidth = 2; ctx.setLineDash([]); ctx.stroke()
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 2; ctx.setLineDash([]); ctx.stroke()
   if (fracMes > 0) {
     ctx.beginPath(); ctx.moveTo(barX0, barY); ctx.lineTo(progX, barY)
-    ctx.strokeStyle = 'rgba(246,255,114,0.65)'; ctx.lineWidth = 2; ctx.stroke()
+    ctx.strokeStyle = 'rgba(240,192,64,0.60)'; ctx.lineWidth = 2; ctx.stroke()
   }
   if (fracMes < 1) {
     ctx.beginPath(); ctx.arc(progX, barY, 3.5, 0, Math.PI * 2)
-    ctx.fillStyle = '#F6FF72'; ctx.setLineDash([]); ctx.fill()
+    ctx.fillStyle = '#F0C040'; ctx.setLineDash([]); ctx.fill()
   }
+
+  // Ground — drawn BEFORE day pill so the pill floats above
+  const gnd = ctx.createLinearGradient(0, H - 10, 0, H + GROUND)
+  gnd.addColorStop(0, 'rgba(12,20,34,0)')
+  gnd.addColorStop(1, '#0c1422')
+  ctx.fillStyle = gnd
+  ctx.fillRect(0, H - 10, W, GROUND + 10)
+
+  // Day labels + pill — drawn on top of ground
   const diaNum = fracMes < 1 ? Math.round(fracMes * diasMes) : diasMes
   ctx.textAlign = 'center'
   ctx.font = '400 9px system-ui, sans-serif'
-  ctx.fillStyle = 'rgba(253,250,247,0.28)'; ctx.fillText('1', barX0, barY + 13)
-  ctx.fillStyle = fracMes >= 1 ? '#F6FF72' : 'rgba(253,250,247,0.28)'
+  ctx.fillStyle = 'rgba(190,205,230,0.28)'; ctx.fillText('1', barX0, barY + 13)
+  ctx.fillStyle = fracMes >= 1 ? '#F0C040' : 'rgba(190,205,230,0.28)'
   ctx.fillText(String(diasMes), barX1, barY + 13)
   if (fracMes < 1) {
     const dayLbl = `día ${diaNum}`
     ctx.font = '700 11px system-ui, sans-serif'
     const dlw = ctx.measureText(dayLbl).width + 14
     const dlx = Math.min(Math.max(progX - dlw / 2, barX0), barX1 - dlw)
-    ctx.fillStyle = 'rgba(20,16,36,0.85)'
+    ctx.fillStyle = 'rgba(8,12,22,0.92)'
     ctx.beginPath()
     ctx.roundRect ? ctx.roundRect(dlx, barY + 4, dlw, 18, 4) : ctx.rect(dlx, barY + 4, dlw, 18)
     ctx.fill()
-    ctx.strokeStyle = 'rgba(246,255,114,0.45)'; ctx.lineWidth = 1; ctx.setLineDash([]); ctx.stroke()
-    ctx.fillStyle = '#F6FF72'; ctx.fillText(dayLbl, progX, barY + 16)
+    ctx.strokeStyle = 'rgba(240,192,64,0.40)'; ctx.lineWidth = 1; ctx.setLineDash([]); ctx.stroke()
+    ctx.fillStyle = '#F0C040'; ctx.fillText(dayLbl, progX, barY + 16)
   }
   ctx.textAlign = 'left'
-
-  // Ground gradient
-  const gnd = ctx.createLinearGradient(0, H - 8, 0, H + GROUND)
-  gnd.addColorStop(0, 'rgba(16,11,30,0)')
-  gnd.addColorStop(1, '#100b1e')
-  ctx.fillStyle = gnd
-  ctx.fillRect(0, H - 8, W, GROUND + 8)
 }
 
 function _drawSun(ctx, t, x, y) {
-  const pulse = 1 + Math.sin(t * 1.8) * 0.10
-  const r1 = 32 * pulse
+  const pulse = 1 + Math.sin(t * 1.8) * 0.08
+  const r1 = 26 * pulse
   const cg1 = ctx.createRadialGradient(x, y, 0, x, y, r1)
-  cg1.addColorStop(0,   'rgba(246,255,114,0.24)')
-  cg1.addColorStop(0.5, 'rgba(240,190,50,0.10)')
-  cg1.addColorStop(1,   'rgba(246,255,114,0)')
+  cg1.addColorStop(0,   'rgba(240,192,64,0.18)')
+  cg1.addColorStop(0.5, 'rgba(220,170,40,0.07)')
+  cg1.addColorStop(1,   'rgba(240,192,64,0)')
   ctx.beginPath(); ctx.arc(x, y, r1, 0, Math.PI * 2); ctx.fillStyle = cg1; ctx.fill()
-  const r2 = 16 * pulse
+  const r2 = 13 * pulse
   const cg2 = ctx.createRadialGradient(x, y, 0, x, y, r2)
-  cg2.addColorStop(0,   'rgba(255,255,245,0.95)')
-  cg2.addColorStop(0.5, 'rgba(246,255,114,0.75)')
-  cg2.addColorStop(1,   'rgba(246,200,60,0)')
+  cg2.addColorStop(0,   'rgba(255,245,215,0.92)')
+  cg2.addColorStop(0.5, 'rgba(240,192,64,0.68)')
+  cg2.addColorStop(1,   'rgba(225,170,35,0)')
   ctx.beginPath(); ctx.arc(x, y, r2, 0, Math.PI * 2); ctx.fillStyle = cg2; ctx.fill()
-  ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI * 2)
-  ctx.fillStyle = '#FFFCE8'; ctx.fill()
+  ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI * 2)
+  ctx.fillStyle = '#FFF8E0'; ctx.fill()
 }
 
 function _animRain(ctx, dt, H) {
   ctx.save()
   for (const d of _drops) {
     ctx.beginPath(); ctx.moveTo(d.x, d.y); ctx.lineTo(d.x + d.len * d.slant, d.y + d.len)
-    ctx.strokeStyle = `rgba(160,205,255,${d.alpha})`; ctx.lineWidth = 1.2; ctx.stroke()
+    ctx.strokeStyle = `rgba(110,160,215,${d.alpha})`; ctx.lineWidth = 1.1; ctx.stroke()
     d.y += d.speed * dt; d.x += d.speed * d.slant * dt
     if (d.y > H + d.len) { d.y = -d.len - rnd() * 80; d.x = d.baseX + (rnd() - 0.5) * 30 }
   }
@@ -841,12 +840,12 @@ function _animSparks(ctx, t, dt, W, maxYh) {
     const r        = s.size * (1 - progress * 0.45)
     if (r > 0.2 && alpha > 0.02) {
       const grd = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, r * 3.5)
-      grd.addColorStop(0,   `rgba(255,255,220,${alpha.toFixed(2)})`)
-      grd.addColorStop(0.4, `rgba(246,255,114,${(alpha * 0.8).toFixed(2)})`)
-      grd.addColorStop(1,   'rgba(246,255,114,0)')
+      grd.addColorStop(0,   `rgba(255,228,120,${alpha.toFixed(2)})`)
+      grd.addColorStop(0.4, `rgba(240,192,64,${(alpha * 0.8).toFixed(2)})`)
+      grd.addColorStop(1,   'rgba(240,192,64,0)')
       ctx.beginPath(); ctx.arc(s.x, s.y, r * 3.5, 0, Math.PI * 2); ctx.fillStyle = grd; ctx.fill()
       ctx.beginPath(); ctx.arc(s.x, s.y, r, 0, Math.PI * 2)
-      ctx.fillStyle = `rgba(255,255,220,${alpha.toFixed(2)})`; ctx.fill()
+      ctx.fillStyle = `rgba(255,225,110,${alpha.toFixed(2)})`; ctx.fill()
     }
     s.life += dt; s.x += s.vx * dt; s.y -= s.vy * dt
     if (s.life >= s.total || s.y < -20) {
@@ -863,7 +862,7 @@ function _animWave(ctx, t, dt, W, minYh, maxYh) {
   for (const d of _dust) {
     const a = Math.max(0, Math.sin(d.life / d.total * Math.PI) * 0.38)
     ctx.beginPath(); ctx.arc(d.x, d.y, d.size, 0, Math.PI * 2)
-    ctx.fillStyle = `rgba(246,255,114,${a.toFixed(2)})`; ctx.fill()
+    ctx.fillStyle = `rgba(240,192,64,${a.toFixed(2)})`; ctx.fill()
     d.life += dt; d.y -= d.vy * dt
     if (d.life >= d.total || d.y < maxYh) {
       d.y = d.baseY + d.zoneH * (0.7 + rnd() * 0.3)
