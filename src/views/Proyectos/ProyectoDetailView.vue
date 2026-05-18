@@ -36,7 +36,7 @@
             <InfoField label="Operador de red" :value="proyecto.operador_red" />
             <InfoField label="Clasificación" :value="proyecto.clasificacion_regulatoria" />
             <InfoField label="Carpeta Drive" :value="proyecto.carpeta_drive_codigo" />
-            <InfoField label="Código base (topic)" :value="proyecto.sub_project" />
+            <InfoField label="API ID Unergy" :value="proyecto.sub_project" />
             <InfoField label="Código TSF" :value="proyecto.codigo_tsf" />
           </template>
           <template v-else>
@@ -73,8 +73,8 @@
               <InputText v-model="editForm.carpeta_drive_codigo" class="w-full" />
             </div>
             <div class="flex flex-col gap-1">
-              <label class="field-label">Código base (topic)</label>
-              <InputText v-model="editForm.sub_project" class="w-full" />
+              <label class="field-label">API ID Unergy</label>
+              <InputText v-model="editForm.sub_project" class="w-full" placeholder="ej: ibirico, bayunca" />
             </div>
             <div class="flex flex-col gap-1">
               <label class="field-label">Código TSF</label>
