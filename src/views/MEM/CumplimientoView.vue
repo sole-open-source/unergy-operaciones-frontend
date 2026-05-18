@@ -496,87 +496,60 @@ function render(t, dt, W, H, des, genTotal, diasMes, minV, maxV, fracMes, estado
   ctx.beginPath(); ctx.moveTo(0, maxYh); ctx.lineTo(W, maxYh)
   ctx.strokeStyle = '#a77ee0'; ctx.lineWidth = 1.5; ctx.stroke()
 
-  // ── Labels ────────────────────────────────────────────────────────────────
-  ctx.font = '600 11px system-ui, sans-serif'; ctx.textAlign = 'right'
-  ctx.fillStyle = '#e8798a'
-  ctx.fillText(`mín ${Math.round(minV).toLocaleString('es-CO')} MWh`, W - 7, minYh - 5)
-  ctx.fillStyle = '#b794e8'
-  ctx.fillText(`máx ${Math.round(maxV).toLocaleString('es-CO')} MWh`, W - 7, maxYh - 5)
+  // ── Eje Y derecho ────────────────────────────────────────────────────────
+  const _toY  = v => H - (v / totalMax) * (H - 28) / 0.85
+  const genYh = _toY(genTotal)
+  const _fmtN = v => Math.round(v).toLocaleString('es-CO')
+  const TK    = 8  // longitud del tick
+
+  ctx.setLineDash([]); ctx.textAlign = 'right'
+  ctx.font = '500 10px system-ui, sans-serif'
+
+  // Máximo
+  ctx.strokeStyle = 'rgba(167,126,224,0.40)'; ctx.lineWidth = 1
+  ctx.beginPath(); ctx.moveTo(W - TK - 2, maxYh); ctx.lineTo(W - 2, maxYh); ctx.stroke()
+  ctx.fillStyle = 'rgba(183,148,232,0.70)'; ctx.fillText(_fmtN(maxV), W - TK - 5, maxYh + 4)
+
+  // Mínimo
+  ctx.strokeStyle = 'rgba(224,85,103,0.40)'; ctx.lineWidth = 1
+  ctx.beginPath(); ctx.moveTo(W - TK - 2, minYh); ctx.lineTo(W - 2, minYh); ctx.stroke()
+  ctx.fillStyle = 'rgba(232,121,138,0.70)'; ctx.fillText(_fmtN(minV), W - TK - 5, minYh + 4)
+
+  // Generación actual — solo si no se superpone con min/max
+  if (genTotal > 0 && genYh > maxYh + 16 && genYh < minYh - 16) {
+    ctx.strokeStyle = 'rgba(246,255,114,0.55)'; ctx.lineWidth = 1
+    ctx.beginPath(); ctx.moveTo(W - TK - 2, genYh); ctx.lineTo(W - 2, genYh); ctx.stroke()
+    ctx.fillStyle = 'rgba(246,255,114,0.90)'; ctx.fillText(_fmtN(genTotal), W - TK - 5, genYh + 4)
+  }
+
+  // Unidad
+  ctx.font = '400 9px system-ui, sans-serif'
+  ctx.fillStyle = 'rgba(253,250,247,0.18)'; ctx.fillText('MWh', W - 2, maxYh - 10)
   ctx.textAlign = 'left'
 
   // ── Sol ───────────────────────────────────────────────────────────────────
   _drawSun(ctx, t, cxf(0.5), arcY(0.5, des))
 
   // ── Anotaciones de período ────────────────────────────────────────────────
-  const _fmt   = v => (v ?? 0).toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' MWh'
-  const _labelAboveDot = (text, cx2, cy2) => {
-    ctx.font = '700 11px system-ui, sans-serif'
-    const tw  = ctx.measureText(text).width
-    const pad = 7, ph = 20
-    const px  = Math.min(Math.max(cx2 - tw / 2 - pad, 4), W - tw - pad * 2 - 4)
-    const py  = Math.max(cy2 - ph - 10, 4)
-    ctx.fillStyle = 'rgba(10,6,22,0.72)'
-    ctx.beginPath()
-    ctx.roundRect ? ctx.roundRect(px, py, tw + pad * 2, ph, 4) : ctx.rect(px, py, tw + pad * 2, ph)
-    ctx.fill()
-    ctx.strokeStyle = 'rgba(246,255,114,0.55)'; ctx.lineWidth = 1; ctx.setLineDash([]); ctx.stroke()
-    ctx.fillStyle = '#F6FF72'; ctx.textAlign = 'center'
-    ctx.fillText(text, cx2, py + 14)
-    ctx.textAlign = 'left'
-    return py
-  }
-
   const barY = H - 12  // barra de progreso del mes
 
   if (fracMes > 0 && fracMes < 1) {
     const dayX   = cxf(fracMes)
     const dotY   = arcY(fracMes, des)
-    const diaNum = Math.round(fracMes * diasMes)
 
-    // Línea del día (halo + línea blanca) — conecta hasta la barra de progreso
-    ctx.save(); ctx.setLineDash([])
-    ctx.strokeStyle = 'rgba(255,255,255,0.07)'; ctx.lineWidth = 8
-    ctx.beginPath(); ctx.moveTo(dayX, 14); ctx.lineTo(dayX, barY); ctx.stroke()
-    ctx.strokeStyle = 'rgba(255,255,255,0.52)'; ctx.lineWidth = 1.5
-    ctx.beginPath(); ctx.moveTo(dayX, 14); ctx.lineTo(dayX, barY); ctx.stroke()
+    // Conector vertical sutil dot → barra
+    ctx.save(); ctx.setLineDash([3, 4])
+    ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 1
+    ctx.beginPath(); ctx.moveTo(dayX, dotY + 8); ctx.lineTo(dayX, barY - 4); ctx.stroke()
     ctx.restore()
 
-    // Badge "Hoy · día X" en la parte superior de la línea
-    ctx.font = '600 10px system-ui, sans-serif'
-    const hoyTxt = `Hoy · día ${diaNum}`
-    const hw = ctx.measureText(hoyTxt).width + 14
-    const hx = Math.min(Math.max(dayX - hw / 2, 4), W - hw - 4)
-    ctx.fillStyle = 'rgba(255,255,255,0.13)'; ctx.beginPath()
-    ctx.roundRect ? ctx.roundRect(hx, 5, hw, 18, 4) : ctx.rect(hx, 5, hw, 18)
-    ctx.fill()
-    ctx.strokeStyle = 'rgba(255,255,255,0.22)'; ctx.lineWidth = 1; ctx.setLineDash([]); ctx.stroke()
-    ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fillText(hoyTxt, hx + 7, 18)
-
-    // Dot brillante en el arco
-    const dg = ctx.createRadialGradient(dayX, dotY, 0, dayX, dotY, 16)
-    dg.addColorStop(0, 'rgba(255,255,255,0.42)'); dg.addColorStop(1, 'rgba(255,255,255,0)')
-    ctx.beginPath(); ctx.arc(dayX, dotY, 16, 0, Math.PI * 2); ctx.fillStyle = dg; ctx.fill()
-    ctx.beginPath(); ctx.arc(dayX, dotY, 5, 0, Math.PI * 2)
-    ctx.fillStyle = '#FFFFFF'; ctx.strokeStyle = '#F6FF72'; ctx.lineWidth = 2; ctx.setLineDash([])
+    // Dot en el arco
+    const dg = ctx.createRadialGradient(dayX, dotY, 0, dayX, dotY, 14)
+    dg.addColorStop(0, 'rgba(255,255,255,0.38)'); dg.addColorStop(1, 'rgba(255,255,255,0)')
+    ctx.beginPath(); ctx.arc(dayX, dotY, 14, 0, Math.PI * 2); ctx.fillStyle = dg; ctx.fill()
+    ctx.beginPath(); ctx.arc(dayX, dotY, 4.5, 0, Math.PI * 2)
+    ctx.fillStyle = '#FFFFFF'; ctx.strokeStyle = '#F6FF72'; ctx.lineWidth = 1.5; ctx.setLineDash([])
     ctx.fill(); ctx.stroke()
-
-    // MWh generados directo sobre el dot
-    _labelAboveDot(_fmt(genTotal), dayX, dotY)
-
-    // Badge "Cierre est. X MWh" — esquina superior derecha
-    const ciTxt = `Cierre est. ${_fmt(des)}`
-    ctx.font = '500 10px system-ui, sans-serif'
-    const cw2 = ctx.measureText(ciTxt).width + 16
-    const cx3 = W - cw2 - 6
-    ctx.fillStyle = 'rgba(246,255,114,0.10)'; ctx.beginPath()
-    ctx.roundRect ? ctx.roundRect(cx3, 6, cw2, 20, 4) : ctx.rect(cx3, 6, cw2, 20)
-    ctx.fill()
-    ctx.strokeStyle = 'rgba(246,255,114,0.28)'; ctx.lineWidth = 1; ctx.setLineDash([]); ctx.stroke()
-    ctx.fillStyle = 'rgba(246,255,114,0.88)'; ctx.fillText(ciTxt, cx3 + 8, 20)
-
-  } else if (fracMes >= 1 && genTotal > 0) {
-    // Mes pasado: label total en la cresta del arco
-    _labelAboveDot(_fmt(genTotal), cxf(0.5), arcY(0.5, des))
   }
 
   // ── Barra de progreso del mes ─────────────────────────────────────────────
@@ -598,6 +571,21 @@ function render(t, dt, W, H, des, genTotal, diasMes, minV, maxV, fracMes, estado
     ctx.beginPath(); ctx.arc(progX, barY, 3.5, 0, Math.PI * 2)
     ctx.fillStyle = '#F6FF72'; ctx.setLineDash([]); ctx.fill()
   }
+
+  // Etiquetas de días en la barra
+  const diaNum = fracMes < 1 ? Math.round(fracMes * diasMes) : diasMes
+  ctx.font = '400 9px system-ui, sans-serif'; ctx.textAlign = 'center'
+  // "1" al inicio
+  ctx.fillStyle = 'rgba(253,250,247,0.22)'; ctx.fillText('1', barX0, barY + 13)
+  // día actual (sobre el dot, en amarillo)
+  if (fracMes < 1) {
+    ctx.fillStyle = 'rgba(246,255,114,0.80)'
+    ctx.fillText(String(diaNum), progX, barY + 13)
+  }
+  // fin de mes
+  ctx.fillStyle = fracMes >= 1 ? 'rgba(246,255,114,0.80)' : 'rgba(253,250,247,0.22)'
+  ctx.fillText(String(diasMes), barX1, barY + 13)
+  ctx.textAlign = 'left'
 
   // ── Gradiente de suelo ────────────────────────────────────────────────────
   const gnd = ctx.createLinearGradient(0, H - 8, 0, H + GROUND)
@@ -697,8 +685,8 @@ function _animWave(ctx, t, dt, W, minYh, maxYh) {
     const y = midY + Math.sin((px / W) * Math.PI * 6 + t * 0.9) * (bandH * 0.18)
     px === 0 ? ctx.moveTo(px, y) : ctx.lineTo(px, y)
   }
-  ctx.strokeStyle = 'rgba(246,255,114,0.15)'
-  ctx.lineWidth = 16; ctx.lineJoin = 'round'
+  ctx.strokeStyle = 'rgba(246,255,114,0.05)'
+  ctx.lineWidth = 9; ctx.lineJoin = 'round'
   ctx.stroke()
 
   // Onda 2 — púrpura, contra-fase
@@ -707,8 +695,8 @@ function _animWave(ctx, t, dt, W, minYh, maxYh) {
     const y = midY + Math.sin((px / W) * Math.PI * 4 - t * 0.6 + 1.6) * (bandH * 0.12)
     px === 0 ? ctx.moveTo(px, y) : ctx.lineTo(px, y)
   }
-  ctx.strokeStyle = 'rgba(145,91,216,0.10)'
-  ctx.lineWidth = 11
+  ctx.strokeStyle = 'rgba(145,91,216,0.04)'
+  ctx.lineWidth = 6
   ctx.stroke()
 
   ctx.restore()
@@ -716,7 +704,7 @@ function _animWave(ctx, t, dt, W, minYh, maxYh) {
   // Partículas flotantes en la zona
   ctx.save()
   for (const d of _dust) {
-    const a = Math.max(0, Math.sin(d.life / d.total * Math.PI) * 0.70)
+    const a = Math.max(0, Math.sin(d.life / d.total * Math.PI) * 0.38)
     ctx.beginPath()
     ctx.arc(d.x, d.y, d.size, 0, Math.PI * 2)
     ctx.fillStyle = `rgba(246,255,114,${a.toFixed(2)})`
