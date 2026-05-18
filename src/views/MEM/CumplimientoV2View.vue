@@ -282,97 +282,117 @@
         </div>
       </div>
 
-      <!-- Detail panel (click on month) -->
-      <div
-        v-if="selectedMonthIdx !== null && anualData.meses[selectedMonthIdx]"
-        class="rounded-xl border p-5"
-        style="background: white; border-color: rgba(44,32,57,0.12);"
-      >
-        <!-- Panel header -->
-        <div class="flex items-center justify-between mb-4">
-          <div>
-            <h3 class="font-bold text-base" style="color: #2C2039;">
-              Desglose — {{ MESES[selectedMonthIdx] }} {{ selectedYear }}
-            </h3>
-            <p class="text-xs mt-0.5" style="color: #7a6e8a;">
-              Generación por planta según GESCON
-              <span
-                v-if="anualData.meses[selectedMonthIdx].tipo_datos !== 'real'"
-                class="ml-1 px-1.5 py-0.5 rounded font-semibold"
-                style="background: rgba(145,91,216,0.12); color: #915BD8;"
-              >proyección</span>
-            </p>
-          </div>
-          <button
-            @click="selectedMonthIdx = null"
-            class="rounded-lg p-1.5 transition-colors"
-            style="color: #7a6e8a;"
-            onmouseover="this.style.background='rgba(44,32,57,0.08)'"
-            onmouseout="this.style.background='transparent'"
-          >
-            <i class="pi pi-times text-sm" />
-          </button>
-        </div>
-
-        <!-- No plants -->
-        <div
-          v-if="!anualData.meses[selectedMonthIdx].plantas.length"
-          class="text-center py-8 text-sm"
-          style="color: #7a6e8a;"
-        >
-          <i class="pi pi-info-circle text-2xl mb-2 block" />
-          Sin plantas asignadas en GESCON para este mes
-        </div>
-
-        <!-- Plants table -->
-        <DataTable
-          v-else
-          :value="anualData.meses[selectedMonthIdx].plantas"
-          size="small"
-          class="border rounded-xl overflow-hidden"
-          style="border-color: rgba(44,32,57,0.10);"
-        >
-          <Column header="Planta" style="min-width: 200px;">
-            <template #body="{ data: p }">
-              <div class="font-semibold text-sm" style="color: #2C2039;">{{ p.nombre }}</div>
-              <div v-if="p.sub_project" class="text-xs mt-0.5 font-mono" style="color: #7a6e8a;">{{ p.sub_project }}</div>
-            </template>
-          </Column>
-          <Column header="% Despacho" style="width: 110px; text-align: right;">
-            <template #body="{ data: p }">
-              <span class="font-mono text-sm">{{ (p.pct_despacho * 100).toFixed(0) }}%</span>
-            </template>
-          </Column>
-          <Column header="Gen. planta" style="width: 140px; text-align: right;">
-            <template #body="{ data: p }">
-              <span v-if="p.gen_planta_mwh !== null" class="font-mono text-sm">{{ fmtMwh(p.gen_planta_mwh) }}</span>
-              <span v-else class="text-xs" style="color: #b0a0c0;">Sin datos</span>
-            </template>
-          </Column>
-          <Column header="Gen. contrato" style="width: 140px; text-align: right;">
-            <template #body="{ data: p }">
-              <span v-if="p.gen_contrato_mwh !== null" class="font-mono text-sm font-semibold" style="color: #2C2039;">
-                {{ fmtMwh(p.gen_contrato_mwh) }}
-              </span>
-              <span v-else class="text-xs" style="color: #b0a0c0;">—</span>
-            </template>
-          </Column>
-        </DataTable>
-
-        <!-- Totals footer -->
-        <div
-          v-if="anualData.meses[selectedMonthIdx].plantas.length"
-          class="flex justify-between items-center mt-3 px-3 py-2 rounded-lg text-sm font-semibold"
-          style="background: rgba(44,32,57,0.05);"
-        >
-          <span style="color: #7a6e8a;">Total generado al contrato</span>
-          <span class="font-mono" style="color: #2C2039;">
-            {{ fmtMwh(genVal(anualData.meses[selectedMonthIdx])) }}
-          </span>
-        </div>
-      </div>
-
     </template>
+
+    <!-- Floating detail panel (Teleport → fixed, z-50) -->
+    <Teleport to="body">
+      <template v-if="selectedMonthIdx !== null && anualData && anualData.meses[selectedMonthIdx]">
+
+        <!-- Backdrop -->
+        <div
+          class="fixed inset-0"
+          style="z-index: 40; background: rgba(44,32,57,0.25);"
+          @click="selectedMonthIdx = null"
+        />
+
+        <!-- Panel -->
+        <div
+          class="fixed rounded-2xl shadow-2xl"
+          style="z-index: 50; background: #FDFAF7; width: 480px; max-height: 80vh; overflow-y: auto;
+                 border: 1px solid rgba(44,32,57,0.12);"
+          :style="{ left: panelX + 'px', top: panelY + 'px' }"
+          @click.stop
+        >
+          <!-- Header -->
+          <div class="flex items-start justify-between px-5 pt-5 pb-4"
+               style="border-bottom: 1px solid rgba(44,32,57,0.08);">
+            <div>
+              <h3 class="font-bold text-base" style="color: #2C2039;">
+                Desglose — {{ MESES[selectedMonthIdx] }} {{ selectedYear }}
+              </h3>
+              <p class="text-xs mt-0.5" style="color: #7a6e8a;">
+                Generación por planta según GESCON
+                <span
+                  v-if="anualData.meses[selectedMonthIdx].tipo_datos !== 'real'"
+                  class="ml-1.5 px-1.5 py-0.5 rounded font-semibold"
+                  style="background: rgba(145,91,216,0.12); color: #915BD8;"
+                >proyección</span>
+              </p>
+            </div>
+            <button
+              @click="selectedMonthIdx = null"
+              class="rounded-lg p-1.5 ml-3 shrink-0"
+              style="color: #7a6e8a; transition: background 0.15s;"
+              onmouseover="this.style.background='rgba(44,32,57,0.08)'"
+              onmouseout="this.style.background='transparent'"
+            >
+              <i class="pi pi-times text-sm" />
+            </button>
+          </div>
+
+          <!-- Body -->
+          <div class="px-5 py-4">
+
+            <!-- No plants -->
+            <div
+              v-if="!anualData.meses[selectedMonthIdx].plantas.length"
+              class="text-center py-8 text-sm"
+              style="color: #7a6e8a;"
+            >
+              <i class="pi pi-info-circle text-2xl mb-2 block" />
+              Sin plantas asignadas en GESCON para este mes
+            </div>
+
+            <!-- Plants table -->
+            <DataTable
+              v-else
+              :value="anualData.meses[selectedMonthIdx].plantas"
+              size="small"
+              class="border rounded-xl overflow-hidden"
+              style="border-color: rgba(44,32,57,0.10);"
+            >
+              <Column header="Planta" style="min-width: 160px;">
+                <template #body="{ data: p }">
+                  <div class="font-semibold text-sm" style="color: #2C2039;">{{ p.nombre }}</div>
+                  <div v-if="p.sub_project" class="text-xs mt-0.5 font-mono" style="color: #7a6e8a;">{{ p.sub_project }}</div>
+                </template>
+              </Column>
+              <Column header="%" style="width: 60px; text-align: right;">
+                <template #body="{ data: p }">
+                  <span class="font-mono text-sm">{{ (p.pct_despacho * 100).toFixed(0) }}%</span>
+                </template>
+              </Column>
+              <Column header="Gen. planta" style="width: 120px; text-align: right;">
+                <template #body="{ data: p }">
+                  <span v-if="p.gen_planta_mwh !== null" class="font-mono text-sm">{{ fmtMwh(p.gen_planta_mwh) }}</span>
+                  <span v-else class="text-xs" style="color: #b0a0c0;">Sin datos</span>
+                </template>
+              </Column>
+              <Column header="Gen. contrato" style="width: 125px; text-align: right;">
+                <template #body="{ data: p }">
+                  <span v-if="p.gen_contrato_mwh !== null" class="font-mono text-sm font-semibold" style="color: #2C2039;">
+                    {{ fmtMwh(p.gen_contrato_mwh) }}
+                  </span>
+                  <span v-else class="text-xs" style="color: #b0a0c0;">—</span>
+                </template>
+              </Column>
+            </DataTable>
+
+            <!-- Total footer -->
+            <div
+              v-if="anualData.meses[selectedMonthIdx].plantas.length"
+              class="flex justify-between items-center mt-3 px-3 py-2.5 rounded-lg text-sm font-semibold"
+              style="background: rgba(44,32,57,0.05);"
+            >
+              <span style="color: #7a6e8a;">Total al contrato</span>
+              <span class="font-mono" style="color: #2C2039;">
+                {{ fmtMwh(genVal(anualData.meses[selectedMonthIdx])) }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </template>
+    </Teleport>
 
     <!-- Empty chart state -->
     <div v-else-if="!chartLoading && !chartError" class="text-center py-16 rounded-xl border" style="color: #7a6e8a; border-color: rgba(44,32,57,0.10);">
@@ -489,6 +509,8 @@ const hovered          = ref(null)
 const tooltipX         = ref(0)
 const tooltipY         = ref(0)
 const selectedMonthIdx = ref(null)
+const panelX           = ref(0)
+const panelY           = ref(0)
 const chartBox         = ref(null)
 
 // ── Chart math ────────────────────────────────────────────────────────────────
@@ -552,7 +574,30 @@ function onSvgMousemove(event) {
 function onSvgClick(event) {
   const idx = monthIdxFromEvent(event)
   if (idx === null) return
-  selectedMonthIdx.value = selectedMonthIdx.value === idx ? null : idx
+  if (selectedMonthIdx.value === idx) {
+    selectedMonthIdx.value = null
+    return
+  }
+  selectedMonthIdx.value = idx
+
+  // Calculate fixed-position for the floating panel
+  const svgEl  = event.currentTarget
+  const rect   = svgEl.getBoundingClientRect()
+  const scaleX = rect.width / SVG_W
+  const PANEL_W = 480
+
+  // Center panel on the clicked bar
+  const barCenterScreen = rect.left + (barX(idx) + barW / 2) * scaleX
+  const rawLeft = barCenterScreen - PANEL_W / 2
+  panelX.value = Math.min(Math.max(rawLeft, 12), window.innerWidth - PANEL_W - 12)
+
+  // Appear just below the SVG, or above if not enough space
+  const spaceBelow = window.innerHeight - rect.bottom - 16
+  if (spaceBelow >= 200) {
+    panelY.value = rect.bottom + 10
+  } else {
+    panelY.value = Math.max(rect.top - 320, 12)
+  }
 }
 
 // ── Formatters ────────────────────────────────────────────────────────────────
@@ -589,10 +634,10 @@ async function loadContratos() {
 
 async function loadAnnualData() {
   if (!selectedContratoId.value) return
-  chartLoading.value  = true
-  chartError.value    = null
-  anualData.value     = null
-  hovered.value       = null
+  chartLoading.value     = true
+  chartError.value       = null
+  anualData.value        = null
+  hovered.value          = null
   selectedMonthIdx.value = null
   try {
     const res = await client.get(`/cumplimiento/ppa/${selectedContratoId.value}/anual`, {
