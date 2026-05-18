@@ -53,24 +53,6 @@
       <!-- Chart card -->
       <div class="rounded-xl border p-4" style="background: white; border-color: rgba(44,32,57,0.12);">
 
-        <!-- Mode toggle -->
-        <div class="flex justify-end mb-3">
-          <div class="flex gap-1 p-1 rounded-lg" style="background: rgba(44,32,57,0.07);">
-            <button
-              @click="viewMode = 'energia'"
-              :class="['mode-btn', viewMode === 'energia' ? 'mode-active' : 'mode-inactive']"
-            >
-              <i class="pi pi-bolt mr-1.5 text-xs" />Energía
-            </button>
-            <button
-              @click="viewMode = 'plantas'"
-              :class="['mode-btn', viewMode === 'plantas' ? 'mode-active' : 'mode-inactive']"
-            >
-              <i class="pi pi-sun mr-1.5 text-xs" />Plantas
-            </button>
-          </div>
-        </div>
-
         <div ref="chartBox" class="relative select-none" style="width: 100%; height: 360px;">
 
           <svg
@@ -79,6 +61,7 @@
             style="width: 100%; height: 100%;"
             @mousemove="onSvgMousemove"
             @mouseleave="hovered = null"
+            @click="onSvgClick"
           >
             <!-- Y-axis grid + labels -->
             <g v-for="gl in yGridLines" :key="gl.val">
@@ -96,12 +79,20 @@
             <!-- Per-month groups -->
             <g v-for="(mes, i) in anualData.meses" :key="i">
 
-              <!-- Current month column highlight -->
+              <!-- Current month column tint -->
               <rect
                 v-if="isCurrentMonth(mes)"
                 :x="slotX(i)" y="0"
                 :width="slotW" :height="SVG_H - PAD_B + 2"
                 fill="rgba(145,91,216,0.04)"
+              />
+
+              <!-- Selected month highlight -->
+              <rect
+                v-if="selectedMonthIdx === i"
+                :x="slotX(i)" y="0"
+                :width="slotW" :height="SVG_H - PAD_B + 2"
+                fill="rgba(240,192,64,0.08)"
               />
 
               <!-- Compliance band (green: min → max) -->
@@ -112,7 +103,6 @@
                 :width="slotW"
                 :height="toY(mes.min_mwh) - toY(mes.max_mwh)"
                 fill="rgba(46,125,50,0.10)"
-                stroke="none"
               />
 
               <!-- Generation bar -->
@@ -139,7 +129,7 @@
                 stroke-dasharray="3,2"
               />
 
-              <!-- Deficit gap (red — from gen top to min line) -->
+              <!-- Deficit gap -->
               <rect
                 v-if="mes.estado === 'deficit' && mes.min_mwh !== null && genVal(mes) > 0 && genVal(mes) < mes.min_mwh"
                 :x="barX(i)"
@@ -149,7 +139,7 @@
                 fill="rgba(214,68,85,0.32)"
               />
 
-              <!-- Excess zone (amber — bar portion above max) -->
+              <!-- Excess zone -->
               <rect
                 v-if="mes.estado === 'excedente' && mes.max_mwh !== null && genVal(mes) > mes.max_mwh"
                 :x="barX(i)"
@@ -159,14 +149,14 @@
                 fill="rgba(240,192,64,0.55)"
               />
 
-              <!-- Min line segment -->
+              <!-- Min line -->
               <line
                 v-if="mes.min_mwh !== null"
                 :x1="slotX(i)" :y1="toY(mes.min_mwh)"
                 :x2="slotX(i) + slotW" :y2="toY(mes.min_mwh)"
                 stroke="rgba(214,68,85,0.50)" stroke-width="1"
               />
-              <!-- Max line segment -->
+              <!-- Max line -->
               <line
                 v-if="mes.max_mwh !== null"
                 :x1="slotX(i)" :y1="toY(mes.max_mwh)"
@@ -176,21 +166,30 @@
 
               <!-- Hover highlight -->
               <rect
-                v-if="hovered === i"
+                v-if="hovered === i && selectedMonthIdx !== i"
                 :x="slotX(i)" :y="PAD_T"
                 :width="slotW" :height="PLOT_H"
                 fill="rgba(145,91,216,0.07)"
+              />
+
+              <!-- Click indicator dot -->
+              <circle
+                v-if="selectedMonthIdx === i"
+                :cx="barX(i) + barW / 2"
+                :cy="SVG_H - PAD_B + 30"
+                r="3"
+                fill="#F0C040"
               />
 
               <!-- Month label -->
               <text
                 :x="barX(i) + barW / 2" :y="SVG_H - PAD_B + 17"
                 text-anchor="middle" font-size="11"
-                :fill="isCurrentMonth(mes) ? '#2C2039' : '#7a6e8a'"
-                :font-weight="isCurrentMonth(mes) ? '700' : '400'"
+                :fill="selectedMonthIdx === i ? '#F0C040' : isCurrentMonth(mes) ? '#2C2039' : '#7a6e8a'"
+                :font-weight="selectedMonthIdx === i || isCurrentMonth(mes) ? '700' : '400'"
               >{{ MESES_CORTOS[i] }}</text>
 
-              <!-- Hover area (transparent) -->
+              <!-- Hover + click target -->
               <rect
                 :x="slotX(i)" :y="PAD_T"
                 :width="slotW" :height="PLOT_H"
@@ -205,14 +204,13 @@
               stroke="rgba(44,32,57,0.18)" stroke-width="1" />
           </svg>
 
-          <!-- Tooltip -->
+          <!-- Tooltip (hover) -->
           <div
             v-if="hovered !== null && anualData.meses[hovered]"
             class="absolute pointer-events-none z-10 rounded-xl shadow-lg text-sm"
-            style="background: #2C2039; color: #FDFAF7; padding: 10px 14px; min-width: 210px;"
+            style="background: #2C2039; color: #FDFAF7; padding: 10px 14px; min-width: 200px;"
             :style="{ left: tooltipX + 'px', top: tooltipY + 'px', transform: 'translateY(-100%)' }"
           >
-            <!-- Header común -->
             <div class="font-bold mb-2" style="color: #F0C040;">
               {{ MESES[hovered] }} {{ selectedYear }}
               <span
@@ -221,77 +219,41 @@
                 style="color: rgba(253,250,247,0.55);"
               >proyección</span>
             </div>
-
-            <!-- Modo Energía -->
-            <template v-if="viewMode === 'energia'">
-              <div class="space-y-1">
-                <div class="flex justify-between gap-6">
-                  <span style="color: rgba(253,250,247,0.65);">Generación</span>
-                  <span class="font-mono font-semibold">{{ fmtMwh(genVal(anualData.meses[hovered])) }}</span>
-                </div>
-                <div v-if="anualData.meses[hovered].min_mwh !== null" class="flex justify-between gap-6">
-                  <span style="color: rgba(253,250,247,0.65);">Mínimo</span>
-                  <span class="font-mono">{{ fmtMwh(anualData.meses[hovered].min_mwh) }}</span>
-                </div>
-                <div v-if="anualData.meses[hovered].max_mwh !== null" class="flex justify-between gap-6">
-                  <span style="color: rgba(253,250,247,0.65);">Máximo</span>
-                  <span class="font-mono">{{ fmtMwh(anualData.meses[hovered].max_mwh) }}</span>
-                </div>
-                <div
-                  v-if="anualData.meses[hovered].estado === 'deficit'"
-                  class="flex justify-between gap-6 mt-2 pt-2"
-                  style="border-top: 1px solid rgba(255,255,255,0.1);"
-                >
-                  <span style="color: #D64455;">Déficit</span>
-                  <span class="font-mono font-bold" style="color: #D64455;">
-                    {{ fmtMwh(anualData.meses[hovered].compras_bolsa_mwh) }}
-                  </span>
-                </div>
-                <div
-                  v-if="anualData.meses[hovered].estado === 'excedente'"
-                  class="flex justify-between gap-6 mt-2 pt-2"
-                  style="border-top: 1px solid rgba(255,255,255,0.1);"
-                >
-                  <span style="color: #F0C040;">Excedente</span>
-                  <span class="font-mono font-bold" style="color: #F0C040;">
-                    {{ fmtMwh(anualData.meses[hovered].excedentes_bolsa_mwh) }}
-                  </span>
-                </div>
+            <div class="space-y-1">
+              <div class="flex justify-between gap-6">
+                <span style="color: rgba(253,250,247,0.65);">Generación</span>
+                <span class="font-mono font-semibold">{{ fmtMwh(genVal(anualData.meses[hovered])) }}</span>
               </div>
-              <div class="mt-2 pt-2" style="border-top: 1px solid rgba(255,255,255,0.1);">
-                <span :class="['text-xs font-bold px-2 py-0.5 rounded-full', estadoBadge(anualData.meses[hovered].estado)]">
-                  {{ estadoLabel(anualData.meses[hovered].estado) }}
+              <div v-if="anualData.meses[hovered].min_mwh !== null" class="flex justify-between gap-6">
+                <span style="color: rgba(253,250,247,0.65);">Mínimo</span>
+                <span class="font-mono">{{ fmtMwh(anualData.meses[hovered].min_mwh) }}</span>
+              </div>
+              <div v-if="anualData.meses[hovered].max_mwh !== null" class="flex justify-between gap-6">
+                <span style="color: rgba(253,250,247,0.65);">Máximo</span>
+                <span class="font-mono">{{ fmtMwh(anualData.meses[hovered].max_mwh) }}</span>
+              </div>
+              <div
+                v-if="anualData.meses[hovered].estado === 'deficit'"
+                class="flex justify-between gap-6 mt-2 pt-2"
+                style="border-top: 1px solid rgba(255,255,255,0.1);"
+              >
+                <span style="color: #D64455;">Déficit</span>
+                <span class="font-mono font-bold" style="color: #D64455;">
+                  {{ fmtMwh(anualData.meses[hovered].compras_bolsa_mwh) }}
                 </span>
               </div>
-            </template>
-
-            <!-- Modo Plantas -->
-            <template v-else>
-              <div class="mb-2 font-semibold" style="color: rgba(253,250,247,0.8);">
-                {{ anualData.meses[hovered].n_plantas }}
-                {{ anualData.meses[hovered].n_plantas === 1 ? 'planta activa' : 'plantas activas' }}
-                <span class="text-xs font-normal" style="color: rgba(253,250,247,0.45);">en GESCON</span>
-              </div>
               <div
-                v-if="anualData.meses[hovered].plantas.length === 0"
-                class="text-xs"
-                style="color: rgba(253,250,247,0.45);"
-              >Sin plantas asignadas este mes</div>
-              <div
-                v-for="(p, pi) in anualData.meses[hovered].plantas"
-                :key="pi"
-                class="flex items-start justify-between gap-4 py-1"
-                :style="pi < anualData.meses[hovered].plantas.length - 1 ? 'border-bottom: 1px solid rgba(255,255,255,0.06)' : ''"
+                v-if="anualData.meses[hovered].estado === 'excedente'"
+                class="flex justify-between gap-6 mt-2 pt-2"
+                style="border-top: 1px solid rgba(255,255,255,0.1);"
               >
-                <div>
-                  <div class="text-xs font-semibold" style="color: #FDFAF7;">{{ p.nombre }}</div>
-                  <div v-if="p.sub_project" class="text-xs" style="color: rgba(253,250,247,0.45);">{{ p.sub_project }}</div>
-                </div>
-                <div class="text-xs font-mono shrink-0" style="color: #915BD8;">
-                  {{ (p.pct_despacho * 100).toFixed(0) }}%
-                </div>
+                <span style="color: #F0C040;">Excedente</span>
+                <span class="font-mono font-bold" style="color: #F0C040;">
+                  {{ fmtMwh(anualData.meses[hovered].excedentes_bolsa_mwh) }}
+                </span>
               </div>
-            </template>
+            </div>
+            <div class="mt-2 pt-1 text-xs" style="color: rgba(253,250,247,0.35);">Clic para ver desglose</div>
           </div>
         </div>
 
@@ -317,6 +279,96 @@
             <div class="w-4 h-4 rounded-sm" style="background: rgba(145,91,216,0.45); border: 1px dashed #915BD8;"></div>
             Proyección
           </div>
+        </div>
+      </div>
+
+      <!-- Detail panel (click on month) -->
+      <div
+        v-if="selectedMonthIdx !== null && anualData.meses[selectedMonthIdx]"
+        class="rounded-xl border p-5"
+        style="background: white; border-color: rgba(44,32,57,0.12);"
+      >
+        <!-- Panel header -->
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h3 class="font-bold text-base" style="color: #2C2039;">
+              Desglose — {{ MESES[selectedMonthIdx] }} {{ selectedYear }}
+            </h3>
+            <p class="text-xs mt-0.5" style="color: #7a6e8a;">
+              Generación por planta según GESCON
+              <span
+                v-if="anualData.meses[selectedMonthIdx].tipo_datos !== 'real'"
+                class="ml-1 px-1.5 py-0.5 rounded font-semibold"
+                style="background: rgba(145,91,216,0.12); color: #915BD8;"
+              >proyección</span>
+            </p>
+          </div>
+          <button
+            @click="selectedMonthIdx = null"
+            class="rounded-lg p-1.5 transition-colors"
+            style="color: #7a6e8a;"
+            onmouseover="this.style.background='rgba(44,32,57,0.08)'"
+            onmouseout="this.style.background='transparent'"
+          >
+            <i class="pi pi-times text-sm" />
+          </button>
+        </div>
+
+        <!-- No plants -->
+        <div
+          v-if="!anualData.meses[selectedMonthIdx].plantas.length"
+          class="text-center py-8 text-sm"
+          style="color: #7a6e8a;"
+        >
+          <i class="pi pi-info-circle text-2xl mb-2 block" />
+          Sin plantas asignadas en GESCON para este mes
+        </div>
+
+        <!-- Plants table -->
+        <DataTable
+          v-else
+          :value="anualData.meses[selectedMonthIdx].plantas"
+          size="small"
+          class="border rounded-xl overflow-hidden"
+          style="border-color: rgba(44,32,57,0.10);"
+        >
+          <Column header="Planta" style="min-width: 200px;">
+            <template #body="{ data: p }">
+              <div class="font-semibold text-sm" style="color: #2C2039;">{{ p.nombre }}</div>
+              <div v-if="p.sub_project" class="text-xs mt-0.5 font-mono" style="color: #7a6e8a;">{{ p.sub_project }}</div>
+            </template>
+          </Column>
+          <Column header="% Despacho" style="width: 110px; text-align: right;">
+            <template #body="{ data: p }">
+              <span class="font-mono text-sm">{{ (p.pct_despacho * 100).toFixed(0) }}%</span>
+            </template>
+          </Column>
+          <Column header="Gen. planta" style="width: 140px; text-align: right;">
+            <template #body="{ data: p }">
+              <span v-if="p.gen_planta_mwh !== null" class="font-mono text-sm">{{ fmtMwh(p.gen_planta_mwh) }}</span>
+              <span v-else class="text-xs" style="color: #b0a0c0;">Sin datos</span>
+            </template>
+          </Column>
+          <Column header="Gen. contrato" style="width: 140px; text-align: right;">
+            <template #body="{ data: p }">
+              <span v-if="p.gen_contrato_mwh !== null" class="font-mono text-sm font-semibold" style="color: #2C2039;">
+                {{ fmtMwh(p.gen_contrato_mwh) }}
+              </span>
+              <span v-else class="text-xs" style="color: #b0a0c0;">—</span>
+            </template>
+          </Column>
+        </DataTable>
+
+        <!-- Totals footer -->
+        <div
+          v-if="anualData.meses[selectedMonthIdx].plantas.length"
+          class="flex justify-between items-center mt-3 px-3 py-2 rounded-lg text-sm font-semibold"
+          style="background: rgba(44,32,57,0.05);"
+        >
+          <span style="color: #7a6e8a;">Total generado al contrato</span>
+          <span class="font-mono" style="color: #2C2039;">
+            {{ fmtMwh(genVal(anualData.meses[selectedMonthIdx])) }}
+          </span>
         </div>
       </div>
 
@@ -373,17 +425,14 @@
         </Column>
         <Column header="Meses" style="width: 90px; text-align: center;">
           <template #body="{ data: row }">
-            <span class="font-mono text-sm">{{ row.meses_con_compromisos }}
-              <span class="text-xs" style="color: #7a6e8a;">/12</span>
-            </span>
+            <span class="font-mono text-sm">{{ row.meses_con_compromisos }}<span class="text-xs" style="color: #7a6e8a;">/12</span></span>
           </template>
         </Column>
         <Column style="width: 44px; text-align: center;">
           <template #body="{ data: row }">
             <i
               :class="row.id === selectedContratoId ? 'pi pi-chart-bar' : 'pi pi-chevron-right'"
-              class="text-xs"
-              style="color: #915BD8;"
+              class="text-xs" style="color: #915BD8;"
             />
           </template>
         </Column>
@@ -425,22 +474,22 @@ const MESES_CORTOS = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct
 // ── State ─────────────────────────────────────────────────────────────────────
 const now    = new Date()
 const years  = Array.from({ length: 18 }, (_, i) => 2024 + i)
-const contratos         = ref([])
-const selectedYear      = ref(now.getFullYear())
+const contratos          = ref([])
+const selectedYear       = ref(now.getFullYear())
 const selectedContratoId = ref(null)
 
 const anualData    = ref(null)
 const chartLoading = ref(false)
 const chartError   = ref(null)
-const viewMode     = ref('energia')   // 'energia' | 'plantas'
 
 const tableData    = ref([])
 const tableLoading = ref(false)
 
-const hovered  = ref(null)
-const tooltipX = ref(0)
-const tooltipY = ref(0)
-const chartBox = ref(null)
+const hovered          = ref(null)
+const tooltipX         = ref(0)
+const tooltipY         = ref(0)
+const selectedMonthIdx = ref(null)
+const chartBox         = ref(null)
 
 // ── Chart math ────────────────────────────────────────────────────────────────
 const yMaxVal = computed(() => {
@@ -463,8 +512,8 @@ const yGridLines = computed(() => {
 
 function niceStep(max) {
   const rough = max / 5
-  const mag = Math.pow(10, Math.floor(Math.log10(rough || 1)))
-  const mult = rough / mag
+  const mag   = Math.pow(10, Math.floor(Math.log10(rough || 1)))
+  const mult  = rough / mag
   if (mult < 1.5) return mag
   if (mult < 3.5) return 2 * mag
   if (mult < 7.5) return 5 * mag
@@ -474,38 +523,36 @@ function niceStep(max) {
 function toY(val) {
   return PAD_T + PLOT_H * (1 - (val || 0) / yMaxVal.value)
 }
-
-function slotX(i) {
-  return PAD_L + i * slotW
-}
-
-function barX(i) {
-  return PAD_L + i * slotW + (slotW - barW) / 2
-}
-
-function genVal(mes) {
-  return mes.gen_proyectada_mwh ?? mes.gen_mwh ?? 0
-}
-
+function slotX(i) { return PAD_L + i * slotW }
+function barX(i)  { return PAD_L + i * slotW + (slotW - barW) / 2 }
+function genVal(mes) { return mes.gen_proyectada_mwh ?? mes.gen_mwh ?? 0 }
 function isCurrentMonth(mes) {
   return selectedYear.value === now.getFullYear() && mes.month === (now.getMonth() + 1)
 }
 
-// ── Tooltip ───────────────────────────────────────────────────────────────────
-function onSvgMousemove(event) {
+// ── Interaction ───────────────────────────────────────────────────────────────
+function monthIdxFromEvent(event) {
   const svgEl = event.currentTarget
   const rect  = svgEl.getBoundingClientRect()
   const svgX  = (event.clientX - rect.left) * (SVG_W / rect.width)
   const idx   = Math.floor((svgX - PAD_L) / slotW)
+  return (idx >= 0 && idx < N && svgX >= PAD_L) ? idx : null
+}
 
-  if (idx >= 0 && idx < N && svgX >= PAD_L) {
-    hovered.value = idx
+function onSvgMousemove(event) {
+  const idx = monthIdxFromEvent(event)
+  hovered.value = idx
+  if (idx !== null) {
     const containerRect = chartBox.value.getBoundingClientRect()
-    tooltipX.value = Math.min(event.clientX - containerRect.left + 12, containerRect.width - 225)
+    tooltipX.value = Math.min(event.clientX - containerRect.left + 12, containerRect.width - 215)
     tooltipY.value = event.clientY - containerRect.top - 10
-  } else {
-    hovered.value = null
   }
+}
+
+function onSvgClick(event) {
+  const idx = monthIdxFromEvent(event)
+  if (idx === null) return
+  selectedMonthIdx.value = selectedMonthIdx.value === idx ? null : idx
 }
 
 // ── Formatters ────────────────────────────────────────────────────────────────
@@ -513,27 +560,14 @@ function fmtMwh(val) {
   if (val === null || val === undefined) return '—'
   return val.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' MWh'
 }
-
 function fmtShort(val) {
   if (val >= 1000) return (val / 1000).toFixed(1).replace(/\.0$/, '') + 'k'
   return Math.round(val).toString()
 }
-
 function fmtFecha(iso) {
   if (!iso) return '—'
   const [y, m] = iso.split('-')
   return `${MESES_CORTOS[parseInt(m) - 1]} ${y}`
-}
-
-function estadoLabel(estado) {
-  return { ok: 'Cumplimiento', deficit: 'Déficit', excedente: 'Excedente', sin_compromisos: 'Sin compromisos' }[estado] || estado
-}
-
-function estadoBadge(estado) {
-  if (estado === 'ok')        return 'estado-ok'
-  if (estado === 'deficit')   return 'estado-deficit'
-  if (estado === 'excedente') return 'estado-excedente'
-  return 'estado-neutral'
 }
 
 // ── Data loading ──────────────────────────────────────────────────────────────
@@ -555,10 +589,11 @@ async function loadContratos() {
 
 async function loadAnnualData() {
   if (!selectedContratoId.value) return
-  chartLoading.value = true
-  chartError.value   = null
-  anualData.value    = null
-  hovered.value      = null
+  chartLoading.value  = true
+  chartError.value    = null
+  anualData.value     = null
+  hovered.value       = null
+  selectedMonthIdx.value = null
   try {
     const res = await client.get(`/cumplimiento/ppa/${selectedContratoId.value}/anual`, {
       params: { year: selectedYear.value },
@@ -621,32 +656,5 @@ onMounted(async () => {
 }
 :deep(.p-datatable .row-selected td) {
   background: rgba(145,91,216,0.09) !important;
-}
-
-.estado-ok        { background: #1B5E20; color: #C8E6C9; padding: 2px 8px; border-radius: 999px; }
-.estado-deficit   { background: #7F0E0E; color: #FFCDD2; padding: 2px 8px; border-radius: 999px; }
-.estado-excedente { background: #5D3A00; color: #FFE0B2; padding: 2px 8px; border-radius: 999px; }
-.estado-neutral   { background: rgba(122,110,138,0.3); color: #FDFAF7; padding: 2px 8px; border-radius: 999px; }
-
-.mode-btn {
-  padding: 4px 12px;
-  border-radius: 7px;
-  font-size: 12px;
-  font-weight: 600;
-  transition: all 0.15s;
-  border: none;
-  cursor: pointer;
-}
-.mode-active {
-  background: #2C2039;
-  color: #FDFAF7;
-  border: 1px solid #915BD8;
-}
-.mode-inactive {
-  background: transparent;
-  color: #7a6e8a;
-}
-.mode-inactive:hover {
-  color: #2C2039;
 }
 </style>
