@@ -299,8 +299,8 @@
         <div
           class="fixed rounded-2xl shadow-2xl"
           style="z-index: 50; background: #FDFAF7; width: 480px; max-height: 80vh; overflow-y: auto;
-                 border: 1px solid rgba(44,32,57,0.12);"
-          :style="{ left: panelX + 'px', top: panelY + 'px' }"
+                 border: 1px solid rgba(44,32,57,0.12);
+                 top: 50%; left: 50%; transform: translate(-50%, -50%);"
           @click.stop
         >
           <!-- Header -->
@@ -509,8 +509,6 @@ const hovered          = ref(null)
 const tooltipX         = ref(0)
 const tooltipY         = ref(0)
 const selectedMonthIdx = ref(null)
-const panelX           = ref(0)
-const panelY           = ref(0)
 const chartBox         = ref(null)
 
 // ── Chart math ────────────────────────────────────────────────────────────────
@@ -574,30 +572,7 @@ function onSvgMousemove(event) {
 function onSvgClick(event) {
   const idx = monthIdxFromEvent(event)
   if (idx === null) return
-  if (selectedMonthIdx.value === idx) {
-    selectedMonthIdx.value = null
-    return
-  }
-  selectedMonthIdx.value = idx
-
-  // Calculate fixed-position for the floating panel
-  const svgEl  = event.currentTarget
-  const rect   = svgEl.getBoundingClientRect()
-  const scaleX = rect.width / SVG_W
-  const PANEL_W = 480
-
-  // Center panel on the clicked bar
-  const barCenterScreen = rect.left + (barX(idx) + barW / 2) * scaleX
-  const rawLeft = barCenterScreen - PANEL_W / 2
-  panelX.value = Math.min(Math.max(rawLeft, 12), window.innerWidth - PANEL_W - 12)
-
-  // Appear just below the SVG, or above if not enough space
-  const spaceBelow = window.innerHeight - rect.bottom - 16
-  if (spaceBelow >= 200) {
-    panelY.value = rect.bottom + 10
-  } else {
-    panelY.value = Math.max(rect.top - 320, 12)
-  }
+  selectedMonthIdx.value = selectedMonthIdx.value === idx ? null : idx
 }
 
 // ── Formatters ────────────────────────────────────────────────────────────────
