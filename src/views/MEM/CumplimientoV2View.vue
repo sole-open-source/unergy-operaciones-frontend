@@ -403,7 +403,14 @@
                   :key="pi"
                   style="border-top: 1px solid rgba(44,32,57,0.06);"
                 >
-                  <td class="py-2 pr-2 font-medium" style="color: #2C2039;">{{ p.nombre }}</td>
+                  <td class="py-2 pr-2 font-medium" style="color: #2C2039;">
+                    {{ p.nombre }}
+                    <span
+                      v-if="p.dias_en_contrato && p.dias_mes && p.dias_en_contrato < p.dias_mes"
+                      class="ml-1 text-xs font-normal"
+                      style="color: #7a6e8a;"
+                    >{{ p.dias_en_contrato }}/{{ p.dias_mes }} días</span>
+                  </td>
                   <td class="py-2 px-2 text-right font-mono text-xs" style="color: #7a6e8a;">
                     {{ (p.pct_despacho * 100).toFixed(0) }}%
                   </td>
