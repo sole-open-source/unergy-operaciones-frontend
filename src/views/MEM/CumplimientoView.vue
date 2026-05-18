@@ -10,15 +10,8 @@
       <div class="flex flex-wrap gap-3 items-end">
         <div class="flex flex-col gap-1">
           <label class="text-xs font-semibold uppercase tracking-wider" style="color: #915BD8;">Contrato</label>
-          <Select
-            v-model="selectedContratoId"
-            :options="contratos"
-            optionLabel="label"
-            optionValue="id"
-            placeholder="Seleccionar contrato"
-            class="w-60"
-            @change="loadData"
-          />
+          <Select v-model="selectedContratoId" :options="contratos" optionLabel="label" optionValue="id"
+            placeholder="Seleccionar contrato" class="w-60" @change="loadData" />
         </div>
         <div class="flex flex-col gap-1">
           <label class="text-xs font-semibold uppercase tracking-wider" style="color: #915BD8;">Mes</label>
@@ -31,7 +24,7 @@
       </div>
     </div>
 
-    <!-- Estado cargando -->
+    <!-- Cargando -->
     <div v-if="loading" class="flex flex-col items-center justify-center py-24 gap-4">
       <ProgressSpinner style="width:48px;height:48px;" strokeWidth="4" animationDuration=".8s" />
       <p class="text-sm" style="color:#7a6e8a;">Consultando generación desde la API de Unergy…</p>
@@ -48,8 +41,8 @@
     <!-- Contenido principal -->
     <template v-else-if="data">
 
-      <!-- Resumen del período -->
-      <div class="flex items-center gap-3 text-sm" style="color: #7a6e8a;">
+      <!-- Resumen período -->
+      <div class="flex items-center gap-3 text-sm flex-wrap" style="color: #7a6e8a;">
         <span class="font-semibold" style="color:#2C2039;">{{ data.contrato.nombre_interno }}</span>
         <span>·</span>
         <span>{{ data.contrato.comprador_nombre }}</span>
@@ -63,80 +56,70 @@
         <span v-else>Mes completo</span>
       </div>
 
-      <!-- Grid principal: canvas + métricas -->
+      <!-- Grid principal -->
       <div class="grid gap-6" style="grid-template-columns: 1fr 380px;">
 
-        <!-- Canvas sky -->
+        <!-- Canvas -->
         <div class="flex flex-col gap-3">
-          <div ref="skyBox" class="sky-box relative rounded-2xl overflow-hidden" style="height: 280px; background: #2C2039; border: 1px solid rgba(145,91,216,0.35);">
+          <div ref="skyBox" class="relative rounded-2xl overflow-hidden"
+               style="height: 300px; background: #04020b; border: 1px solid rgba(145,91,216,0.3);">
             <canvas ref="canvasRef" class="absolute inset-0 w-full h-full" />
-            <div ref="sunEl" class="sun absolute w-8 h-8 rounded-full pointer-events-none" style="background: #F6FF72; border: 2.5px solid #c8cc3a; transform: translate(-50%,-50%); transition: left .3s, top .3s;" />
-            <!-- Suelo con paneles -->
-            <div class="absolute bottom-0 left-0 right-0 h-9" style="background: #1e1429; border-top: 2px solid #915BD8;">
-              <div class="flex gap-1 absolute left-1/2 -translate-x-1/2 top-1.5">
-                <div v-for="i in 8" :key="i" class="w-5 h-3 rounded-sm" style="background: #3d2e52; border: 1px solid #915BD8;" />
+            <!-- Suelo solar -->
+            <div class="absolute bottom-0 left-0 right-0 h-9"
+                 style="background: #100b1e; border-top: 1px solid rgba(145,91,216,0.45);">
+              <div class="flex gap-1.5 absolute left-1/2 -translate-x-1/2 top-1.5">
+                <div v-for="i in 9" :key="i" class="w-5 h-3 rounded-sm"
+                     style="background: #221440; border: 1px solid rgba(145,91,216,0.5);" />
               </div>
             </div>
           </div>
 
           <!-- Leyenda -->
-          <div class="flex flex-wrap gap-4">
-            <div class="flex items-center gap-1.5 text-xs" style="color:#7a6e8a;">
-              <div class="w-6 h-1 rounded" style="background:#F6FF72;"></div>
-              Energía generada contrato
+          <div class="flex flex-wrap gap-5">
+            <div class="flex items-center gap-2 text-xs" style="color:#7a6e8a;">
+              <svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" stroke="#F6FF72" stroke-width="2.5"/></svg>
+              Generación contrato
             </div>
-            <div class="flex items-center gap-1.5 text-xs" style="color:#7a6e8a;">
-              <div class="w-6 h-0.5 rounded" style="background:#ff6b6b;"></div>
-              Mínimo (take-or-pay)
+            <div class="flex items-center gap-2 text-xs" style="color:#7a6e8a;">
+              <svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" stroke="#e05567" stroke-width="1.5" stroke-dasharray="5,3"/></svg>
+              Mínimo take-or-pay
             </div>
-            <div class="flex items-center gap-1.5 text-xs" style="color:#7a6e8a;">
-              <div class="w-6 h-0.5 rounded" style="background:#915BD8;"></div>
-              Máximo (give-or-take)
-            </div>
-            <div class="flex items-center gap-1.5 text-xs" style="color:#7a6e8a;">
-              <div class="w-6 h-1 rounded" style="background:rgba(246,255,114,0.35);"></div>
-              Zona contractual OK
+            <div class="flex items-center gap-2 text-xs" style="color:#7a6e8a;">
+              <svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" stroke="#a77ee0" stroke-width="1.5"/></svg>
+              Máximo give-or-take
             </div>
           </div>
         </div>
 
-        <!-- Panel derecho: estado + métricas -->
+        <!-- Panel métricas -->
         <div class="flex flex-col gap-4">
-
-          <!-- Status bar -->
-          <div :class="['rounded-lg px-4 py-3 text-sm font-semibold text-center', statusClass]">
+          <div :class="['rounded-xl px-4 py-3 text-sm font-semibold text-center tracking-wide', statusClass]">
             {{ statusText }}
           </div>
 
-          <!-- Métricas -->
           <div class="grid grid-cols-2 gap-3">
-            <!-- Generado real -->
             <div class="metric-card" style="background: rgba(44,32,57,0.06);">
               <div class="metric-label">Generado acum.</div>
               <div class="metric-value">{{ fmtMwh(data.generacion.gen_total_mwh) }}</div>
               <div class="metric-sub" v-if="data.periodo.es_mes_actual">Real hasta día {{ data.periodo.dia_actual }}</div>
             </div>
 
-            <!-- Proyectado (solo mes actual) -->
             <div v-if="data.periodo.es_mes_actual" class="metric-card" :class="projCardClass">
               <div class="metric-label">Proy. fin de mes</div>
               <div class="metric-value" :class="projValueClass">{{ fmtMwh(data.generacion.gen_proyectada_mwh) }}</div>
               <div class="metric-sub">Extrap. lineal</div>
             </div>
 
-            <!-- Mínimo -->
-            <div class="metric-card" style="background: rgba(255,107,107,0.08); border: 1px solid rgba(255,107,107,0.3);">
+            <div class="metric-card" style="background: rgba(224,85,103,0.08); border: 1px solid rgba(224,85,103,0.25);">
               <div class="metric-label" style="color:#c0504d;">Mínimo contrato</div>
               <div class="metric-value">{{ fmtMwh(data.compromisos.energia_minima_mwh) }}</div>
             </div>
 
-            <!-- Máximo -->
             <div class="metric-card" style="background: rgba(145,91,216,0.08); border: 1px solid rgba(145,91,216,0.3);">
               <div class="metric-label" style="color:#915BD8;">Máximo contrato</div>
               <div class="metric-value">{{ fmtMwh(data.compromisos.energia_maxima_mwh) }}</div>
             </div>
 
-            <!-- Compra en bolsa -->
             <div class="metric-card" :class="data.balance.compras_bolsa_mwh > 0 ? 'danger' : ''">
               <div class="metric-label">Compra en bolsa</div>
               <div class="metric-value" :class="data.balance.compras_bolsa_mwh > 0 ? 'text-red-700 font-bold' : ''">
@@ -145,7 +128,6 @@
               <div class="metric-sub">max(0, mín − gen)</div>
             </div>
 
-            <!-- Venta en bolsa -->
             <div class="metric-card" :class="data.balance.excedentes_bolsa_mwh > 0 ? 'warn' : ''">
               <div class="metric-label">Venta en bolsa</div>
               <div class="metric-value" :class="data.balance.excedentes_bolsa_mwh > 0 ? 'text-amber-700 font-bold' : ''">
@@ -155,13 +137,10 @@
             </div>
           </div>
 
-          <!-- Tarifa -->
           <div v-if="data.generacion.tarifa_cop_kwh" class="rounded-lg px-4 py-2.5 text-sm flex justify-between items-center" style="background: rgba(44,32,57,0.06);">
             <span style="color:#7a6e8a;">Tarifa contrato</span>
             <span class="font-semibold">{{ data.generacion.tarifa_cop_kwh.toFixed(0) }} COP/kWh</span>
           </div>
-
-          <!-- N° plantas activas -->
           <div class="rounded-lg px-4 py-2.5 text-sm flex justify-between items-center" style="background: rgba(44,32,57,0.06);">
             <span style="color:#7a6e8a;">Plantas activas GESCON</span>
             <span class="font-semibold">{{ data.generacion.n_plantas_activas }}</span>
@@ -169,22 +148,15 @@
         </div>
       </div>
 
-      <!-- Tabla de plantas -->
+      <!-- Tabla plantas -->
       <div>
-        <h2 class="text-base font-semibold mb-3" style="color:#2C2039;">
-          Desglose por planta
-        </h2>
-        <DataTable
-          :value="data.generacion.plantas"
-          size="small"
-          stripedRows
-          class="border rounded-xl overflow-hidden"
-          style="border-color: rgba(44,32,57,0.12);"
-        >
+        <h2 class="text-base font-semibold mb-3" style="color:#2C2039;">Desglose por planta</h2>
+        <DataTable :value="data.generacion.plantas" size="small" stripedRows
+          class="border rounded-xl overflow-hidden" style="border-color: rgba(44,32,57,0.12);">
           <Column field="nombre" header="Planta" sortable style="min-width:200px;" />
           <Column header="% Despacho" style="width:110px; text-align:right;">
             <template #body="{ data: row }">
-              <span class="font-mono text-sm">{{ row.pct_despacho.toFixed(1) }}%</span>
+              <span class="font-mono text-sm">{{ (row.pct_despacho * 100).toFixed(1) }}%</span>
             </template>
           </Column>
           <Column header="Gen. planta" style="width:120px; text-align:right;">
@@ -202,7 +174,8 @@
           </Column>
           <Column header="Último dato" style="width:120px; text-align:center;">
             <template #body="{ data: row }">
-              <span v-if="row.ultimo_dia" class="text-sm" :style="row.ultimo_dia < data.periodo.dia_actual - 2 ? 'color:#c0504d; font-weight:600;' : 'color:#7a6e8a;'">
+              <span v-if="row.ultimo_dia" class="text-sm"
+                :style="row.ultimo_dia < data.periodo.dia_actual - 2 ? 'color:#c0504d;font-weight:600;' : 'color:#7a6e8a;'">
                 Día {{ row.ultimo_dia }}
               </span>
               <span v-else class="text-xs" style="color:#b0a0c0;">—</span>
@@ -210,15 +183,19 @@
           </Column>
           <Column style="width:50px; text-align:center;">
             <template #body="{ data: row }">
-              <i v-if="row.sin_api_id" class="pi pi-exclamation-circle text-orange-500" v-tooltip="'Planta sin API ID configurado en proyectos'" />
-              <i v-else-if="row.sin_datos" class="pi pi-exclamation-triangle text-red-500" v-tooltip="'Sin datos de generación en la API'" />
-              <i v-else-if="row.ultimo_dia && row.ultimo_dia < data.periodo.dia_actual - 2" class="pi pi-clock text-yellow-500" v-tooltip="`Datos atrasados: último registro día ${row.ultimo_dia}`" />
+              <i v-if="row.sin_api_id" class="pi pi-exclamation-circle text-orange-500"
+                 v-tooltip="'Planta sin API ID configurado en proyectos'" />
+              <i v-else-if="row.sin_datos" class="pi pi-exclamation-triangle text-red-500"
+                 v-tooltip="'Sin datos de generación en la API'" />
+              <i v-else-if="row.ultimo_dia && row.ultimo_dia < data.periodo.dia_actual - 2"
+                 class="pi pi-clock text-yellow-500"
+                 v-tooltip="`Datos atrasados: último registro día ${row.ultimo_dia}`" />
             </template>
           </Column>
         </DataTable>
       </div>
 
-      <!-- Alertas de datos faltantes -->
+      <!-- Alertas datos faltantes -->
       <div class="space-y-2">
         <Message v-if="data.generacion.sin_api_id.length > 0" severity="warn" :closable="false">
           <strong>Plantas sin API ID:</strong> {{ data.generacion.sin_api_id.join(', ') }}.
@@ -226,13 +203,13 @@
         </Message>
         <Message v-if="data.generacion.plantas_sin_datos.length > 0" severity="error" :closable="false">
           <strong>Plantas sin datos de generación:</strong> {{ data.generacion.plantas_sin_datos.join(', ') }}.
-          La generación acumulada del contrato está incompleta.
+          La generación acumulada está incompleta.
         </Message>
       </div>
 
     </template>
 
-    <!-- Estado vacío -->
+    <!-- Vacío -->
     <div v-else-if="!loading" class="text-center py-20" style="color:#7a6e8a;">
       <i class="pi pi-chart-line text-5xl mb-4 block" style="color:#915BD8;" />
       <p>Selecciona un contrato y período para ver el cumplimiento.</p>
@@ -242,7 +219,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import Select from 'primevue/select'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
@@ -251,48 +228,40 @@ import Tag from 'primevue/tag'
 import ProgressSpinner from 'primevue/progressspinner'
 import client from '@/api/client'
 
-// ── Constantes ─────────────────────────────────────────────────────────────
+// ── Constants ────────────────────────────────────────────────────────────────
 
 const MESES = [
-  { label: 'Enero',      value: 1  },
-  { label: 'Febrero',    value: 2  },
-  { label: 'Marzo',      value: 3  },
-  { label: 'Abril',      value: 4  },
-  { label: 'Mayo',       value: 5  },
-  { label: 'Junio',      value: 6  },
-  { label: 'Julio',      value: 7  },
-  { label: 'Agosto',     value: 8  },
-  { label: 'Septiembre', value: 9  },
-  { label: 'Octubre',    value: 10 },
-  { label: 'Noviembre',  value: 11 },
-  { label: 'Diciembre',  value: 12 },
+  { label: 'Enero', value: 1 }, { label: 'Febrero', value: 2 },
+  { label: 'Marzo', value: 3 }, { label: 'Abril', value: 4 },
+  { label: 'Mayo', value: 5 }, { label: 'Junio', value: 6 },
+  { label: 'Julio', value: 7 }, { label: 'Agosto', value: 8 },
+  { label: 'Septiembre', value: 9 }, { label: 'Octubre', value: 10 },
+  { label: 'Noviembre', value: 11 }, { label: 'Diciembre', value: 12 },
 ]
 
-const now = new Date()
+const now  = new Date()
 const anios = Array.from({ length: 8 }, (_, i) => 2023 + i)
 
-// ── Estado ──────────────────────────────────────────────────────────────────
+// ── State ────────────────────────────────────────────────────────────────────
 
-const contratos       = ref([])
+const contratos          = ref([])
 const selectedContratoId = ref(null)
-const selectedMonth   = ref(now.getMonth() + 1)
-const selectedYear    = ref(now.getFullYear())
-const data            = ref(null)
-const loading         = ref(false)
-const error           = ref(null)
+const selectedMonth      = ref(now.getMonth() + 1)
+const selectedYear       = ref(now.getFullYear())
+const data               = ref(null)
+const loading            = ref(false)
+const error              = ref(null)
 
-const skyBox   = ref(null)
+const skyBox    = ref(null)
 const canvasRef = ref(null)
-const sunEl    = ref(null)
 
-// ── Computed ────────────────────────────────────────────────────────────────
+// ── Computed ─────────────────────────────────────────────────────────────────
 
 const statusClass = computed(() => {
-  if (!data.value) return ''
-  const est = data.value.balance.estado
-  if (est === 'ok')         return 'status-ok'
-  if (est === 'deficit')    return 'status-low'
-  if (est === 'excedente')  return 'status-high'
+  const e = data.value?.balance?.estado
+  if (e === 'ok')        return 'status-ok'
+  if (e === 'deficit')   return 'status-low'
+  if (e === 'excedente') return 'status-high'
   return 'status-neutral'
 })
 
@@ -301,17 +270,16 @@ const statusText = computed(() => {
   const { estado, compras_bolsa_mwh, excedentes_bolsa_mwh } = data.value.balance
   const { es_mes_actual } = data.value.periodo
   if (estado === 'ok')
-    return es_mes_actual ? 'Proyección OK — en la zona contractual' : 'Zona contractual — cumplimiento total'
+    return es_mes_actual ? 'Proyección OK — dentro de la zona contractual' : 'Cumplimiento — zona contractual'
   if (estado === 'deficit')
     return `${es_mes_actual ? 'Proyección: d' : 'D'}éficit ${fmtMwh(compras_bolsa_mwh)} — compra en bolsa`
   if (estado === 'excedente')
     return `${es_mes_actual ? 'Proyección: e' : 'E'}xcedente ${fmtMwh(excedentes_bolsa_mwh)} — venta en bolsa`
-  return 'Sin compromisos definidos para este período'
+  return 'Sin compromisos para este período'
 })
 
 const projCardClass = computed(() => {
-  if (!data.value) return ''
-  const e = data.value.balance.estado
+  const e = data.value?.balance?.estado
   if (e === 'deficit')   return 'danger'
   if (e === 'excedente') return 'warn'
   if (e === 'ok')        return 'ok-dark'
@@ -319,162 +287,357 @@ const projCardClass = computed(() => {
 })
 
 const projValueClass = computed(() => {
-  if (!data.value) return ''
-  const e = data.value.balance.estado
+  const e = data.value?.balance?.estado
   if (e === 'deficit')   return 'text-red-700 font-bold'
   if (e === 'excedente') return 'text-amber-700 font-bold'
   return ''
 })
 
-// ── Helpers ─────────────────────────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
 function fmtMwh(val) {
   if (val === null || val === undefined) return '—'
   return val.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' MWh'
 }
 
-// ── Canvas ───────────────────────────────────────────────────────────────────
+// ── Animation ────────────────────────────────────────────────────────────────
 
-function drawCanvas(des, minV, maxV, fracMes) {
-  const canvas = canvasRef.value
-  const box    = skyBox.value
-  const sun    = sunEl.value
-  if (!canvas || !box) return
+let animFrame = null
+let _stars  = []
+let _drops  = []   // lluvia (deficit)
+let _sparks = []   // energía al cielo (excedente)
+let _dust   = []   // partículas flotantes (ok)
 
-  const W = box.offsetWidth
-  const H = box.offsetHeight - 36  // restar el suelo (36px)
-  canvas.width  = W
-  canvas.height = H + 36
-  const ctx = canvas.getContext('2d')
-  ctx.clearRect(0, 0, W, canvas.height)
+function rnd() { return Math.random() }
 
-  const groundY  = H
-  const totalMax = Math.max(maxV * 1.35, des * 1.15, 900)
-  const N        = 120
+function initParticles(estado, W, H, minYh, maxYh) {
+  _stars = Array.from({ length: 55 }, () => ({
+    x: rnd() * W,
+    y: rnd() * H * 0.72,
+    r: 0.3 + rnd() * 1.0,
+    phase: rnd() * Math.PI * 2,
+    freq:  0.3 + rnd() * 0.8,
+  }))
 
-  const cx    = t => 30 + t * (W - 60)
-  const arcY  = (t, val) => groundY - Math.sin(t * Math.PI) * (groundY - 28) * (val / totalMax) / 0.85
-  const desYf = t => arcY(t, des)
+  _drops = []; _sparks = []; _dust = []
 
-  const minYh = groundY - (minV / totalMax) * (groundY - 28) / 0.85
-  const maxYh = groundY - (maxV / totalMax) * (groundY - 28) / 0.85
-  const enZona = des >= minV && des <= maxV
-
-  // Indicador de día actual (línea vertical punteada)
-  if (fracMes > 0 && fracMes < 1) {
-    const x = cx(fracMes)
-    ctx.save()
-    ctx.strokeStyle = 'rgba(253,250,247,0.2)'
-    ctx.lineWidth = 1
-    ctx.setLineDash([3, 5])
-    ctx.beginPath()
-    ctx.moveTo(x, 0)
-    ctx.lineTo(x, groundY)
-    ctx.stroke()
-    ctx.restore()
-  }
-
-  // Aura zona OK
-  if (enZona) {
-    const bandH = minYh - maxYh
-    ctx.beginPath()
-    ctx.rect(0, maxYh, W, bandH)
-    ctx.fillStyle = 'rgba(246,255,114,0.07)'
-    ctx.fill()
-    for (let layer = 0; layer < 6; layer++) {
-      const spread = layer * 3, h = bandH - spread * 2
-      if (h > 0) {
-        ctx.beginPath()
-        ctx.rect(0, maxYh + spread, W, h)
-        ctx.fillStyle = `rgba(246,255,114,${0.042 - layer * 0.005})`
-        ctx.fill()
-      }
+  if (estado === 'deficit') {
+    for (let i = 0; i < 60; i++) {
+      const x = 20 + rnd() * (W - 40)
+      _drops.push({
+        x,
+        y: -rnd() * H * 0.9,
+        speed: 75 + rnd() * 90,
+        len:   9 + rnd() * 13,
+        alpha: 0.35 + rnd() * 0.45,
+        slant: 0.10 + rnd() * 0.12,
+        baseX: x,
+      })
     }
-    ctx.setLineDash([])
-    ctx.lineWidth = 8
-    ctx.beginPath(); ctx.moveTo(0, minYh); ctx.lineTo(W, minYh)
-    ctx.strokeStyle = 'rgba(246,255,114,0.20)'; ctx.stroke()
-    ctx.beginPath(); ctx.moveTo(0, maxYh); ctx.lineTo(W, maxYh)
-    ctx.strokeStyle = 'rgba(246,255,114,0.15)'; ctx.stroke()
-  }
-
-  // Lluvia (déficit)
-  if (des < minV) {
-    for (let r = 0; r < 32; r++) {
-      const t  = 0.05 + (r / 32) * 0.9
-      const rx = cx(t) + Math.sin(r * 5) * 6
-      const ty = minYh, by = desYf(t)
-      if (by > ty + 6) {
-        ctx.save()
-        ctx.strokeStyle = 'rgba(253,250,247,0.38)'; ctx.lineWidth = 1.2; ctx.setLineDash([3, 6])
-        ctx.beginPath(); ctx.moveTo(rx, ty + 2); ctx.lineTo(rx + 2, by - 3); ctx.stroke()
-        ctx.restore()
-        ctx.beginPath()
-        ctx.ellipse(rx + 2, by + 3, 2, 3, 0, 0, Math.PI * 2)
-        ctx.fillStyle = 'rgba(253,250,247,0.42)'; ctx.fill()
-      }
+  } else if (estado === 'excedente') {
+    for (let i = 0; i < 55; i++) {
+      const x = 20 + rnd() * (W - 40)
+      _sparks.push({
+        x, y: maxYh + rnd() * 12,
+        vy: 25 + rnd() * 70,
+        vx: (rnd() - 0.5) * 14,
+        life:  rnd() * 1.5,
+        total: 1.5 + rnd() * 1.8,
+        size:  1.5 + rnd() * 2.5,
+        baseX: x, baseY: maxYh,
+      })
     }
-  }
-
-  // Flechas excedente
-  if (des > maxV) {
-    for (let a = 0; a < 12; a++) {
-      const t = 0.1 + (a / 12) * 0.8
-      const x = cx(t), top = desYf(t), bot = maxYh
-      if (bot > top + 10) {
-        ctx.save()
-        ctx.strokeStyle = 'rgba(246,255,114,0.60)'; ctx.lineWidth = 1.5; ctx.setLineDash([2, 4])
-        ctx.beginPath(); ctx.moveTo(x, bot - 3); ctx.lineTo(x, top + 8); ctx.stroke()
-        ctx.restore()
-        ctx.setLineDash([])
-        ctx.beginPath(); ctx.moveTo(x - 4, top + 12); ctx.lineTo(x, top + 5); ctx.lineTo(x + 4, top + 12)
-        ctx.strokeStyle = 'rgba(246,255,114,0.75)'; ctx.lineWidth = 1.5; ctx.stroke()
-      }
+  } else if (estado === 'ok') {
+    const zoneH = Math.max(minYh - maxYh, 1)
+    for (let i = 0; i < 32; i++) {
+      const y = maxYh + rnd() * zoneH
+      _dust.push({
+        x: 20 + rnd() * (W - 40),
+        y,
+        vy: 6 + rnd() * 20,
+        life:  rnd() * 4,
+        total: 4 + rnd() * 5,
+        size:  0.9 + rnd() * 1.8,
+        baseY: maxYh, zoneH,
+      })
     }
-  }
-
-  // Curva solar con halo
-  const traceDes = () => {
-    ctx.beginPath()
-    for (let i = 0; i <= N; i++) {
-      const t = i / N
-      i === 0 ? ctx.moveTo(cx(t), desYf(t)) : ctx.lineTo(cx(t), desYf(t))
-    }
-  }
-  traceDes(); ctx.strokeStyle = 'rgba(246,255,114,0.15)'; ctx.lineWidth = 10; ctx.setLineDash([]); ctx.stroke()
-  traceDes(); ctx.strokeStyle = '#F6FF72'; ctx.lineWidth = 2.5; ctx.stroke()
-
-  // Línea mínimo
-  ctx.beginPath(); ctx.moveTo(0, minYh); ctx.lineTo(W, minYh)
-  ctx.strokeStyle = '#ff6b6b'; ctx.lineWidth = 1.5; ctx.setLineDash([6, 4]); ctx.stroke()
-
-  // Línea máximo
-  ctx.beginPath(); ctx.moveTo(0, maxYh); ctx.lineTo(W, maxYh)
-  ctx.strokeStyle = '#915BD8'; ctx.lineWidth = 1.5; ctx.setLineDash([]); ctx.stroke()
-
-  // Labels
-  ctx.font = '500 11px system-ui, sans-serif'
-  ctx.fillStyle = '#ff8888'; ctx.fillText(`mín ${Math.round(minV)} MWh`, W - 115, minYh - 6)
-  ctx.fillStyle = '#b794e8'; ctx.fillText(`máx ${Math.round(maxV)} MWh`, W - 115, maxYh - 6)
-
-  // Posición del sol (pico del arco)
-  const sunX = cx(0.5) * box.offsetWidth / W
-  const sunY = arcY(0.5, des) * box.offsetHeight / (H + 36)
-  if (sun) {
-    sun.style.left = sunX + 'px'
-    sun.style.top  = sunY + 'px'
   }
 }
 
-function redrawFromData() {
-  if (!data.value || !data.value.compromisos.energia_minima_mwh) return
+function startAnimation() {
+  stopAnimation()
+  if (!data.value?.compromisos?.energia_minima_mwh) return
+  const canvas = canvasRef.value
+  const box    = skyBox.value
+  if (!canvas || !box) return
+
+  const GROUND = 36
+  const W = box.offsetWidth
+  const H = box.offsetHeight - GROUND
+  canvas.width  = W
+  canvas.height = H + GROUND
+
   const { gen_total_mwh, gen_proyectada_mwh } = data.value.generacion
   const { energia_minima_mwh: minV, energia_maxima_mwh: maxV } = data.value.compromisos
   const { es_mes_actual, dia_actual, dias_mes } = data.value.periodo
-  // Arc shows the value used for status assessment
-  const des = es_mes_actual ? gen_proyectada_mwh : gen_total_mwh
+  const des     = es_mes_actual ? gen_proyectada_mwh : gen_total_mwh
   const fracMes = es_mes_actual ? dia_actual / dias_mes : 1
-  drawCanvas(des, minV, maxV, fracMes)
+  const estado  = data.value.balance.estado
+
+  const totalMax = Math.max(maxV * 1.35, des * 1.15, 900)
+  const toY  = v  => H - (v / totalMax) * (H - 28) / 0.85
+  const minYh = toY(minV)
+  const maxYh = toY(maxV)
+
+  initParticles(estado, W, H, minYh, maxYh)
+
+  let lastTs = null
+  const tick = (ts) => {
+    const dt = lastTs === null ? 0.016 : Math.min((ts - lastTs) / 1000, 0.05)
+    lastTs = ts
+    render(ts / 1000, dt, W, H, des, minV, maxV, fracMes, estado, totalMax, minYh, maxYh)
+    animFrame = requestAnimationFrame(tick)
+  }
+  animFrame = requestAnimationFrame(tick)
+}
+
+function stopAnimation() {
+  if (animFrame !== null) { cancelAnimationFrame(animFrame); animFrame = null }
+}
+
+function render(t, dt, W, H, des, minV, maxV, fracMes, estado, totalMax, minYh, maxYh) {
+  const canvas = canvasRef.value
+  if (!canvas) return
+  const ctx   = canvas.getContext('2d')
+  const GROUND = 36
+  const N      = 120
+  const cxf    = f => 30 + f * (W - 60)
+  const arcY   = (f, v) => H - Math.sin(f * Math.PI) * (H - 28) * (v / totalMax) / 0.85
+
+  ctx.clearRect(0, 0, W, H + GROUND)
+
+  // ── Sky ──────────────────────────────────────────────────────────────────
+  const sky = ctx.createLinearGradient(0, 0, 0, H)
+  sky.addColorStop(0,    '#04020b')
+  sky.addColorStop(0.45, '#0d0919')
+  sky.addColorStop(1,    '#19102a')
+  ctx.fillStyle = sky
+  ctx.fillRect(0, 0, W, H)
+
+  // ── Stars ─────────────────────────────────────────────────────────────
+  for (const s of _stars) {
+    const a = 0.15 + 0.80 * ((Math.sin(t * s.freq + s.phase) + 1) * 0.5)
+    ctx.beginPath()
+    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2)
+    ctx.fillStyle = `rgba(253,250,247,${a.toFixed(2)})`
+    ctx.fill()
+  }
+
+  // ── Zone band (min–max) ─────────────────────────────────────────────────
+  const band = ctx.createLinearGradient(0, maxYh, 0, minYh)
+  band.addColorStop(0,   'rgba(145,91,216,0.14)')
+  band.addColorStop(0.5, 'rgba(246,255,114,0.06)')
+  band.addColorStop(1,   'rgba(145,91,216,0.14)')
+  ctx.fillStyle = band
+  ctx.fillRect(0, maxYh, W, minYh - maxYh)
+
+  // ── Tinte de estado ─────────────────────────────────────────────────────
+  if (estado === 'deficit') {
+    const fog = ctx.createLinearGradient(0, minYh, 0, H)
+    fog.addColorStop(0, 'rgba(100,160,255,0.10)')
+    fog.addColorStop(1, 'rgba(80,120,200,0.04)')
+    ctx.fillStyle = fog
+    ctx.fillRect(0, minYh, W, H - minYh)
+  } else if (estado === 'excedente') {
+    const glow = ctx.createLinearGradient(0, 0, 0, maxYh)
+    glow.addColorStop(0, 'rgba(246,255,114,0.06)')
+    glow.addColorStop(1, 'rgba(246,255,114,0)')
+    ctx.fillStyle = glow
+    ctx.fillRect(0, 0, W, maxYh)
+  }
+
+  // ── Animaciones de estado ────────────────────────────────────────────────
+  if (estado === 'deficit')        _animRain(ctx, dt, H)
+  else if (estado === 'excedente') _animSparks(ctx, t, dt, W, maxYh)
+  else if (estado === 'ok')        _animWave(ctx, t, dt, W, minYh, maxYh)
+
+  // ── Indicador día actual ─────────────────────────────────────────────────
+  if (fracMes > 0 && fracMes < 1) {
+    const x = cxf(fracMes)
+    ctx.save()
+    ctx.strokeStyle = 'rgba(253,250,247,0.14)'; ctx.lineWidth = 1; ctx.setLineDash([3, 5])
+    ctx.beginPath(); ctx.moveTo(x, 8); ctx.lineTo(x, H - 4)
+    ctx.stroke(); ctx.restore()
+  }
+
+  // ── Arc: capas de halo + línea principal ─────────────────────────────────
+  const traceArc = () => {
+    ctx.beginPath()
+    for (let i = 0; i <= N; i++) {
+      const f = i / N
+      i === 0 ? ctx.moveTo(cxf(f), arcY(f, des)) : ctx.lineTo(cxf(f), arcY(f, des))
+    }
+  }
+  ctx.setLineDash([])
+  traceArc(); ctx.strokeStyle = 'rgba(246,255,114,0.04)'; ctx.lineWidth = 22; ctx.stroke()
+  traceArc(); ctx.strokeStyle = 'rgba(246,255,114,0.10)'; ctx.lineWidth = 12; ctx.stroke()
+  traceArc(); ctx.strokeStyle = 'rgba(246,255,114,0.18)'; ctx.lineWidth = 5;  ctx.stroke()
+  const arcW = estado === 'ok' ? 2.0 + Math.sin(t * 1.4) * 0.6 : 2.5
+  traceArc(); ctx.strokeStyle = '#F6FF72'; ctx.lineWidth = arcW; ctx.stroke()
+
+  // ── Línea mínimo ──────────────────────────────────────────────────────────
+  ctx.beginPath(); ctx.moveTo(0, minYh); ctx.lineTo(W, minYh)
+  ctx.strokeStyle = '#e05567'; ctx.lineWidth = 1.5; ctx.setLineDash([6, 4]); ctx.stroke()
+  ctx.setLineDash([])
+
+  // ── Línea máximo ──────────────────────────────────────────────────────────
+  ctx.beginPath(); ctx.moveTo(0, maxYh); ctx.lineTo(W, maxYh)
+  ctx.strokeStyle = '#a77ee0'; ctx.lineWidth = 1.5; ctx.stroke()
+
+  // ── Labels ────────────────────────────────────────────────────────────────
+  ctx.font = '600 11px system-ui, sans-serif'; ctx.textAlign = 'right'
+  ctx.fillStyle = '#e8798a'
+  ctx.fillText(`mín ${Math.round(minV).toLocaleString('es-CO')} MWh`, W - 7, minYh - 5)
+  ctx.fillStyle = '#b794e8'
+  ctx.fillText(`máx ${Math.round(maxV).toLocaleString('es-CO')} MWh`, W - 7, maxYh - 5)
+  ctx.textAlign = 'left'
+
+  // ── Sol ───────────────────────────────────────────────────────────────────
+  _drawSun(ctx, t, cxf(0.5), arcY(0.5, des))
+
+  // ── Gradiente de suelo ────────────────────────────────────────────────────
+  const gnd = ctx.createLinearGradient(0, H - 8, 0, H + GROUND)
+  gnd.addColorStop(0, 'rgba(16,11,30,0)')
+  gnd.addColorStop(1, '#100b1e')
+  ctx.fillStyle = gnd
+  ctx.fillRect(0, H - 8, W, GROUND + 8)
+}
+
+function _drawSun(ctx, t, x, y) {
+  const pulse = 1 + Math.sin(t * 1.8) * 0.10
+
+  const r1  = 32 * pulse
+  const cg1 = ctx.createRadialGradient(x, y, 0, x, y, r1)
+  cg1.addColorStop(0,   'rgba(246,255,114,0.24)')
+  cg1.addColorStop(0.5, 'rgba(240,190,50,0.10)')
+  cg1.addColorStop(1,   'rgba(246,255,114,0)')
+  ctx.beginPath(); ctx.arc(x, y, r1, 0, Math.PI * 2)
+  ctx.fillStyle = cg1; ctx.fill()
+
+  const r2  = 16 * pulse
+  const cg2 = ctx.createRadialGradient(x, y, 0, x, y, r2)
+  cg2.addColorStop(0,   'rgba(255,255,245,0.95)')
+  cg2.addColorStop(0.5, 'rgba(246,255,114,0.75)')
+  cg2.addColorStop(1,   'rgba(246,200,60,0)')
+  ctx.beginPath(); ctx.arc(x, y, r2, 0, Math.PI * 2)
+  ctx.fillStyle = cg2; ctx.fill()
+
+  ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI * 2)
+  ctx.fillStyle = '#FFFCE8'; ctx.fill()
+}
+
+function _animRain(ctx, dt, H) {
+  ctx.save()
+  for (const d of _drops) {
+    ctx.beginPath()
+    ctx.moveTo(d.x, d.y)
+    ctx.lineTo(d.x + d.len * d.slant, d.y + d.len)
+    ctx.strokeStyle = `rgba(160,205,255,${d.alpha})`
+    ctx.lineWidth = 1.2
+    ctx.stroke()
+
+    d.y += d.speed * dt
+    d.x += d.speed * d.slant * dt
+    if (d.y > H + d.len) {
+      d.y = -d.len - rnd() * 80
+      d.x = d.baseX + (rnd() - 0.5) * 30
+    }
+  }
+  ctx.restore()
+}
+
+function _animSparks(ctx, t, dt, W, maxYh) {
+  ctx.save()
+  for (const s of _sparks) {
+    const progress = s.life / s.total
+    const alpha    = Math.max(0, Math.sin(progress * Math.PI))
+    const r        = s.size * (1 - progress * 0.45)
+
+    if (r > 0.2 && alpha > 0.02) {
+      const grd = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, r * 3.5)
+      grd.addColorStop(0,   `rgba(255,255,220,${alpha.toFixed(2)})`)
+      grd.addColorStop(0.4, `rgba(246,255,114,${(alpha * 0.8).toFixed(2)})`)
+      grd.addColorStop(1,   'rgba(246,255,114,0)')
+      ctx.beginPath(); ctx.arc(s.x, s.y, r * 3.5, 0, Math.PI * 2)
+      ctx.fillStyle = grd; ctx.fill()
+
+      ctx.beginPath(); ctx.arc(s.x, s.y, r, 0, Math.PI * 2)
+      ctx.fillStyle = `rgba(255,255,220,${alpha.toFixed(2)})`; ctx.fill()
+    }
+
+    s.life += dt
+    s.x   += s.vx * dt
+    s.y   -= s.vy * dt
+
+    if (s.life >= s.total || s.y < -20) {
+      s.x    = s.baseX + (rnd() - 0.5) * 30
+      s.y    = s.baseY + rnd() * 8
+      s.vy   = 25 + rnd() * 70
+      s.vx   = (rnd() - 0.5) * 14
+      s.life = rnd() * 0.5
+      s.size = 1.5 + rnd() * 2.5
+    }
+  }
+  ctx.restore()
+}
+
+function _animWave(ctx, t, dt, W, minYh, maxYh) {
+  const bandH = minYh - maxYh
+  const midY  = maxYh + bandH * 0.5
+
+  ctx.save()
+
+  // Onda 1 — dorada, lenta
+  ctx.beginPath()
+  for (let px = 0; px <= W; px += 3) {
+    const y = midY + Math.sin((px / W) * Math.PI * 6 + t * 0.9) * (bandH * 0.18)
+    px === 0 ? ctx.moveTo(px, y) : ctx.lineTo(px, y)
+  }
+  ctx.strokeStyle = 'rgba(246,255,114,0.15)'
+  ctx.lineWidth = 16; ctx.lineJoin = 'round'
+  ctx.stroke()
+
+  // Onda 2 — púrpura, contra-fase
+  ctx.beginPath()
+  for (let px = 0; px <= W; px += 3) {
+    const y = midY + Math.sin((px / W) * Math.PI * 4 - t * 0.6 + 1.6) * (bandH * 0.12)
+    px === 0 ? ctx.moveTo(px, y) : ctx.lineTo(px, y)
+  }
+  ctx.strokeStyle = 'rgba(145,91,216,0.10)'
+  ctx.lineWidth = 11
+  ctx.stroke()
+
+  ctx.restore()
+
+  // Partículas flotantes en la zona
+  ctx.save()
+  for (const d of _dust) {
+    const a = Math.max(0, Math.sin(d.life / d.total * Math.PI) * 0.70)
+    ctx.beginPath()
+    ctx.arc(d.x, d.y, d.size, 0, Math.PI * 2)
+    ctx.fillStyle = `rgba(246,255,114,${a.toFixed(2)})`
+    ctx.fill()
+
+    d.life += dt
+    d.y    -= d.vy * dt
+    if (d.life >= d.total || d.y < maxYh) {
+      d.y    = d.baseY + d.zoneH * (0.7 + rnd() * 0.3)
+      d.x    = 20 + rnd() * (W - 40)
+      d.life = rnd() * 1.5
+      d.vy   = 6 + rnd() * 20
+    }
+  }
+  ctx.restore()
 }
 
 // ── Data loading ─────────────────────────────────────────────────────────────
@@ -482,15 +645,16 @@ function redrawFromData() {
 async function loadData() {
   if (!selectedContratoId.value) return
   loading.value = true
-  error.value = null
-  data.value = null
+  error.value   = null
+  data.value    = null
+  stopAnimation()
   try {
     const res = await client.get(`/cumplimiento/ppa/${selectedContratoId.value}`, {
       params: { year: selectedYear.value, month: selectedMonth.value },
     })
     data.value = res.data
     await nextTick()
-    redrawFromData()
+    startAnimation()
   } catch (e) {
     error.value = e.response?.data?.detail || 'Error consultando el cumplimiento. Intenta de nuevo.'
   } finally {
@@ -507,7 +671,6 @@ onMounted(async () => {
       ...c,
       label: c.nombre_interno || c.numero_codigo_contrato || `Contrato ${c.id}`,
     }))
-    // Default: Terpel 1
     const terpel = contratos.value.find(c => c.nombre_interno === 'Terpel 1')
     selectedContratoId.value = terpel?.id || contratos.value[0]?.id
     if (selectedContratoId.value) await loadData()
@@ -516,12 +679,13 @@ onMounted(async () => {
   }
 })
 
-// Redraw on resize
+onUnmounted(() => stopAnimation())
+
 let resizeObserver = null
 watch(skyBox, (el) => {
   if (!el) return
   resizeObserver?.disconnect()
-  resizeObserver = new ResizeObserver(() => redrawFromData())
+  resizeObserver = new ResizeObserver(() => startAnimation())
   resizeObserver.observe(el)
 })
 </script>
@@ -554,16 +718,12 @@ watch(skyBox, (el) => {
 }
 .metric-card.ok-dark .metric-label { color: #915BD8; }
 .metric-card.ok-dark .metric-value { color: #F6FF72; }
-.metric-card.danger {
-  background: #FAECE7;
-}
-.metric-card.warn {
-  background: #FAEEDA;
-}
+.metric-card.danger { background: #FAECE7; }
+.metric-card.warn   { background: #FAEEDA; }
 
-.status-ok     { background: #2C2039; color: #F6FF72; border: 1px solid #915BD8; }
-.status-low    { background: #FAECE7; color: #791F1F; }
-.status-high   { background: #FAEEDA; color: #633806; }
+.status-ok      { background: #2C2039; color: #F6FF72; border: 1px solid #915BD8; }
+.status-low     { background: #FAECE7; color: #791F1F; }
+.status-high    { background: #FAEEDA; color: #633806; }
 .status-neutral { background: rgba(44,32,57,0.08); color: #7a6e8a; }
 
 :deep(.p-datatable .p-datatable-thead th) {
