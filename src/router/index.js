@@ -25,6 +25,7 @@ const routes = [
   { path: '/mem/precio-bolsa', name: 'MemPrecioBolsa',   component: () => import('@/views/MEM/PrecioBolsaView.vue') },
   { path: '/mem/balance',      name: 'MemBalance',       component: () => import('@/views/MEM/BalanceView.vue') },
   { path: '/mem/cumplimiento', name: 'MemCumplimiento',  component: () => import('@/views/MEM/CumplimientoView.vue') },
+  { path: '/mem/cumplimiento-v2', name: 'MemCumplimientoV2', component: () => import('@/views/MEM/CumplimientoV2View.vue') },
   { path: '/:pathMatch(.*)*', redirect: '/dashboard' },
 ]
 
