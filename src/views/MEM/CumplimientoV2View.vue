@@ -284,116 +284,6 @@
 
     </template>
 
-    <!-- Floating detail panel (Teleport → fixed, z-50) -->
-    <Teleport to="body">
-      <template v-if="selectedMonthIdx !== null && anualData && anualData.meses[selectedMonthIdx]">
-
-        <!-- Backdrop -->
-        <div
-          class="fixed inset-0"
-          style="z-index: 40; background: rgba(44,32,57,0.25);"
-          @click="selectedMonthIdx = null"
-        />
-
-        <!-- Panel -->
-        <div
-          class="fixed rounded-2xl shadow-2xl"
-          style="z-index: 50; background: #FDFAF7; width: 480px; max-height: 80vh; overflow-y: auto;
-                 border: 1px solid rgba(44,32,57,0.12);
-                 top: 50%; left: 50%; transform: translate(-50%, -50%);"
-          @click.stop
-        >
-          <!-- Header -->
-          <div class="flex items-start justify-between px-5 pt-5 pb-4"
-               style="border-bottom: 1px solid rgba(44,32,57,0.08);">
-            <div>
-              <h3 class="font-bold text-base" style="color: #2C2039;">
-                Desglose — {{ MESES[selectedMonthIdx] }} {{ selectedYear }}
-              </h3>
-              <p class="text-xs mt-0.5" style="color: #7a6e8a;">
-                Generación por planta según GESCON
-                <span
-                  v-if="anualData.meses[selectedMonthIdx].tipo_datos !== 'real'"
-                  class="ml-1.5 px-1.5 py-0.5 rounded font-semibold"
-                  style="background: rgba(145,91,216,0.12); color: #915BD8;"
-                >proyección</span>
-              </p>
-            </div>
-            <button
-              @click="selectedMonthIdx = null"
-              class="rounded-lg p-1.5 ml-3 shrink-0"
-              style="color: #7a6e8a; transition: background 0.15s;"
-              onmouseover="this.style.background='rgba(44,32,57,0.08)'"
-              onmouseout="this.style.background='transparent'"
-            >
-              <i class="pi pi-times text-sm" />
-            </button>
-          </div>
-
-          <!-- Body -->
-          <div class="px-5 py-4">
-
-            <!-- No plants -->
-            <div
-              v-if="!anualData.meses[selectedMonthIdx].plantas.length"
-              class="text-center py-8 text-sm"
-              style="color: #7a6e8a;"
-            >
-              <i class="pi pi-info-circle text-2xl mb-2 block" />
-              Sin plantas asignadas en GESCON para este mes
-            </div>
-
-            <!-- Plants table -->
-            <DataTable
-              v-else
-              :value="anualData.meses[selectedMonthIdx].plantas"
-              size="small"
-              class="border rounded-xl overflow-hidden"
-              style="border-color: rgba(44,32,57,0.10);"
-            >
-              <Column header="Planta" style="min-width: 160px;">
-                <template #body="{ data: p }">
-                  <div class="font-semibold text-sm" style="color: #2C2039;">{{ p.nombre }}</div>
-                  <div v-if="p.sub_project" class="text-xs mt-0.5 font-mono" style="color: #7a6e8a;">{{ p.sub_project }}</div>
-                </template>
-              </Column>
-              <Column header="%" style="width: 60px; text-align: right;">
-                <template #body="{ data: p }">
-                  <span class="font-mono text-sm">{{ (p.pct_despacho * 100).toFixed(0) }}%</span>
-                </template>
-              </Column>
-              <Column header="Gen. planta" style="width: 120px; text-align: right;">
-                <template #body="{ data: p }">
-                  <span v-if="p.gen_planta_mwh !== null" class="font-mono text-sm">{{ fmtMwh(p.gen_planta_mwh) }}</span>
-                  <span v-else class="text-xs" style="color: #b0a0c0;">Sin datos</span>
-                </template>
-              </Column>
-              <Column header="Gen. contrato" style="width: 125px; text-align: right;">
-                <template #body="{ data: p }">
-                  <span v-if="p.gen_contrato_mwh !== null" class="font-mono text-sm font-semibold" style="color: #2C2039;">
-                    {{ fmtMwh(p.gen_contrato_mwh) }}
-                  </span>
-                  <span v-else class="text-xs" style="color: #b0a0c0;">—</span>
-                </template>
-              </Column>
-            </DataTable>
-
-            <!-- Total footer -->
-            <div
-              v-if="anualData.meses[selectedMonthIdx].plantas.length"
-              class="flex justify-between items-center mt-3 px-3 py-2.5 rounded-lg text-sm font-semibold"
-              style="background: rgba(44,32,57,0.05);"
-            >
-              <span style="color: #7a6e8a;">Total al contrato</span>
-              <span class="font-mono" style="color: #2C2039;">
-                {{ fmtMwh(genVal(anualData.meses[selectedMonthIdx])) }}
-              </span>
-            </div>
-          </div>
-        </div>
-      </template>
-    </Teleport>
-
     <!-- Empty chart state -->
     <div v-else-if="!chartLoading && !chartError" class="text-center py-16 rounded-xl border" style="color: #7a6e8a; border-color: rgba(44,32,57,0.10);">
       <i class="pi pi-chart-bar text-4xl mb-3 block" style="color: #915BD8;" />
@@ -458,6 +348,86 @@
         </Column>
       </DataTable>
     </div>
+
+    <!-- Floating month breakdown (Teleport renders outside component so z-index is never clipped) -->
+    <Teleport to="body">
+      <template v-if="selectedMonthIdx !== null && anualData && anualData.meses[selectedMonthIdx]">
+        <div
+          class="fixed inset-0"
+          style="z-index: 40; background: rgba(44,32,57,0.25);"
+          @click="selectedMonthIdx = null"
+        />
+        <div
+          class="fixed rounded-2xl shadow-2xl"
+          style="z-index: 50; background: #FDFAF7; width: 480px; max-height: 80vh; overflow-y: auto; border: 1px solid rgba(44,32,57,0.12); top: 50%; left: 50%; transform: translate(-50%, -50%);"
+          @click.stop
+        >
+          <!-- Header -->
+          <div class="flex items-center justify-between px-5 py-4" style="border-bottom: 1px solid rgba(44,32,57,0.10);">
+            <div>
+              <span class="font-bold text-base" style="color: #2C2039;">
+                {{ MESES[selectedMonthIdx] }} {{ selectedYear }}
+              </span>
+              <span
+                v-if="anualData.meses[selectedMonthIdx].tipo_datos !== 'real'"
+                class="ml-2 text-xs px-2 py-0.5 rounded-full font-medium"
+                style="background: rgba(145,91,216,0.12); color: #915BD8;"
+              >proyección</span>
+            </div>
+            <button
+              class="rounded-lg p-1.5"
+              style="color: #7a6e8a;"
+              @click="selectedMonthIdx = null"
+            >
+              <i class="pi pi-times text-sm" />
+            </button>
+          </div>
+
+          <!-- Plant breakdown table -->
+          <div class="px-5 py-4">
+            <p class="text-xs font-semibold uppercase tracking-widest mb-3" style="color: #915BD8;">
+              Desglose por planta
+            </p>
+            <table class="w-full text-sm">
+              <thead>
+                <tr style="color: #7a6e8a; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">
+                  <th class="text-left pb-2">Planta</th>
+                  <th class="text-right pb-2">%</th>
+                  <th class="text-right pb-2">Gen. planta</th>
+                  <th class="text-right pb-2">Gen. contrato</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="(p, pi) in anualData.meses[selectedMonthIdx].plantas"
+                  :key="pi"
+                  style="border-top: 1px solid rgba(44,32,57,0.06);"
+                >
+                  <td class="py-2 pr-2 font-medium" style="color: #2C2039;">{{ p.nombre }}</td>
+                  <td class="py-2 px-2 text-right font-mono text-xs" style="color: #7a6e8a;">
+                    {{ (p.pct_despacho * 100).toFixed(0) }}%
+                  </td>
+                  <td class="py-2 px-2 text-right font-mono" style="color: #2C2039;">
+                    {{ p.gen_planta_mwh !== null ? fmtMwh(p.gen_planta_mwh) : '—' }}
+                  </td>
+                  <td class="py-2 pl-2 text-right font-mono font-semibold" style="color: #915BD8;">
+                    {{ p.gen_contrato_mwh !== null ? fmtMwh(p.gen_contrato_mwh) : '—' }}
+                  </td>
+                </tr>
+              </tbody>
+              <tfoot>
+                <tr style="border-top: 2px solid rgba(44,32,57,0.12);">
+                  <td colspan="3" class="pt-3 text-sm font-semibold" style="color: #2C2039;">Total al contrato</td>
+                  <td class="pt-3 text-right font-mono font-bold" style="color: #2C2039;">
+                    {{ fmtMwh(genVal(anualData.meses[selectedMonthIdx])) }}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      </template>
+    </Teleport>
 
   </div>
 </template>
