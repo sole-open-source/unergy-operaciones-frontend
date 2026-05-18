@@ -526,17 +526,19 @@ function render(t, dt, W, H, des, genTotal, diasMes, minV, maxV, fracMes, estado
     return py
   }
 
+  const barY = H - 12  // barra de progreso del mes
+
   if (fracMes > 0 && fracMes < 1) {
     const dayX   = cxf(fracMes)
     const dotY   = arcY(fracMes, des)
     const diaNum = Math.round(fracMes * diasMes)
 
-    // Línea del día (halo + línea blanca)
+    // Línea del día (halo + línea blanca) — conecta hasta la barra de progreso
     ctx.save(); ctx.setLineDash([])
     ctx.strokeStyle = 'rgba(255,255,255,0.07)'; ctx.lineWidth = 8
-    ctx.beginPath(); ctx.moveTo(dayX, 14); ctx.lineTo(dayX, H - 18); ctx.stroke()
+    ctx.beginPath(); ctx.moveTo(dayX, 14); ctx.lineTo(dayX, barY); ctx.stroke()
     ctx.strokeStyle = 'rgba(255,255,255,0.52)'; ctx.lineWidth = 1.5
-    ctx.beginPath(); ctx.moveTo(dayX, 14); ctx.lineTo(dayX, H - 18); ctx.stroke()
+    ctx.beginPath(); ctx.moveTo(dayX, 14); ctx.lineTo(dayX, barY); ctx.stroke()
     ctx.restore()
 
     // Badge "Hoy · día X" en la parte superior de la línea
@@ -577,28 +579,25 @@ function render(t, dt, W, H, des, genTotal, diasMes, minV, maxV, fracMes, estado
     _labelAboveDot(_fmt(genTotal), cxf(0.5), arcY(0.5, des))
   }
 
-  // ── Eje de días en la base ────────────────────────────────────────────────
-  const axisY   = H - 16
-  const diaNum  = fracMes < 1 ? Math.round(fracMes * diasMes) : diasMes
-  // Ticks cada 5 días; siempre incluir día 1 y el último día del mes
-  const ticks = new Set([1])
-  for (let d = 5; d < diasMes; d += 5) ticks.add(d)
-  ticks.add(diasMes)
+  // ── Barra de progreso del mes ─────────────────────────────────────────────
+  const barX0 = 30, barX1 = W - 30
+  const progX  = barX0 + Math.min(fracMes, 1) * (barX1 - barX0)
 
-  ctx.font = '400 9px system-ui, sans-serif'
-  ctx.textAlign = 'center'
-  for (const d of ticks) {
-    const fx   = cxf(d / diasMes)
-    const isHoy = d === diaNum
-    // Tick vertical
-    ctx.strokeStyle = isHoy ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.16)'
-    ctx.lineWidth = 1; ctx.setLineDash([])
-    ctx.beginPath(); ctx.moveTo(fx, axisY); ctx.lineTo(fx, axisY + 5); ctx.stroke()
-    // Número
-    ctx.fillStyle  = isHoy ? 'rgba(246,255,114,0.90)' : 'rgba(253,250,247,0.28)'
-    ctx.fillText(String(d), fx, axisY + 14)
+  // Track completo (fondo tenue)
+  ctx.beginPath(); ctx.moveTo(barX0, barY); ctx.lineTo(barX1, barY)
+  ctx.strokeStyle = 'rgba(255,255,255,0.10)'; ctx.lineWidth = 2; ctx.setLineDash([]); ctx.stroke()
+
+  // Tramo transcurrido (amarillo)
+  if (fracMes > 0) {
+    ctx.beginPath(); ctx.moveTo(barX0, barY); ctx.lineTo(progX, barY)
+    ctx.strokeStyle = 'rgba(246,255,114,0.65)'; ctx.lineWidth = 2; ctx.stroke()
   }
-  ctx.textAlign = 'left'
+
+  // Dot en la posición actual (solo mes en curso)
+  if (fracMes < 1) {
+    ctx.beginPath(); ctx.arc(progX, barY, 3.5, 0, Math.PI * 2)
+    ctx.fillStyle = '#F6FF72'; ctx.setLineDash([]); ctx.fill()
+  }
 
   // ── Gradiente de suelo ────────────────────────────────────────────────────
   const gnd = ctx.createLinearGradient(0, H - 8, 0, H + GROUND)
