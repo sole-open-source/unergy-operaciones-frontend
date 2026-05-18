@@ -63,9 +63,15 @@
           <span v-if="generalData.periodo.es_mes_actual">
             Día {{ generalData.periodo.dia_actual }} de {{ generalData.periodo.dias_mes }}
           </span>
+          <span v-else-if="generalData.periodo.es_mes_futuro">Mes futuro</span>
           <span v-else>Mes completo</span>
-          <span v-if="generalData.periodo.dia_min_datos">
+          <span v-if="generalData.periodo.dia_min_datos && !generalData.periodo.es_mes_futuro">
             · Datos hasta día {{ generalData.periodo.dia_min_datos }}
+          </span>
+          <span v-if="generalData.periodo.es_mes_futuro"
+                class="px-2 py-0.5 rounded text-xs font-semibold"
+                style="background: rgba(145,91,216,0.15); color: #915BD8;">
+            Proyección histórica
           </span>
         </div>
 
@@ -106,8 +112,8 @@
             <div class="metric-label">Generado acum. total</div>
             <div class="metric-value">{{ fmtMwh(generalData.totales.gen_total_mwh) }}</div>
           </div>
-          <div v-if="generalData.periodo.es_mes_actual" class="metric-card" :class="generalProjClass">
-            <div class="metric-label">Proyección fin de mes</div>
+          <div v-if="generalData.periodo.es_mes_actual || generalData.periodo.es_mes_futuro" class="metric-card" :class="generalProjClass">
+            <div class="metric-label">{{ generalData.periodo.es_mes_futuro ? 'Proyección mensual' : 'Proyección fin de mes' }}</div>
             <div class="metric-value" :class="generalProjValueClass">{{ fmtMwh(generalData.totales.gen_proyectada_mwh) }}</div>
           </div>
           <div class="metric-card" style="background: rgba(224,85,103,0.08); border: 1px solid rgba(224,85,103,0.25);">
@@ -150,7 +156,7 @@
                 <div v-if="row.dia_min_datos" class="text-xs mt-0.5" style="color:#7a6e8a;">hasta día {{ row.dia_min_datos }}</div>
               </template>
             </Column>
-            <Column v-if="generalData.periodo.es_mes_actual" header="Proyección" style="width:130px; text-align:right;">
+            <Column v-if="generalData.periodo.es_mes_actual || generalData.periodo.es_mes_futuro" header="Proyección" style="width:130px; text-align:right;">
               <template #body="{ data: row }">
                 <span class="font-mono text-sm" :class="row.estado === 'deficit' ? 'text-red-700 font-bold' : row.estado === 'excedente' ? 'text-amber-700 font-bold' : ''">
                   {{ fmtMwh(row.gen_proyectada_mwh) }}
@@ -237,7 +243,13 @@
               · Datos hasta día {{ data.periodo.dia_min_datos }}
             </span>
           </span>
+          <span v-else-if="data.periodo.es_mes_futuro">Mes futuro</span>
           <span v-else>Mes completo</span>
+          <span v-if="data.periodo.es_mes_futuro"
+                class="px-2 py-0.5 rounded text-xs font-semibold"
+                style="background: rgba(145,91,216,0.15); color: #915BD8;">
+            Proyección histórica (últ. 15 días)
+          </span>
         </div>
 
         <!-- Grid principal -->
@@ -288,10 +300,10 @@
                 <div class="metric-sub" v-if="data.periodo.es_mes_actual">Real hasta día {{ data.periodo.dia_actual }}</div>
               </div>
 
-              <div v-if="data.periodo.es_mes_actual" class="metric-card" :class="projCardClass">
-                <div class="metric-label">Proy. fin de mes</div>
+              <div v-if="data.periodo.es_mes_actual || data.periodo.es_mes_futuro" class="metric-card" :class="projCardClass">
+                <div class="metric-label">{{ data.periodo.es_mes_futuro ? 'Proy. mensual' : 'Proy. fin de mes' }}</div>
                 <div class="metric-value" :class="projValueClass">{{ fmtMwh(data.generacion.gen_proyectada_mwh) }}</div>
-                <div class="metric-sub">Extrap. lineal</div>
+                <div class="metric-sub">{{ data.periodo.es_mes_futuro ? 'Promedio 15 días' : 'Extrap. lineal' }}</div>
               </div>
 
               <div class="metric-card" style="background: rgba(224,85,103,0.08); border: 1px solid rgba(224,85,103,0.25);">
@@ -468,13 +480,14 @@ const statusClass = computed(() => {
 const statusText = computed(() => {
   if (!data.value) return ''
   const { estado, compras_bolsa_mwh, excedentes_bolsa_mwh } = data.value.balance
-  const { es_mes_actual } = data.value.periodo
+  const { es_mes_actual, es_mes_futuro } = data.value.periodo
+  const esProy = es_mes_actual || es_mes_futuro
   if (estado === 'ok')
-    return es_mes_actual ? 'Proyección OK — dentro de la zona contractual' : 'Cumplimiento — zona contractual'
+    return esProy ? 'Proyección OK — dentro de la zona contractual' : 'Cumplimiento — zona contractual'
   if (estado === 'deficit')
-    return `${es_mes_actual ? 'Proyección: d' : 'D'}éficit ${fmtMwh(compras_bolsa_mwh)} — compra en bolsa`
+    return `${esProy ? 'Proyección: d' : 'D'}éficit ${fmtMwh(compras_bolsa_mwh)} — compra en bolsa`
   if (estado === 'excedente')
-    return `${es_mes_actual ? 'Proyección: e' : 'E'}xcedente ${fmtMwh(excedentes_bolsa_mwh)} — venta en bolsa`
+    return `${esProy ? 'Proyección: e' : 'E'}xcedente ${fmtMwh(excedentes_bolsa_mwh)} — venta en bolsa`
   return 'Sin compromisos para este período'
 })
 
