@@ -354,6 +354,7 @@ async function uploadFotos(event) {
 }
 
 async function deleteFoto(foto) {
+  if (!confirm('¿Estás seguro de que deseas eliminar esta foto?')) return
   try {
     await api.delete(`/fallas/${props.falla.id}/fotos/${foto.id}`)
     const { data } = await api.get(`/fallas/${props.falla.id}`)

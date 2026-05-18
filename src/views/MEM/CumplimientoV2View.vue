@@ -62,6 +62,9 @@
           <span>{{ anualData.contrato.comprador_nombre }}</span>
           <span>·</span>
           <span>{{ anualData.year }}</span>
+          <span v-if="selectedContratoId === CONSOLIDADO_ID" class="text-xs px-2 py-0.5 rounded-full font-medium" style="background: rgba(145,91,216,0.12); color: #915BD8;">
+            Suma de todos los contratos
+          </span>
         </div>
 
         <div class="rounded-xl border p-4" style="background: white; border-color: rgba(44,32,57,0.12);">
@@ -163,13 +166,13 @@
           <span v-if="tableLoading" class="text-xs" style="color: #7a6e8a;">Cargando…</span>
         </div>
         <DataTable
-          :value="tableData"
+          :value="tableDataWithTotal"
           size="small"
           stripedRows
           class="border rounded-xl overflow-hidden cursor-pointer"
           style="border-color: rgba(44,32,57,0.12);"
           @row-click="e => selectContrato(e.data.id)"
-          :rowClass="row => row.id === selectedContratoId ? 'row-selected' : ''"
+          :rowClass="row => row.id === selectedContratoId ? 'row-selected' : row.id === CONSOLIDADO_ID ? 'row-consolidado' : ''"
         >
           <Column header="Contrato" style="min-width: 200px;">
             <template #body="{ data: row }">
@@ -417,6 +420,7 @@
                 <tr v-for="(p, pi) in anualData.meses[selectedMonthIdx].plantas" :key="pi" style="border-top: 1px solid rgba(44,32,57,0.06);">
                   <td class="py-2 pr-2 font-medium" style="color: #2C2039;">
                     {{ p.nombre }}
+                    <span v-if="p.contrato" class="ml-1 text-xs font-normal px-1.5 py-0.5 rounded" style="color: #915BD8; background: rgba(145,91,216,0.08);">{{ p.contrato }}</span>
                     <span v-if="p.dias_en_contrato && p.dias_mes && p.dias_en_contrato < p.dias_mes" class="ml-1 text-xs font-normal" style="color: #7a6e8a;">{{ p.dias_en_contrato }}/{{ p.dias_mes }} días</span>
                   </td>
                   <td class="py-2 px-2 text-right font-mono text-xs" style="color: #7a6e8a;">{{ (p.pct_despacho * 100).toFixed(0) }}%</td>
@@ -499,6 +503,28 @@ const simAssignments   = ref({})
 const dragPlanta       = ref(null)
 const dragFromContrato = ref(undefined)
 const dragOver         = ref(null)
+
+// ── Table with consolidated row ──────────────────────────────────────────────
+const tableDataWithTotal = computed(() => {
+  if (!tableData.value.length) return []
+  const rows = tableData.value
+  const totalMin = rows.reduce((s, r) => s + (r.total_min_mwh || 0), 0)
+  const totalMax = rows.reduce((s, r) => s + (r.total_max_mwh || 0), 0)
+  const maxMeses = Math.max(...rows.map(r => r.meses_con_compromisos || 0))
+  return [
+    {
+      id: CONSOLIDADO_ID,
+      nombre_interno: 'Consolidado (todos)',
+      comprador_nombre: `${rows.length} contratos`,
+      fecha_inicio: null,
+      fecha_fin: null,
+      total_min_mwh: Math.round(totalMin * 10) / 10,
+      total_max_mwh: Math.round(totalMax * 10) / 10,
+      meses_con_compromisos: maxMeses,
+    },
+    ...rows,
+  ]
+})
 
 // ── Chart math ────────────────────────────────────────────────────────────────
 const yMaxVal = computed(() => {
@@ -637,16 +663,21 @@ function fmtFecha(iso) {
 }
 
 // ── Data loading ──────────────────────────────────────────────────────────────
+const CONSOLIDADO_ID = '__consolidado__'
+
 async function loadContratos() {
   try {
     const res = await client.get('/cumplimiento/ppa')
-    contratos.value = res.data.map(c => ({
+    const mapped = res.data.map(c => ({
       ...c,
       label: c.nombre_interno || c.numero_codigo_contrato || `Contrato ${c.id}`,
     }))
-    if (contratos.value.length > 0) {
-      const terpel = contratos.value.find(c => c.nombre_interno === 'Terpel 1')
-      selectedContratoId.value = terpel?.id || contratos.value[0]?.id
+    contratos.value = [
+      { id: CONSOLIDADO_ID, label: '📊 Consolidado (todos)' },
+      ...mapped,
+    ]
+    if (mapped.length > 0) {
+      selectedContratoId.value = CONSOLIDADO_ID
     }
   } catch (e) {
     console.error('Error loading contratos', e)
@@ -661,14 +692,99 @@ async function loadAnnualData() {
   hovered.value      = null
   selectedMonthIdx.value = null
   try {
-    const res = await client.get(`/cumplimiento/ppa/${selectedContratoId.value}/anual`, {
-      params: { year: selectedYear.value },
-    })
-    anualData.value = res.data
+    if (selectedContratoId.value === CONSOLIDADO_ID) {
+      await loadConsolidado()
+    } else {
+      const res = await client.get(`/cumplimiento/ppa/${selectedContratoId.value}/anual`, {
+        params: { year: selectedYear.value },
+      })
+      anualData.value = res.data
+    }
   } catch (e) {
     chartError.value = e.response?.data?.detail || 'Error al cargar los datos anuales.'
   } finally {
     chartLoading.value = false
+  }
+}
+
+async function loadConsolidado() {
+  const realContratos = contratos.value.filter(c => c.id !== CONSOLIDADO_ID)
+  if (!realContratos.length) return
+
+  const results = await Promise.allSettled(
+    realContratos.map(c =>
+      client.get(`/cumplimiento/ppa/${c.id}/anual`, { params: { year: selectedYear.value } })
+    )
+  )
+
+  const successful = results
+    .filter(r => r.status === 'fulfilled')
+    .map(r => r.value.data)
+
+  if (!successful.length) {
+    chartError.value = 'No se pudo cargar ningún contrato.'
+    return
+  }
+
+  const meses = []
+  for (let i = 0; i < 12; i++) {
+    let totalGen = 0, totalProy = null, totalMin = 0, totalMax = 0
+    let hasMin = false, hasMax = false
+    const allPlantas = []
+
+    for (const data of successful) {
+      const mes = data.meses[i]
+      totalGen += mes.gen_mwh || 0
+      if (mes.gen_proyectada_mwh !== null && mes.gen_proyectada_mwh !== undefined) {
+        totalProy = (totalProy || 0) + mes.gen_proyectada_mwh
+      }
+      if (mes.min_mwh !== null) { totalMin += mes.min_mwh; hasMin = true }
+      if (mes.max_mwh !== null) { totalMax += mes.max_mwh; hasMax = true }
+      for (const p of (mes.plantas || [])) {
+        allPlantas.push({
+          ...p,
+          contrato: data.contrato.nombre_interno || data.contrato.numero_codigo_contrato,
+        })
+      }
+    }
+
+    const minMwh = hasMin ? Math.round(totalMin * 1000) / 1000 : null
+    const maxMwh = hasMax ? Math.round(totalMax * 1000) / 1000 : null
+    const gen = Math.round(totalGen * 1000) / 1000
+    const val = totalProy !== null ? Math.round(totalProy * 1000) / 1000 : gen
+
+    let estado = 'sin_compromisos', compras = null, excedentes = null
+    if (minMwh !== null && maxMwh !== null) {
+      if (val < minMwh) { estado = 'deficit'; compras = Math.round((minMwh - val) * 1000) / 1000; excedentes = 0 }
+      else if (val > maxMwh) { estado = 'excedente'; compras = 0; excedentes = Math.round((val - maxMwh) * 1000) / 1000 }
+      else { estado = 'ok'; compras = 0; excedentes = 0 }
+    }
+
+    const ref = successful[0].meses[i]
+    meses.push({
+      month: i + 1,
+      gen_mwh: gen,
+      gen_proyectada_mwh: totalProy !== null ? Math.round(totalProy * 1000) / 1000 : null,
+      min_mwh: minMwh,
+      max_mwh: maxMwh,
+      estado,
+      tipo_datos: ref.tipo_datos,
+      compras_bolsa_mwh: compras,
+      excedentes_bolsa_mwh: excedentes,
+      plantas: allPlantas,
+      n_plantas: allPlantas.length,
+    })
+  }
+
+  anualData.value = {
+    contrato: {
+      id: CONSOLIDADO_ID,
+      nombre_interno: 'Consolidado',
+      numero_codigo_contrato: `${successful.length} contratos`,
+      comprador_nombre: 'Todos los compradores',
+    },
+    year: selectedYear.value,
+    meses,
   }
 }
 
@@ -685,7 +801,10 @@ async function loadTableData() {
 }
 
 function onYearChange() { loadAnnualData(); loadTableData() }
-function selectContrato(id) { selectedContratoId.value = id; loadAnnualData() }
+function selectContrato(id) {
+  selectedContratoId.value = id
+  loadAnnualData()
+}
 
 async function loadSimulator() {
   simLoading.value = true
@@ -731,5 +850,10 @@ onMounted(async () => {
 }
 :deep(.p-datatable .row-selected td) {
   background: rgba(145,91,216,0.09) !important;
+}
+:deep(.p-datatable .row-consolidado td) {
+  background: rgba(145,91,216,0.05) !important;
+  border-bottom: 2px solid rgba(145,91,216,0.18) !important;
+  font-weight: 600;
 }
 </style>

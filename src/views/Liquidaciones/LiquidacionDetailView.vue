@@ -1060,6 +1060,7 @@ async function guardarCosto() {
 }
 
 async function eliminarCosto(id) {
+  if (!confirm('¿Estás seguro de que deseas eliminar este costo?')) return
   try {
     await api.delete(`/liquidaciones/${route.params.id}/costos/${id}`)
     liq.value.costos = liq.value.costos.filter(c => c.id !== id)
@@ -1099,6 +1100,7 @@ async function guardarFactura() {
 }
 
 async function eliminarFactura(id) {
+  if (!confirm('¿Estás seguro de que deseas eliminar esta factura?')) return
   try {
     await api.delete(`/liquidaciones/${route.params.id}/facturas/${id}`)
     liq.value.facturas = liq.value.facturas.filter(f => f.id !== id)
@@ -1139,6 +1141,7 @@ async function guardarMandato() {
 }
 
 async function eliminarMandato(id) {
+  if (!confirm('¿Estás seguro de que deseas eliminar este mandato?')) return
   try {
     await api.delete(`/liquidaciones/${route.params.id}/mandatos/${id}`)
     toast.add({ severity: 'success', summary: 'Mandato eliminado', life: 2000 })
@@ -1181,6 +1184,7 @@ async function guardarLinea() {
 }
 
 async function eliminarLinea(mandatoId, lineaId) {
+  if (!confirm('¿Estás seguro de que deseas eliminar esta línea?')) return
   try {
     await api.delete(`/liquidaciones/${route.params.id}/mandatos/${mandatoId}/lineas/${lineaId}`)
     toast.add({ severity: 'success', summary: 'Línea eliminada', life: 2000 })

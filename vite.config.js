@@ -13,11 +13,11 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://localhost:8000',
+        target: 'https://backend-production-63d8.up.railway.app',
         changeOrigin: true,
       },
       '/monitoreo': {
-        target: 'http://localhost:8000',
+        target: 'https://backend-production-63d8.up.railway.app',
         changeOrigin: true,
       },
     },

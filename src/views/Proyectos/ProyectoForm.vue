@@ -252,6 +252,7 @@ async function agregarInversionista() {
 }
 
 async function eliminarInversionista(invId) {
+  if (!confirm('¿Estás seguro de que deseas eliminar este inversionista?')) return
   try {
     await api.delete(`/proyectos/${props.proyectoId}/inversionistas/${invId}`)
     inversionistas.value = inversionistas.value.filter(i => i.id !== invId)

@@ -525,6 +525,7 @@ async function agregarInversionista() {
 }
 
 async function eliminarInversionista(invId) {
+  if (!confirm('¿Estás seguro de que deseas eliminar este inversionista?')) return
   try {
     await api.delete(`/proyectos/${route.params.id}/inversionistas/${invId}`)
     proyecto.value.inversionistas = proyecto.value.inversionistas.filter(i => i.id !== invId)
