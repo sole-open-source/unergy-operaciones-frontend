@@ -81,9 +81,10 @@ const ALL_GROUPS = [
   {
     label: 'MEM',
     items: [
-      { to: '/mem/gescon',       label: 'GESCON',          icon: 'pi pi-book' },
-      { to: '/mem/precio-bolsa', label: 'Precio de bolsa', icon: 'pi pi-chart-line' },
-      { to: '/mem/balance',      label: 'Balance',         icon: 'pi pi-chart-bar' },
+      { to: '/mem/gescon',        label: 'GESCON',          icon: 'pi pi-book' },
+      { to: '/mem/precio-bolsa',  label: 'Precio de bolsa', icon: 'pi pi-chart-line' },
+      { to: '/mem/balance',       label: 'Balance',         icon: 'pi pi-chart-bar' },
+      { to: '/mem/cumplimiento',  label: 'Cumplimiento',    icon: 'pi pi-shield' },
     ],
   },
   {
