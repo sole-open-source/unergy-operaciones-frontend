@@ -100,6 +100,7 @@ const ALL_GROUPS = [
     items: [
       { to: '/mem/gescon',          label: 'GESCON',            icon: 'pi pi-book' },
       { to: '/mem/precio-bolsa',    label: 'Precio de bolsa',   icon: 'pi pi-chart-line' },
+      { to: '/mem/clima',           label: 'Clima & ENSO',      icon: 'pi pi-cloud' },
       { to: '/mem/balance',         label: 'Balance',           icon: 'pi pi-chart-bar' },
       { to: '/mem/cumplimiento',    label: 'Cumplimiento',      icon: 'pi pi-shield' },
       { to: '/mem/cumplimiento-v2', label: 'Cumplimiento v2',   icon: 'pi pi-chart-bar' },

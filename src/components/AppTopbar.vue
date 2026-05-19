@@ -50,6 +50,7 @@ const titles = {
   MemPrecioBolsa:  'Precio de bolsa',
   MemFronteras:    'Fronteras',
   MemBalance:      'Balance energético',
+  MemClima:        'Inteligencia Climática',
   MemGescon:       'GESCON',
   MemCumplimiento: 'Cumplimiento',
   MemCumplimientoV2: 'Cumplimiento v2',
