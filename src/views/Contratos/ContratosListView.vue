@@ -224,7 +224,16 @@ const contratos = ref([])
 const loading = ref(false)
 const filtroQ = ref('')
 
-const contratosFiltrados = computed(() => contratos.value)
+const contratosFiltrados = computed(() => {
+  const q = filtroQ.value.toLowerCase()
+  if (!q) return contratos.value
+  return contratos.value.filter(c =>
+    (c.nombre_interno ?? '').toLowerCase().includes(q) ||
+    (c.numero_codigo_contrato ?? '').toLowerCase().includes(q) ||
+    (c.comprador_nombre ?? '').toLowerCase().includes(q) ||
+    (c.proyectos ?? []).some(p => (p.nombre_comercial ?? '').toLowerCase().includes(q))
+  )
+})
 
 // Otros servicios
 const contratosServicio = ref([])
