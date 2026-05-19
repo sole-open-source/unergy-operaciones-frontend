@@ -1142,6 +1142,9 @@ async function loadAnnualData() {
       )
     }
     updateCacheSize()
+    if (anualData.value && selectedYear.value === now.getFullYear()) {
+      selectedMonthIdx.value = now.getMonth()
+    }
   } catch (e) {
     chartError.value = e.response?.data?.detail || 'Error al cargar los datos anuales.'
   } finally {
