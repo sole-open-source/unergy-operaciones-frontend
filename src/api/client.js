@@ -19,6 +19,12 @@ api.interceptors.response.use(
       localStorage.removeItem('user')
       window.location.href = '/login'
     }
+    if (err.response?.status === 403) {
+      const msg = err.response.data?.detail || 'No tienes permisos para esta acción'
+      if (typeof window.__primeToast === 'function') {
+        window.__primeToast({ severity: 'error', summary: 'Acceso denegado', detail: msg, life: 4000 })
+      }
+    }
     return Promise.reject(err)
   }
 )

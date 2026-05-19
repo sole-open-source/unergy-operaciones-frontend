@@ -16,14 +16,20 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
+import { useToast } from 'primevue/usetoast'
 import Toast from 'primevue/toast'
 import ConfirmDialog from 'primevue/confirmdialog'
 import AppSidebar from '@/components/AppSidebar.vue'
 import AppTopbar from '@/components/AppTopbar.vue'
 
 const route = useRoute()
+const toast = useToast()
 const isLoginPage = computed(() => route.name === 'Login')
 const isMonitoreo = computed(() => route.name === 'Fallas')
+
+onMounted(() => {
+  window.__primeToast = (opts) => toast.add(opts)
+})
 </script>
