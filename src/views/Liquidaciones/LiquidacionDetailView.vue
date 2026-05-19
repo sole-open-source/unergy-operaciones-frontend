@@ -202,6 +202,55 @@
         </div>
       </div>
 
+      <!-- ══ DATOS XM (Mercado) ══ -->
+      <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div class="px-4 py-2.5 flex items-center gap-3 cursor-pointer select-none"
+          style="background:rgba(59,130,246,0.06); color:#1e40af; border-left:3px solid #3B82F6"
+          @click="toggleSeccion('xm_datos')">
+          <i :class="seccionesAbiertas.has('xm_datos') ? 'pi pi-chevron-down' : 'pi pi-chevron-right'" class="text-xs" />
+          <span class="font-semibold">Datos XM ({{ (liq.xm_datos || []).length }})</span>
+          <div class="ml-auto flex items-center gap-2">
+            <Button v-if="!(liq.xm_datos || []).length" icon="pi pi-bolt" label="Auto-poblar"
+              text size="small" style="color:#1e40af"
+              @click.stop="autoPopulateXM()" :loading="autoPopulatingXM" />
+          </div>
+        </div>
+        <div v-if="seccionesAbiertas.has('xm_datos')">
+          <div v-if="!(liq.xm_datos || []).length" class="p-6 text-center">
+            <i class="pi pi-database text-3xl mb-2" style="color: #9CA3AF;" />
+            <p class="text-sm" style="color: #6b5a8a;">Sin datos XM registrados</p>
+            <p class="text-xs mt-1" style="color: #9CA3AF;">Usa "Auto-poblar" para calcular desde generación y precios de bolsa</p>
+          </div>
+          <table v-else class="w-full text-xs">
+            <thead>
+              <tr class="text-gray-600" style="background:#f1f5f9">
+                <th class="px-3 py-1.5 text-left">Tipo Venta</th>
+                <th class="px-3 py-1.5 text-right">Energía kWh</th>
+                <th class="px-3 py-1.5 text-right">Tarifa $/kWh</th>
+                <th class="px-3 py-1.5 text-right">Valor COP</th>
+                <th class="px-3 py-1.5 text-left">Ref. Factura XM</th>
+                <th class="px-3 py-1.5 w-20" />
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="x in (liq.xm_datos || [])" :key="x.id"
+                class="border-b hover:bg-blue-50"
+                style="background:rgba(59,130,246,0.03); border-color:rgba(44,32,57,0.06)">
+                <td class="px-3 py-1.5 text-blue-700 font-medium">{{ x.tipo_venta }}</td>
+                <td class="px-3 py-1.5 text-right font-mono" style="color:#2C2039">{{ Number(x.energia_kwh).toLocaleString('es-CO', {maximumFractionDigits: 1}) }}</td>
+                <td class="px-3 py-1.5 text-right font-mono" style="color:#2C2039">${{ Number(x.tarifa_aplicada_kwh).toFixed(2) }}</td>
+                <td class="px-3 py-1.5 text-right font-semibold" style="color:#1e40af">${{ Number(x.valor_bruto_cop).toLocaleString('es-CO', {maximumFractionDigits: 0}) }}</td>
+                <td class="px-3 py-1.5 text-gray-500 font-mono">{{ x.referencia_factura_xm || '—' }}</td>
+                <td class="px-3 py-1.5 text-center">
+                  <Button icon="pi pi-trash" text rounded severity="danger" size="small"
+                    @click="deleteXMDato(x.id)" title="Eliminar" />
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <!-- ══ COSTOS ══ -->
       <div class="bg-white rounded-xl shadow-sm overflow-hidden">
         <div class="px-4 py-2.5 flex items-center gap-3 cursor-pointer select-none"
@@ -692,7 +741,7 @@ const proyectoInversionistas = ref([])
 const loading = ref(false)
 const guardando = ref(false)
 
-const seccionesAbiertas = ref(new Set(['ingresos', 'costos', 'servicios']))
+const seccionesAbiertas = ref(new Set(['ingresos', 'xm_datos', 'costos', 'servicios']))
 function toggleSeccion(key) {
   if (seccionesAbiertas.value.has(key)) seccionesAbiertas.value.delete(key)
   else seccionesAbiertas.value.add(key)
@@ -1031,6 +1080,38 @@ async function guardarResumen() {
     toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo actualizar', life: 3000 })
   } finally {
     guardando.value = false
+  }
+}
+
+// ─── Datos XM ────────────────────────────────────────────────────────────────
+const autoPopulatingXM = ref(false)
+
+async function autoPopulateXM() {
+  autoPopulatingXM.value = true
+  try {
+    const { data } = await api.post(`/liquidaciones/${route.params.id}/xm-datos/auto-populate`)
+    if (data.xm_datos?.length) {
+      liq.value.xm_datos = data.xm_datos
+      toast.add({ severity: 'success', summary: 'Datos XM poblados', detail: data.msg, life: 5000 })
+    } else {
+      toast.add({ severity: 'warn', summary: 'Sin datos', detail: data.msg, life: 4000 })
+    }
+  } catch (e) {
+    const msg = e.response?.data?.detail || 'Error al auto-poblar datos XM'
+    toast.add({ severity: 'error', summary: 'Error', detail: msg, life: 4000 })
+  } finally {
+    autoPopulatingXM.value = false
+  }
+}
+
+async function deleteXMDato(datoId) {
+  if (!confirm('¿Eliminar este dato XM?')) return
+  try {
+    await api.delete(`/liquidaciones/${route.params.id}/xm-datos/${datoId}`)
+    liq.value.xm_datos = (liq.value.xm_datos || []).filter(x => x.id !== datoId)
+    toast.add({ severity: 'success', summary: 'Dato XM eliminado', life: 2000 })
+  } catch {
+    toast.add({ severity: 'error', summary: 'Error al eliminar', life: 3000 })
   }
 }
 
