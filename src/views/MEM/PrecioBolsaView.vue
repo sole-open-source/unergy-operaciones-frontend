@@ -154,12 +154,12 @@
         <div class="rounded-xl border border-gray-100 bg-white p-4" v-if="clima.enso">
           <h3 class="font-semibold text-gray-700 mb-2 text-sm">Clasificación ENSO</h3>
           <div class="flex items-center gap-4">
-            <span class="text-lg font-bold" :class="ensoColor">{{ clima.enso.classification }}</span>
-            <span class="text-sm text-gray-500">Niño 3.4: {{ clima.enso.nino34_predicted?.toFixed(2) }}</span>
+            <span class="text-lg font-bold" :class="ensoColor">{{ clima.enso.current_state || (Array.isArray(clima.enso.classification) ? clima.enso.classification[0] : clima.enso.classification) }}</span>
+            <span class="text-sm text-gray-500">ONI: {{ clima.enso.latest_oni?.toFixed(2) ?? (Array.isArray(clima.enso.nino34_predicted) ? clima.enso.nino34_predicted[0]?.toFixed(2) : clima.enso.nino34_predicted?.toFixed(2)) }}</span>
           </div>
           <div v-if="clima.enso.probabilities" class="flex gap-3 mt-2">
             <span v-for="(prob, label) in clima.enso.probabilities" :key="label"
-              class="text-xs text-gray-500">{{ label }}: {{ (prob * 100).toFixed(0) }}%</span>
+              class="text-xs text-gray-500">{{ label.replace('p_','') }}: {{ ((Array.isArray(prob) ? prob[0] : prob) * 100).toFixed(0) }}%</span>
           </div>
         </div>
 
@@ -177,9 +177,9 @@
               <template #body="{ data }">
                 <span :class="[
                   'inline-flex items-center gap-1 text-xs font-semibold rounded-full px-2 py-0.5',
-                  data.direction === 'COMPRAR' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                  data.direction?.includes('COMPRAR') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
                 ]">
-                  <i :class="data.direction === 'COMPRAR' ? 'pi pi-arrow-down' : 'pi pi-arrow-up'" class="text-[10px]" />
+                  <i :class="data.direction?.includes('COMPRAR') ? 'pi pi-arrow-down' : 'pi pi-arrow-up'" class="text-[10px]" />
                   {{ data.direction }}
                 </span>
               </template>
@@ -345,7 +345,8 @@ const genRows = computed(() => {
 })
 
 const ensoColor = computed(() => {
-  const c = clima.value?.enso?.classification || ''
+  const enso = clima.value?.enso
+  const c = enso?.current_state || (Array.isArray(enso?.classification) ? enso.classification[0] : enso?.classification) || ''
   if (c.includes('Niño')) return 'text-red-600'
   if (c.includes('Niña')) return 'text-blue-600'
   return 'text-gray-600'
