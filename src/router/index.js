@@ -14,6 +14,7 @@ const routes = [
   { path: '/contratos/:id', name: 'ContratoDetalle', component: () => import('@/views/Contratos/ContratoDetailView.vue') },
   { path: '/fallas', name: 'Fallas', component: () => import('@/views/Fallas/MonitoreoView.vue'), meta: { roles: ['admin', 'operaciones', 'monitoreo'] } },
   { path: '/fallas/:id', name: 'FallaDetalle', component: () => import('@/views/Fallas/FallaDetailView.vue'), meta: { roles: ['admin', 'operaciones', 'monitoreo'] } },
+  { path: '/solar', name: 'Solar', component: () => import('@/views/Solar/SolarView.vue'), meta: { roles: ['admin', 'operaciones', 'monitoreo'] } },
   { path: '/liquidaciones', name: 'Liquidaciones', component: () => import('@/views/Liquidaciones/LiquidacionesListView.vue'), meta: { roles: ['admin', 'liquidaciones'] } },
   { path: '/liquidaciones/inversionista', name: 'LiquidacionesPorInversionista', component: () => import('@/views/Liquidaciones/LiquidacionesPorInversionistaView.vue'), meta: { roles: ['admin', 'liquidaciones'] } },
   { path: '/liquidaciones/:id', name: 'LiquidacionDetalle', component: () => import('@/views/Liquidaciones/LiquidacionDetailView.vue'), meta: { roles: ['admin', 'liquidaciones'] } },

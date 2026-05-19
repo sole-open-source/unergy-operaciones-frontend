@@ -109,7 +109,9 @@
       <TabPanel header="Simulación">
         <div class="p-4 space-y-6">
           <div v-for="sim in SIMULACIONES" :key="sim.key">
-            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">{{ sim.label }} (kWh/mes)</p>
+            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+              {{ sim.label }} <span class="normal-case font-normal">(kWh/mes)</span>
+            </p>
             <div class="grid grid-cols-6 gap-2">
               <div v-for="(mes, i) in MESES" :key="sim.key + '-' + i">
                 <label class="block text-[10px] text-gray-400 mb-0.5 text-center">{{ mes }}</label>
@@ -120,8 +122,8 @@
                   class="w-full"
                   inputClass="text-center text-xs px-1 py-1"
                 />
-                <p v-else class="text-center text-sm font-medium text-gray-700 bg-gray-50 rounded py-1">
-                  {{ sim.displayArray.value[i] != null ? sim.displayArray.value[i] : '—' }}
+                <p v-else class="text-center text-sm font-semibold text-gray-800 bg-gray-50 rounded py-1.5 px-1 tabular-nums">
+                  {{ sim.displayArray.value[i] != null ? Math.round(sim.displayArray.value[i]).toLocaleString('es-CO') : '—' }}
                 </p>
               </div>
             </div>
