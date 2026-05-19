@@ -241,20 +241,20 @@
           <i class="pi pi-eye text-xs" />Mostrar ocultos ({{ hiddenContratos.size }})
         </button>
         <button
-          @click="showFicticioForm = true"
+          @click="showNuevoForm = true"
           class="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm border transition"
           style="border-color: rgba(240,192,64,0.5); color: #9a6700; background: rgba(240,192,64,0.08);"
         >
-          <i class="pi pi-plus text-xs" />PPA ficticio
+          <i class="pi pi-plus text-xs" />PPA nuevo
         </button>
         <span class="text-xs" style="color: #7a6e8a;">Arrastra las plantas entre contratos para simular</span>
       </div>
 
-      <!-- Formulario PPA ficticio -->
-      <div v-if="showFicticioForm" class="rounded-xl border p-5" style="background: white; border-color: rgba(240,192,64,0.4);">
+      <!-- Formulario PPA nuevo -->
+      <div v-if="showNuevoForm" class="rounded-xl border p-5" style="background: white; border-color: rgba(240,192,64,0.4);">
         <div class="flex items-center gap-2 mb-4">
           <i class="pi pi-bolt" style="color: #F0C040;" />
-          <span class="font-bold text-sm" style="color: #2C2039;">Nuevo PPA ficticio</span>
+          <span class="font-bold text-sm" style="color: #2C2039;">Nuevo PPA nuevo</span>
         </div>
         <div class="flex flex-wrap items-end gap-4">
           <div class="flex flex-col gap-1">
@@ -271,7 +271,7 @@
           </div>
           <div class="flex gap-2">
             <button
-              @click="crearFicticio"
+              @click="crearNuevo"
               :disabled="!ficticioNombre || ficticioMax <= 0"
               class="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition"
               :style="!ficticioNombre || ficticioMax <= 0
@@ -281,7 +281,7 @@
               <i class="pi pi-check text-xs" />Crear
             </button>
             <button
-              @click="showFicticioForm = false"
+              @click="showNuevoForm = false"
               class="px-3 py-2 rounded-lg text-sm transition"
               style="color: #7a6e8a;"
             >Cancelar</button>
@@ -314,17 +314,17 @@
                 <div class="min-w-0">
                   <div class="flex items-center gap-1.5">
                     <span class="font-bold text-sm truncate" style="color: #2C2039;">{{ c.nombre }}</span>
-                    <span v-if="c._ficticio" class="text-xs px-1.5 py-0.5 rounded font-medium flex-shrink-0" style="background: rgba(240,192,64,0.18); color: #9a6700;">Ficticio</span>
+                    <span v-if="c._ficticio" class="text-xs px-1.5 py-0.5 rounded font-medium flex-shrink-0" style="background: rgba(240,192,64,0.18); color: #9a6700;">Nuevo</span>
                   </div>
                   <div class="text-xs mt-0.5 truncate" style="color: #7a6e8a;">{{ c.comprador_nombre }}</div>
                 </div>
                 <div class="flex items-center gap-0.5 flex-shrink-0">
                   <button
                     v-if="c._ficticio"
-                    @click.stop="eliminarFicticio(c.id)"
+                    @click.stop="eliminarNuevo(c.id)"
                     class="rounded-md p-1 transition-colors hover:bg-red-50"
                     style="color: #D64455;"
-                    v-tooltip="'Eliminar PPA ficticio'"
+                    v-tooltip="'Eliminar PPA'"
                   >
                     <i class="pi pi-trash text-xs" />
                   </button>
@@ -579,7 +579,7 @@ const simError         = ref(null)
 const simAssignments   = ref({})
 const hiddenContratos  = ref(new Set())
 const ficticioContratos = ref([])
-const showFicticioForm = ref(false)
+const showNuevoForm = ref(false)
 const ficticioNombre   = ref('')
 const ficticioMin      = ref(0)
 const ficticioMax      = ref(0)
@@ -714,7 +714,7 @@ function resetSim() {
   hiddenContratos.value = new Set()
 }
 
-function crearFicticio() {
+function crearNuevo() {
   if (!ficticioNombre.value || ficticioMax.value <= 0) return
   const id = `__ficticio_${ficticioNextId++}`
   const contrato = {
@@ -730,10 +730,10 @@ function crearFicticio() {
   ficticioNombre.value = ''
   ficticioMin.value = 0
   ficticioMax.value = 0
-  showFicticioForm.value = false
+  showNuevoForm.value = false
 }
 
-function eliminarFicticio(contratoId) {
+function eliminarNuevo(contratoId) {
   const plantas = simAssignments.value[contratoId] || []
   if (plantas.length) {
     if (!simAssignments.value['none']) simAssignments.value['none'] = []
