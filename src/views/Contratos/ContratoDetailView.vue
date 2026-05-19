@@ -452,6 +452,10 @@
 
       <!-- ══ PROYECTOS ══ -->
       <TabPanel :header="`Proyectos (${contrato.proyectos?.length || 0})`">
+        <div class="flex justify-end mb-3">
+          <Button label="Asociar proyecto" icon="pi pi-plus" size="small" severity="secondary" outlined
+            @click="abrirAsociar" />
+        </div>
         <div v-if="contrato.proyectos?.length" class="p-2">
           <DataTable :value="contrato.proyectos" stripedRows class="text-sm" rowHover>
             <Column field="id" header="ID" style="width:60px" />
@@ -471,6 +475,28 @@
         </div>
       </TabPanel>
     </TabView>
+
+    <!-- Dialog asociar proyecto -->
+    <Dialog v-model:visible="showAsociar" header="Asociar proyecto" modal :style="{ width: '420px' }">
+      <div class="flex flex-col gap-2 pt-1">
+        <label class="text-xs font-medium text-gray-600">Buscar proyecto</label>
+        <Select
+          v-model="proyectoSeleccionado"
+          :options="todosProyectosDisponibles"
+          optionLabel="nombre_comercial"
+          placeholder="Seleccionar proyecto…"
+          filter
+          filterPlaceholder="Buscar…"
+          class="w-full"
+          :loading="cargandoProyectos"
+        />
+      </div>
+      <template #footer>
+        <Button label="Cancelar" severity="secondary" outlined @click="showAsociar = false" />
+        <Button label="Asociar" icon="pi pi-check" :loading="asociando"
+          :disabled="!proyectoSeleccionado" @click="asociarProyecto" />
+      </template>
+    </Dialog>
   </div>
 
   <!-- Loading -->
@@ -503,6 +529,8 @@ import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import DatePicker from 'primevue/datepicker'
 import Textarea from 'primevue/textarea'
+import Dialog from 'primevue/dialog'
+import Select from 'primevue/select'
 import InfoField from '@/components/InfoField.vue'
 import api from '@/api/client'
 
@@ -787,6 +815,49 @@ const cantidadesAnuales = computed(() => {
   if (!contrato.value?.compromisos_energia) return []
   return agregarPorAño(cantidadesMensuales.value, ['energia_minima', 'energia_maxima'], 'suma')
 })
+
+// Asociar proyecto
+const showAsociar = ref(false)
+const proyectoSeleccionado = ref(null)
+const todosProyectos = ref([])
+const cargandoProyectos = ref(false)
+const asociando = ref(false)
+
+const todosProyectosDisponibles = computed(() => {
+  const asociadosIds = new Set((contrato.value?.proyectos ?? []).map(p => p.id))
+  return todosProyectos.value.filter(p => !asociadosIds.has(p.id))
+})
+
+async function abrirAsociar() {
+  showAsociar.value = true
+  proyectoSeleccionado.value = null
+  if (todosProyectos.value.length) return
+  cargandoProyectos.value = true
+  try {
+    const { data } = await api.get('/proyectos', { params: { size: 500 } })
+    todosProyectos.value = (data.items ?? data).sort((a, b) =>
+      (a.nombre_comercial ?? '').localeCompare(b.nombre_comercial ?? ''))
+  } catch (e) {
+    toast.add({ severity: 'error', summary: 'Error', detail: e.message, life: 3000 })
+  } finally {
+    cargandoProyectos.value = false
+  }
+}
+
+async function asociarProyecto() {
+  if (!proyectoSeleccionado.value) return
+  asociando.value = true
+  try {
+    await api.post(`/ppa/${contrato.value.id}/proyectos`, { proyecto_id: proyectoSeleccionado.value.id })
+    contrato.value.proyectos = [...(contrato.value.proyectos ?? []), proyectoSeleccionado.value]
+    showAsociar.value = false
+    toast.add({ severity: 'success', summary: 'Proyecto asociado', detail: proyectoSeleccionado.value.nombre_comercial, life: 2500 })
+  } catch (e) {
+    toast.add({ severity: 'error', summary: 'Error', detail: e.response?.data?.detail || e.message, life: 4000 })
+  } finally {
+    asociando.value = false
+  }
+}
 
 async function cargar() {
   loading.value = true
