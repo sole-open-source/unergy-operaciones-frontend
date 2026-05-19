@@ -13,6 +13,13 @@
       <i class="pi pi-spin pi-spinner text-3xl" style="color: #915BD8;" />
     </div>
 
+    <template v-else-if="!history.length && !loading">
+      <div class="flex flex-col items-center py-16 gap-3" style="color: #6b5a8a;">
+        <i class="pi pi-cloud-download text-4xl" style="color: #c4b8d4;" />
+        <p class="text-sm font-medium">Servicio de balance no disponible</p>
+        <p class="text-xs">EVO API no configurada — los datos se mostrarán cuando DailySpot esté activo.</p>
+      </div>
+    </template>
     <template v-else>
       <!-- KPI row -->
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -130,11 +137,11 @@ async function fetchData() {
   loading.value = true
   try {
     const [h, c] = await Promise.all([
-      api.get(`/evo/dailyspot/history?days=${days.value}`),
-      api.get('/evo/clima/history?limit=5'),
+      api.get(`/evo/dailyspot/history?days=${days.value}`).catch(() => null),
+      api.get('/evo/clima/history?limit=5').catch(() => null),
     ])
-    history.value = h.data
-    climaHistory.value = c.data
+    if (h?.data) history.value = h.data
+    if (c?.data) climaHistory.value = c.data
   } catch (e) {
     console.error('Error loading balance data:', e)
   } finally {

@@ -8,6 +8,13 @@
       </div>
     </div>
 
+    <!-- No data banner -->
+    <div v-if="!oniData.length && !priceData.length" class="rounded-xl p-4 flex items-center gap-3"
+         style="background: rgba(145,91,216,0.06); border: 1px solid rgba(145,91,216,0.15);">
+      <i class="pi pi-info-circle" style="color: #915BD8;" />
+      <p class="text-sm" style="color: #6b5a8a;">Datos climáticos no disponibles — EVO API no configurada. Se mostrarán cuando el servicio esté activo.</p>
+    </div>
+
     <!-- Current ENSO Status -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
       <div v-for="kpi in ensoKpis" :key="kpi.label"
