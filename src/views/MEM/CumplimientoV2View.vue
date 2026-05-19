@@ -2,9 +2,23 @@
   <div class="p-6 space-y-6 min-h-screen" style="background: #FDFAF7; color: #2C2039;">
 
     <!-- Header -->
-    <div>
-      <h1 class="text-2xl font-bold" style="color: #2C2039;">Cumplimiento PPA</h1>
-      <p class="text-sm mt-0.5" style="color: #7a6e8a;">Generación vs. compromisos contractuales de energía</p>
+    <div class="flex items-start justify-between">
+      <div>
+        <h1 class="text-2xl font-bold" style="color: #2C2039;">Cumplimiento PPA</h1>
+        <p class="text-sm mt-0.5" style="color: #7a6e8a;">Generación vs. compromisos contractuales de energía</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <span v-if="cacheSize" class="text-xs font-mono px-2 py-1 rounded" style="background: rgba(145,91,216,0.08); color: #915BD8;">
+          caché: {{ cacheSize }}
+        </span>
+        <button @click="clearCacheAndReload"
+          class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
+          style="border: 1px solid rgba(214,68,85,0.3); color: #D64455; background: rgba(214,68,85,0.05);"
+          :style="cacheClearing ? 'opacity: 0.6; pointer-events: none;' : ''">
+          <i class="pi pi-refresh text-xs" :class="{ 'pi-spin': cacheClearing }" />
+          Borrar caché y consultar energía
+        </button>
+      </div>
     </div>
 
     <!-- Tab bar -->
@@ -705,6 +719,87 @@ import Message from 'primevue/message'
 import ProgressSpinner from 'primevue/progressspinner'
 import client from '@/api/client'
 
+// ── LocalStorage cache ───────────────────────────────────────────────────────
+const CACHE_PREFIX = 'cumpl_'
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000
+
+function cacheKey(endpoint, params) {
+  return CACHE_PREFIX + endpoint + '|' + JSON.stringify(params)
+}
+
+function cacheGet(endpoint, params) {
+  try {
+    const raw = localStorage.getItem(cacheKey(endpoint, params))
+    if (!raw) return null
+    const { ts, data } = JSON.parse(raw)
+    if (Date.now() - ts > CACHE_TTL_MS) {
+      localStorage.removeItem(cacheKey(endpoint, params))
+      return null
+    }
+    return data
+  } catch { return null }
+}
+
+function cacheSet(endpoint, params, data) {
+  try {
+    localStorage.setItem(cacheKey(endpoint, params), JSON.stringify({ ts: Date.now(), data }))
+  } catch { /* quota exceeded — ignore */ }
+}
+
+function cacheClearAll() {
+  const keys = []
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i)
+    if (k && k.startsWith(CACHE_PREFIX)) keys.push(k)
+  }
+  keys.forEach(k => localStorage.removeItem(k))
+}
+
+function cacheGetSize() {
+  let bytes = 0, count = 0
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i)
+    if (k && k.startsWith(CACHE_PREFIX)) {
+      bytes += (localStorage.getItem(k) || '').length * 2
+      count++
+    }
+  }
+  if (!count) return ''
+  const mb = bytes / (1024 * 1024)
+  return mb >= 1 ? `${mb.toFixed(1)} MB (${count})` : `${(bytes / 1024).toFixed(0)} KB (${count})`
+}
+
+async function cachedGet(endpoint, params = {}) {
+  const cached = cacheGet(endpoint, params)
+  if (cached) return cached
+  const res = await client.get(endpoint, { params })
+  cacheSet(endpoint, params, res.data)
+  return res.data
+}
+
+const cacheSize = ref(cacheGetSize())
+const cacheClearing = ref(false)
+
+function updateCacheSize() { cacheSize.value = cacheGetSize() }
+
+async function clearCacheAndReload() {
+  cacheClearing.value = true
+  cacheClearAll()
+  cacheSize.value = ''
+  anualData.value = null
+  simData.value = null
+  pcData.value = null
+  tableData.value = []
+  try {
+    await Promise.all([loadAnnualData(), loadTableData()])
+    if (activeTab.value === 0) await loadSimulator()
+    if (activeTab.value === 2) await loadPlantasContratos()
+  } finally {
+    cacheClearing.value = false
+    updateCacheSize()
+  }
+}
+
 // ── Tabs ──────────────────────────────────────────────────────────────────────
 const TABS      = ['Estrategia', 'Cumplimiento', 'Proyectos']
 const activeTab = ref(0)
@@ -1041,11 +1136,12 @@ async function loadAnnualData() {
     if (selectedContratoId.value === CONSOLIDADO_ID) {
       await loadConsolidado()
     } else {
-      const res = await client.get(`/cumplimiento/ppa/${selectedContratoId.value}/anual`, {
-        params: { year: selectedYear.value },
-      })
-      anualData.value = res.data
+      anualData.value = await cachedGet(
+        `/cumplimiento/ppa/${selectedContratoId.value}/anual`,
+        { year: selectedYear.value },
+      )
     }
+    updateCacheSize()
   } catch (e) {
     chartError.value = e.response?.data?.detail || 'Error al cargar los datos anuales.'
   } finally {
@@ -1059,13 +1155,14 @@ async function loadConsolidado() {
 
   const results = await Promise.allSettled(
     realContratos.map(c =>
-      client.get(`/cumplimiento/ppa/${c.id}/anual`, { params: { year: selectedYear.value } })
+      cachedGet(`/cumplimiento/ppa/${c.id}/anual`, { year: selectedYear.value })
     )
   )
+  updateCacheSize()
 
   const successful = results
     .filter(r => r.status === 'fulfilled')
-    .map(r => r.value.data)
+    .map(r => r.value)
 
   if (!successful.length) {
     chartError.value = 'No se pudo cargar ningún contrato.'
@@ -1137,8 +1234,8 @@ async function loadConsolidado() {
 async function loadTableData() {
   tableLoading.value = true
   try {
-    const res = await client.get('/cumplimiento/ppa/resumen-anual', { params: { year: selectedYear.value } })
-    tableData.value = res.data
+    tableData.value = await cachedGet('/cumplimiento/ppa/resumen-anual', { year: selectedYear.value })
+    updateCacheSize()
   } catch (e) {
     console.error('Error loading table data', e)
   } finally {
@@ -1156,11 +1253,10 @@ async function loadSimulator() {
   simLoading.value = true
   simError.value   = null
   try {
-    const res = await client.get('/cumplimiento/simulador', {
-      params: { year: simYear.value, month: simMonth.value },
-    })
-    simData.value = res.data
-    initAssignments(res.data)
+    const data = await cachedGet('/cumplimiento/simulador', { year: simYear.value, month: simMonth.value })
+    simData.value = data
+    initAssignments(data)
+    updateCacheSize()
   } catch (e) {
     simError.value = e.response?.data?.detail || 'Error al cargar el simulador.'
   } finally {
@@ -1172,10 +1268,8 @@ async function loadPlantasContratos() {
   pcLoading.value = true
   pcError.value   = null
   try {
-    const res = await client.get('/cumplimiento/plantas-contratos', {
-      params: { year: pcYear.value, month: pcMonth.value },
-    })
-    pcData.value = res.data
+    pcData.value = await cachedGet('/cumplimiento/plantas-contratos', { year: pcYear.value, month: pcMonth.value })
+    updateCacheSize()
   } catch (e) {
     pcError.value = e.response?.data?.detail || 'Error al cargar plantas y contratos.'
   } finally {
