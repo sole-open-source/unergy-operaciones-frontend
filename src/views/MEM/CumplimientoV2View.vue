@@ -21,7 +21,7 @@
     </div>
 
     <!-- ═══════════════ CUMPLIMIENTO TAB ═══════════════ -->
-    <div v-show="activeTab === 0" class="space-y-6">
+    <div v-show="activeTab === 1" class="space-y-6">
 
       <!-- Selectors -->
       <div class="flex flex-wrap gap-3 items-end">
@@ -213,7 +213,7 @@
     </div>
 
     <!-- ═══════════════ SIMULADOR TAB ═══════════════ -->
-    <div v-show="activeTab === 1" class="space-y-5">
+    <div v-show="activeTab === 0" class="space-y-5">
 
       <!-- Controls -->
       <div class="flex flex-wrap items-end gap-3">
@@ -510,6 +510,135 @@
 
     </div>
 
+    <!-- ═══════════════ PROYECTOS TAB ═══════════════ -->
+    <div v-show="activeTab === 2" class="space-y-5">
+
+      <!-- Month selector + mode switch -->
+      <div class="flex flex-wrap items-end gap-4">
+        <div class="flex flex-col gap-1">
+          <label class="text-xs font-semibold uppercase tracking-wider" style="color: #915BD8;">Año</label>
+          <Select v-model="pcYear" :options="years" class="w-24" @change="loadPlantasContratos" />
+        </div>
+        <div class="flex flex-col gap-1">
+          <label class="text-xs font-semibold uppercase tracking-wider" style="color: #915BD8;">Mes</label>
+          <Select v-model="pcMonth" :options="MESES_OPTIONS" optionLabel="label" optionValue="value" class="w-40" @change="loadPlantasContratos" />
+        </div>
+        <div class="flex rounded-lg overflow-hidden border" style="border-color: rgba(44,32,57,0.15);">
+          <button
+            v-for="mode in PC_MODES" :key="mode.key"
+            @click="pcMode = mode.key"
+            class="px-4 py-2 text-sm font-semibold transition-colors"
+            :style="pcMode === mode.key
+              ? `background: ${mode.bg}; color: ${mode.color};`
+              : 'background: transparent; color: #7a6e8a;'"
+          >{{ mode.label }}</button>
+        </div>
+        <span class="text-xs" style="color: #7a6e8a;">
+          {{ pcMode === 'venta' ? 'Plantas inscritas en GESCON por contrato de venta'
+           : pcMode === 'compra' ? 'Plantas que Unergy compra energía'
+           : 'Plantas sin asignación GESCON este mes (van a bolsa)' }}
+        </span>
+      </div>
+
+      <div v-if="pcLoading" class="flex flex-col items-center justify-center py-20 gap-3">
+        <ProgressSpinner style="width:48px;height:48px;" strokeWidth="4" animationDuration=".8s" />
+        <p class="text-sm" style="color: #7a6e8a;">Cargando plantas y contratos…</p>
+      </div>
+
+      <Message v-else-if="pcError" severity="error" :closable="false">{{ pcError }}</Message>
+
+      <template v-else-if="pcData">
+
+        <!-- VENTA mode -->
+        <template v-if="pcMode === 'venta'">
+          <div v-for="c in pcData.venta" :key="c.id"
+            class="rounded-xl border overflow-hidden" style="border-color: rgba(44,32,57,0.12); background: white;">
+            <div class="px-4 py-3 flex items-center justify-between"
+              style="background: rgba(145,91,216,0.04); border-bottom: 1px solid rgba(44,32,57,0.07);">
+              <div>
+                <span class="font-bold text-sm" style="color: #2C2039;">{{ c.nombre }}</span>
+                <span class="ml-2 text-xs" style="color: #7a6e8a;">{{ c.comprador_nombre }}</span>
+              </div>
+              <span class="text-xs font-mono px-2 py-0.5 rounded"
+                style="background: rgba(145,91,216,0.10); color: #915BD8;">
+                {{ c.plantas.length }} plantas
+              </span>
+            </div>
+            <div v-if="c.plantas.length" class="divide-y" style="border-color: rgba(44,32,57,0.05);">
+              <div v-for="p in c.plantas" :key="p.id" class="px-4 py-2.5 flex items-center justify-between text-sm">
+                <div class="flex items-center gap-2">
+                  <span class="font-medium" style="color: #2C2039;">{{ p.nombre }}</span>
+                  <span v-if="p.codigo_sic" class="text-xs font-mono px-1.5 py-0.5 rounded" style="background: rgba(44,32,57,0.06); color: #7a6e8a;">{{ p.codigo_sic }}</span>
+                  <span v-if="p.pct_despacho != null" class="text-xs font-mono" style="color: #915BD8;">{{ (p.pct_despacho * 100).toFixed(0) }}%</span>
+                </div>
+                <div class="text-xs font-mono text-right" style="color: #7a6e8a;">
+                  <span v-if="p.fecha_inicio">{{ p.fecha_inicio }}</span>
+                  <span v-if="p.fecha_inicio && p.fecha_fin"> → </span>
+                  <span v-if="p.fecha_fin" :style="isExpiringSoon(p.fecha_fin) ? 'color: #D64455; font-weight: 600;' : ''">{{ p.fecha_fin }}</span>
+                </div>
+              </div>
+            </div>
+            <div v-else class="px-4 py-4 text-xs text-center" style="color: rgba(44,32,57,0.3);">
+              Sin plantas asignadas en GESCON para {{ MESES[pcMonth - 1] }} {{ pcYear }}
+            </div>
+          </div>
+        </template>
+
+        <!-- COMPRA mode -->
+        <template v-if="pcMode === 'compra'">
+          <div v-if="!pcData.compra.length" class="text-center py-12 text-sm" style="color: #7a6e8a;">
+            No hay contratos de compra vigentes en {{ MESES[pcMonth - 1] }} {{ pcYear }}
+          </div>
+          <div v-for="c in pcData.compra" :key="c.id"
+            class="rounded-xl border overflow-hidden" style="border-color: rgba(240,192,64,0.4); background: white;">
+            <div class="px-4 py-3 flex items-center justify-between"
+              style="background: rgba(240,192,64,0.08); border-bottom: 1px solid rgba(240,192,64,0.2);">
+              <div>
+                <span class="font-bold text-sm" style="color: #9a6700;">{{ c.nombre }}</span>
+                <span class="ml-2 text-xs" style="color: #7a6e8a;">Vendedor: {{ c.vendedor_nombre }}</span>
+              </div>
+              <span class="text-xs font-mono px-2 py-0.5 rounded"
+                style="background: rgba(240,192,64,0.18); color: #9a6700;">
+                {{ c.plantas.length }} plantas
+              </span>
+            </div>
+            <div v-if="c.plantas.length" class="divide-y" style="border-color: rgba(44,32,57,0.05);">
+              <div v-for="p in c.plantas" :key="p.id" class="px-4 py-2.5 flex items-center justify-between text-sm">
+                <span class="font-medium" style="color: #2C2039;">{{ p.nombre }}</span>
+                <div class="text-xs font-mono text-right" style="color: #7a6e8a;">
+                  <span v-if="p.fecha_inicio">{{ p.fecha_inicio }}</span>
+                  <span v-if="p.fecha_inicio && p.fecha_fin"> → </span>
+                  <span v-if="p.fecha_fin" :style="isExpiringSoon(p.fecha_fin) ? 'color: #D64455; font-weight: 600;' : ''">{{ p.fecha_fin }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
+
+        <!-- BOLSA mode -->
+        <template v-if="pcMode === 'bolsa'">
+          <div class="rounded-xl border overflow-hidden" style="border-color: rgba(44,32,57,0.12); background: white;">
+            <div class="px-4 py-3" style="background: rgba(44,32,57,0.04); border-bottom: 1px solid rgba(44,32,57,0.07);">
+              <span class="font-bold text-sm" style="color: #2C2039;">Plantas en bolsa</span>
+              <span class="ml-2 text-xs" style="color: #7a6e8a;">Sin asignación GESCON en {{ MESES[pcMonth - 1] }} {{ pcYear }}</span>
+              <span class="ml-2 text-xs font-mono px-2 py-0.5 rounded" style="background: rgba(44,32,57,0.08); color: #7a6e8a;">
+                {{ pcData.bolsa.length }}
+              </span>
+            </div>
+            <div v-if="pcData.bolsa.length" class="divide-y" style="border-color: rgba(44,32,57,0.05);">
+              <div v-for="p in pcData.bolsa" :key="p.id" class="px-4 py-2.5 text-sm font-medium" style="color: #2C2039;">
+                {{ p.nombre }}
+              </div>
+            </div>
+            <div v-else class="px-4 py-8 text-xs text-center" style="color: rgba(44,32,57,0.3);">
+              Todas las plantas tienen asignación GESCON este mes
+            </div>
+          </div>
+        </template>
+
+      </template>
+    </div>
+
     <!-- Floating month breakdown -->
     <Teleport to="body">
       <template v-if="selectedMonthIdx !== null && anualData && anualData.meses[selectedMonthIdx]">
@@ -577,7 +706,7 @@ import ProgressSpinner from 'primevue/progressspinner'
 import client from '@/api/client'
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
-const TABS      = ['Cumplimiento', 'Estrategia']
+const TABS      = ['Estrategia', 'Cumplimiento', 'Proyectos']
 const activeTab = ref(0)
 
 // ── Chart constants ───────────────────────────────────────────────────────────
@@ -636,6 +765,19 @@ const sortDesc         = ref(true)
 const dragPlanta       = ref(null)
 const dragFromContrato = ref(undefined)
 const dragOver         = ref(null)
+
+// ── Proyectos tab state ──────────────────────────────────────────────────────
+const PC_MODES = [
+  { key: 'venta',  label: 'Venta',  bg: 'rgba(145,91,216,0.12)', color: '#915BD8' },
+  { key: 'compra', label: 'Compra', bg: 'rgba(240,192,64,0.18)', color: '#9a6700' },
+  { key: 'bolsa',  label: 'Bolsa',  bg: 'rgba(44,32,57,0.10)',   color: '#2C2039' },
+]
+const pcYear    = ref(now.getFullYear())
+const pcMonth   = ref(now.getMonth() + 1)
+const pcMode    = ref('venta')
+const pcData    = ref(null)
+const pcLoading = ref(false)
+const pcError   = ref(null)
 
 const allContratos = computed(() => {
   if (!simData.value) return []
@@ -1026,7 +1168,32 @@ async function loadSimulator() {
   }
 }
 
-watch(activeTab, (tab) => { if (tab === 1 && !simData.value) loadSimulator() })
+async function loadPlantasContratos() {
+  pcLoading.value = true
+  pcError.value   = null
+  try {
+    const res = await client.get('/cumplimiento/plantas-contratos', {
+      params: { year: pcYear.value, month: pcMonth.value },
+    })
+    pcData.value = res.data
+  } catch (e) {
+    pcError.value = e.response?.data?.detail || 'Error al cargar plantas y contratos.'
+  } finally {
+    pcLoading.value = false
+  }
+}
+
+function isExpiringSoon(dateStr) {
+  if (!dateStr) return false
+  const end = new Date(dateStr + 'T00:00:00')
+  const diff = (end - now) / (1000 * 60 * 60 * 24)
+  return diff >= 0 && diff <= 60
+}
+
+watch(activeTab, (tab) => {
+  if (tab === 0 && !simData.value) loadSimulator()
+  if (tab === 2 && !pcData.value) loadPlantasContratos()
+})
 
 onMounted(async () => {
   await loadContratos()
