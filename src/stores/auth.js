@@ -1,6 +1,5 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import api from '@/api/client'
 
 const BASE = import.meta.env.VITE_API_URL || ''
 
