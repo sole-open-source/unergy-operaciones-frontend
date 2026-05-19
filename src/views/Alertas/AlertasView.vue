@@ -116,6 +116,14 @@ const MODULOS = computed(() => [
     color: '#915BD8',
     count: kpis.value.fallas_abiertas || 0,
   },
+  {
+    to: '/garantias?expiring_days=30',
+    label: 'Garantías por Vencer',
+    desc: 'Garantías que vencen en los próximos 30 días',
+    icon: 'pi pi-wallet',
+    color: '#CA8A04',
+    count: kpis.value.garantias_por_vencer || 0,
+  },
 ])
 
 onMounted(async () => {
