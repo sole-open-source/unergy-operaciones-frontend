@@ -338,14 +338,25 @@ const criticalAlerts = computed(() => {
       })
     }
   }
+  if (data.value.garantias_por_vencer > 0) {
+    alerts.push({
+      key: 'garantias-vencimiento',
+      title: `${data.value.garantias_por_vencer} garantía${data.value.garantias_por_vencer > 1 ? 's' : ''} por vencer`,
+      detail: 'Vencimiento dentro de los próximos 30 días',
+      icon: 'pi pi-wallet',
+      iconColor: '#CA8A04',
+      bgColor: 'rgba(202,138,4,0.1)',
+      to: '/garantias',
+    })
+  }
   return alerts
 })
 
 const quickLinks = [
   { to: '/generacion-solar', label: 'Generación Solar', icon: 'pi pi-sun', bg: 'rgba(240,192,64,0.15)', color: '#D4A017' },
-  { to: '/mem/precio-bolsa', label: 'Precio de Bolsa', icon: 'pi pi-chart-line', bg: 'rgba(145,91,216,0.1)', color: '#915BD8' },
   { to: '/mem/cumplimiento', label: 'Cumplimiento PPA', icon: 'pi pi-shield', bg: 'rgba(16,185,129,0.1)', color: '#10B981' },
-  { to: '/mem/fronteras', label: 'Fronteras', icon: 'pi pi-globe', bg: 'rgba(44,32,57,0.08)', color: '#2C2039' },
+  { to: '/garantias', label: 'Garantías', icon: 'pi pi-wallet', bg: 'rgba(145,91,216,0.1)', color: '#915BD8' },
+  { to: '/alertas', label: 'Centro de Alertas', icon: 'pi pi-exclamation-circle', bg: 'rgba(214,68,85,0.08)', color: '#D64455' },
 ]
 
 onMounted(async () => {

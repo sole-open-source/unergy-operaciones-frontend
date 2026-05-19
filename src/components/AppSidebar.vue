@@ -92,6 +92,7 @@ const ALL_GROUPS = [
     label: 'Comercialización',
     items: [
       { to: '/mem/cumplimiento',    label: 'Cumplimiento PPA', icon: 'pi pi-shield' },
+      { to: '/garantias',           label: 'Garantías',        icon: 'pi pi-wallet' },
       { to: '/mem/gescon',          label: 'GESCON / ASIC',    icon: 'pi pi-book' },
       { to: '/mem/precio-bolsa',    label: 'Precio de Bolsa',  icon: 'pi pi-chart-line' },
       { to: '/mem/balance',         label: 'Balance Energía',  icon: 'pi pi-chart-bar' },

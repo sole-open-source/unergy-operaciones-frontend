@@ -17,6 +17,7 @@ const routes = [
   { path: '/liquidaciones', name: 'Liquidaciones', component: () => import('@/views/Liquidaciones/LiquidacionesListView.vue'), meta: { roles: ['admin', 'liquidaciones'] } },
   { path: '/liquidaciones/inversionista', name: 'LiquidacionesPorInversionista', component: () => import('@/views/Liquidaciones/LiquidacionesPorInversionistaView.vue'), meta: { roles: ['admin', 'liquidaciones'] } },
   { path: '/liquidaciones/:id', name: 'LiquidacionDetalle', component: () => import('@/views/Liquidaciones/LiquidacionDetailView.vue'), meta: { roles: ['admin', 'liquidaciones'] } },
+  { path: '/garantias',               name: 'Garantias',           component: () => import('@/views/Garantias/GarantiasView.vue') },
   { path: '/alertas',                name: 'Alertas',             component: () => import('@/views/Alertas/AlertasView.vue') },
   { path: '/alertas/contratos-ppa',  name: 'AlertasContratosPPA', component: () => import('@/views/Alertas/AlertasContratosPPAView.vue') },
   { path: '/alertas/monitoreo',      name: 'AlertasMonitoreo',    component: () => import('@/views/Alertas/AlertasMonitoreoView.vue') },
