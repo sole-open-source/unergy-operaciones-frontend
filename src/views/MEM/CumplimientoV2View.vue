@@ -306,17 +306,29 @@
               class="rounded-xl border transition-shadow flex flex-col"
               style="border-color: rgba(44,32,57,0.12); background: white;"
               :style="dragOver === c.id ? 'border-color: #915BD8; box-shadow: 0 0 0 2px rgba(145,91,216,0.18);' : ''"
-              @dragover.prevent="dragOver = c.id"
+              @dragover.prevent="dragOver = c.id; if (!expandedContratos.has(c.id)) toggleExpand(c.id)"
               @drop.prevent="onDrop(c.id)"
             >
               <!-- Contract header -->
-              <div class="px-4 pt-3 pb-2 border-b flex items-start justify-between gap-2" style="border-color: rgba(44,32,57,0.07);">
-                <div class="min-w-0">
-                  <div class="flex items-center gap-1.5">
-                    <span class="font-bold text-sm truncate" style="color: #2C2039;">{{ c.nombre }}</span>
-                    <span v-if="c._ficticio" class="text-xs px-1.5 py-0.5 rounded font-medium flex-shrink-0" style="background: rgba(240,192,64,0.18); color: #9a6700;">Nuevo</span>
+              <div
+                class="px-4 pt-3 pb-2 border-b flex items-start justify-between gap-2 cursor-pointer select-none"
+                style="border-color: rgba(44,32,57,0.07);"
+                @click="toggleExpand(c.id)"
+              >
+                <div class="flex items-center gap-2 min-w-0">
+                  <i
+                    class="pi text-xs transition-transform flex-shrink-0"
+                    :class="expandedContratos.has(c.id) ? 'pi-chevron-down' : 'pi-chevron-right'"
+                    style="color: #915BD8;"
+                  />
+                  <div class="min-w-0">
+                    <div class="flex items-center gap-1.5">
+                      <span class="font-bold text-sm truncate" style="color: #2C2039;">{{ c.nombre }}</span>
+                      <span v-if="c._ficticio" class="text-xs px-1.5 py-0.5 rounded font-medium flex-shrink-0" style="background: rgba(240,192,64,0.18); color: #9a6700;">Nuevo</span>
+                      <span class="text-xs font-mono flex-shrink-0" style="color: #7a6e8a;">{{ (simAssignments[c.id] || []).length }} plantas</span>
+                    </div>
+                    <div class="text-xs mt-0.5 truncate" style="color: #7a6e8a;">{{ c.comprador_nombre }}</div>
                   </div>
-                  <div class="text-xs mt-0.5 truncate" style="color: #7a6e8a;">{{ c.comprador_nombre }}</div>
                 </div>
                 <div class="flex items-center gap-0.5 flex-shrink-0">
                   <button
@@ -380,8 +392,8 @@
                 </div>
               </div>
 
-              <!-- Plant drop zone -->
-              <div class="p-3 space-y-1.5 overflow-y-auto sim-plant-zone" style="min-height: 64px; max-height: 220px;">
+              <!-- Plant drop zone (collapsible) -->
+              <div v-show="expandedContratos.has(c.id)" class="p-3 space-y-1.5 overflow-y-auto sim-plant-zone" style="min-height: 64px; max-height: 220px;">
                 <div
                   v-for="p in (simAssignments[c.id] || [])"
                   :key="p.id"
@@ -584,6 +596,7 @@ const ficticioNombre   = ref('')
 const ficticioMin      = ref(0)
 const ficticioMax      = ref(0)
 let ficticioNextId     = 1
+const expandedContratos = ref(new Set())
 const dragPlanta       = ref(null)
 const dragFromContrato = ref(undefined)
 const dragOver         = ref(null)
@@ -742,6 +755,13 @@ function eliminarNuevo(contratoId) {
   delete simAssignments.value[contratoId]
   ficticioContratos.value = ficticioContratos.value.filter(c => c.id !== contratoId)
   hiddenContratos.value = new Set([...hiddenContratos.value].filter(id => id !== contratoId))
+}
+
+function toggleExpand(contratoId) {
+  const next = new Set(expandedContratos.value)
+  if (next.has(contratoId)) next.delete(contratoId)
+  else next.add(contratoId)
+  expandedContratos.value = next
 }
 
 function hideContrato(contratoId) {
