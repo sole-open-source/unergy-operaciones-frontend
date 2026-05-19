@@ -240,7 +240,53 @@
         >
           <i class="pi pi-eye text-xs" />Mostrar ocultos ({{ hiddenContratos.size }})
         </button>
+        <button
+          @click="showFicticioForm = true"
+          class="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm border transition"
+          style="border-color: rgba(240,192,64,0.5); color: #9a6700; background: rgba(240,192,64,0.08);"
+        >
+          <i class="pi pi-plus text-xs" />PPA ficticio
+        </button>
         <span class="text-xs" style="color: #7a6e8a;">Arrastra las plantas entre contratos para simular</span>
+      </div>
+
+      <!-- Formulario PPA ficticio -->
+      <div v-if="showFicticioForm" class="rounded-xl border p-5" style="background: white; border-color: rgba(240,192,64,0.4);">
+        <div class="flex items-center gap-2 mb-4">
+          <i class="pi pi-bolt" style="color: #F0C040;" />
+          <span class="font-bold text-sm" style="color: #2C2039;">Nuevo PPA ficticio</span>
+        </div>
+        <div class="flex flex-wrap items-end gap-4">
+          <div class="flex flex-col gap-1">
+            <label class="text-xs font-semibold" style="color: #7a6e8a;">Nombre</label>
+            <InputText v-model="ficticioNombre" placeholder="Ej: PPA Simulado 1" class="w-48" />
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-xs font-semibold" style="color: #7a6e8a;">Mínimo (MWh)</label>
+            <InputText v-model.number="ficticioMin" type="number" placeholder="0" class="w-32" />
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-xs font-semibold" style="color: #7a6e8a;">Máximo (MWh)</label>
+            <InputText v-model.number="ficticioMax" type="number" placeholder="0" class="w-32" />
+          </div>
+          <div class="flex gap-2">
+            <button
+              @click="crearFicticio"
+              :disabled="!ficticioNombre || ficticioMax <= 0"
+              class="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition"
+              :style="!ficticioNombre || ficticioMax <= 0
+                ? 'background: rgba(44,32,57,0.08); color: rgba(44,32,57,0.3); cursor: not-allowed;'
+                : 'background: #915BD8; color: white; cursor: pointer;'"
+            >
+              <i class="pi pi-check text-xs" />Crear
+            </button>
+            <button
+              @click="showFicticioForm = false"
+              class="px-3 py-2 rounded-lg text-sm transition"
+              style="color: #7a6e8a;"
+            >Cancelar</button>
+          </div>
+        </div>
       </div>
 
       <div v-if="simLoading" class="flex flex-col items-center justify-center py-20 gap-3">
@@ -266,17 +312,31 @@
               <!-- Contract header -->
               <div class="px-4 pt-3 pb-2 border-b flex items-start justify-between gap-2" style="border-color: rgba(44,32,57,0.07);">
                 <div class="min-w-0">
-                  <div class="font-bold text-sm truncate" style="color: #2C2039;">{{ c.nombre }}</div>
+                  <div class="flex items-center gap-1.5">
+                    <span class="font-bold text-sm truncate" style="color: #2C2039;">{{ c.nombre }}</span>
+                    <span v-if="c._ficticio" class="text-xs px-1.5 py-0.5 rounded font-medium flex-shrink-0" style="background: rgba(240,192,64,0.18); color: #9a6700;">Ficticio</span>
+                  </div>
                   <div class="text-xs mt-0.5 truncate" style="color: #7a6e8a;">{{ c.comprador_nombre }}</div>
                 </div>
-                <button
-                  @click.stop="hideContrato(c.id)"
-                  class="flex-shrink-0 rounded-md p-1 transition-colors hover:bg-red-50"
-                  style="color: #b0a0c0;"
-                  v-tooltip="'Ocultar contrato'"
-                >
-                  <i class="pi pi-eye-slash text-xs" />
-                </button>
+                <div class="flex items-center gap-0.5 flex-shrink-0">
+                  <button
+                    v-if="c._ficticio"
+                    @click.stop="eliminarFicticio(c.id)"
+                    class="rounded-md p-1 transition-colors hover:bg-red-50"
+                    style="color: #D64455;"
+                    v-tooltip="'Eliminar PPA ficticio'"
+                  >
+                    <i class="pi pi-trash text-xs" />
+                  </button>
+                  <button
+                    @click.stop="hideContrato(c.id)"
+                    class="rounded-md p-1 transition-colors hover:bg-red-50"
+                    style="color: #b0a0c0;"
+                    v-tooltip="'Ocultar contrato'"
+                  >
+                    <i class="pi pi-eye-slash text-xs" />
+                  </button>
+                </div>
               </div>
 
               <!-- Compliance meter -->
@@ -462,6 +522,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import Select from 'primevue/select'
+import InputText from 'primevue/inputtext'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Message from 'primevue/message'
@@ -517,13 +578,23 @@ const simLoading       = ref(false)
 const simError         = ref(null)
 const simAssignments   = ref({})
 const hiddenContratos  = ref(new Set())
+const ficticioContratos = ref([])
+const showFicticioForm = ref(false)
+const ficticioNombre   = ref('')
+const ficticioMin      = ref(0)
+const ficticioMax      = ref(0)
+let ficticioNextId     = 1
 const dragPlanta       = ref(null)
 const dragFromContrato = ref(undefined)
 const dragOver         = ref(null)
 
-const visibleContratos = computed(() => {
+const allContratos = computed(() => {
   if (!simData.value) return []
-  return simData.value.contratos.filter(c => !hiddenContratos.value.has(c.id))
+  return [...simData.value.contratos, ...ficticioContratos.value]
+})
+
+const visibleContratos = computed(() => {
+  return allContratos.value.filter(c => !hiddenContratos.value.has(c.id))
 })
 
 // ── Table with consolidated row ──────────────────────────────────────────────
@@ -607,7 +678,7 @@ function onSvgClick(event) {
 const simResults = computed(() => {
   if (!simData.value || !Object.keys(simAssignments.value).length) return {}
   const out = {}
-  for (const c of simData.value.contratos) {
+  for (const c of allContratos.value) {
     const plantas = simAssignments.value[c.id] || []
     const gen = plantas.reduce((sum, p) => {
       if (p.avg_daily_mwh == null) return sum
@@ -639,7 +710,38 @@ function initAssignments(data) {
 
 function resetSim() {
   if (simData.value) initAssignments(simData.value)
+  ficticioContratos.value = []
   hiddenContratos.value = new Set()
+}
+
+function crearFicticio() {
+  if (!ficticioNombre.value || ficticioMax.value <= 0) return
+  const id = `__ficticio_${ficticioNextId++}`
+  const contrato = {
+    id,
+    nombre: ficticioNombre.value.trim(),
+    comprador_nombre: 'Simulado',
+    min_mwh: ficticioMin.value || 0,
+    max_mwh: ficticioMax.value,
+    _ficticio: true,
+  }
+  ficticioContratos.value = [...ficticioContratos.value, contrato]
+  simAssignments.value[id] = []
+  ficticioNombre.value = ''
+  ficticioMin.value = 0
+  ficticioMax.value = 0
+  showFicticioForm.value = false
+}
+
+function eliminarFicticio(contratoId) {
+  const plantas = simAssignments.value[contratoId] || []
+  if (plantas.length) {
+    if (!simAssignments.value['none']) simAssignments.value['none'] = []
+    simAssignments.value['none'].push(...plantas)
+  }
+  delete simAssignments.value[contratoId]
+  ficticioContratos.value = ficticioContratos.value.filter(c => c.id !== contratoId)
+  hiddenContratos.value = new Set([...hiddenContratos.value].filter(id => id !== contratoId))
 }
 
 function hideContrato(contratoId) {
