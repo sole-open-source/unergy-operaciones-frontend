@@ -315,6 +315,93 @@
           @creado="onContratoServicioCreado"
         />
       </TabPanel>
+
+      <!-- ══ CROSS-DB ══ -->
+      <TabPanel header="Datos Externos">
+        <div v-if="crossLoading" class="flex justify-center py-8">
+          <ProgressSpinner />
+        </div>
+        <div v-else-if="!crossData" class="text-center py-8 text-gray-400">
+          <i class="pi pi-link text-3xl mb-2 block" />
+          <p class="text-sm">Sin datos cruzados disponibles</p>
+          <Button label="Sincronizar" icon="pi pi-sync" size="small" outlined class="mt-3" @click="syncCross" :loading="syncing" />
+        </div>
+        <div v-else class="space-y-4 p-4">
+          <!-- Origina data -->
+          <div v-if="crossData.origina" class="rounded-xl border p-4" style="border-color: #e8e0f0;">
+            <h4 class="text-sm font-semibold mb-3" style="color: #915BD8;">
+              <i class="pi pi-database mr-1" />OriginabotDB
+            </h4>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+              <div><span class="text-xs text-gray-400 block">Código</span><span class="font-mono font-medium">{{ crossData.origina.name }}</span></div>
+              <div><span class="text-xs text-gray-400 block">Stage</span><Tag :value="crossData.origina.stage" :severity="crossData.origina.stage === 'operation' ? 'success' : 'info'" /></div>
+              <div><span class="text-xs text-gray-400 block">kW AC</span><span class="font-medium">{{ crossData.origina.kw_ac?.toLocaleString() }}</span></div>
+              <div><span class="text-xs text-gray-400 block">kW DC</span><span class="font-medium">{{ crossData.origina.kw_dc?.toLocaleString() }}</span></div>
+              <div><span class="text-xs text-gray-400 block">Paneles</span><span class="font-medium">{{ crossData.origina.panels?.toLocaleString() }}</span></div>
+              <div><span class="text-xs text-gray-400 block">Contrato</span><span class="font-medium">{{ crossData.origina.contract_type }}</span></div>
+              <div><span class="text-xs text-gray-400 block">Circuito</span><span class="font-medium">{{ crossData.origina.circuit || '—' }}</span></div>
+              <div><span class="text-xs text-gray-400 block">Op. Red</span><span class="font-medium">{{ crossData.origina.grid_operator || '—' }}</span></div>
+            </div>
+          </div>
+
+          <!-- Viabilities -->
+          <div v-if="crossData.origina_viabilities?.length" class="rounded-xl border p-4" style="border-color: #e8e0f0;">
+            <h4 class="text-sm font-semibold mb-3" style="color: #2C2039;">Viabilidades</h4>
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
+              <div v-for="v in crossData.origina_viabilities" :key="v.type"
+                   class="flex items-center gap-2 text-sm">
+                <Tag :value="v.status"
+                     :severity="v.status === 'viable' ? 'success' : v.status === 'not_viable' ? 'danger' : v.status === 'viable_conditional' ? 'warn' : 'secondary'" />
+                <span class="text-gray-600 capitalize">{{ v.type }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- RequestsDB data -->
+          <div v-if="crossData.requestsdb" class="rounded-xl border p-4" style="border-color: #e8e0f0;">
+            <h4 class="text-sm font-semibold mb-3" style="color: #3B82F6;">
+              <i class="pi pi-sitemap mr-1" />RequestsDB — Solicitud de Conexión
+            </h4>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+              <div><span class="text-xs text-gray-400 block">Código externo</span><span class="font-mono font-medium">{{ crossData.requestsdb.external_code || '—' }}</span></div>
+              <div><span class="text-xs text-gray-400 block">Op. Red</span><span class="font-medium">{{ crossData.requestsdb.grid_operator_name || '—' }}</span></div>
+              <div><span class="text-xs text-gray-400 block">Circuito</span><span class="font-medium">{{ crossData.requestsdb.circuit_name || '—' }}</span></div>
+              <div><span class="text-xs text-gray-400 block">Subestación</span><span class="font-medium">{{ crossData.requestsdb.substation_name || '—' }}</span></div>
+              <div><span class="text-xs text-gray-400 block">kWp</span><span class="font-medium">{{ crossData.requestsdb.kwp?.toLocaleString() || '—' }}</span></div>
+              <div><span class="text-xs text-gray-400 block">Doc. Status</span><span class="font-medium">{{ crossData.requestsdb.documentation_status || '—' }}</span></div>
+              <div><span class="text-xs text-gray-400 block">Red Proyecto</span><span class="font-medium">{{ crossData.requestsdb.network_project_status || '—' }}</span></div>
+              <div><span class="text-xs text-gray-400 block">Ciudad</span><span class="font-medium">{{ crossData.requestsdb.city_name || '—' }}</span></div>
+            </div>
+          </div>
+
+          <!-- RequestsDB status -->
+          <div v-if="crossData.requestsdb_status?.length" class="rounded-xl border p-4" style="border-color: #e8e0f0;">
+            <h4 class="text-sm font-semibold mb-2" style="color: #2C2039;">Último estado solicitud</h4>
+            <div v-for="s in crossData.requestsdb_status" :key="s.date" class="text-sm">
+              <Tag :value="s.status" severity="info" /> <span class="text-gray-400 ml-2">{{ s.date }}</span>
+              <span v-if="s.by" class="text-gray-400"> · {{ s.by }}</span>
+            </div>
+          </div>
+
+          <!-- Grid info -->
+          <div v-if="crossData.grid_info" class="rounded-xl border p-4" style="border-color: #e8e0f0;">
+            <h4 class="text-sm font-semibold mb-2" style="color: #2C2039;">Info de Red (MGS Grid Map)</h4>
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+              <div v-for="(val, key) in crossData.grid_info" :key="key">
+                <span class="text-xs text-gray-400 block capitalize">{{ key.replace(/_/g, ' ') }}</span>
+                <span class="font-medium">{{ val || '—' }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- No external data -->
+          <div v-if="!crossData.origina && !crossData.requestsdb && !crossData.grid_info"
+               class="text-center py-6 text-gray-400">
+            <p class="text-sm">No se encontraron datos cruzados para este proyecto.</p>
+            <Button label="Ejecutar sincronización" icon="pi pi-sync" size="small" outlined class="mt-3" @click="syncCross" :loading="syncing" />
+          </div>
+        </div>
+      </TabPanel>
     </TabView>
   </div>
 
@@ -385,6 +472,31 @@ const srvExpanded = ref(null)
 const contratosInline = ref([])
 const loadingInline = ref(false)
 const showContratoWizard = ref(false)
+
+// ── Cross-DB ─────────────────────────────────────────────────────────────────
+const crossData = ref(null)
+const crossLoading = ref(false)
+const syncing = ref(false)
+
+async function loadCrossData() {
+  crossLoading.value = true
+  try {
+    const { data } = await api.get(`/correlation/project/${route.params.id}`)
+    crossData.value = data.error ? null : data
+  } catch { /* graceful degrade */ }
+  finally { crossLoading.value = false }
+}
+
+async function syncCross() {
+  syncing.value = true
+  try {
+    await api.post('/correlation/sync')
+    await loadCrossData()
+    toast.add({ severity: 'success', summary: 'Sincronización completada', life: 3000 })
+  } catch {
+    toast.add({ severity: 'error', summary: 'Error al sincronizar', life: 3000 })
+  } finally { syncing.value = false }
+}
 
 // ── Modo edición ──────────────────────────────────────────────────────────────
 const isEditMode = computed(() => route.query.edit === 'true')
@@ -634,6 +746,7 @@ onMounted(async () => {
     clientes.value = clientesRes.data.items
     for (const s of SERVICIOS_FLAGS) srvFlags[s.key] = proyRes.data[s.key]
     if (isEditMode.value) populateEditForm()
+    loadCrossData()
   } catch (e) {
     errorMsg.value = e.response?.data?.detail || e.message || 'Error de conexión con el servidor'
   } finally {

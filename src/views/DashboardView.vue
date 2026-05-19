@@ -18,7 +18,6 @@
 
     <!-- Row 2: Precio Bolsa + MGS Alarms -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-      <!-- Precio de Bolsa -->
       <div class="bg-white rounded-xl shadow-sm p-5" style="border: 1px solid #e8e0f0;">
         <div class="flex items-center justify-between mb-3">
           <h3 class="text-sm font-semibold" style="color: #2C2039;">Precio de Bolsa</h3>
@@ -31,7 +30,6 @@
         <p v-else class="text-sm" style="color: #6b5a8a;">Sin datos de precio disponibles</p>
       </div>
 
-      <!-- MGS Alarmas -->
       <div class="bg-white rounded-xl shadow-sm p-5" style="border: 1px solid #e8e0f0;">
         <div class="flex items-center justify-between mb-3">
           <h3 class="text-sm font-semibold" style="color: #2C2039;">Alarmas MGS</h3>
@@ -42,6 +40,22 @@
             {{ data.alarmas_mgs ?? 0 }}
           </span>
           <span class="text-sm" style="color: #6b5a8a;">{{ data.alarmas_mgs === 1 ? 'alarma activa' : 'alarmas activas' }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pipeline overview -->
+    <div v-if="pipeline.stages?.length" class="bg-white rounded-xl shadow-sm p-5" style="border: 1px solid #e8e0f0;">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-sm font-semibold" style="color: #2C2039;">Pipeline Origina ({{ pipeline.total_projects }} proyectos)</h3>
+        <RouterLink to="/proyectos" class="text-xs font-medium" style="color: #915BD8;">Ver proyectos →</RouterLink>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        <div v-for="stage in pipelineStages" :key="stage.stage"
+             class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm"
+             :style="{ background: stage.bg }">
+          <span class="font-bold" :style="{ color: stage.color }">{{ stage.count }}</span>
+          <span class="text-xs" style="color: #6b5a8a;">{{ stage.label }}</span>
         </div>
       </div>
     </div>
@@ -65,6 +79,32 @@ import { ref, computed, onMounted } from 'vue'
 import api from '@/api/client'
 
 const data = ref({})
+const pipeline = ref({})
+
+const STAGE_CONFIG = {
+  operation:     { label: 'Operación',     color: '#10B981', bg: 'rgba(16,185,129,0.1)' },
+  construction:  { label: 'Construcción',  color: '#F0C040', bg: 'rgba(240,192,64,0.1)' },
+  deploy:        { label: 'Deploy',        color: '#3B82F6', bg: 'rgba(59,130,246,0.1)' },
+  signed:        { label: 'Firmado',       color: '#915BD8', bg: 'rgba(145,91,216,0.1)' },
+  portfolio:     { label: 'Portafolio',    color: '#8B5CF6', bg: 'rgba(139,92,246,0.1)' },
+  due_diligence: { label: 'Due Diligence', color: '#6366F1', bg: 'rgba(99,102,241,0.1)' },
+  negociation:   { label: 'Negociación',   color: '#14B8A6', bg: 'rgba(20,184,166,0.1)' },
+  prospect:      { label: 'Prospecto',     color: '#94A3B8', bg: 'rgba(148,163,184,0.1)' },
+  paused:        { label: 'Pausado',       color: '#F59E0B', bg: 'rgba(245,158,11,0.1)' },
+  dead:          { label: 'Muerto',        color: '#9CA3AF', bg: 'rgba(156,163,175,0.05)' },
+}
+
+const pipelineStages = computed(() => {
+  if (!pipeline.value.stages) return []
+  return pipeline.value.stages
+    .filter(s => s.stage !== 'dead')
+    .map(s => ({
+      ...s,
+      label: STAGE_CONFIG[s.stage]?.label || s.stage,
+      color: STAGE_CONFIG[s.stage]?.color || '#6b5a8a',
+      bg: STAGE_CONFIG[s.stage]?.bg || 'rgba(107,90,138,0.08)',
+    }))
+})
 
 const topKpis = computed(() => [
   {
@@ -108,8 +148,12 @@ const quickLinks = [
 
 onMounted(async () => {
   try {
-    const { data: d } = await api.get('/dashboard/kpis')
-    data.value = d
+    const [kpiRes, pipeRes] = await Promise.all([
+      api.get('/dashboard/kpis').catch(() => null),
+      api.get('/correlation/pipeline').catch(() => null),
+    ])
+    if (kpiRes?.data) data.value = kpiRes.data
+    if (pipeRes?.data?.available) pipeline.value = pipeRes.data
   } catch {
     // degrade gracefully
   }
