@@ -185,6 +185,9 @@
           <div class="flex items-center gap-2">
             <h3 class="font-semibold text-gray-700">Alarmas activas</h3>
             <Tag :value="`${mgsStatus.active_alarms.length}`" severity="danger" class="text-xs" />
+            <Button v-if="dbAlarms.length > 1" label="Resolver todas" icon="pi pi-check-circle"
+              size="small" severity="success" text class="ml-auto"
+              @click="resolveAll" />
           </div>
 
           <div v-for="alarm in mgsStatus.active_alarms" :key="alarm.timestamp"
@@ -209,6 +212,27 @@
                 ]">{{ alarm.alarm_type.replace('_', ' ') }}</span>
               </div>
               <p class="text-xs text-gray-600 mt-0.5">{{ alarm.details }}</p>
+            </div>
+          </div>
+
+          <!-- DB-persisted alarms with resolve buttons -->
+          <div v-if="dbAlarms.length" class="space-y-2 mt-4">
+            <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Alarmas persistentes</h4>
+            <div v-for="alarm in dbAlarms" :key="alarm.id"
+              class="rounded-lg border border-gray-200 p-3 flex items-center gap-3">
+              <i :class="[
+                'pi text-sm',
+                alarm.severity === 'CRITICAL' ? 'pi-times-circle text-red-500' :
+                alarm.severity === 'WARNING' ? 'pi-exclamation-triangle text-orange-500' :
+                'pi-info-circle text-blue-500'
+              ]" />
+              <div class="flex-1 min-w-0">
+                <span class="text-xs font-semibold text-gray-800">{{ alarm.proyecto_nombre }}</span>
+                <span class="text-xs text-gray-400 ml-2">{{ alarm.alarm_type?.replace(/_/g, ' ') }}</span>
+                <p class="text-xs text-gray-500 mt-0.5 line-clamp-1">{{ alarm.details }}</p>
+              </div>
+              <Button icon="pi pi-check" size="small" severity="success" text
+                v-tooltip.top="'Resolver'" @click="resolveAlarm(alarm.id)" />
             </div>
           </div>
         </div>
@@ -315,7 +339,8 @@
             <span v-if="data.resolved_at" class="text-xs text-green-600 font-mono">
               {{ new Date(data.resolved_at).toLocaleString('es-CO') }}
             </span>
-            <span v-else class="text-xs text-red-500 font-semibold">Activa</span>
+            <Button v-else label="Resolver" icon="pi pi-check" size="small" severity="success" text
+              @click="resolveHistoryAlarm(data)" />
           </template>
         </Column>
       </DataTable>
@@ -343,6 +368,7 @@ const fallas = ref([])
 const mgsStatus = ref(null)
 const mgsPlants = ref([])
 const alarmHistory = ref([])
+const dbAlarms = ref([])
 
 onMounted(async () => {
   try {
@@ -363,6 +389,11 @@ onMounted(async () => {
     if (mgsRes?.data) mgsStatus.value = mgsRes.data
     if (plantsRes?.data) mgsPlants.value = plantsRes.data
     if (historyRes?.data) alarmHistory.value = Array.isArray(historyRes.data) ? historyRes.data : (historyRes.data.items ?? [])
+
+    try {
+      const dbRes = await api.get('/mgs/alarms')
+      dbAlarms.value = dbRes.data ?? []
+    } catch { /* MGS alarms table may not exist yet */ }
   } catch (e) {
     console.error('Error cargando alertas de monitoreo:', e)
   } finally {
@@ -397,6 +428,33 @@ const mgsCards = computed(() => {
     { label: 'Error', value: c.ERROR ?? 0, color: '#EF4444' },
   ]
 })
+
+async function resolveAlarm(id) {
+  try {
+    await api.patch(`/mgs/alarms/${id}/resolve`)
+    dbAlarms.value = dbAlarms.value.filter(a => a.id !== id)
+  } catch (e) {
+    console.error('Error resolviendo alarma:', e)
+  }
+}
+
+async function resolveAll() {
+  try {
+    await api.patch('/mgs/alarms/resolve-all')
+    dbAlarms.value = []
+  } catch (e) {
+    console.error('Error resolviendo alarmas:', e)
+  }
+}
+
+async function resolveHistoryAlarm(alarm) {
+  try {
+    await api.patch(`/mgs/alarms/${alarm.id}/resolve`)
+    alarm.resolved_at = new Date().toISOString()
+  } catch (e) {
+    console.error('Error resolviendo alarma:', e)
+  }
+}
 
 function statusColor(status) {
   return { OK: '#10B981', WARNING: '#F59E0B', ERROR: '#EF4444', NO_DATA: '#9CA3AF' }[status] || '#D1D5DB'
