@@ -28,6 +28,7 @@ const routes = [
   { path: '/mem/balance',      name: 'MemBalance',       component: () => import('@/views/MEM/BalanceView.vue') },
   { path: '/mem/clima',        name: 'MemClima',         component: () => import('@/views/MEM/ClimaView.vue') },
   { path: '/mem/cumplimiento', name: 'MemCumplimiento',  component: () => import('@/views/MEM/CumplimientoV2View.vue') },
+  { path: '/mem/descubrimientos', name: 'MemDescubrimientos', component: () => import('@/views/MEM/DescubrimientosView.vue') },
   { path: '/mem/cumplimiento-v2', redirect: '/mem/cumplimiento' },
   { path: '/:pathMatch(.*)*', redirect: '/dashboard' },
 ]
