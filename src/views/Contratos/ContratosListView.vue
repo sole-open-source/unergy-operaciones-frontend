@@ -93,8 +93,11 @@
         <Column field="fecha_fin" header="Fin" sortable style="width:100px">
           <template #body="{ data }">{{ formatFecha(data.fecha_fin) }}</template>
         </Column>
-        <Column style="width:50px">
+        <Column style="width:90px">
           <template #body="{ data }">
+            <Button icon="pi pi-copy" text size="small" severity="secondary"
+              v-tooltip.top="'Duplicar contrato'"
+              @click.stop="duplicarContrato(data)" />
             <Button icon="pi pi-arrow-right" text size="small" severity="secondary"
               @click.stop="irAContrato(data)" v-tooltip="'Ver detalle'" />
           </template>
@@ -231,7 +234,8 @@
 
     <!-- Wizards -->
     <PPAContratoWizard v-if="showWizard" :visible="showWizard"
-      @cerrar="showWizard = false" @creado="onContratoCreado" />
+      :initialData="contratoADuplicar"
+      @cerrar="onWizardCerrar" @creado="onContratoCreado" />
 
     <ContratoServicioWizard
       v-if="showServicioWizard"
@@ -303,6 +307,17 @@ const MODALIDAD_LABELS = {
 const servicioActivo = ref('ppa')
 const showWizard = ref(false)
 const showServicioWizard = ref(false)
+const contratoADuplicar = ref(null)
+
+function duplicarContrato(contrato) {
+  contratoADuplicar.value = contrato
+  showWizard.value = true
+}
+
+function onWizardCerrar() {
+  showWizard.value = false
+  contratoADuplicar.value = null
+}
 
 const servicioInfo = computed(() => SERVICIOS.find(s => s.key === servicioActivo.value))
 

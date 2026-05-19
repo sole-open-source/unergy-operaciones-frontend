@@ -41,9 +41,6 @@
               <div class="flex items-center gap-1">
                 <Tag :value="c.tipo_contrato || '—'" :severity="c.tipo_contrato === 'venta' ? 'success' : 'info'" class="text-xs" />
                 <Button icon="pi pi-pencil" text size="small" severity="secondary" @click="abrirFormEditar(c)" />
-                <Button icon="pi pi-copy" text size="small" severity="secondary"
-                  v-tooltip.top="'Duplicar contrato'"
-                  @click="duplicarContrato(c)" />
                 <Button icon="pi pi-trash" text size="small" severity="danger" @click="confirmarEliminar(c)" />
               </div>
             </div>
@@ -120,7 +117,7 @@
     </TabView>
 
     <!-- Dialog formulario PPA -->
-    <Dialog v-model:visible="showForm" :header="dialogTitulo"
+    <Dialog v-model:visible="showForm" :header="editando ? 'Editar contrato PPA' : 'Nuevo contrato PPA'"
       modal :style="{ width: '780px' }" :breakpoints="{ '960px': '90vw' }" @hide="resetForm">
       <div class="space-y-5 pt-1">
 
@@ -283,7 +280,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import { useConfirm } from 'primevue/useconfirm'
@@ -359,25 +356,6 @@ function abrirFormNuevo() {
   resetForm()
   showForm.value = true
 }
-
-function duplicarContrato(contrato) {
-  resetForm()
-  const EXCLUIR = ['numero_codigo_contrato', 'fecha_inicio', 'fecha_fin',
-                   'gescon_fecha_inicio', 'gescon_fecha_fin', 'gescon_codigo']
-  Object.keys(form).forEach(k => {
-    form[k] = EXCLUIR.includes(k) ? null : (contrato[k] ?? null)
-  })
-  editando.value = null
-  showForm.value = true
-}
-
-const dialogTitulo = computed(() => {
-  if (editando.value) return 'Editar contrato PPA'
-  const nombreOrigen = form.nombre_interno || form.comprador_nombre
-  return nombreOrigen && !form.numero_codigo_contrato
-    ? 'Nuevo contrato PPA (duplicado)'
-    : 'Nuevo contrato PPA'
-})
 
 function abrirFormEditar(contrato) {
   resetForm()

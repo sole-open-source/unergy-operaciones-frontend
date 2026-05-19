@@ -347,7 +347,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { useToast } from 'primevue/usetoast'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
@@ -361,7 +361,10 @@ import Textarea from 'primevue/textarea'
 import NuevoClienteDialog from '@/components/NuevoClienteDialog.vue'
 import api from '@/api/client'
 
-defineProps({ visible: Boolean })
+const props = defineProps({
+  visible: Boolean,
+  initialData: { type: Object, default: null },
+})
 const emit = defineEmits(['update:visible', 'cerrar', 'creado'])
 
 const toast = useToast()
@@ -464,6 +467,17 @@ const form = reactive({
   codigo_sic: null,
   gescon_codigo: null, gescon_fecha_inicio: null, gescon_fecha_fin: null,
   gescon_precio: null, gescon_cantidades_kwh: null,
+})
+
+const EXCLUIR_DUPLICADO = ['numero_codigo_contrato', 'fecha_inicio', 'fecha_fin',
+  'gescon_fecha_inicio', 'gescon_fecha_fin', 'gescon_codigo']
+
+watch(() => props.visible, (visible) => {
+  if (visible && props.initialData) {
+    Object.keys(form).forEach(k => {
+      form[k] = EXCLUIR_DUPLICADO.includes(k) ? null : (props.initialData[k] ?? null)
+    })
+  }
 })
 
 // ── Parsers ─────────────────────────────────────────────────────────────────
