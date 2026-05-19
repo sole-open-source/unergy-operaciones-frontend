@@ -108,6 +108,14 @@
           </template>
         </Column>
 
+        <Column header="Dup." style="width:55px;">
+          <template #body="{ data }">
+            <span v-if="data.es_duplicado" class="text-[10px] font-semibold px-1.5 py-0.5 rounded"
+              style="background: rgba(214,68,85,0.12); color: #D64455;"
+              v-tooltip.top="'Duplicado — exposición en bolsa'">Bolsa</span>
+          </template>
+        </Column>
+
         <Column header="" style="width:72px;">
           <template #body="{ data }">
             <div class="flex items-center gap-1">
@@ -181,8 +189,8 @@
           </div>
         </div>
 
-        <!-- Fila 4: Proyecto + coexistencia -->
-        <div class="grid grid-cols-[1fr_auto] gap-4 items-end">
+        <!-- Fila 4: Proyecto + coexistencia + duplicado -->
+        <div class="grid grid-cols-[1fr_auto_auto] gap-4 items-end">
           <div class="flex flex-col gap-1">
             <label class="text-xs font-medium" style="color:#6b5a8a;">Planta / Proyecto</label>
             <Select v-model="form.proyecto_id" :options="proyectos"
@@ -196,6 +204,14 @@
             </label>
             <i class="pi pi-info-circle text-xs cursor-help" style="color:#9b89b5;"
               v-tooltip.top="'Activado: esta planta reemplaza la anterior en este SIC. Desactivado: coexiste con las demás plantas del mismo SIC.'" />
+          </div>
+          <div class="flex items-center gap-2 pb-1">
+            <Checkbox v-model="form.es_duplicado" :binary="true" inputId="es_duplicado" />
+            <label for="es_duplicado" class="text-xs font-medium cursor-pointer" style="color:#D64455;">
+              Duplicado
+            </label>
+            <i class="pi pi-info-circle text-xs cursor-help" style="color:#9b89b5;"
+              v-tooltip.top="'Marcar si esta planta ya está en otro contrato. La generación se contará como exposición en bolsa, no como cumplimiento.'" />
           </div>
         </div>
 
@@ -384,6 +400,7 @@ const FORM_INICIAL = () => ({
   link_archivo: '',
   observaciones: '',
   reemplaza_anterior: true,
+  es_duplicado: false,
 })
 const form = ref(FORM_INICIAL())
 
@@ -430,6 +447,7 @@ function abrirEditar(row) {
     link_archivo: row.link_archivo || '',
     observaciones: row.observaciones || '',
     reemplaza_anterior: row.reemplaza_anterior ?? true,
+    es_duplicado: row.es_duplicado ?? false,
   }
   errores.value = {}
   dialogVisible.value = true

@@ -441,13 +441,17 @@
                 >
                   <div class="min-w-0">
                     <span class="font-medium truncate block" style="color: #2C2039; max-width: 128px;">{{ p.nombre }}</span>
-                    <span v-if="p.comprado_por_unergy" class="text-[10px] font-semibold px-1.5 py-0.5 rounded mt-0.5 inline-block"
+                    <span v-if="p.es_duplicado" class="text-[10px] font-semibold px-1.5 py-0.5 rounded mt-0.5 inline-block"
+                      style="background: rgba(214,68,85,0.12); color: #D64455;"
+                      v-tooltip="'Duplicado — exposición en bolsa'"
+                    >Exp. bolsa</span>
+                    <span v-else-if="p.comprado_por_unergy" class="text-[10px] font-semibold px-1.5 py-0.5 rounded mt-0.5 inline-block"
                       style="background: rgba(240,192,64,0.25); color: #9a6700;"
                       v-tooltip="p.contrato_compra_nombre || 'Contrato de compra'"
                     >Compra Unergy</span>
                   </div>
                   <div class="text-right flex-shrink-0">
-                    <div class="font-mono font-semibold" :style="p.comprado_por_unergy ? 'color: #9a6700;' : 'color: #915BD8;'">
+                    <div class="font-mono font-semibold" :style="p.es_duplicado ? 'color: #D64455;' : p.comprado_por_unergy ? 'color: #9a6700;' : 'color: #915BD8;'">
                       {{ p.avg_daily_mwh != null ? fmtMwh(p.avg_daily_mwh * simData.dias_mes * p.pct_despacho) : '—' }}
                     </div>
                     <div style="color: #7a6e8a;">{{ (p.pct_despacho * 100).toFixed(0) }}%</div>
@@ -499,11 +503,14 @@
               ]"
             >
               <span class="font-medium" style="color: #2C2039;">{{ p.nombre }}</span>
-              <span v-if="p.comprado_por_unergy" class="font-semibold px-1.5 py-0.5 rounded"
+              <span v-if="p.es_duplicado" class="font-semibold px-1.5 py-0.5 rounded"
+                style="background: rgba(214,68,85,0.12); color: #D64455;"
+              >Dup.</span>
+              <span v-else-if="p.comprado_por_unergy" class="font-semibold px-1.5 py-0.5 rounded"
                 style="background: rgba(240,192,64,0.25); color: #9a6700;"
                 v-tooltip="p.contrato_compra_nombre || 'Contrato de compra'"
               >Compra</span>
-              <span class="font-mono" :style="p.comprado_por_unergy ? 'color: #9a6700;' : 'color: #7a6e8a;'">
+              <span class="font-mono" :style="p.es_duplicado ? 'color: #D64455;' : p.comprado_por_unergy ? 'color: #9a6700;' : 'color: #7a6e8a;'">
                 {{ p.avg_daily_mwh != null ? fmtMwh(p.avg_daily_mwh * simData.dias_mes) : '—' }}
               </span>
             </div>
@@ -579,9 +586,12 @@
               </span>
             </div>
             <div v-if="c.plantas.length" class="divide-y" style="border-color: rgba(44,32,57,0.05);">
-              <div v-for="p in c.plantas" :key="p.id" class="px-4 py-2.5 flex items-center justify-between text-sm">
+              <div v-for="p in c.plantas" :key="p.id" class="px-4 py-2.5 flex items-center justify-between text-sm"
+                :style="p.es_duplicado ? 'background: rgba(214,68,85,0.04);' : ''">
                 <div class="flex items-center gap-2">
                   <span class="font-medium" style="color: #2C2039;">{{ p.nombre }}</span>
+                  <span v-if="p.es_duplicado" class="text-[10px] font-semibold px-1.5 py-0.5 rounded"
+                    style="background: rgba(214,68,85,0.12); color: #D64455;">Exp. bolsa</span>
                   <span v-if="p.codigo_sic" class="text-xs font-mono px-1.5 py-0.5 rounded" style="background: rgba(44,32,57,0.06); color: #7a6e8a;">{{ p.codigo_sic }}</span>
                   <span v-if="p.pct_despacho != null" class="text-xs font-mono" style="color: #915BD8;">{{ (p.pct_despacho * 100).toFixed(0) }}%</span>
                 </div>
@@ -683,21 +693,29 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="(p, pi) in anualData.meses[selectedMonthIdx].plantas" :key="pi" style="border-top: 1px solid rgba(44,32,57,0.06);">
+                <tr v-for="(p, pi) in anualData.meses[selectedMonthIdx].plantas" :key="pi"
+                  style="border-top: 1px solid rgba(44,32,57,0.06);"
+                  :style="p.es_duplicado ? 'background: rgba(214,68,85,0.04);' : ''"
+                >
                   <td class="py-2 pr-2 font-medium" style="color: #2C2039;">
                     {{ p.nombre }}
+                    <span v-if="p.es_duplicado" class="ml-1 text-[10px] font-semibold px-1.5 py-0.5 rounded" style="background: rgba(214,68,85,0.12); color: #D64455;">Exp. bolsa</span>
                     <span v-if="p.contrato" class="ml-1 text-xs font-normal px-1.5 py-0.5 rounded" style="color: #915BD8; background: rgba(145,91,216,0.08);">{{ p.contrato }}</span>
                     <span v-if="p.dias_en_contrato && p.dias_mes && p.dias_en_contrato < p.dias_mes" class="ml-1 text-xs font-normal" style="color: #7a6e8a;">{{ p.dias_en_contrato }}/{{ p.dias_mes }} días</span>
                   </td>
                   <td class="py-2 px-2 text-right font-mono text-xs" style="color: #7a6e8a;">{{ (p.pct_despacho * 100).toFixed(0) }}%</td>
                   <td class="py-2 px-2 text-right font-mono" style="color: #2C2039;">{{ p.gen_planta_mwh !== null ? fmtMwh(p.gen_planta_mwh) : '—' }}</td>
-                  <td class="py-2 pl-2 text-right font-mono font-semibold" style="color: #915BD8;">{{ p.gen_contrato_mwh !== null ? fmtMwh(p.gen_contrato_mwh) : '—' }}</td>
+                  <td class="py-2 pl-2 text-right font-mono font-semibold" :style="p.es_duplicado ? 'color: #D64455;' : 'color: #915BD8;'">{{ p.gen_contrato_mwh !== null ? fmtMwh(p.gen_contrato_mwh) : '—' }}</td>
                 </tr>
               </tbody>
               <tfoot>
                 <tr style="border-top: 2px solid rgba(44,32,57,0.12);">
                   <td colspan="3" class="pt-3 text-sm font-semibold" style="color: #2C2039;">Total al contrato</td>
                   <td class="pt-3 text-right font-mono font-bold" style="color: #2C2039;">{{ fmtMwh(genVal(anualData.meses[selectedMonthIdx])) }}</td>
+                </tr>
+                <tr v-if="anualData.meses[selectedMonthIdx].exposicion_bolsa_duplicados_mwh">
+                  <td colspan="3" class="pt-1 text-sm font-semibold" style="color: #D64455;">Exposición bolsa (duplicados)</td>
+                  <td class="pt-1 text-right font-mono font-bold" style="color: #D64455;">{{ fmtMwh(anualData.meses[selectedMonthIdx].exposicion_bolsa_duplicados_mwh) }}</td>
                 </tr>
               </tfoot>
             </table>
@@ -1172,7 +1190,7 @@ async function loadConsolidado() {
   const meses = []
   for (let i = 0; i < 12; i++) {
     let totalGen = 0, totalProy = null, totalMin = 0, totalMax = 0
-    let hasMin = false, hasMax = false
+    let hasMin = false, hasMax = false, totalBolsaDup = 0
     const allPlantas = []
 
     for (const data of successful) {
@@ -1183,6 +1201,7 @@ async function loadConsolidado() {
       }
       if (mes.min_mwh !== null) { totalMin += mes.min_mwh; hasMin = true }
       if (mes.max_mwh !== null) { totalMax += mes.max_mwh; hasMax = true }
+      if (mes.exposicion_bolsa_duplicados_mwh) totalBolsaDup += mes.exposicion_bolsa_duplicados_mwh
       for (const p of (mes.plantas || [])) {
         allPlantas.push({
           ...p,
@@ -1214,6 +1233,7 @@ async function loadConsolidado() {
       tipo_datos: ref.tipo_datos,
       compras_bolsa_mwh: compras,
       excedentes_bolsa_mwh: excedentes,
+      exposicion_bolsa_duplicados_mwh: totalBolsaDup > 0 ? Math.round(totalBolsaDup * 1000) / 1000 : null,
       plantas: allPlantas,
       n_plantas: allPlantas.length,
     })
