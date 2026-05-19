@@ -530,7 +530,7 @@ import ProgressSpinner from 'primevue/progressspinner'
 import client from '@/api/client'
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
-const TABS      = ['Cumplimiento', 'Simulador']
+const TABS      = ['Cumplimiento', 'Estrategia']
 const activeTab = ref(0)
 
 // ── Chart constants ───────────────────────────────────────────────────────────
