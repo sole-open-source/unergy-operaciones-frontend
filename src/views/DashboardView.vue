@@ -66,7 +66,7 @@
           <h3 class="text-sm font-semibold" style="color: #2C2039;">Precio de Bolsa</h3>
           <RouterLink to="/mem/precio-bolsa" class="text-xs font-medium" style="color: #915BD8;">Ver detalle →</RouterLink>
         </div>
-        <div v-if="data.precio_bolsa_cop_kwh" class="flex items-baseline gap-2">
+        <div v-if="data.precio_bolsa_cop_kwh != null" class="flex items-baseline gap-2">
           <span class="text-4xl font-bold" style="color: #2C2039;">${{ data.precio_bolsa_cop_kwh }}</span>
           <span class="text-sm" style="color: #6b5a8a;">COP/kWh</span>
         </div>
@@ -157,7 +157,7 @@
     <!-- Pipeline overview -->
     <div v-if="pipeline.stages?.length" class="bg-white rounded-xl shadow-sm p-5" style="border: 1px solid #e8e0f0;">
       <div class="flex items-center justify-between mb-4">
-        <h3 class="text-sm font-semibold" style="color: #2C2039;">Pipeline Origina ({{ pipeline.total_projects }} proyectos)</h3>
+        <h3 class="text-sm font-semibold" style="color: #2C2039;">Pipeline Originación ({{ pipeline.total_projects }} proyectos)</h3>
         <RouterLink to="/proyectos" class="text-xs font-medium" style="color: #915BD8;">Ver proyectos →</RouterLink>
       </div>
       <div class="flex flex-wrap gap-2">
@@ -378,6 +378,7 @@ onMounted(async () => {
       const now = new Date()
       const res = await api.get('/cumplimiento/ppa/resumen', {
         params: { year: now.getFullYear(), month: now.getMonth() + 1 },
+        timeout: 15000,
       })
       if (res?.data) cumplimiento.value = res.data
     } catch {

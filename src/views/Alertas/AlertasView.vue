@@ -119,11 +119,15 @@ const MODULOS = computed(() => [
 ])
 
 onMounted(async () => {
-  const [kpiRes, ppaRes] = await Promise.all([
-    api.get('/dashboard/kpis').catch(() => null),
-    api.get('/alertas/contratos-ppa').catch(() => null),
-  ])
-  if (kpiRes?.data) kpis.value = kpiRes.data
-  if (ppaRes?.data) ppaAlerts.value = ppaRes.data
+  try {
+    const [kpiRes, ppaRes] = await Promise.all([
+      api.get('/dashboard/kpis').catch(() => null),
+      api.get('/alertas/contratos-ppa').catch(() => null),
+    ])
+    if (kpiRes?.data) kpis.value = kpiRes.data
+    if (ppaRes?.data) ppaAlerts.value = ppaRes.data
+  } catch {
+    // degrade gracefully
+  }
 })
 </script>

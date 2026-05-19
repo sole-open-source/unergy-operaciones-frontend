@@ -66,8 +66,8 @@ const auth = useAuthStore()
 const { mobileOpen } = useSidebar()
 
 const initials = computed(() => {
-  const name = auth.user?.nombre || auth.user?.email || ''
-  return name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase()
+  const name = (auth.user?.nombre || auth.user?.email || '').trim()
+  return name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase()
 })
 
 const ALL_GROUPS = [
