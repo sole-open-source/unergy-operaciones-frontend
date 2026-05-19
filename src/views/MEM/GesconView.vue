@@ -101,6 +101,13 @@
           </template>
         </Column>
 
+        <Column header="Coex." style="width:50px;">
+          <template #body="{ data }">
+            <i v-if="!data.reemplaza_anterior" class="pi pi-link text-xs" style="color:#e6a817;"
+              v-tooltip.top="'Coexiste con otras plantas en este SIC'" />
+          </template>
+        </Column>
+
         <Column header="" style="width:72px;">
           <template #body="{ data }">
             <div class="flex items-center gap-1">
@@ -174,12 +181,22 @@
           </div>
         </div>
 
-        <!-- Fila 4: Proyecto -->
-        <div class="flex flex-col gap-1">
-          <label class="text-xs font-medium" style="color:#6b5a8a;">Planta / Proyecto</label>
-          <Select v-model="form.proyecto_id" :options="proyectos"
-            optionLabel="nombre_comercial" optionValue="id"
-            placeholder="Seleccionar proyecto (opcional)" filter showClear class="w-full" />
+        <!-- Fila 4: Proyecto + coexistencia -->
+        <div class="grid grid-cols-[1fr_auto] gap-4 items-end">
+          <div class="flex flex-col gap-1">
+            <label class="text-xs font-medium" style="color:#6b5a8a;">Planta / Proyecto</label>
+            <Select v-model="form.proyecto_id" :options="proyectos"
+              optionLabel="nombre_comercial" optionValue="id"
+              placeholder="Seleccionar proyecto (opcional)" filter showClear class="w-full" />
+          </div>
+          <div class="flex items-center gap-2 pb-1">
+            <Checkbox v-model="form.reemplaza_anterior" :binary="true" inputId="reemplaza" />
+            <label for="reemplaza" class="text-xs font-medium cursor-pointer" style="color:#6b5a8a;">
+              Reemplaza anterior
+            </label>
+            <i class="pi pi-info-circle text-xs cursor-help" style="color:#9b89b5;"
+              v-tooltip.top="'Activado: esta planta reemplaza la anterior en este SIC. Desactivado: coexiste con las demás plantas del mismo SIC.'" />
+          </div>
         </div>
 
         <!-- Fila 5: Fechas -->
@@ -273,6 +290,7 @@ import Select from 'primevue/select'
 import Dialog from 'primevue/dialog'
 import DatePicker from 'primevue/datepicker'
 import Textarea from 'primevue/textarea'
+import Checkbox from 'primevue/checkbox'
 import { useToast } from 'primevue/usetoast'
 
 const toast = useToast()
@@ -365,6 +383,7 @@ const FORM_INICIAL = () => ({
   nombre_contacto_solicitante: '',
   link_archivo: '',
   observaciones: '',
+  reemplaza_anterior: true,
 })
 const form = ref(FORM_INICIAL())
 
@@ -410,6 +429,7 @@ function abrirEditar(row) {
     nombre_contacto_solicitante: row.nombre_contacto_solicitante || '',
     link_archivo: row.link_archivo || '',
     observaciones: row.observaciones || '',
+    reemplaza_anterior: row.reemplaza_anterior ?? true,
   }
   errores.value = {}
   dialogVisible.value = true
