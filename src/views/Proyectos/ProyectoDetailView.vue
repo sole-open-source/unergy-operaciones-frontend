@@ -518,22 +518,28 @@ const editForm = reactive({
   produccion_especifica_kwh_kwp: null,
 })
 
-// ── Simulación P90 / P50 ──────────────────────────────────────────────────────
+// ── Simulación P90 / P50 / P99 ───────────────────────────────────────────────
 const editP90 = ref(Array(12).fill(null))
 const editP50 = ref(Array(12).fill(null))
+const editP99 = ref(Array(12).fill(null))
 
 const p90Display = computed(() => parseMonthArray(proyecto.value?.p90_mensual_kwh))
 const p50Display = computed(() => parseMonthArray(proyecto.value?.p50_mensual_kwh))
+const p99Display = computed(() => parseMonthArray(proyecto.value?.p99_mensual_kwh))
 
 const SIMULACIONES = [
   { key: 'p90', label: 'P90', editArray: editP90, displayArray: p90Display },
   { key: 'p50', label: 'P50', editArray: editP50, displayArray: p50Display },
+  { key: 'p99', label: 'P99', editArray: editP99, displayArray: p99Display },
 ]
 
-function parseMonthArray(jsonStr) {
-  if (!jsonStr) return Array(12).fill(null)
+function parseMonthArray(val) {
+  if (!val) return Array(12).fill(null)
+  // Si ya es un array (API devuelve lista directamente), úsalo tal cual
+  if (Array.isArray(val)) return val.map(v => (v ?? null))
+  // Si es string JSON (formato legado), parsearlo
   try {
-    const arr = JSON.parse(jsonStr)
+    const arr = JSON.parse(val)
     return Array.isArray(arr) ? arr.map(v => (v ?? null)) : Array(12).fill(null)
   } catch {
     return Array(12).fill(null)
@@ -551,6 +557,7 @@ function populateEditForm() {
   Object.keys(editForm).forEach(k => { if (k in p) editForm[k] = p[k] ?? null })
   editP90.value = parseMonthArray(p.p90_mensual_kwh)
   editP50.value = parseMonthArray(p.p50_mensual_kwh)
+  editP99.value = parseMonthArray(p.p99_mensual_kwh)
 }
 
 watch(isEditMode, (entering) => {
@@ -574,8 +581,10 @@ async function saveEdit() {
     }
     const p90json = serializeMonthArray(editP90.value)
     const p50json = serializeMonthArray(editP50.value)
+    const p99json = serializeMonthArray(editP99.value)
     if (p90json !== null) payload.p90_mensual_kwh = p90json
     if (p50json !== null) payload.p50_mensual_kwh = p50json
+    if (p99json !== null) payload.p99_mensual_kwh = p99json
 
     await api.patch(`/proyectos/${route.params.id}`, payload)
     const [proyRes, invRes] = await Promise.all([
