@@ -267,6 +267,59 @@
         </div>
       </template>
     </template>
+
+    <!-- ═══ TAB 2: Historial Alarmas ═══ -->
+    <template v-if="!loading && activeTab === 2">
+      <div v-if="!alarmHistory.length" class="flex flex-col items-center py-12 gap-2 text-gray-400">
+        <i class="pi pi-history text-3xl" />
+        <p class="text-sm">Sin historial de alarmas MGS</p>
+      </div>
+
+      <DataTable v-else :value="alarmHistory" size="small" stripedRows :rowHover="true"
+        :paginator="alarmHistory.length > 30" :rows="30" class="text-sm"
+        scrollable scrollHeight="520px">
+
+        <Column field="created_at" header="Fecha" style="min-width:150px" sortable>
+          <template #body="{ data }">
+            <span class="font-mono text-xs">{{ new Date(data.created_at).toLocaleString('es-CO') }}</span>
+          </template>
+        </Column>
+
+        <Column field="proyecto_nombre" header="Proyecto" style="min-width:180px" />
+
+        <Column field="severity" header="Severidad" style="min-width:100px">
+          <template #body="{ data }">
+            <span :class="[
+              'text-xs font-semibold rounded-full px-2 py-0.5',
+              data.severity === 'CRITICAL' ? 'bg-red-100 text-red-600' :
+              data.severity === 'WARNING' ? 'bg-orange-100 text-orange-600' :
+              'bg-blue-100 text-blue-600'
+            ]">{{ data.severity }}</span>
+          </template>
+        </Column>
+
+        <Column field="alarm_type" header="Tipo" style="min-width:140px">
+          <template #body="{ data }">
+            <span class="text-xs text-gray-600">{{ data.alarm_type?.replace(/_/g, ' ') }}</span>
+          </template>
+        </Column>
+
+        <Column field="details" header="Detalle" style="min-width:220px">
+          <template #body="{ data }">
+            <span class="text-xs text-gray-500 line-clamp-2">{{ data.details }}</span>
+          </template>
+        </Column>
+
+        <Column field="resolved_at" header="Resuelta" style="min-width:150px">
+          <template #body="{ data }">
+            <span v-if="data.resolved_at" class="text-xs text-green-600 font-mono">
+              {{ new Date(data.resolved_at).toLocaleString('es-CO') }}
+            </span>
+            <span v-else class="text-xs text-red-500 font-semibold">Activa</span>
+          </template>
+        </Column>
+      </DataTable>
+    </template>
   </div>
 </template>
 
@@ -280,7 +333,7 @@ import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import api from '@/api/client'
 
-const TABS = ['Fallas', 'MGS Minigranjas']
+const TABS = ['Fallas', 'MGS Minigranjas', 'Historial Alarmas']
 const activeTab = ref(0)
 const loading = ref(true)
 const polling = ref(false)
@@ -289,14 +342,16 @@ const stats = ref({})
 const fallas = ref([])
 const mgsStatus = ref(null)
 const mgsPlants = ref([])
+const alarmHistory = ref([])
 
 onMounted(async () => {
   try {
-    const [statsRes, fallasRes, mgsRes, plantsRes] = await Promise.all([
+    const [statsRes, fallasRes, mgsRes, plantsRes, historyRes] = await Promise.all([
       api.get('/fallas/stats/resumen'),
       api.get('/fallas', { params: { size: 500 } }),
       api.get('/mgs/status').catch(() => null),
       api.get('/mgs/plants').catch(() => null),
+      api.get('/mgs/alarms/history', { params: { limit: 200 } }).catch(() => null),
     ])
     stats.value = statsRes.data
 
@@ -307,6 +362,7 @@ onMounted(async () => {
 
     if (mgsRes?.data) mgsStatus.value = mgsRes.data
     if (plantsRes?.data) mgsPlants.value = plantsRes.data
+    if (historyRes?.data) alarmHistory.value = Array.isArray(historyRes.data) ? historyRes.data : (historyRes.data.items ?? [])
   } catch (e) {
     console.error('Error cargando alertas de monitoreo:', e)
   } finally {
