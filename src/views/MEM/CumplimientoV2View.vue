@@ -745,12 +745,6 @@ function eliminarFicticio(contratoId) {
 }
 
 function hideContrato(contratoId) {
-  const plantas = simAssignments.value[contratoId] || []
-  if (plantas.length) {
-    if (!simAssignments.value['none']) simAssignments.value['none'] = []
-    simAssignments.value['none'].push(...plantas)
-    simAssignments.value[contratoId] = []
-  }
   hiddenContratos.value = new Set([...hiddenContratos.value, contratoId])
 }
 
