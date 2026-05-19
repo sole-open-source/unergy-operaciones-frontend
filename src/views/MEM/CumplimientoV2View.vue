@@ -1142,9 +1142,6 @@ async function loadAnnualData() {
       )
     }
     updateCacheSize()
-    if (anualData.value && selectedYear.value === now.getFullYear()) {
-      selectedMonthIdx.value = now.getMonth()
-    }
   } catch (e) {
     chartError.value = e.response?.data?.detail || 'Error al cargar los datos anuales.'
   } finally {
@@ -1289,12 +1286,13 @@ function isExpiringSoon(dateStr) {
 
 watch(activeTab, (tab) => {
   if (tab === 0 && !simData.value) loadSimulator()
+  if (tab === 1 && !anualData.value) { loadAnnualData(); loadTableData() }
   if (tab === 2 && !pcData.value) loadPlantasContratos()
 })
 
 onMounted(async () => {
   await loadContratos()
-  await Promise.all([loadAnnualData(), loadTableData()])
+  loadSimulator()
 })
 </script>
 
