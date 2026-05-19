@@ -1,6 +1,11 @@
 <template>
-  <header class="h-14 bg-white border-b flex items-center justify-between px-6 shrink-0" style="border-color: #e8e0f0;">
-    <h1 class="text-sm font-semibold" style="color: #2C2039;">{{ pageTitle }}</h1>
+  <header class="h-14 bg-white border-b flex items-center justify-between px-4 sm:px-6 shrink-0" style="border-color: #e8e0f0;">
+    <div class="flex items-center gap-3">
+      <button class="lg:hidden p-1 -ml-1" @click="toggle" style="color: #2C2039;">
+        <i class="pi pi-bars text-lg" />
+      </button>
+      <h1 class="text-sm font-semibold" style="color: #2C2039;">{{ pageTitle }}</h1>
+    </div>
 
     <div class="flex items-center gap-3">
       <span class="text-xs hidden sm:block" style="color: #6b5a8a;">{{ auth.user?.email }}</span>
@@ -23,22 +28,32 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useSidebar } from '@/composables/useSidebar'
 
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
+const { toggle } = useSidebar()
 
 const titles = {
   Dashboard:       'Panel principal',
   Clientes:        'Clientes',
+  ClienteDetalle:  'Detalle de cliente',
   Proyectos:       'Proyectos',
   ProyectoDetalle: 'Detalle de proyecto',
-  Fallas:          'Fallas',
+  Fallas:          'Monitoreo de fallas',
   FallaDetalle:    'Detalle de falla',
   Liquidaciones:   'Liquidaciones',
+  LiquidacionDetalle: 'Detalle de liquidación',
+  PrecioBolsa:     'Precio de bolsa',
+  Fronteras:       'Fronteras',
+  Balance:         'Balance energético',
+  GESCON:          'GESCON',
+  Cumplimiento:    'Cumplimiento',
+  AlertasMonitoreo: 'Alarmas de monitoreo',
 }
 
-const pageTitle = computed(() => titles[route.name] || route.name)
+const pageTitle = computed(() => titles[route.name] || route.name || 'Operaciones')
 
 function handleLogout() {
   auth.logout()

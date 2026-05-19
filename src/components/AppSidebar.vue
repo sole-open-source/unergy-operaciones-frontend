@@ -1,15 +1,26 @@
 <template>
-  <aside class="w-64 flex flex-col shrink-0" style="background-color: #2C2039;">
+  <!-- Mobile overlay -->
+  <div v-if="mobileOpen" class="fixed inset-0 z-40 bg-black/50 lg:hidden" @click="mobileOpen = false" />
+
+  <aside :class="[
+    'flex flex-col shrink-0 z-50 transition-transform duration-200',
+    'fixed inset-y-0 left-0 w-64 lg:relative lg:translate-x-0',
+    mobileOpen ? 'translate-x-0' : '-translate-x-full'
+  ]" style="background-color: #2C2039;">
     <!-- Logo -->
-    <div class="px-6 py-5 flex flex-col items-start border-b" style="border-color: rgba(255,255,255,0.08);">
-      <img src="/logos/Logo_avena.png" alt="Unergy" class="h-7 w-auto object-contain" />
-      <span class="text-xs mt-1.5" style="color: rgba(253,250,247,0.45);">Plataforma Operaciones</span>
+    <div class="px-6 py-5 flex items-center justify-between border-b" style="border-color: rgba(255,255,255,0.08);">
+      <div>
+        <img src="/logos/Logo_avena.png" alt="Unergy" class="h-7 w-auto object-contain" />
+        <span class="text-xs mt-1.5 block" style="color: rgba(253,250,247,0.45);">Plataforma Operaciones</span>
+      </div>
+      <button class="lg:hidden text-white/60 hover:text-white" @click="mobileOpen = false">
+        <i class="pi pi-times text-lg" />
+      </button>
     </div>
 
     <!-- Nav -->
     <nav class="flex-1 px-3 py-4 overflow-y-auto">
       <template v-for="group in navGroups" :key="group.label || '__main__'">
-        <!-- Separador de sección -->
         <div v-if="group.label" class="px-3 pt-4 pb-1.5">
           <span class="text-[10px] font-bold uppercase tracking-widest" style="color: rgba(145,91,216,0.7);">
             {{ group.label }}
@@ -22,6 +33,7 @@
           :to="item.to"
           class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150 nav-item"
           active-class="nav-active"
+          @click="mobileOpen = false"
         >
           <i :class="[item.icon, 'text-base w-5 text-center shrink-0']" />
           {{ item.label }}
@@ -48,8 +60,10 @@
 <script setup>
 import { computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
+import { useSidebar } from '@/composables/useSidebar'
 
 const auth = useAuthStore()
+const { mobileOpen } = useSidebar()
 
 const initials = computed(() => {
   const name = auth.user?.nombre || auth.user?.email || ''
@@ -59,16 +73,18 @@ const initials = computed(() => {
 const ALL_GROUPS = [
   {
     items: [
-      { to: '/clientes',       label: 'Clientes',        icon: 'pi pi-building' },
-      { to: '/proyectos',      label: 'Proyectos',       icon: 'pi pi-bolt' },
-      { to: '/servicios',      label: 'Servicios',       icon: 'pi pi-file-edit' },
-      { to: '/mem/fronteras',  label: 'Fronteras',       icon: 'pi pi-globe' },
+      { to: '/dashboard',       label: 'Dashboard',        icon: 'pi pi-home' },
+      { to: '/clientes',        label: 'Clientes',         icon: 'pi pi-building' },
+      { to: '/proyectos',       label: 'Proyectos',        icon: 'pi pi-bolt' },
+      { to: '/servicios',       label: 'Servicios',        icon: 'pi pi-file-edit' },
+      { to: '/mem/fronteras',   label: 'Fronteras',        icon: 'pi pi-globe' },
     ],
   },
   {
     label: 'Operaciones',
     items: [
       { to: '/fallas', label: 'Monitoreo', icon: 'pi pi-exclamation-triangle', roles: ['admin', 'operaciones', 'monitoreo'] },
+      { to: '/alertas/monitoreo', label: 'Alarmas MGS', icon: 'pi pi-bell', roles: ['admin', 'operaciones', 'monitoreo'] },
     ],
   },
   {
@@ -79,13 +95,13 @@ const ALL_GROUPS = [
     ],
   },
   {
-    label: 'MEM',
+    label: 'Mercado',
     items: [
-      { to: '/mem/gescon',        label: 'GESCON',          icon: 'pi pi-book' },
-      { to: '/mem/precio-bolsa',  label: 'Precio de bolsa', icon: 'pi pi-chart-line' },
-      { to: '/mem/balance',       label: 'Balance',         icon: 'pi pi-chart-bar' },
-      { to: '/mem/cumplimiento',    label: 'Cumplimiento',    icon: 'pi pi-shield' },
-      { to: '/mem/cumplimiento-v2', label: 'Cumplimiento v2',  icon: 'pi pi-chart-bar' },
+      { to: '/mem/gescon',          label: 'GESCON',            icon: 'pi pi-book' },
+      { to: '/mem/precio-bolsa',    label: 'Precio de bolsa',   icon: 'pi pi-chart-line' },
+      { to: '/mem/balance',         label: 'Balance',           icon: 'pi pi-chart-bar' },
+      { to: '/mem/cumplimiento',    label: 'Cumplimiento',      icon: 'pi pi-shield' },
+      { to: '/mem/cumplimiento-v2', label: 'Cumplimiento v2',   icon: 'pi pi-chart-bar' },
     ],
   },
   {

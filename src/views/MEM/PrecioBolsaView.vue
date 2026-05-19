@@ -212,6 +212,75 @@
         </div>
       </template>
     </template>
+
+    <!-- ═══ TAB 2: Histórico ═══ -->
+    <template v-if="!loading && activeTab === 2">
+      <div v-if="!histPrices.length" class="flex flex-col items-center py-12 gap-2 text-gray-400">
+        <i class="pi pi-database text-3xl" />
+        <p class="text-sm">Sin datos históricos.</p>
+      </div>
+
+      <template v-else>
+        <!-- Stats row -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div v-for="kpi in histKpis" :key="kpi.label"
+            class="rounded-xl border p-3" :style="`border-color:${kpi.color}33; background:${kpi.color}08`">
+            <p class="text-2xl font-bold" :style="`color:${kpi.color}`">{{ kpi.value }}</p>
+            <p class="text-xs font-medium mt-0.5" :style="`color:${kpi.color}cc`">{{ kpi.label }}</p>
+          </div>
+        </div>
+
+        <!-- Price + ONI SVG chart -->
+        <div class="rounded-xl border border-gray-100 bg-white p-4">
+          <h3 class="font-semibold text-gray-700 mb-3 text-sm">Precio Bolsa vs ONI ({{ histPrices.length }} meses)</h3>
+          <svg :viewBox="`0 0 ${histChartW} ${histChartH}`" class="w-full" style="max-height:320px">
+            <!-- Background ENSO bands -->
+            <rect v-for="(band, i) in ensoBands" :key="'b'+i"
+              :x="band.x" :y="10" :width="band.w" :height="histChartH - 30"
+              :fill="band.color" opacity="0.12" />
+
+            <!-- Price line -->
+            <polyline :points="histPriceLine" fill="none" stroke="#915BD8" stroke-width="1.5" />
+
+            <!-- ONI line (secondary axis) -->
+            <polyline :points="histOniLine" fill="none" stroke="#3B82F6" stroke-width="1" stroke-dasharray="4,2" />
+
+            <!-- Zero line for ONI -->
+            <line :x1="histPadL" :x2="histChartW - histPadR"
+              :y1="oniToY(0)" :y2="oniToY(0)"
+              stroke="#94a3b8" stroke-width="0.5" stroke-dasharray="2,2" />
+
+            <!-- Year labels -->
+            <template v-for="(yl, i) in histYearLabels" :key="'yl'+i">
+              <text :x="yl.x" :y="histChartH - 2" text-anchor="middle" fill="#9ca3af" font-size="9">{{ yl.year }}</text>
+            </template>
+
+            <!-- Legend -->
+            <line x1="10" x2="30" y1="6" y2="6" stroke="#915BD8" stroke-width="2" />
+            <text x="33" y="9" fill="#915BD8" font-size="8">Precio COP/kWh</text>
+            <line x1="140" x2="160" y1="6" y2="6" stroke="#3B82F6" stroke-width="1" stroke-dasharray="4,2" />
+            <text x="163" y="9" fill="#3B82F6" font-size="8">ONI</text>
+            <rect x="230" y="2" width="10" height="8" fill="#ef4444" opacity="0.2" />
+            <text x="243" y="9" fill="#9ca3af" font-size="8">El Niño</text>
+            <rect x="300" y="2" width="10" height="8" fill="#3b82f6" opacity="0.2" />
+            <text x="313" y="9" fill="#9ca3af" font-size="8">La Niña</text>
+          </svg>
+        </div>
+
+        <!-- Price by ENSO phase table -->
+        <div class="rounded-xl border border-gray-100 bg-white p-4">
+          <h3 class="font-semibold text-gray-700 mb-3 text-sm">Precio promedio por fase ENSO</h3>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div v-for="phase in ensoPhaseStats" :key="phase.label"
+              class="rounded-lg p-4 text-center" :style="`background: ${phase.bg}`">
+              <p class="text-lg font-bold" :style="`color: ${phase.color}`">{{ phase.label }}</p>
+              <p class="text-2xl font-bold mt-1" style="color: #2C2039;">${{ phase.avgPrice }}</p>
+              <p class="text-xs mt-1" style="color: #6b5a8a;">{{ phase.count }} meses · prom. COP/kWh</p>
+            </div>
+          </div>
+        </div>
+      </template>
+    </template>
   </div>
 </template>
 
@@ -223,7 +292,7 @@ import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import api from '@/api/client'
 
-const TABS = ['Precios de Bolsa', 'Clima / Pronóstico']
+const TABS = ['Precios de Bolsa', 'Clima / Pronóstico', 'Histórico']
 const activeTab = ref(0)
 const loading = ref(true)
 const spot = ref(null)
@@ -231,6 +300,8 @@ const clima = ref(null)
 const hoverBar = ref(null)
 const tooltipLeft = ref(0)
 const tooltipTop = ref(0)
+const histPrices = ref([])
+const histOni = ref([])
 
 const chartW = 700
 const chartH = 200
@@ -241,12 +312,16 @@ const padB = 20
 
 onMounted(async () => {
   try {
-    const [spotRes, climaRes] = await Promise.all([
+    const [spotRes, climaRes, pricesRes, oniRes] = await Promise.all([
       api.get('/evo/dailyspot/latest').catch(() => null),
       api.get('/evo/clima/forecast').catch(() => null),
+      api.get('/evo/clima/prices?years=26').catch(() => null),
+      api.get('/evo/clima/oni?years=26').catch(() => null),
     ])
     if (spotRes?.data) spot.value = spotRes.data
     if (climaRes?.data) clima.value = climaRes.data
+    if (pricesRes?.data) histPrices.value = pricesRes.data.reverse()
+    if (oniRes?.data) histOni.value = oniRes.data.reverse()
   } catch (e) {
     console.error('Error cargando datos MEM:', e)
   } finally {
@@ -350,6 +425,146 @@ const ensoColor = computed(() => {
   if (c.includes('Niño')) return 'text-red-600'
   if (c.includes('Niña')) return 'text-blue-600'
   return 'text-gray-600'
+})
+
+// ─── Historical chart computations ──────────────────────
+const histChartW = 800
+const histChartH = 280
+const histPadL = 55
+const histPadR = 20
+
+const histPriceRange = computed(() => {
+  if (!histPrices.value.length) return { min: 0, max: 1000 }
+  const vals = histPrices.value.map(p => Number(p.price_cop_kwh) || 0)
+  return { min: Math.min(...vals) * 0.9, max: Math.max(...vals) * 1.05 }
+})
+
+function histPriceToY(price) {
+  const { min, max } = histPriceRange.value
+  const range = max - min || 1
+  return 20 + (histChartH - 40) * (1 - (price - min) / range)
+}
+
+const oniRange = computed(() => {
+  if (!histOni.value.length) return { min: -2, max: 2 }
+  const vals = histOni.value.map(o => Number(o.oni_value) || 0)
+  return { min: Math.min(...vals, -1.5), max: Math.max(...vals, 1.5) }
+})
+
+function oniToY(oni) {
+  const { min, max } = oniRange.value
+  const range = max - min || 1
+  return 20 + (histChartH - 40) * (1 - (oni - min) / range)
+}
+
+const histPriceLine = computed(() => {
+  const n = histPrices.value.length
+  if (!n) return ''
+  const step = (histChartW - histPadL - histPadR) / Math.max(n - 1, 1)
+  return histPrices.value.map((p, i) => {
+    const x = histPadL + i * step
+    const y = histPriceToY(Number(p.price_cop_kwh) || 0)
+    return `${x},${y}`
+  }).join(' ')
+})
+
+const histOniLine = computed(() => {
+  const n = histOni.value.length
+  if (!n) return ''
+  const step = (histChartW - histPadL - histPadR) / Math.max(n - 1, 1)
+  return histOni.value.map((o, i) => {
+    const x = histPadL + i * step
+    const y = oniToY(Number(o.oni_value) || 0)
+    return `${x},${y}`
+  }).join(' ')
+})
+
+const ensoBands = computed(() => {
+  const n = histOni.value.length
+  if (!n) return []
+  const step = (histChartW - histPadL - histPadR) / Math.max(n - 1, 1)
+  const bands = []
+  let start = null
+  let phase = null
+  for (let i = 0; i < n; i++) {
+    const p = histOni.value[i].enso_phase
+    if (p !== phase) {
+      if (start !== null && phase && phase !== 'Neutral') {
+        bands.push({
+          x: histPadL + start * step,
+          w: (i - start) * step,
+          color: phase === 'El Niño' ? '#ef4444' : '#3b82f6',
+        })
+      }
+      start = i
+      phase = p
+    }
+  }
+  if (start !== null && phase && phase !== 'Neutral') {
+    bands.push({
+      x: histPadL + start * step,
+      w: (n - start) * step,
+      color: phase === 'El Niño' ? '#ef4444' : '#3b82f6',
+    })
+  }
+  return bands
+})
+
+const histYearLabels = computed(() => {
+  const n = histPrices.value.length
+  if (!n) return []
+  const step = (histChartW - histPadL - histPadR) / Math.max(n - 1, 1)
+  const labels = []
+  let lastYear = null
+  for (let i = 0; i < n; i++) {
+    const yr = histPrices.value[i].year
+    if (yr !== lastYear && histPrices.value[i].month <= 2) {
+      labels.push({ x: histPadL + i * step, year: yr })
+      lastYear = yr
+    }
+  }
+  return labels
+})
+
+const histKpis = computed(() => {
+  const data = histPrices.value
+  if (!data.length) return []
+  const prices = data.map(p => Number(p.price_cop_kwh) || 0)
+  const avg = prices.reduce((s, p) => s + p, 0) / prices.length
+  const max = Math.max(...prices)
+  const min = Math.min(...prices)
+  const latest = prices[prices.length - 1]
+  return [
+    { label: 'Meses de datos', value: data.length, color: '#915BD8' },
+    { label: 'Precio actual', value: `$${latest.toFixed(0)}`, color: '#2C2039' },
+    { label: 'Prom. histórico', value: `$${avg.toFixed(0)}`, color: '#10B981' },
+    { label: 'Máx. histórico', value: `$${max.toFixed(0)}`, color: '#D64455' },
+  ]
+})
+
+const ensoPhaseStats = computed(() => {
+  const data = histPrices.value
+  if (!data.length) return []
+  const groups = {}
+  for (const p of data) {
+    const phase = p.enso_phase || 'Neutral'
+    if (!groups[phase]) groups[phase] = { prices: [], count: 0 }
+    groups[phase].prices.push(Number(p.price_cop_kwh) || 0)
+    groups[phase].count++
+  }
+  const phases = [
+    { key: 'El Niño', label: 'El Niño', color: '#D64455', bg: 'rgba(214,68,85,0.08)' },
+    { key: 'Neutral', label: 'Neutral', color: '#6b5a8a', bg: 'rgba(107,90,138,0.08)' },
+    { key: 'La Niña', label: 'La Niña', color: '#3B82F6', bg: 'rgba(59,130,246,0.08)' },
+  ]
+  return phases.filter(p => groups[p.key]).map(p => {
+    const g = groups[p.key]
+    return {
+      ...p,
+      avgPrice: (g.prices.reduce((s, v) => s + v, 0) / g.count).toFixed(0),
+      count: g.count,
+    }
+  })
 })
 </script>
 
