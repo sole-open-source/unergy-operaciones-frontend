@@ -101,19 +101,25 @@
           </template>
         </Column>
 
-        <Column header="" style="width:40px;">
+        <Column header="" style="width:72px;">
           <template #body="{ data }">
-            <a v-if="data.link_archivo" :href="data.link_archivo" target="_blank"
-              class="text-purple-500 hover:text-purple-700">
-              <i class="pi pi-external-link text-xs" />
-            </a>
+            <div class="flex items-center gap-1">
+              <button @click="abrirEditar(data)" class="p-1 rounded hover:bg-purple-50 transition-colors"
+                title="Editar" style="color: #915BD8;">
+                <i class="pi pi-pencil text-xs" />
+              </button>
+              <a v-if="data.link_archivo" :href="data.link_archivo" target="_blank"
+                class="p-1 rounded hover:bg-purple-50 transition-colors text-purple-500 hover:text-purple-700">
+                <i class="pi pi-external-link text-xs" />
+              </a>
+            </div>
           </template>
         </Column>
       </DataTable>
     </div>
 
     <!-- ── Dialog Registro ─────────────────────────────────────── -->
-    <Dialog v-model:visible="dialogVisible" header="Registrar contrato ASIC" modal
+    <Dialog v-model:visible="dialogVisible" :header="editandoId ? 'Editar contrato ASIC' : 'Registrar contrato ASIC'" modal
       :style="{ width: '700px' }" :breakpoints="{ '768px': '95vw' }">
       <form @submit.prevent="guardar" class="space-y-5 pt-1">
 
@@ -243,7 +249,7 @@
 
         <div class="flex justify-end gap-2 pt-2">
           <Button label="Cancelar" severity="secondary" @click="dialogVisible = false" type="button" />
-          <Button label="Guardar" icon="pi pi-check" type="submit" :loading="guardando"
+          <Button :label="editandoId ? 'Actualizar' : 'Guardar'" icon="pi pi-check" type="submit" :loading="guardando"
             style="background:#915BD8; border-color:#915BD8;" />
         </div>
       </form>
@@ -336,6 +342,7 @@ async function cargarProyectos() {
 const dialogVisible = ref(false)
 const guardando = ref(false)
 const errores = ref({})
+const editandoId = ref(null)
 
 const FORM_INICIAL = () => ({
   tipo_solicitud: null,
@@ -369,7 +376,41 @@ const opcionesEstadoForm = [
 ]
 
 function abrirNuevo() {
+  editandoId.value = null
   form.value = FORM_INICIAL()
+  errores.value = {}
+  dialogVisible.value = true
+}
+
+function parseDateField(v) {
+  if (!v) return null
+  return new Date(v + 'T12:00:00')
+}
+
+function abrirEditar(row) {
+  editandoId.value = row.id
+  form.value = {
+    tipo_solicitud: row.tipo_solicitud,
+    estado_solicitud: row.estado_solicitud,
+    codigo_sic_contrato: row.codigo_sic_contrato || '',
+    contrato_interno: row.contrato_interno || '',
+    nombre_interno: row.nombre_interno || '',
+    codigo_sic_vendedor: row.codigo_sic_vendedor || '',
+    codigo_sic_comprador: row.codigo_sic_comprador || '',
+    prioridad_limitacion: row.prioridad_limitacion,
+    proyecto_id: row.proyecto_id,
+    fecha_solicitud: parseDateField(row.fecha_solicitud),
+    fecha_inicio: parseDateField(row.fecha_inicio),
+    fecha_fin: parseDateField(row.fecha_fin),
+    tipo_mercado: row.tipo_mercado || '',
+    tipo_asignacion: row.tipo_asignacion || '',
+    porcentaje_fncer: row.porcentaje_fncer,
+    porcentaje_despacho: row.porcentaje_despacho,
+    requerimiento_asic: row.requerimiento_asic || '',
+    nombre_contacto_solicitante: row.nombre_contacto_solicitante || '',
+    link_archivo: row.link_archivo || '',
+    observaciones: row.observaciones || '',
+  }
   errores.value = {}
   dialogVisible.value = true
 }
@@ -404,10 +445,20 @@ async function guardar() {
       fecha_inicio: toIso(form.value.fecha_inicio),
       fecha_fin: toIso(form.value.fecha_fin),
     }
-    const { data } = await api.post('/asic', payload)
-    rows.value = [data, ...rows.value]
+
+    if (editandoId.value) {
+      const { data } = await api.patch(`/asic/${editandoId.value}`, payload)
+      const idx = rows.value.findIndex(r => r.id === editandoId.value)
+      if (idx !== -1) rows.value.splice(idx, 1, data)
+      else rows.value = [data, ...rows.value]
+      rows.value = [...rows.value]
+      toast.add({ severity: 'success', summary: 'Actualizado', detail: 'Contrato ASIC actualizado', life: 3000 })
+    } else {
+      const { data } = await api.post('/asic', payload)
+      rows.value = [data, ...rows.value]
+      toast.add({ severity: 'success', summary: 'Guardado', detail: 'Contrato ASIC registrado', life: 3000 })
+    }
     dialogVisible.value = false
-    toast.add({ severity: 'success', summary: 'Guardado', detail: 'Contrato ASIC registrado', life: 3000 })
   } catch (e) {
     toast.add({ severity: 'error', summary: 'Error', detail: e.response?.data?.detail || 'Error al guardar', life: 4000 })
   } finally {
