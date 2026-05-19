@@ -353,6 +353,17 @@ const criticalAlerts = computed(() => {
       to: '/garantias',
     })
   }
+  if (data.value.liquidaciones_pendientes > 0) {
+    alerts.push({
+      key: 'liquidaciones-pendientes',
+      title: `${data.value.liquidaciones_pendientes} proyecto${data.value.liquidaciones_pendientes > 1 ? 's' : ''} sin liquidación este mes`,
+      detail: 'Proyectos en operación que requieren liquidación',
+      icon: 'pi pi-file-edit',
+      iconColor: '#915BD8',
+      bgColor: 'rgba(145,91,216,0.1)',
+      to: '/liquidaciones',
+    })
+  }
   return alerts
 })
 
@@ -360,6 +371,7 @@ const quickLinks = [
   { to: '/generacion-solar', label: 'Generación Solar', icon: 'pi pi-sun', bg: 'rgba(240,192,64,0.15)', color: '#D4A017' },
   { to: '/mem/cumplimiento', label: 'Cumplimiento PPA', icon: 'pi pi-shield', bg: 'rgba(16,185,129,0.1)', color: '#10B981' },
   { to: '/mem/descubrimientos', label: 'Descubrimientos', icon: 'pi pi-bolt', bg: 'rgba(240,192,64,0.1)', color: '#F0C040' },
+  { to: '/liquidaciones', label: 'Liquidaciones', icon: 'pi pi-file-edit', bg: 'rgba(145,91,216,0.08)', color: '#915BD8' },
   { to: '/garantias', label: 'Garantías', icon: 'pi pi-wallet', bg: 'rgba(145,91,216,0.1)', color: '#915BD8' },
   { to: '/alertas', label: 'Centro de Alertas', icon: 'pi pi-exclamation-circle', bg: 'rgba(214,68,85,0.08)', color: '#D64455' },
 ]
