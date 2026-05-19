@@ -16,8 +16,26 @@
       </div>
     </div>
 
-    <!-- Row 2: Precio Bolsa + MGS Alarms -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <!-- Row 2: Fleet Power + Precio Bolsa + MGS Alarms -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div class="bg-white rounded-xl shadow-sm p-5" style="border: 1px solid #e8e0f0;">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-sm font-semibold" style="color: #2C2039;">Generación Flota</h3>
+          <RouterLink to="/generacion-solar" class="text-xs font-medium" style="color: #915BD8;">Ver detalle →</RouterLink>
+        </div>
+        <div v-if="data.fleet_power_kw != null" class="flex items-baseline gap-2">
+          <span class="text-4xl font-bold" :style="{ color: data.fleet_power_kw > 0 ? '#10B981' : '#6b5a8a' }">
+            {{ data.fleet_power_kw > 1000 ? (data.fleet_power_kw / 1000).toFixed(1) : data.fleet_power_kw }}
+          </span>
+          <span class="text-sm" style="color: #6b5a8a;">{{ data.fleet_power_kw > 1000 ? 'MW' : 'kW' }}</span>
+          <span v-if="data.fleet_online != null" class="text-xs ml-2 px-2 py-0.5 rounded-full"
+                style="background: rgba(16,185,129,0.1); color: #10B981;">
+            {{ data.fleet_online }} online
+          </span>
+        </div>
+        <p v-else class="text-sm" style="color: #6b5a8a;">Solenium no disponible</p>
+      </div>
+
       <div class="bg-white rounded-xl shadow-sm p-5" style="border: 1px solid #e8e0f0;">
         <div class="flex items-center justify-between mb-3">
           <h3 class="text-sm font-semibold" style="color: #2C2039;">Precio de Bolsa</h3>
@@ -140,10 +158,10 @@ const topKpis = computed(() => [
 ])
 
 const quickLinks = [
+  { to: '/generacion-solar', label: 'Generación Solar', icon: 'pi pi-sun', bg: 'rgba(240,192,64,0.15)', color: '#D4A017' },
   { to: '/mem/precio-bolsa', label: 'Precio de Bolsa', icon: 'pi pi-chart-line', bg: 'rgba(145,91,216,0.1)', color: '#915BD8' },
-  { to: '/fallas', label: 'Monitoreo', icon: 'pi pi-eye', bg: 'rgba(214,68,85,0.1)', color: '#D64455' },
+  { to: '/fallas', label: 'Monitoreo Fallas', icon: 'pi pi-eye', bg: 'rgba(214,68,85,0.1)', color: '#D64455' },
   { to: '/mem/fronteras', label: 'Fronteras', icon: 'pi pi-globe', bg: 'rgba(44,32,57,0.08)', color: '#2C2039' },
-  { to: '/liquidaciones', label: 'Liquidaciones', icon: 'pi pi-dollar', bg: 'rgba(16,185,129,0.1)', color: '#10B981' },
 ]
 
 onMounted(async () => {

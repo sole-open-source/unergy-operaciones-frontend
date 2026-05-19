@@ -35,6 +35,16 @@
         </Column>
         <Column field="tipo_proyecto" header="Tipo" />
         <Column field="potencia_instalada_kwp" header="kWp" />
+        <Column header="Potencia (kW)" style="width:110px">
+          <template #body="{ data }">
+            <span v-if="fleetMap[data.nombre_comercial] != null"
+                  class="font-mono text-sm font-semibold"
+                  :style="{ color: fleetMap[data.nombre_comercial] > 0 ? '#10B981' : '#9CA3AF' }">
+              {{ fleetMap[data.nombre_comercial].toFixed(1) }}
+            </span>
+            <span v-else class="text-gray-300 text-xs">—</span>
+          </template>
+        </Column>
         <Column field="codigo_tsf" header="Cód. TSF" />
         <Column header="Servicios" style="width:160px">
           <template #body="{ data }">
@@ -90,7 +100,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, reactive } from 'vue'
+import { ref, computed, onMounted, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
@@ -131,6 +141,15 @@ const deleteProyecto = ref(null)
 const deleting = ref(false)
 
 const filters = reactive({ q: '', estado: null, tipo_proyecto: null })
+const fleetData = ref([])
+
+const fleetMap = computed(() => {
+  const map = {}
+  for (const p of fleetData.value) {
+    map[p.name] = p.power_kw || 0
+  }
+  return map
+})
 
 const estadoSeverity = (e) => (
   { en_operacion: 'success', en_desarrollo: 'info', suspendido: 'warn', cancelado: 'secondary' }[e] || 'secondary'
@@ -151,7 +170,12 @@ async function load() {
   }
 }
 
-onMounted(load)
+onMounted(() => {
+  load()
+  api.get('/generacion-solar/fleet').then(r => {
+    if (r.data?.projects) fleetData.value = r.data.projects
+  }).catch(() => {})
+})
 
 let searchTimer
 function onSearch() {
