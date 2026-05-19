@@ -3,8 +3,8 @@
 
     <!-- Header -->
     <div>
-      <h1 class="text-2xl font-bold" style="color: #2C2039;">Cumplimiento v2</h1>
-      <p class="text-sm mt-0.5" style="color: #7a6e8a;">Vista anual de cumplimiento contractual</p>
+      <h1 class="text-2xl font-bold" style="color: #2C2039;">Cumplimiento PPA</h1>
+      <p class="text-sm mt-0.5" style="color: #7a6e8a;">Generación vs. compromisos contractuales de energía</p>
     </div>
 
     <!-- Tab bar -->

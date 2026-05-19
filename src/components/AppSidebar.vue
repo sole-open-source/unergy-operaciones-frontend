@@ -77,7 +77,6 @@ const ALL_GROUPS = [
       { to: '/clientes',        label: 'Clientes',         icon: 'pi pi-building' },
       { to: '/proyectos',       label: 'Proyectos',        icon: 'pi pi-bolt' },
       { to: '/servicios',       label: 'Servicios',        icon: 'pi pi-file-edit' },
-      { to: '/mem/fronteras',   label: 'Fronteras',        icon: 'pi pi-globe' },
     ],
   },
   {
@@ -86,6 +85,17 @@ const ALL_GROUPS = [
       { to: '/generacion-solar', label: 'Generación Solar', icon: 'pi pi-sun', roles: ['admin', 'operaciones', 'monitoreo'] },
       { to: '/fallas', label: 'Monitoreo Fallas', icon: 'pi pi-exclamation-triangle', roles: ['admin', 'operaciones', 'monitoreo'] },
       { to: '/alertas/monitoreo', label: 'Alarmas MGS', icon: 'pi pi-bell', roles: ['admin', 'operaciones', 'monitoreo'] },
+      { to: '/mem/fronteras',   label: 'Fronteras',        icon: 'pi pi-globe', roles: ['admin', 'operaciones', 'monitoreo'] },
+    ],
+  },
+  {
+    label: 'Comercialización',
+    items: [
+      { to: '/mem/cumplimiento',    label: 'Cumplimiento PPA', icon: 'pi pi-shield' },
+      { to: '/mem/gescon',          label: 'GESCON / ASIC',    icon: 'pi pi-book' },
+      { to: '/mem/precio-bolsa',    label: 'Precio de Bolsa',  icon: 'pi pi-chart-line' },
+      { to: '/mem/balance',         label: 'Balance Energía',  icon: 'pi pi-chart-bar' },
+      { to: '/mem/clima',           label: 'Clima & ENSO',     icon: 'pi pi-cloud' },
     ],
   },
   {
@@ -96,20 +106,9 @@ const ALL_GROUPS = [
     ],
   },
   {
-    label: 'Mercado',
-    items: [
-      { to: '/mem/gescon',          label: 'GESCON',            icon: 'pi pi-book' },
-      { to: '/mem/precio-bolsa',    label: 'Precio de bolsa',   icon: 'pi pi-chart-line' },
-      { to: '/mem/clima',           label: 'Clima & ENSO',      icon: 'pi pi-cloud' },
-      { to: '/mem/balance',         label: 'Balance',           icon: 'pi pi-chart-bar' },
-      { to: '/mem/cumplimiento',    label: 'Cumplimiento',      icon: 'pi pi-shield' },
-      { to: '/mem/cumplimiento-v2', label: 'Cumplimiento v2',   icon: 'pi pi-chart-bar' },
-    ],
-  },
-  {
     label: 'Alertas',
     items: [
-      { to: '/alertas', label: 'Alertas', icon: 'pi pi-exclamation-circle' },
+      { to: '/alertas', label: 'Centro de Alertas', icon: 'pi pi-exclamation-circle' },
     ],
   },
 ]
