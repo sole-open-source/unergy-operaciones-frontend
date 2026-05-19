@@ -137,14 +137,50 @@
 
           <!-- GESCON / SIC -->
           <div>
-            <p class="text-xs font-semibold text-amber-600 uppercase tracking-wide mb-3">GESCON / SIC</p>
-            <div class="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+            <div class="flex items-center justify-between mb-3">
+              <p class="text-xs font-semibold text-amber-600 uppercase tracking-wide">GESCON / SIC</p>
+              <Button v-if="!editandoGescon" icon="pi pi-pencil" label="Editar" size="small" text severity="secondary"
+                @click="editandoGescon = true" />
+              <div v-else class="flex gap-2">
+                <Button label="Cancelar" size="small" text severity="secondary" @click="editandoGescon = false" />
+                <Button label="Guardar" size="small" icon="pi pi-check" :loading="guardandoGescon" @click="guardarGescon" />
+              </div>
+            </div>
+            <!-- Modo lectura -->
+            <div v-if="!editandoGescon" class="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
               <InfoField label="Código SIC" :value="contrato.codigo_sic" />
               <InfoField label="Código GESCON" :value="contrato.gescon_codigo" />
               <InfoField label="GESCON inicio" :value="formatFecha(contrato.gescon_fecha_inicio)" />
               <InfoField label="GESCON fin" :value="formatFecha(contrato.gescon_fecha_fin)" />
               <InfoField label="Precio GESCON" :value="contrato.gescon_precio != null ? `$${Number(contrato.gescon_precio).toFixed(4)}` : null" />
               <InfoField label="Cantidades GESCON (kWh)" :value="contrato.gescon_cantidades_kwh != null ? Number(contrato.gescon_cantidades_kwh).toLocaleString('es-CO') : null" />
+            </div>
+            <!-- Modo edición -->
+            <div v-else class="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <div class="flex flex-col gap-1">
+                <label class="text-xs font-medium text-gray-600">Código SIC</label>
+                <InputText v-model="formGescon.codigo_sic" class="w-full" />
+              </div>
+              <div class="flex flex-col gap-1">
+                <label class="text-xs font-medium text-gray-600">Código GESCON</label>
+                <InputText v-model="formGescon.gescon_codigo" class="w-full" />
+              </div>
+              <div class="flex flex-col gap-1">
+                <label class="text-xs font-medium text-gray-600">Precio GESCON ($/kWh)</label>
+                <InputNumber v-model="formGescon.gescon_precio" :maxFractionDigits="4" class="w-full" />
+              </div>
+              <div class="flex flex-col gap-1">
+                <label class="text-xs font-medium text-gray-600">GESCON inicio</label>
+                <DatePicker v-model="formGescon.gescon_fecha_inicio" dateFormat="yy-mm-dd" showIcon class="w-full" />
+              </div>
+              <div class="flex flex-col gap-1">
+                <label class="text-xs font-medium text-gray-600">GESCON fin</label>
+                <DatePicker v-model="formGescon.gescon_fecha_fin" dateFormat="yy-mm-dd" showIcon class="w-full" />
+              </div>
+              <div class="flex flex-col gap-1">
+                <label class="text-xs font-medium text-gray-600">Cantidades GESCON (kWh)</label>
+                <InputNumber v-model="formGescon.gescon_cantidades_kwh" :maxFractionDigits="3" class="w-full" />
+              </div>
             </div>
           </div>
 
@@ -464,6 +500,8 @@ import Column from 'primevue/column'
 import Divider from 'primevue/divider'
 import SelectButton from 'primevue/selectbutton'
 import InputText from 'primevue/inputtext'
+import InputNumber from 'primevue/inputnumber'
+import DatePicker from 'primevue/datepicker'
 import Textarea from 'primevue/textarea'
 import InfoField from '@/components/InfoField.vue'
 import api from '@/api/client'
@@ -505,6 +543,46 @@ async function guardarId() {
     toast.add({ severity: 'error', summary: 'Error', detail: e.response?.data?.detail || e.message, life: 4000 })
   } finally {
     guardandoId.value = false
+  }
+}
+
+// Edición inline de GESCON
+const editandoGescon = ref(false)
+const guardandoGescon = ref(false)
+const formGescon = reactive({
+  codigo_sic: null,
+  gescon_codigo: null,
+  gescon_fecha_inicio: null,
+  gescon_fecha_fin: null,
+  gescon_precio: null,
+  gescon_cantidades_kwh: null,
+})
+
+function toISODate(v) {
+  if (!v) return null
+  if (v instanceof Date) return v.toISOString().slice(0, 10)
+  return String(v).slice(0, 10)
+}
+
+async function guardarGescon() {
+  guardandoGescon.value = true
+  try {
+    const payload = {
+      codigo_sic: formGescon.codigo_sic || null,
+      gescon_codigo: formGescon.gescon_codigo || null,
+      gescon_fecha_inicio: toISODate(formGescon.gescon_fecha_inicio),
+      gescon_fecha_fin: toISODate(formGescon.gescon_fecha_fin),
+      gescon_precio: formGescon.gescon_precio,
+      gescon_cantidades_kwh: formGescon.gescon_cantidades_kwh,
+    }
+    await api.patch(`/ppa/${contrato.value.id}`, payload)
+    Object.assign(contrato.value, payload)
+    editandoGescon.value = false
+    toast.add({ severity: 'success', summary: 'GESCON actualizado', life: 2000 })
+  } catch (e) {
+    toast.add({ severity: 'error', summary: 'Error', detail: e.response?.data?.detail || e.message, life: 4000 })
+  } finally {
+    guardandoGescon.value = false
   }
 }
 
@@ -715,6 +793,14 @@ async function cargar() {
   try {
     const { data } = await api.get(`/ppa/${route.params.id}`)
     contrato.value = data
+    Object.assign(formGescon, {
+      codigo_sic: data.codigo_sic ?? null,
+      gescon_codigo: data.gescon_codigo ?? null,
+      gescon_fecha_inicio: data.gescon_fecha_inicio ?? null,
+      gescon_fecha_fin: data.gescon_fecha_fin ?? null,
+      gescon_precio: data.gescon_precio ?? null,
+      gescon_cantidades_kwh: data.gescon_cantidades_kwh ?? null,
+    })
     if (data.numero_codigo_contrato || data.codigo_sic) cargarAsic(data)
   } catch (e) {
     toast.add({ severity: 'error', summary: 'Error', detail: e.message, life: 3000 })
