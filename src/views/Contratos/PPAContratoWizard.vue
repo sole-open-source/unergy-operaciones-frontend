@@ -478,7 +478,7 @@ watch(() => props.visible, (visible) => {
       form[k] = EXCLUIR_DUPLICADO.includes(k) ? null : (props.initialData[k] ?? null)
     })
   }
-})
+}, { immediate: true })
 
 // ── Parsers ─────────────────────────────────────────────────────────────────
 
