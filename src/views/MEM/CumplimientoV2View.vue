@@ -247,6 +247,15 @@
         >
           <i class="pi pi-plus text-xs" />PPA nuevo
         </button>
+        <button
+          @click="sortDesc = !sortDesc"
+          class="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm border transition"
+          style="border-color: rgba(145,91,216,0.25); color: #915BD8; background: transparent;"
+          v-tooltip="sortDesc ? 'Mayor cumplimiento primero' : 'Menor cumplimiento primero'"
+        >
+          <i class="pi text-xs" :class="sortDesc ? 'pi-sort-amount-down' : 'pi-sort-amount-up'" />
+          {{ sortDesc ? '↓ Mayor %' : '↑ Menor %' }}
+        </button>
         <span class="text-xs" style="color: #7a6e8a;">Arrastra las plantas entre contratos para simular</span>
       </div>
 
@@ -326,6 +335,14 @@
                       <span class="font-bold text-sm truncate" style="color: #2C2039;">{{ c.nombre }}</span>
                       <span v-if="c._ficticio" class="text-xs px-1.5 py-0.5 rounded font-medium flex-shrink-0" style="background: rgba(240,192,64,0.18); color: #9a6700;">Nuevo</span>
                       <span class="text-xs font-mono flex-shrink-0" style="color: #7a6e8a;">{{ (simAssignments[c.id] || []).length }} plantas</span>
+                      <span v-if="simResults[c.id]?.pct !== null && simResults[c.id]?.pct !== undefined"
+                        class="text-xs font-semibold px-1.5 py-0.5 rounded flex-shrink-0"
+                        :style="simResults[c.id].estado === 'ok'
+                          ? 'background: rgba(46,125,50,0.12); color: #2e7d32;'
+                          : simResults[c.id].estado === 'deficit'
+                          ? 'background: rgba(214,68,85,0.12); color: #D64455;'
+                          : 'background: rgba(240,192,64,0.18); color: #9a6700;'"
+                      >{{ Math.round(simResults[c.id].pct) }}%</span>
                     </div>
                     <div class="text-xs mt-0.5 truncate" style="color: #7a6e8a;">{{ c.comprador_nombre }}</div>
                   </div>
@@ -597,6 +614,7 @@ const ficticioMin      = ref(0)
 const ficticioMax      = ref(0)
 let ficticioNextId     = 1
 const expandedContratos = ref([])
+const sortDesc         = ref(true)
 const dragPlanta       = ref(null)
 const dragFromContrato = ref(undefined)
 const dragOver         = ref(null)
@@ -607,7 +625,13 @@ const allContratos = computed(() => {
 })
 
 const visibleContratos = computed(() => {
-  return allContratos.value.filter(c => !hiddenContratos.value.has(c.id))
+  const filtered = allContratos.value.filter(c => !hiddenContratos.value.has(c.id))
+  const res = simResults.value
+  return filtered.slice().sort((a, b) => {
+    const pctA = res[a.id]?.pct ?? -1
+    const pctB = res[b.id]?.pct ?? -1
+    return sortDesc.value ? pctB - pctA : pctA - pctB
+  })
 })
 
 // ── Table with consolidated row ──────────────────────────────────────────────
