@@ -483,8 +483,10 @@
     <!-- Wizard edición completa -->
     <PPAContratoWizard v-if="showWizard" :visible="showWizard"
       :initialData="wizardInitialData"
+      :editandoId="wizardEditandoId"
       @cerrar="showWizard = false"
-      @creado="cargar" />
+      @editado="onWizardEditado"
+      @creado="onWizardCreado" />
 
     <!-- Dialog asociar proyecto -->
     <Dialog v-model:visible="showAsociar" header="Asociar proyecto" modal :style="{ width: '420px' }">
@@ -830,10 +832,23 @@ const cantidadesAnuales = computed(() => {
 // Wizard edición completa
 const showWizard = ref(false)
 const wizardInitialData = ref(null)
+const wizardEditandoId = ref(null)
 
 function abrirEdicionCompleta() {
   wizardInitialData.value = { ...contrato.value }
+  wizardEditandoId.value = contrato.value.id
   showWizard.value = true
+}
+
+function onWizardEditado() {
+  showWizard.value = false
+  cargar()
+  toast.add({ severity: 'success', summary: 'Contrato actualizado', life: 2000 })
+}
+
+function onWizardCreado() {
+  showWizard.value = false
+  cargar()
 }
 
 // Asociar proyecto

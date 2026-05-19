@@ -1,6 +1,6 @@
 <template>
   <Dialog :visible="visible" @update:visible="$emit('update:visible', $event)" modal :style="{ width: '820px' }" :breakpoints="{ '900px': '95vw' }"
-    :header="null" :closable="true" @hide="$emit('cerrar')">
+    :header="editandoId ? 'Editar contrato PPA' : 'Nuevo contrato PPA'" :closable="true" @hide="$emit('cerrar')">
 
     <!-- Step indicator -->
     <div class="px-6 pt-5 pb-4 border-b border-gray-100">
@@ -364,8 +364,9 @@ import api from '@/api/client'
 const props = defineProps({
   visible: Boolean,
   initialData: { type: Object, default: null },
+  editandoId: { type: Number, default: null },
 })
-const emit = defineEmits(['update:visible', 'cerrar', 'creado'])
+const emit = defineEmits(['update:visible', 'cerrar', 'creado', 'editado'])
 
 const toast = useToast()
 const PREVIEW_ROWS = 5
@@ -560,23 +561,35 @@ async function guardar() {
     }
     payload.proyecto_ids = proyectosSeleccionados.value.map(p => p.id)
 
-    const { data: contrato } = await api.post('/ppa', payload)
+    let contrato
+    if (props.editandoId) {
+      const { data } = await api.patch(`/ppa/${props.editandoId}`, payload)
+      contrato = data
+    } else {
+      const { data } = await api.post('/ppa', payload)
+      contrato = data
+    }
 
+    const contratoId = contrato?.id ?? props.editandoId
     if (tarifasRows.value.length) {
-      await api.put(`/ppa/${contrato.id}/tarifas`, tarifasRows.value)
+      await api.put(`/ppa/${contratoId}/tarifas`, tarifasRows.value)
     }
     if (energiaRows.value.length) {
-      await api.put(`/ppa/${contrato.id}/compromisos`, energiaRows.value)
+      await api.put(`/ppa/${contratoId}/compromisos`, energiaRows.value)
     }
 
-    const msg = [
-      `Contrato "${contrato.nombre_interno || contrato.numero_codigo_contrato}" creado`,
-      tarifasRows.value.length ? `${tarifasRows.value.length} tarifas` : null,
-      energiaRows.value.length ? `${energiaRows.value.length} compromisos` : null,
-    ].filter(Boolean).join(' · ')
-
-    toast.add({ severity: 'success', summary: 'Contrato creado', detail: msg, life: 4000 })
-    emit('creado', contrato)
+    if (props.editandoId) {
+      toast.add({ severity: 'success', summary: 'Contrato actualizado', life: 3000 })
+      emit('editado', contrato)
+    } else {
+      const msg = [
+        `Contrato "${contrato.nombre_interno || contrato.numero_codigo_contrato}" creado`,
+        tarifasRows.value.length ? `${tarifasRows.value.length} tarifas` : null,
+        energiaRows.value.length ? `${energiaRows.value.length} compromisos` : null,
+      ].filter(Boolean).join(' · ')
+      toast.add({ severity: 'success', summary: 'Contrato creado', detail: msg, life: 4000 })
+      emit('creado', contrato)
+    }
     emit('cerrar')
   } catch (e) {
     toast.add({ severity: 'error', summary: 'Error al guardar', detail: e.response?.data?.detail || e.message, life: 5000 })
