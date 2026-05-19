@@ -475,8 +475,10 @@ const EXCLUIR_DUPLICADO = ['numero_codigo_contrato', 'fecha_inicio', 'fecha_fin'
 
 watch(() => props.visible, (visible) => {
   if (visible && props.initialData) {
+    const esEdicion = !!props.editandoId
     Object.keys(form).forEach(k => {
-      form[k] = EXCLUIR_DUPLICADO.includes(k) ? null : (props.initialData[k] ?? null)
+      const limpiar = !esEdicion && EXCLUIR_DUPLICADO.includes(k)
+      form[k] = limpiar ? null : (props.initialData[k] ?? null)
     })
   }
 }, { immediate: true })
