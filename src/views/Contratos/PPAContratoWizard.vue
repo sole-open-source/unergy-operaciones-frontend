@@ -480,6 +480,18 @@ watch(() => props.visible, (visible) => {
       const limpiar = !esEdicion && EXCLUIR_DUPLICADO.includes(k)
       form[k] = limpiar ? null : (props.initialData[k] ?? null)
     })
+
+    if (esEdicion) {
+      // Tarifas: { año, mes, tarifa } — mismo formato que tarifasRows
+      const tarifasData = props.initialData.tarifas ?? []
+      tarifasRows.value = tarifasData.map(t => ({ año: t.año, mes: t.mes, tarifa: t.tarifa }))
+      tarifasPaste.value = tarifasData.map(t => `${t.año}\t${t.mes}\t${t.tarifa}`).join('\n')
+
+      // Cantidades: { año, mes, energia_minima, energia_maxima }
+      const cantData = props.initialData.compromisos_energia ?? []
+      energiaRows.value = cantData.map(c => ({ año: c.año, mes: c.mes, energia_minima: c.energia_minima, energia_maxima: c.energia_maxima }))
+      energiaPaste.value = cantData.map(c => `${c.año}\t${c.mes}\t${c.energia_minima}\t${c.energia_maxima}`).join('\n')
+    }
   }
 }, { immediate: true })
 
