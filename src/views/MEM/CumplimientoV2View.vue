@@ -418,12 +418,22 @@
                   @dragstart="onDragStart(p, c.id)"
                   @dragend="onDragEnd"
                   class="flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg text-xs select-none"
-                  style="background: rgba(145,91,216,0.08); cursor: grab; border: 1px solid rgba(145,91,216,0.15);"
-                  :style="dragPlanta && dragPlanta.id === p.id ? 'opacity: 0.35;' : ''"
+                  :style="[
+                    p.comprado_por_unergy
+                      ? 'background: rgba(240,192,64,0.12); cursor: grab; border: 1px solid rgba(240,192,64,0.4);'
+                      : 'background: rgba(145,91,216,0.08); cursor: grab; border: 1px solid rgba(145,91,216,0.15);',
+                    dragPlanta && dragPlanta.id === p.id ? 'opacity: 0.35;' : '',
+                  ]"
                 >
-                  <span class="font-medium truncate" style="color: #2C2039; max-width: 128px;">{{ p.nombre }}</span>
+                  <div class="min-w-0">
+                    <span class="font-medium truncate block" style="color: #2C2039; max-width: 128px;">{{ p.nombre }}</span>
+                    <span v-if="p.comprado_por_unergy" class="text-[10px] font-semibold px-1.5 py-0.5 rounded mt-0.5 inline-block"
+                      style="background: rgba(240,192,64,0.25); color: #9a6700;"
+                      v-tooltip="p.contrato_compra_nombre || 'Contrato de compra'"
+                    >Compra Unergy</span>
+                  </div>
                   <div class="text-right flex-shrink-0">
-                    <div class="font-mono font-semibold" style="color: #915BD8;">
+                    <div class="font-mono font-semibold" :style="p.comprado_por_unergy ? 'color: #9a6700;' : 'color: #915BD8;'">
                       {{ p.avg_daily_mwh != null ? fmtMwh(p.avg_daily_mwh * simData.dias_mes * p.pct_despacho) : '—' }}
                     </div>
                     <div style="color: #7a6e8a;">{{ (p.pct_despacho * 100).toFixed(0) }}%</div>
@@ -467,11 +477,19 @@
               @dragstart="onDragStart(p, null)"
               @dragend="onDragEnd"
               class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs select-none"
-              style="background: rgba(44,32,57,0.06); cursor: grab; border: 1px solid rgba(44,32,57,0.10);"
-              :style="dragPlanta && dragPlanta.id === p.id ? 'opacity: 0.35;' : ''"
+              :style="[
+                p.comprado_por_unergy
+                  ? 'background: rgba(240,192,64,0.15); cursor: grab; border: 1px solid rgba(240,192,64,0.4);'
+                  : 'background: rgba(44,32,57,0.06); cursor: grab; border: 1px solid rgba(44,32,57,0.10);',
+                dragPlanta && dragPlanta.id === p.id ? 'opacity: 0.35;' : '',
+              ]"
             >
               <span class="font-medium" style="color: #2C2039;">{{ p.nombre }}</span>
-              <span class="font-mono" style="color: #7a6e8a;">
+              <span v-if="p.comprado_por_unergy" class="font-semibold px-1.5 py-0.5 rounded"
+                style="background: rgba(240,192,64,0.25); color: #9a6700;"
+                v-tooltip="p.contrato_compra_nombre || 'Contrato de compra'"
+              >Compra</span>
+              <span class="font-mono" :style="p.comprado_por_unergy ? 'color: #9a6700;' : 'color: #7a6e8a;'">
                 {{ p.avg_daily_mwh != null ? fmtMwh(p.avg_daily_mwh * simData.dias_mes) : '—' }}
               </span>
             </div>
