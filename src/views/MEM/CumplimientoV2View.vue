@@ -232,6 +232,14 @@
         >
           <i class="pi pi-refresh text-xs" />Resetear
         </button>
+        <button
+          v-if="hiddenContratos.size > 0"
+          @click="showAllContratos"
+          class="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm border transition"
+          style="border-color: rgba(46,125,50,0.35); color: #2e7d32; background: transparent;"
+        >
+          <i class="pi pi-eye text-xs" />Mostrar ocultos ({{ hiddenContratos.size }})
+        </button>
         <span class="text-xs" style="color: #7a6e8a;">Arrastra las plantas entre contratos para simular</span>
       </div>
 
@@ -244,22 +252,31 @@
 
       <template v-else-if="simData">
 
-        <!-- Contract columns (horizontal scroll) -->
-        <div class="overflow-x-auto pb-3">
-          <div class="flex gap-4 items-start" style="min-width: max-content;">
+        <!-- Contract columns (responsive grid) -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             <div
-              v-for="c in simData.contratos"
+              v-for="c in visibleContratos"
               :key="c.id"
-              class="rounded-xl border flex-shrink-0 transition-shadow"
-              style="width: 270px; border-color: rgba(44,32,57,0.12); background: white;"
+              class="rounded-xl border transition-shadow flex flex-col"
+              style="border-color: rgba(44,32,57,0.12); background: white;"
               :style="dragOver === c.id ? 'border-color: #915BD8; box-shadow: 0 0 0 2px rgba(145,91,216,0.18);' : ''"
               @dragover.prevent="dragOver = c.id"
               @drop.prevent="onDrop(c.id)"
             >
               <!-- Contract header -->
-              <div class="px-4 pt-4 pb-2 border-b" style="border-color: rgba(44,32,57,0.07);">
-                <div class="font-bold text-sm" style="color: #2C2039;">{{ c.nombre }}</div>
-                <div class="text-xs mt-0.5" style="color: #7a6e8a;">{{ c.comprador_nombre }}</div>
+              <div class="px-4 pt-3 pb-2 border-b flex items-start justify-between gap-2" style="border-color: rgba(44,32,57,0.07);">
+                <div class="min-w-0">
+                  <div class="font-bold text-sm truncate" style="color: #2C2039;">{{ c.nombre }}</div>
+                  <div class="text-xs mt-0.5 truncate" style="color: #7a6e8a;">{{ c.comprador_nombre }}</div>
+                </div>
+                <button
+                  @click.stop="hideContrato(c.id)"
+                  class="flex-shrink-0 rounded-md p-1 transition-colors hover:bg-red-50"
+                  style="color: #b0a0c0;"
+                  v-tooltip="'Ocultar contrato'"
+                >
+                  <i class="pi pi-eye-slash text-xs" />
+                </button>
               </div>
 
               <!-- Compliance meter -->
@@ -304,7 +321,7 @@
               </div>
 
               <!-- Plant drop zone -->
-              <div class="p-3 space-y-1.5" style="min-height: 64px;">
+              <div class="p-3 space-y-1.5 overflow-y-auto sim-plant-zone" style="min-height: 64px; max-height: 220px;">
                 <div
                   v-for="p in (simAssignments[c.id] || [])"
                   :key="p.id"
@@ -339,7 +356,6 @@
                 </div>
               </div>
             </div>
-          </div>
         </div>
 
         <!-- Sin contrato pool -->
@@ -500,9 +516,15 @@ const simData          = ref(null)
 const simLoading       = ref(false)
 const simError         = ref(null)
 const simAssignments   = ref({})
+const hiddenContratos  = ref(new Set())
 const dragPlanta       = ref(null)
 const dragFromContrato = ref(undefined)
 const dragOver         = ref(null)
+
+const visibleContratos = computed(() => {
+  if (!simData.value) return []
+  return simData.value.contratos.filter(c => !hiddenContratos.value.has(c.id))
+})
 
 // ── Table with consolidated row ──────────────────────────────────────────────
 const tableDataWithTotal = computed(() => {
@@ -615,7 +637,24 @@ function initAssignments(data) {
   simAssignments.value = a
 }
 
-function resetSim() { if (simData.value) initAssignments(simData.value) }
+function resetSim() {
+  if (simData.value) initAssignments(simData.value)
+  hiddenContratos.value = new Set()
+}
+
+function hideContrato(contratoId) {
+  const plantas = simAssignments.value[contratoId] || []
+  if (plantas.length) {
+    if (!simAssignments.value['none']) simAssignments.value['none'] = []
+    simAssignments.value['none'].push(...plantas)
+    simAssignments.value[contratoId] = []
+  }
+  hiddenContratos.value = new Set([...hiddenContratos.value, contratoId])
+}
+
+function showAllContratos() {
+  hiddenContratos.value = new Set()
+}
 
 function onDragStart(planta, fromContratoId) {
   dragPlanta.value = { ...planta }
@@ -855,5 +894,15 @@ onMounted(async () => {
   background: rgba(145,91,216,0.05) !important;
   border-bottom: 2px solid rgba(145,91,216,0.18) !important;
   font-weight: 600;
+}
+.sim-plant-zone::-webkit-scrollbar {
+  width: 4px;
+}
+.sim-plant-zone::-webkit-scrollbar-thumb {
+  background: rgba(145,91,216,0.2);
+  border-radius: 2px;
+}
+.sim-plant-zone::-webkit-scrollbar-track {
+  background: transparent;
 }
 </style>
