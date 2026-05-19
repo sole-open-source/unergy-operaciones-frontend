@@ -232,7 +232,7 @@
                 <p class="text-xs text-gray-500 mt-0.5 line-clamp-1">{{ alarm.details }}</p>
               </div>
               <Button icon="pi pi-check" size="small" severity="success" text
-                v-tooltip.top="'Resolver'" @click="resolveAlarm(alarm.id)" />
+                title="Resolver" @click="resolveAlarm(alarm.id)" />
             </div>
           </div>
         </div>
