@@ -231,7 +231,7 @@
       <template v-if="step === 4">
         <p class="step-title">Compromisos de energía <span class="normal-case font-normal text-gray-400">(opcional)</span></p>
         <p class="text-xs text-gray-400 mb-3">
-          Copia las columnas <strong>Año · Mes · Mín · Máx</strong> desde Excel y pégalas aquí (valores en MWh/mes).
+          Copia las columnas <strong>Año · Mes · Mín</strong> desde Excel y pégalas aquí (valores en MWh/mes). La columna <strong>Máx</strong> es opcional.
         </p>
         <Textarea
           v-model="energiaPaste"
@@ -531,13 +531,13 @@ function parseEnergia() {
   const rows = []
   for (const [i, line] of lines.entries()) {
     const cols = splitRow(line)
-    if (cols.length < 4) { energiaError.value = `Fila ${i + 1}: se esperan 4 columnas`; energiaRows.value = []; return }
+    if (cols.length < 3) { energiaError.value = `Fila ${i + 1}: se esperan al menos 3 columnas (Año · Mes · Mín)`; energiaRows.value = []; return }
     const año = parseInt(cols[0].trim(), 10)
     const mes = parseMes(cols[1].trim())
     const min = parseFloat(cols[2].trim().replace(',', '.'))
-    const max = parseFloat(cols[3].trim().replace(',', '.'))
-    if (isNaN(año) || !mes || isNaN(min) || isNaN(max)) { energiaError.value = `Fila ${i + 1}: datos inválidos`; energiaRows.value = []; return }
-    rows.push({ año, mes, energia_minima: min, energia_maxima: max })
+    const max = cols[3] ? parseFloat(cols[3].trim().replace(',', '.')) : null
+    if (isNaN(año) || !mes || isNaN(min)) { energiaError.value = `Fila ${i + 1}: datos inválidos`; energiaRows.value = []; return }
+    rows.push({ año, mes, energia_minima: min, energia_maxima: (max !== null && !isNaN(max)) ? max : null })
   }
   energiaRows.value = rows
 }
