@@ -1,20 +1,24 @@
 <template>
   <div v-if="contrato" class="space-y-6">
     <!-- Header -->
-    <div class="flex items-center gap-2">
-      <Button icon="pi pi-arrow-left" text @click="$router.back()" class="-ml-2" />
-      <div>
-        <h2 class="text-xl font-bold text-gray-800">
-          {{ contrato.nombre_interno || contrato.numero_codigo_contrato || 'Contrato PPA' }}
-        </h2>
-        <div class="flex items-center gap-2 mt-0.5">
-          <span v-if="contrato.numero_codigo_contrato" class="text-xs text-gray-400 font-mono">
-            {{ contrato.numero_codigo_contrato }}
-          </span>
-          <Tag value="PPA" severity="warning" class="text-xs" />
-          <span class="text-xs text-gray-400">{{ contrato.proyectos?.length || 0 }} proyectos</span>
+    <div class="flex items-center justify-between gap-2">
+      <div class="flex items-center gap-2">
+        <Button icon="pi pi-arrow-left" text @click="$router.back()" class="-ml-2" />
+        <div>
+          <h2 class="text-xl font-bold text-gray-800">
+            {{ contrato.nombre_interno || contrato.numero_codigo_contrato || 'Contrato PPA' }}
+          </h2>
+          <div class="flex items-center gap-2 mt-0.5">
+            <span v-if="contrato.numero_codigo_contrato" class="text-xs text-gray-400 font-mono">
+              {{ contrato.numero_codigo_contrato }}
+            </span>
+            <Tag value="PPA" severity="warning" class="text-xs" />
+            <span class="text-xs text-gray-400">{{ contrato.proyectos?.length || 0 }} proyectos</span>
+          </div>
         </div>
       </div>
+      <Button label="Editar contrato" icon="pi pi-pencil" severity="secondary" outlined
+        @click="abrirEdicionCompleta" />
     </div>
 
     <!-- Tabs -->
@@ -476,6 +480,12 @@
       </TabPanel>
     </TabView>
 
+    <!-- Wizard edición completa -->
+    <PPAContratoWizard v-if="showWizard" :visible="showWizard"
+      :initialData="wizardInitialData"
+      @cerrar="showWizard = false"
+      @creado="cargar" />
+
     <!-- Dialog asociar proyecto -->
     <Dialog v-model:visible="showAsociar" header="Asociar proyecto" modal :style="{ width: '420px' }">
       <div class="flex flex-col gap-2 pt-1">
@@ -532,6 +542,7 @@ import Textarea from 'primevue/textarea'
 import Dialog from 'primevue/dialog'
 import Select from 'primevue/select'
 import InfoField from '@/components/InfoField.vue'
+import PPAContratoWizard from '@/views/Contratos/PPAContratoWizard.vue'
 import api from '@/api/client'
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
@@ -815,6 +826,15 @@ const cantidadesAnuales = computed(() => {
   if (!contrato.value?.compromisos_energia) return []
   return agregarPorAño(cantidadesMensuales.value, ['energia_minima', 'energia_maxima'], 'suma')
 })
+
+// Wizard edición completa
+const showWizard = ref(false)
+const wizardInitialData = ref(null)
+
+function abrirEdicionCompleta() {
+  wizardInitialData.value = { ...contrato.value }
+  showWizard.value = true
+}
 
 // Asociar proyecto
 const showAsociar = ref(false)
