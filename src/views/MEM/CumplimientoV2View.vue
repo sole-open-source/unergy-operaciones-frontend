@@ -318,7 +318,7 @@
                 <div class="flex items-center gap-2 min-w-0">
                   <i
                     class="pi text-xs transition-transform flex-shrink-0"
-                    :class="expandedContratos[c.id] ? 'pi-chevron-down' : 'pi-chevron-right'"
+                    :class="expandedContratos.includes(c.id) ? 'pi-chevron-down' : 'pi-chevron-right'"
                     style="color: #915BD8;"
                   />
                   <div class="min-w-0">
@@ -393,7 +393,7 @@
               </div>
 
               <!-- Plant drop zone (collapsible) -->
-              <div v-show="expandedContratos[c.id]" class="p-3 space-y-1.5 overflow-y-auto sim-plant-zone" style="min-height: 64px; max-height: 220px;">
+              <div v-show="expandedContratos.includes(c.id)" class="p-3 space-y-1.5 overflow-y-auto sim-plant-zone" style="min-height: 64px; max-height: 220px;">
                 <div
                   v-for="p in (simAssignments[c.id] || [])"
                   :key="p.id"
@@ -596,7 +596,7 @@ const ficticioNombre   = ref('')
 const ficticioMin      = ref(0)
 const ficticioMax      = ref(0)
 let ficticioNextId     = 1
-const expandedContratos = ref({})
+const expandedContratos = ref([])
 const dragPlanta       = ref(null)
 const dragFromContrato = ref(undefined)
 const dragOver         = ref(null)
@@ -725,7 +725,7 @@ function resetSim() {
   if (simData.value) initAssignments(simData.value)
   ficticioContratos.value = []
   hiddenContratos.value = new Set()
-  expandedContratos.value = {}
+  expandedContratos.value = []
 }
 
 function crearNuevo() {
@@ -759,10 +759,9 @@ function eliminarNuevo(contratoId) {
 }
 
 function toggleExpand(contratoId) {
-  expandedContratos.value = {
-    ...expandedContratos.value,
-    [contratoId]: !expandedContratos.value[contratoId],
-  }
+  const idx = expandedContratos.value.indexOf(contratoId)
+  if (idx >= 0) expandedContratos.value.splice(idx, 1)
+  else expandedContratos.value.push(contratoId)
 }
 
 function hideContrato(contratoId) {
@@ -775,8 +774,8 @@ function showAllContratos() {
 
 function onDragOver(contratoId) {
   dragOver.value = contratoId
-  if (!expandedContratos.value[contratoId]) {
-    expandedContratos.value = { ...expandedContratos.value, [contratoId]: true }
+  if (!expandedContratos.value.includes(contratoId)) {
+    expandedContratos.value.push(contratoId)
   }
 }
 
