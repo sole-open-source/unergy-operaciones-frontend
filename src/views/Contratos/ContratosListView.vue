@@ -10,7 +10,8 @@
     <div class="flex justify-end">
       <Button v-if="servicioActivo === 'ppa'" label="Nuevo contrato PPA" icon="pi pi-plus"
         class="bg-amber-500 border-amber-500 hover:bg-amber-600" @click="showWizard = true" />
-      <Button v-else-if="servicioActivo !== 'ppa'" :label="`Nuevo contrato ${servicioInfo?.label}`"
+      <Button v-else-if="servicioActivo !== 'ppa' && servicioActivo !== 'representacion'"
+        :label="`Nuevo contrato ${servicioInfo?.label}`"
         icon="pi pi-plus"
         :style="`background:${servicioInfo?.color}; border-color:${servicioInfo?.color}`"
         @click="showServicioWizard = true" />
@@ -46,7 +47,7 @@
       </div>
     </div>
 
-    <!-- ── PPA ─────────────────────────────────────────────────────── -->
+    <!-- PPA -->
     <template v-if="servicioActivo === 'ppa'">
       <div class="flex gap-3 items-center">
         <IconField class="flex-1 max-w-sm">
@@ -101,7 +102,85 @@
       </DataTable>
     </template>
 
-    <!-- ── REPRESENTACIÓN / OPERACIÓN / REC ───────────────────────── -->
+    <!-- REPRESENTACIÓN — Lista de plantas -->
+    <template v-else-if="servicioActivo === 'representacion'">
+      <div class="flex gap-3 items-center">
+        <IconField class="flex-1 max-w-sm">
+          <InputIcon class="pi pi-search" />
+          <InputText v-model="filtroRepresentacion" placeholder="Buscar por planta, representante, comercializador…"
+            class="w-full" />
+        </IconField>
+      </div>
+
+      <DataTable
+        :value="plantasRepresentacionFiltradas"
+        :loading="loadingPlantas"
+        stripedRows
+        class="text-sm"
+        paginator
+        :rows="20"
+        :rowsPerPageOptions="[10, 20, 50]"
+        paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown"
+        emptyMessage="No hay plantas con servicio de representación."
+        rowHover
+        sortField="nombre_comercial"
+        :sortOrder="1"
+      >
+        <Column field="nombre_comercial" header="Planta" sortable>
+          <template #body="{ data }">
+            <span class="font-medium text-gray-800">{{ data.nombre_comercial }}</span>
+          </template>
+        </Column>
+        <Column field="potencia_instalada_kwp" header="Potencia (kWp)" sortable style="width:130px">
+          <template #body="{ data }">
+            <span class="text-gray-600">{{ data.potencia_instalada_kwp ? Number(data.potencia_instalada_kwp).toLocaleString('es-CO') : '—' }}</span>
+          </template>
+        </Column>
+        <Column field="estado" header="Estado" sortable style="width:130px">
+          <template #body="{ data }">
+            <Tag :value="ESTADO_PROYECTO_LABELS[data.estado] || data.estado"
+              :severity="ESTADO_PROYECTO_SEVERITY[data.estado]" />
+          </template>
+        </Column>
+        <Column header="Ubicación" style="width:180px">
+          <template #body="{ data }">
+            <span class="text-gray-600 text-xs">{{ [data.municipio, data.departamento].filter(Boolean).join(', ') || '—' }}</span>
+          </template>
+        </Column>
+        <Column header="Representante" style="width:180px">
+          <template #body="{ data }">
+            <span class="text-gray-700">{{ data.servicio_representacion?.nombre_rf || '—' }}</span>
+          </template>
+        </Column>
+        <Column header="Modalidad venta" style="width:160px">
+          <template #body="{ data }">
+            <Tag v-if="data.servicio_representacion?.modalidad_venta"
+              :value="MODALIDAD_LABELS[data.servicio_representacion.modalidad_venta] || data.servicio_representacion.modalidad_venta"
+              severity="info" />
+            <span v-else class="text-gray-300">—</span>
+          </template>
+        </Column>
+        <Column header="Cód. despacho XM" style="width:140px">
+          <template #body="{ data }">
+            <span class="font-mono text-xs text-gray-500">{{ data.servicio_representacion?.codigo_despacho_xm || '—' }}</span>
+          </template>
+        </Column>
+        <Column header="CGM" style="width:60px">
+          <template #body="{ data }">
+            <i v-if="data.srv_cgm" class="pi pi-check-circle text-green-500" v-tooltip="'Tiene CGM'" />
+            <i v-else class="pi pi-minus text-gray-300" />
+          </template>
+        </Column>
+        <Column style="width:50px">
+          <template #body="{ data }">
+            <Button icon="pi pi-arrow-right" text size="small" severity="secondary"
+              @click.stop="irAProyecto(data)" v-tooltip="'Ver planta'" />
+          </template>
+        </Column>
+      </DataTable>
+    </template>
+
+    <!-- OPERACIÓN / REC — contratos de servicio -->
     <template v-else>
       <div class="flex gap-3 items-center">
         <IconField class="flex-1 max-w-sm">
@@ -145,18 +224,6 @@
         <Column header="Estado" style="width:120px">
           <template #body="{ data }">
             <Tag :value="ESTADO_LABELS[data.estado] || data.estado" :severity="ESTADO_SEVERITY[data.estado]" />
-          </template>
-        </Column>
-        <Column v-if="servicioActivo === 'representacion'" header="CGM" style="width:60px">
-          <template #body="{ data }">
-            <i v-if="data.tiene_cgm" class="pi pi-check-circle text-green-500" v-tooltip="'Incluye CGM'" />
-            <i v-else class="pi pi-minus text-gray-300" />
-          </template>
-        </Column>
-        <Column v-if="servicioActivo === 'representacion'" header="Promotor" style="width:70px">
-          <template #body="{ data }">
-            <i v-if="data.tiene_promotor" class="pi pi-check-circle text-blue-400" v-tooltip="'Incluye Promotor'" />
-            <i v-else class="pi pi-minus text-gray-300" />
           </template>
         </Column>
       </DataTable>
@@ -213,6 +280,26 @@ const ESTADO_SEVERITY = {
   en_renovacion:'warn',
 }
 
+const ESTADO_PROYECTO_LABELS = {
+  en_desarrollo: 'En desarrollo',
+  en_operacion:  'En operación',
+  suspendido:    'Suspendido',
+  cancelado:     'Cancelado',
+}
+const ESTADO_PROYECTO_SEVERITY = {
+  en_desarrollo: 'warn',
+  en_operacion:  'success',
+  suspendido:    'danger',
+  cancelado:     'secondary',
+}
+
+const MODALIDAD_LABELS = {
+  bolsa_directa:        'Bolsa directa',
+  bolsa_comercializador:'Bolsa comercializador',
+  ppa:                  'PPA',
+  interna:              'Interna',
+}
+
 const servicioActivo = ref('ppa')
 const showWizard = ref(false)
 const showServicioWizard = ref(false)
@@ -235,7 +322,24 @@ const contratosFiltrados = computed(() => {
   )
 })
 
-// Otros servicios
+// Plantas con representación
+const plantasRepresentacion = ref([])
+const loadingPlantas = ref(false)
+const filtroRepresentacion = ref('')
+
+const plantasRepresentacionFiltradas = computed(() => {
+  const q = filtroRepresentacion.value.toLowerCase()
+  if (!q) return plantasRepresentacion.value
+  return plantasRepresentacion.value.filter(p =>
+    (p.nombre_comercial ?? '').toLowerCase().includes(q) ||
+    (p.servicio_representacion?.nombre_rf ?? '').toLowerCase().includes(q) ||
+    (p.servicio_representacion?.nombre_comercializador ?? '').toLowerCase().includes(q) ||
+    (p.departamento ?? '').toLowerCase().includes(q) ||
+    (p.municipio ?? '').toLowerCase().includes(q)
+  )
+})
+
+// Otros servicios (operación, rec)
 const contratosServicio = ref([])
 const loadingServicio = ref(false)
 const filtroServicio = ref('')
@@ -252,6 +356,7 @@ const contratosServicioFiltrados = computed(() => {
 
 function conteoServicio(key) {
   if (key === 'ppa') return contratos.value.length
+  if (key === 'representacion' && servicioActivo.value === 'representacion') return plantasRepresentacion.value.length
   if (key === servicioActivo.value) return contratosServicio.value.length
   return 0
 }
@@ -259,7 +364,9 @@ function conteoServicio(key) {
 function seleccionarServicio(key) {
   servicioActivo.value = key
   filtroServicio.value = ''
+  filtroRepresentacion.value = ''
   if (key === 'ppa') cargar()
+  else if (key === 'representacion') cargarPlantasRepresentacion()
   else cargarServicio(key)
 }
 
@@ -272,6 +379,10 @@ function irAContrato(data) {
   router.push(`/contratos/${data.id}`)
 }
 
+function irAProyecto(data) {
+  router.push(`/proyectos/${data.id}`)
+}
+
 let buscarTimeout = null
 function buscar() {
   clearTimeout(buscarTimeout)
@@ -281,7 +392,6 @@ function buscar() {
 let buscarServicioTimeout = null
 function buscarServicio() {
   clearTimeout(buscarServicioTimeout)
-  // client-side filter — no debounce needed, but keep consistent
 }
 
 function onContratoCreado() {
@@ -303,6 +413,18 @@ async function cargar() {
     toast.add({ severity: 'error', summary: 'Error al cargar contratos', detail: e.message, life: 3000 })
   } finally {
     loading.value = false
+  }
+}
+
+async function cargarPlantasRepresentacion() {
+  loadingPlantas.value = true
+  try {
+    const { data } = await api.get('/proyectos', { params: { servicio: 'representacion', size: 500 } })
+    plantasRepresentacion.value = data.items
+  } catch (e) {
+    toast.add({ severity: 'error', summary: 'Error al cargar plantas', detail: e.message, life: 3000 })
+  } finally {
+    loadingPlantas.value = false
   }
 }
 
