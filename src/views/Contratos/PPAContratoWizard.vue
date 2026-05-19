@@ -150,7 +150,11 @@
           <div class="grid grid-cols-3 gap-4">
             <div class="flex flex-col gap-1">
               <label class="field-label">Índice de indexación</label>
-              <InputText v-model="form.indice_indexacion" placeholder="IPP, IPC…" class="w-full" />
+              <Select v-model="form.indice_indexacion"
+                :options="INDICES_INDEXACION"
+                optionLabel="label" optionValue="value"
+                placeholder="Seleccionar índice"
+                showClear class="w-full" />
             </div>
             <div class="flex flex-col gap-1">
               <label class="field-label">Periodicidad indexación</label>
@@ -387,6 +391,15 @@ const PERIODICIDADES = [
   { label: 'Anual', value: 'anual' },
 ]
 
+const INDICES_INDEXACION = [
+  { label: 'IPP', value: 'IPP' },
+  { label: 'IPC', value: 'IPC' },
+  { label: 'IPC + spread', value: 'IPC + spread' },
+  { label: 'IPP + spread', value: 'IPP + spread' },
+  { label: 'Fijo', value: 'Fijo' },
+  { label: 'Otro', value: 'Otro' },
+]
+
 const MESES_ES = {
   enero: 1, febrero: 2, marzo: 3, abril: 4, mayo: 5, junio: 6,
   julio: 7, agosto: 8, septiembre: 9, octubre: 10, noviembre: 11, diciembre: 12,
@@ -491,6 +504,19 @@ watch(() => props.visible, (visible) => {
       const cantData = props.initialData.compromisos_energia ?? []
       energiaRows.value = cantData.map(c => ({ año: c.año, mes: c.mes, energia_minima: c.energia_minima, energia_maxima: c.energia_maxima }))
       energiaPaste.value = cantData.map(c => `${c.año}\t${c.mes}\t${c.energia_minima}\t${c.energia_maxima}`).join('\n')
+
+      // Proyectos: precargar seleccionados cuando todosProyectos esté disponible
+      const proyectosData = props.initialData.proyectos ?? []
+      if (proyectosData.length) {
+        watch(() => todosProyectos.value, (lista) => {
+          if (!lista.length) return
+          proyectosSeleccionados.value = lista.filter(p =>
+            proyectosData.some(pd => pd.id === p.id)
+          )
+        }, { immediate: true })
+      } else {
+        proyectosSeleccionados.value = []
+      }
     }
   }
 }, { immediate: true })
