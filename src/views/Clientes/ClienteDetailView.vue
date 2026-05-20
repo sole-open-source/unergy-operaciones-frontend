@@ -196,6 +196,102 @@
 
         </div>
 
+        <!-- ── Tab: Proyectos vinculados ── -->
+        <div v-if="activeTab === 'proyectos'" class="space-y-4">
+          <p class="text-sm" style="color: #6b5a8a;">Proyectos asociados a este cliente.</p>
+          <div v-if="loadingRelated" class="flex justify-center py-8">
+            <i class="pi pi-spin pi-spinner text-xl" style="color: #915BD8;" />
+          </div>
+          <div v-else-if="clienteProyectos.length === 0" class="text-center py-10 text-sm" style="color: #9b89b5;">
+            No hay proyectos vinculados a este cliente.
+          </div>
+          <div v-else class="space-y-2">
+            <RouterLink v-for="p in clienteProyectos" :key="p.id" :to="`/proyectos/${p.id}`"
+              class="flex items-center justify-between rounded-xl px-4 py-3 transition-colors hover:bg-gray-50"
+              style="border: 1.5px solid #e8e0f0;">
+              <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background: rgba(145,91,216,0.1);">
+                  <i class="pi pi-bolt text-sm" style="color: #915BD8;" />
+                </div>
+                <div>
+                  <p class="text-sm font-semibold" style="color: #2C2039;">{{ p.nombre_comercial }}</p>
+                  <p class="text-xs" style="color: #6b5a8a;">
+                    {{ [p.municipio, p.departamento].filter(Boolean).join(', ') || '—' }}
+                    <span v-if="p.potencia_instalada_kwp" class="ml-2">{{ p.potencia_instalada_kwp }} kWp</span>
+                  </p>
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                <span v-if="p.estado" class="text-xs px-2 py-0.5 rounded-full font-medium"
+                  :style="p.estado === 'en_operacion' ? 'background:rgba(16,185,129,0.1);color:#10B981' : 'background:rgba(240,192,64,0.1);color:#CA8A04'">
+                  {{ p.estado === 'en_operacion' ? 'En operación' : p.estado }}
+                </span>
+                <i class="pi pi-chevron-right text-xs" style="color: #915BD8;" />
+              </div>
+            </RouterLink>
+          </div>
+        </div>
+
+        <!-- ── Tab: Fronteras ── -->
+        <div v-if="activeTab === 'fronteras'" class="space-y-4">
+          <p class="text-sm" style="color: #6b5a8a;">Fronteras comerciales del cliente.</p>
+          <div v-if="loadingRelated" class="flex justify-center py-8">
+            <i class="pi pi-spin pi-spinner text-xl" style="color: #915BD8;" />
+          </div>
+          <div v-else-if="clienteFronteras.length === 0" class="text-center py-10 text-sm" style="color: #9b89b5;">
+            No hay fronteras registradas para este cliente.
+          </div>
+          <div v-else class="space-y-2">
+            <div v-for="f in clienteFronteras" :key="f.id"
+              class="flex items-center justify-between rounded-xl px-4 py-3"
+              style="border: 1.5px solid #e8e0f0;">
+              <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background: rgba(59,130,246,0.1);">
+                  <i class="pi pi-globe text-sm" style="color: #3B82F6;" />
+                </div>
+                <div>
+                  <p class="text-sm font-semibold font-mono" style="color: #2C2039;">{{ f.codigo_frontera }}</p>
+                  <p class="text-xs" style="color: #6b5a8a;">{{ f.nombre_frontera || '—' }}</p>
+                </div>
+              </div>
+              <span v-if="f.estado" class="text-xs px-2 py-0.5 rounded-full font-medium"
+                :style="f.estado === 'activa' ? 'background:rgba(16,185,129,0.1);color:#10B981' : 'background:rgba(240,192,64,0.1);color:#CA8A04'">
+                {{ f.estado }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Tab: Contratos PPA ── -->
+        <div v-if="activeTab === 'ppa'" class="space-y-4">
+          <p class="text-sm" style="color: #6b5a8a;">Contratos PPA vinculados al cliente.</p>
+          <div v-if="loadingRelated" class="flex justify-center py-8">
+            <i class="pi pi-spin pi-spinner text-xl" style="color: #915BD8;" />
+          </div>
+          <div v-else-if="clientePPA.length === 0" class="text-center py-10 text-sm" style="color: #9b89b5;">
+            No hay contratos PPA para este cliente.
+          </div>
+          <div v-else class="space-y-2">
+            <RouterLink v-for="c in clientePPA" :key="c.id" :to="`/contratos/${c.id}`"
+              class="flex items-center justify-between rounded-xl px-4 py-3 transition-colors hover:bg-gray-50"
+              style="border: 1.5px solid #e8e0f0;">
+              <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background: rgba(245,158,11,0.1);">
+                  <i class="pi pi-file-edit text-sm" style="color: #F59E0B;" />
+                </div>
+                <div>
+                  <p class="text-sm font-semibold" style="color: #2C2039;">{{ c.nombre_interno || c.numero_codigo_contrato || 'Sin nombre' }}</p>
+                  <p class="text-xs" style="color: #6b5a8a;">
+                    {{ c.comprador_nombre || '—' }} → {{ c.vendedor_nombre || '—' }}
+                    <span v-if="c.fecha_inicio"> · {{ c.fecha_inicio }} a {{ c.fecha_fin || '—' }}</span>
+                  </p>
+                </div>
+              </div>
+              <i class="pi pi-chevron-right text-xs" style="color: #915BD8;" />
+            </RouterLink>
+          </div>
+        </div>
+
       </div>
     </div>
   </div>
@@ -341,7 +437,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, reactive } from 'vue'
+import { ref, computed, onMounted, reactive, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import Dialog from 'primevue/dialog'
@@ -364,7 +460,15 @@ const tabs = [
   { key: 'info',       label: 'Información',  icon: 'pi pi-user' },
   { key: 'servicios',  label: 'Servicios',     icon: 'pi pi-briefcase' },
   { key: 'documentos', label: 'Documentos',    icon: 'pi pi-folder' },
+  { key: 'proyectos',  label: 'Proyectos',     icon: 'pi pi-bolt' },
+  { key: 'fronteras',  label: 'Fronteras',     icon: 'pi pi-globe' },
+  { key: 'ppa',        label: 'Contratos PPA', icon: 'pi pi-file-edit' },
 ]
+
+const clienteProyectos = ref([])
+const clienteFronteras = ref([])
+const clientePPA = ref([])
+const loadingRelated = ref(false)
 
 const SERVICIOS = [
   { value: 'operacion',      label: 'Operación & Mantenimiento' },
@@ -618,6 +722,32 @@ async function cargar() {
   const { data } = await api.get(`/clientes/${route.params.id}`)
   cliente.value = data
 }
+
+async function loadRelatedData(tab) {
+  loadingRelated.value = true
+  try {
+    if (tab === 'proyectos' && clienteProyectos.value.length === 0) {
+      const { data } = await api.get(`/clientes/${route.params.id}/proyectos`).catch(() => ({ data: [] }))
+      clienteProyectos.value = Array.isArray(data) ? data : (data.items ?? [])
+    } else if (tab === 'fronteras' && clienteFronteras.value.length === 0) {
+      const { data } = await api.get(`/clientes/${route.params.id}/fronteras`).catch(() => ({ data: [] }))
+      clienteFronteras.value = Array.isArray(data) ? data : (data.items ?? [])
+    } else if (tab === 'ppa' && clientePPA.value.length === 0) {
+      const { data } = await api.get(`/clientes/${route.params.id}/contratos-ppa`).catch(() => ({ data: [] }))
+      clientePPA.value = Array.isArray(data) ? data : (data.items ?? [])
+    }
+  } catch {
+    // degrade gracefully
+  } finally {
+    loadingRelated.value = false
+  }
+}
+
+watch(activeTab, (tab) => {
+  if (['proyectos', 'fronteras', 'ppa'].includes(tab)) {
+    loadRelatedData(tab)
+  }
+})
 
 onMounted(cargar)
 </script>

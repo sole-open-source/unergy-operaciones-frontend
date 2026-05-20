@@ -101,19 +101,40 @@
           </template>
         </Column>
 
-        <Column header="" style="width:40px;">
+        <Column header="Coex." style="width:50px;">
           <template #body="{ data }">
-            <a v-if="data.link_archivo" :href="data.link_archivo" target="_blank"
-              class="text-purple-500 hover:text-purple-700">
-              <i class="pi pi-external-link text-xs" />
-            </a>
+            <i v-if="!data.reemplaza_anterior" class="pi pi-link text-xs" style="color:#e6a817;"
+              v-tooltip.top="'Coexiste con otras plantas en este SIC'" />
+          </template>
+        </Column>
+
+        <Column header="Dup." style="width:55px;">
+          <template #body="{ data }">
+            <span v-if="data.es_duplicado" class="text-[10px] font-semibold px-1.5 py-0.5 rounded"
+              style="background: rgba(214,68,85,0.12); color: #D64455;"
+              v-tooltip.top="'Duplicado — exposición en bolsa'">Bolsa</span>
+          </template>
+        </Column>
+
+        <Column header="" style="width:72px;">
+          <template #body="{ data }">
+            <div class="flex items-center gap-1">
+              <button @click="abrirEditar(data)" class="p-1 rounded hover:bg-purple-50 transition-colors"
+                title="Editar" style="color: #915BD8;">
+                <i class="pi pi-pencil text-xs" />
+              </button>
+              <a v-if="data.link_archivo" :href="data.link_archivo" target="_blank"
+                class="p-1 rounded hover:bg-purple-50 transition-colors text-purple-500 hover:text-purple-700">
+                <i class="pi pi-external-link text-xs" />
+              </a>
+            </div>
           </template>
         </Column>
       </DataTable>
     </div>
 
     <!-- ── Dialog Registro ─────────────────────────────────────── -->
-    <Dialog v-model:visible="dialogVisible" header="Registrar contrato ASIC" modal
+    <Dialog v-model:visible="dialogVisible" :header="editandoId ? 'Editar contrato ASIC' : 'Registrar contrato ASIC'" modal
       :style="{ width: '700px' }" :breakpoints="{ '768px': '95vw' }">
       <form @submit.prevent="guardar" class="space-y-5 pt-1">
 
@@ -168,12 +189,30 @@
           </div>
         </div>
 
-        <!-- Fila 4: Proyecto -->
-        <div class="flex flex-col gap-1">
-          <label class="text-xs font-medium" style="color:#6b5a8a;">Planta / Proyecto</label>
-          <Select v-model="form.proyecto_id" :options="proyectos"
-            optionLabel="nombre_comercial" optionValue="id"
-            placeholder="Seleccionar proyecto (opcional)" filter showClear class="w-full" />
+        <!-- Fila 4: Proyecto + coexistencia + duplicado -->
+        <div class="grid grid-cols-[1fr_auto_auto] gap-4 items-end">
+          <div class="flex flex-col gap-1">
+            <label class="text-xs font-medium" style="color:#6b5a8a;">Planta / Proyecto</label>
+            <Select v-model="form.proyecto_id" :options="proyectos"
+              optionLabel="nombre_comercial" optionValue="id"
+              placeholder="Seleccionar proyecto (opcional)" filter showClear class="w-full" />
+          </div>
+          <div class="flex items-center gap-2 pb-1">
+            <Checkbox v-model="form.reemplaza_anterior" :binary="true" inputId="reemplaza" />
+            <label for="reemplaza" class="text-xs font-medium cursor-pointer" style="color:#6b5a8a;">
+              Reemplaza anterior
+            </label>
+            <i class="pi pi-info-circle text-xs cursor-help" style="color:#9b89b5;"
+              v-tooltip.top="'Activado: esta planta reemplaza la anterior en este SIC. Desactivado: coexiste con las demás plantas del mismo SIC.'" />
+          </div>
+          <div class="flex items-center gap-2 pb-1">
+            <Checkbox v-model="form.es_duplicado" :binary="true" inputId="es_duplicado" />
+            <label for="es_duplicado" class="text-xs font-medium cursor-pointer" style="color:#D64455;">
+              Duplicado
+            </label>
+            <i class="pi pi-info-circle text-xs cursor-help" style="color:#9b89b5;"
+              v-tooltip.top="'Marcar si esta planta ya está en otro contrato. La generación se contará como exposición en bolsa, no como cumplimiento.'" />
+          </div>
         </div>
 
         <!-- Fila 5: Fechas -->
@@ -243,7 +282,7 @@
 
         <div class="flex justify-end gap-2 pt-2">
           <Button label="Cancelar" severity="secondary" @click="dialogVisible = false" type="button" />
-          <Button label="Guardar" icon="pi pi-check" type="submit" :loading="guardando"
+          <Button :label="editandoId ? 'Actualizar' : 'Guardar'" icon="pi pi-check" type="submit" :loading="guardando"
             style="background:#915BD8; border-color:#915BD8;" />
         </div>
       </form>
@@ -267,6 +306,7 @@ import Select from 'primevue/select'
 import Dialog from 'primevue/dialog'
 import DatePicker from 'primevue/datepicker'
 import Textarea from 'primevue/textarea'
+import Checkbox from 'primevue/checkbox'
 import { useToast } from 'primevue/usetoast'
 
 const toast = useToast()
@@ -336,6 +376,7 @@ async function cargarProyectos() {
 const dialogVisible = ref(false)
 const guardando = ref(false)
 const errores = ref({})
+const editandoId = ref(null)
 
 const FORM_INICIAL = () => ({
   tipo_solicitud: null,
@@ -358,6 +399,8 @@ const FORM_INICIAL = () => ({
   nombre_contacto_solicitante: '',
   link_archivo: '',
   observaciones: '',
+  reemplaza_anterior: true,
+  es_duplicado: false,
 })
 const form = ref(FORM_INICIAL())
 
@@ -369,7 +412,43 @@ const opcionesEstadoForm = [
 ]
 
 function abrirNuevo() {
+  editandoId.value = null
   form.value = FORM_INICIAL()
+  errores.value = {}
+  dialogVisible.value = true
+}
+
+function parseDateField(v) {
+  if (!v) return null
+  return new Date(v + 'T12:00:00')
+}
+
+function abrirEditar(row) {
+  editandoId.value = row.id
+  form.value = {
+    tipo_solicitud: row.tipo_solicitud,
+    estado_solicitud: row.estado_solicitud,
+    codigo_sic_contrato: row.codigo_sic_contrato || '',
+    contrato_interno: row.contrato_interno || '',
+    nombre_interno: row.nombre_interno || '',
+    codigo_sic_vendedor: row.codigo_sic_vendedor || '',
+    codigo_sic_comprador: row.codigo_sic_comprador || '',
+    prioridad_limitacion: row.prioridad_limitacion,
+    proyecto_id: row.proyecto_id,
+    fecha_solicitud: parseDateField(row.fecha_solicitud),
+    fecha_inicio: parseDateField(row.fecha_inicio),
+    fecha_fin: parseDateField(row.fecha_fin),
+    tipo_mercado: row.tipo_mercado || '',
+    tipo_asignacion: row.tipo_asignacion || '',
+    porcentaje_fncer: row.porcentaje_fncer,
+    porcentaje_despacho: row.porcentaje_despacho,
+    requerimiento_asic: row.requerimiento_asic || '',
+    nombre_contacto_solicitante: row.nombre_contacto_solicitante || '',
+    link_archivo: row.link_archivo || '',
+    observaciones: row.observaciones || '',
+    reemplaza_anterior: row.reemplaza_anterior ?? true,
+    es_duplicado: row.es_duplicado ?? false,
+  }
   errores.value = {}
   dialogVisible.value = true
 }
@@ -404,10 +483,20 @@ async function guardar() {
       fecha_inicio: toIso(form.value.fecha_inicio),
       fecha_fin: toIso(form.value.fecha_fin),
     }
-    const { data } = await api.post('/asic', payload)
-    rows.value = [data, ...rows.value]
+
+    if (editandoId.value) {
+      const { data } = await api.patch(`/asic/${editandoId.value}`, payload)
+      const idx = rows.value.findIndex(r => r.id === editandoId.value)
+      if (idx !== -1) rows.value.splice(idx, 1, data)
+      else rows.value = [data, ...rows.value]
+      rows.value = [...rows.value]
+      toast.add({ severity: 'success', summary: 'Actualizado', detail: 'Contrato ASIC actualizado', life: 3000 })
+    } else {
+      const { data } = await api.post('/asic', payload)
+      rows.value = [data, ...rows.value]
+      toast.add({ severity: 'success', summary: 'Guardado', detail: 'Contrato ASIC registrado', life: 3000 })
+    }
     dialogVisible.value = false
-    toast.add({ severity: 'success', summary: 'Guardado', detail: 'Contrato ASIC registrado', life: 3000 })
   } catch (e) {
     toast.add({ severity: 'error', summary: 'Error', detail: e.response?.data?.detail || 'Error al guardar', life: 4000 })
   } finally {

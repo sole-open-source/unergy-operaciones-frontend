@@ -83,13 +83,18 @@
 
     <!-- Tabs -->
     <div class="flex gap-0 border-b" style="border-color: rgba(44,32,57,0.10);">
-      <button v-for="(tab, i) in ['Garantías', 'Movimientos recientes', 'Por tipo']" :key="i"
+      <button v-for="(tab, i) in ['Garantías', 'Vencimientos Próximos', 'Movimientos recientes', 'Por tipo']" :key="i"
               @click="activeTab = i"
               class="px-5 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors"
               :style="activeTab === i
                 ? 'color: #915BD8; border-color: #915BD8;'
                 : 'color: #7a6e8a; border-color: transparent;'">
         {{ tab }}
+        <span v-if="i === 1 && vencimientoCount > 0"
+          class="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+          style="background: rgba(214,68,85,0.1); color: #D64455;">
+          {{ vencimientoCount }}
+        </span>
       </button>
     </div>
 
@@ -175,8 +180,64 @@
       </div>
     </div>
 
-    <!-- Tab: Recent Movements -->
+    <!-- Tab: Vencimientos Próximos -->
     <div v-if="activeTab === 1" class="space-y-4">
+      <div class="flex flex-wrap gap-2 items-center mb-2">
+        <button v-for="d in [30, 60, 90]" :key="d" @click="vencimientoDays = d"
+          class="px-3 py-1.5 text-xs rounded-lg font-medium transition-colors"
+          :style="vencimientoDays === d ? { backgroundColor: '#915BD8', color: 'white' } : { color: '#6b5a8a', border: '1px solid #e8e0f0' }">
+          {{ d }} días
+        </button>
+      </div>
+      <div class="bg-white rounded-xl shadow-sm overflow-hidden" style="border: 1px solid #e8e0f0;">
+        <DataTable :value="vencimientosFiltrados" class="text-sm" stripedRows
+          :paginator="vencimientosFiltrados.length > 10" :rows="10">
+          <template #empty>
+            <div class="text-center py-12" style="color: #10B981;">
+              <i class="pi pi-check-circle text-3xl mb-2 block" />
+              Sin garantías por vencer en los próximos {{ vencimientoDays }} días
+            </div>
+          </template>
+          <Column field="proyecto_nombre" header="Proyecto" style="min-width: 180px">
+            <template #body="{ data: g }">
+              <span class="font-semibold" style="color: #2C2039;">{{ g.proyecto_nombre || '—' }}</span>
+            </template>
+          </Column>
+          <Column field="tipo" header="Tipo" style="min-width: 120px">
+            <template #body="{ data: g }">
+              <Tag :value="TIPO_LABELS[g.tipo] || g.tipo" :severity="tipoSeverity(g.tipo)" />
+            </template>
+          </Column>
+          <Column field="valor_cop" header="Valor" style="min-width: 130px">
+            <template #body="{ data: g }">
+              <span class="font-semibold tabular-nums" style="color: #2C2039;">{{ fmtCOP(g.valor_cop) }}</span>
+            </template>
+          </Column>
+          <Column field="fecha_vencimiento" header="Vencimiento" style="min-width: 140px">
+            <template #body="{ data: g }">
+              <span class="font-semibold" :style="{ color: diasRestantes(g) <= 7 ? '#D64455' : diasRestantes(g) <= 30 ? '#CA8A04' : '#2C2039' }">
+                {{ g.fecha_vencimiento }}
+              </span>
+              <Tag class="ml-1.5" :severity="diasRestantes(g) <= 7 ? 'danger' : diasRestantes(g) <= 30 ? 'warn' : 'info'"
+                :value="`${diasRestantes(g)}d`" />
+            </template>
+          </Column>
+          <Column field="estado" header="Estado" style="min-width: 110px">
+            <template #body="{ data: g }">
+              <Tag :value="ESTADO_LABELS[g.estado] || g.estado" :severity="estadoSeverity(g.estado)" />
+            </template>
+          </Column>
+          <Column style="width: 60px">
+            <template #body="{ data: g }">
+              <Button icon="pi pi-eye" text rounded size="small" @click="openDetail(g)" />
+            </template>
+          </Column>
+        </DataTable>
+      </div>
+    </div>
+
+    <!-- Tab: Recent Movements -->
+    <div v-if="activeTab === 2" class="space-y-4">
       <div class="bg-white rounded-xl shadow-sm overflow-hidden" style="border: 1px solid #e8e0f0;">
         <DataTable v-if="resumen.movimientos_recientes?.length" :value="resumen.movimientos_recientes"
                    class="text-sm" stripedRows>
@@ -211,7 +272,7 @@
     </div>
 
     <!-- Tab: By Type -->
-    <div v-if="activeTab === 2" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div v-if="activeTab === 3" class="grid grid-cols-1 md:grid-cols-3 gap-4">
       <div v-for="(info, tipo) in resumen.por_tipo" :key="tipo"
            class="bg-white rounded-xl shadow-sm p-5" style="border: 1px solid #e8e0f0;">
         <div class="flex items-center gap-2 mb-3">
@@ -287,6 +348,11 @@
             <Select v-model="form.tipo" :options="tipoOptions" optionLabel="label" optionValue="value" class="w-full" />
           </div>
           <div>
+            <label class="text-xs font-semibold uppercase block mb-1" style="color: #6b5a8a;">Contrato PPA</label>
+            <Select v-model="form.contrato_ppa_id" :options="contratosPPA" optionLabel="label" optionValue="value"
+              placeholder="Sin contrato" showClear filter class="w-full" />
+          </div>
+          <div>
             <label class="text-xs font-semibold uppercase block mb-1" style="color: #6b5a8a;">Estado</label>
             <Select v-model="form.estado" :options="estadoOptions" optionLabel="label" optionValue="value" class="w-full" />
           </div>
@@ -321,6 +387,21 @@
           <div class="col-span-1 sm:col-span-2">
             <label class="text-xs font-semibold uppercase block mb-1" style="color: #6b5a8a;">Observaciones</label>
             <Textarea v-model="form.observaciones" rows="2" class="w-full" />
+          </div>
+          <div class="col-span-1 sm:col-span-2">
+            <label class="text-xs font-semibold uppercase block mb-1" style="color: #6b5a8a;">Documento adjunto</label>
+            <div class="flex items-center gap-3">
+              <label class="cursor-pointer px-4 py-2 rounded-lg text-sm font-medium text-white flex items-center gap-1.5"
+                style="background: #6b5a8a;">
+                <i class="pi pi-upload text-xs" />
+                {{ attachedFile ? 'Cambiar' : 'Seleccionar archivo' }}
+                <input type="file" accept=".pdf,.jpg,.jpeg,.png,.docx" class="hidden" @change="onFileAttach" />
+              </label>
+              <span v-if="attachedFile" class="text-sm truncate max-w-48" style="color: #2C2039;">{{ attachedFile.name }}</span>
+              <span v-else-if="form.documento_url" class="text-xs" style="color: #6b5a8a;">
+                <a :href="form.documento_url" target="_blank" class="underline" style="color: #915BD8;">Ver adjunto actual</a>
+              </span>
+            </div>
           </div>
         </div>
       </form>
@@ -366,6 +447,9 @@ const detailMovimientos = ref([])
 const editingId = ref(null)
 const filterEstado = ref(null)
 const filterTipo = ref(null)
+const vencimientoDays = ref(30)
+const attachedFile = ref(null)
+const contratosPPA = ref([])
 
 const TIPO_LABELS = {
   cuenta_custodia: 'Cuenta custodia',
@@ -408,9 +492,28 @@ const defaultForm = () => ({
   fecha_vencimiento: null,
   estado: 'vigente',
   observaciones: null,
+  documento_url: null,
 })
 
 const form = ref(defaultForm())
+
+const vencimientosFiltrados = computed(() => {
+  return garantias.value.filter(g => {
+    const d = diasRestantes(g)
+    return d > 0 && d <= vencimientoDays.value && g.estado !== 'liberada'
+  }).sort((a, b) => diasRestantes(a) - diasRestantes(b))
+})
+
+const vencimientoCount = computed(() => {
+  return garantias.value.filter(g => {
+    const d = diasRestantes(g)
+    return d > 0 && d <= 90 && g.estado !== 'liberada'
+  }).length
+})
+
+function onFileAttach(e) {
+  attachedFile.value = e.target.files[0] || null
+}
 
 const filteredGarantias = computed(() => {
   let list = garantias.value
@@ -472,7 +575,9 @@ function editGarantia(g) {
     fecha_vencimiento: g.fecha_vencimiento,
     estado: g.estado,
     observaciones: g.observaciones,
+    documento_url: g.documento_url || null,
   }
+  attachedFile.value = null
   showCreate.value = true
 }
 
@@ -505,14 +610,30 @@ async function saveGarantia() {
       fecha_constitucion: formatDateForApi(form.value.fecha_constitucion),
       fecha_vencimiento: formatDateForApi(form.value.fecha_vencimiento),
     }
+    let garantiaId
     if (editingId.value) {
       await api.patch(`/garantias/${editingId.value}`, payload)
+      garantiaId = editingId.value
       toast.add({ severity: 'success', summary: 'Actualizada', life: 2000 })
     } else {
-      await api.post('/garantias', payload)
+      const { data: created } = await api.post('/garantias', payload)
+      garantiaId = created.id
       toast.add({ severity: 'success', summary: 'Garantía creada', life: 2000 })
     }
+    // Upload attached document
+    if (attachedFile.value && garantiaId) {
+      try {
+        const fd = new FormData()
+        fd.append('archivo', attachedFile.value)
+        await api.post(`/garantias/${garantiaId}/documento`, fd, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        })
+      } catch {
+        toast.add({ severity: 'warn', summary: 'Archivo no subido', detail: 'La garantía se guardó pero el archivo no pudo subirse', life: 4000 })
+      }
+    }
     showCreate.value = false
+    attachedFile.value = null
     editingId.value = null
     form.value = defaultForm()
     await loadData()
@@ -526,14 +647,17 @@ async function saveGarantia() {
 async function loadData() {
   loading.value = true
   try {
-    const [resRes, listRes, projRes] = await Promise.all([
+    const [resRes, listRes, projRes, ppaRes] = await Promise.all([
       api.get('/garantias/resumen').catch(() => ({ data: {} })),
       api.get('/garantias').catch(() => ({ data: { items: [] } })),
       api.get('/proyectos', { params: { size: 500 } }).catch(() => ({ data: { items: [] } })),
+      api.get('/ppa').catch(() => ({ data: [] })),
     ])
     resumen.value = resRes.data || {}
     garantias.value = listRes.data?.items || []
     proyectos.value = projRes.data?.items || []
+    const ppaList = Array.isArray(ppaRes.data) ? ppaRes.data : (ppaRes.data?.items || [])
+    contratosPPA.value = ppaList.map(c => ({ value: c.id, label: c.nombre_interno || c.numero_codigo_contrato || `PPA #${c.id}` }))
   } finally {
     loading.value = false
   }

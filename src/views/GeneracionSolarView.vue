@@ -97,6 +97,33 @@
             </div>
           </template>
         </Column>
+        <Column header="kWh/kWp" style="min-width:90px" sortable sortField="kwh_per_kwp">
+          <template #body="{ data }">
+            <span v-if="data.capacity_kwp > 0 && data.energy_today_kwh != null"
+              class="font-mono text-xs font-semibold" style="color: #915BD8;">
+              {{ (data.energy_today_kwh / data.capacity_kwp).toFixed(2) }}
+            </span>
+            <span v-else class="text-xs" style="color: #9CA3AF;">—</span>
+          </template>
+        </Column>
+        <Column header="Fuente" style="min-width:90px">
+          <template #body="{ data }">
+            <span class="text-xs px-2 py-0.5 rounded-full"
+              :style="data.data_source === 'quoia'
+                ? 'background: rgba(145,91,216,0.1); color: #915BD8'
+                : 'background: rgba(16,185,129,0.1); color: #10B981'">
+              {{ data.data_source === 'quoia' ? 'Quoia' : 'Solenium' }}
+            </span>
+          </template>
+        </Column>
+        <Column header="Últ. dato" style="min-width:110px" sortable sortField="last_update">
+          <template #body="{ data }">
+            <span v-if="data.last_update" class="text-xs font-mono" style="color: #6b5a8a;">
+              {{ formatLastUpdate(data.last_update) }}
+            </span>
+            <span v-else class="text-xs" style="color: #D64455;">sin datos</span>
+          </template>
+        </Column>
         <Column field="irradiance_w_m2" header="Irrad. (W/m²)" style="min-width:110px" sortable>
           <template #body="{ data }">
             <span class="font-mono text-xs" :style="{ color: data.irradiance_w_m2 ? '#D4A017' : '#9CA3AF' }">
@@ -139,8 +166,87 @@
       <p v-else class="text-sm" style="color: #6b5a8a;">Cargando disponibilidad...</p>
     </div>
 
-    <!-- Tab 2: Project Detail (selected) -->
+    <!-- Tab 2: Generation History -->
     <div v-if="activeTab === 2" class="space-y-4">
+      <div class="bg-white rounded-xl shadow-sm p-5" style="border: 1px solid #e8e0f0;">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-sm font-semibold" style="color: #2C2039;">Generación Diaria Flota ({{ histDays }} días)</h3>
+          <div class="flex gap-1">
+            <button v-for="d in [7, 30, 90]" :key="d" @click="histDays = d; loadHistory()"
+                    class="px-3 py-1 text-xs rounded-md font-medium"
+                    :style="histDays === d ? { backgroundColor: '#915BD8', color: 'white' } : { color: '#6b5a8a' }">
+              {{ d }}d
+            </button>
+          </div>
+        </div>
+
+        <div v-if="!histData.length" class="flex flex-col items-center py-8 gap-2 text-gray-400">
+          <i class="pi pi-database text-3xl" />
+          <p class="text-sm">Sin datos históricos de generación.</p>
+          <p class="text-xs" style="color: #6b5a8a;">Los datos se sincronizarán automáticamente desde Solenium.</p>
+        </div>
+
+        <template v-else>
+          <div class="grid grid-cols-3 gap-4 mb-4">
+            <div class="rounded-lg p-3" style="background: #f8f6fb;">
+              <p class="text-xs" style="color: #6b5a8a;">Total generado</p>
+              <p class="text-2xl font-bold" style="color: #2C2039;">{{ histTotal }} MWh</p>
+            </div>
+            <div class="rounded-lg p-3" style="background: #f8f6fb;">
+              <p class="text-xs" style="color: #6b5a8a;">Promedio diario</p>
+              <p class="text-2xl font-bold" style="color: #D4A017;">{{ histAvg }} MWh</p>
+            </div>
+            <div class="rounded-lg p-3" style="background: #f8f6fb;">
+              <p class="text-xs" style="color: #6b5a8a;">Días con datos</p>
+              <p class="text-2xl font-bold" style="color: #915BD8;">{{ histData.length }}</p>
+            </div>
+          </div>
+
+          <svg :viewBox="`0 0 ${histChartW} ${histChartH}`" class="w-full" style="max-height: 260px;">
+            <line v-for="y in histGridY" :key="'g'+y.val"
+              :x1="histPadL" :x2="histChartW - 10" :y1="y.py" :y2="y.py"
+              stroke="#e5e7eb" stroke-width="0.5" />
+            <text v-for="y in histGridY" :key="'t'+y.val"
+              :x="histPadL - 4" :y="y.py + 3" text-anchor="end"
+              fill="#9ca3af" font-size="9">{{ y.label }}</text>
+            <rect v-for="(bar, i) in histBars" :key="i"
+              :x="bar.x" :y="bar.y" :width="bar.w" :height="bar.h"
+              fill="#915BD8" opacity="0.85" rx="2" />
+            <text v-for="(lbl, i) in histXLabels" :key="'xl'+i"
+              :x="lbl.x" :y="histChartH - 2" text-anchor="middle"
+              fill="#9ca3af" font-size="8">{{ lbl.text }}</text>
+          </svg>
+        </template>
+      </div>
+
+      <!-- Per-project generation ranking -->
+      <div v-if="histByProject.length" class="bg-white rounded-xl shadow-sm p-5" style="border: 1px solid #e8e0f0;">
+        <h3 class="text-sm font-semibold mb-3" style="color: #2C2039;">Generación por Proyecto</h3>
+        <DataTable :value="histByProject" size="small" stripedRows :rowHover="true"
+                   sortField="mwh" :sortOrder="-1" class="text-sm">
+          <Column field="name" header="Proyecto" style="min-width:200px" sortable />
+          <Column field="mwh" header="MWh" style="min-width:100px" sortable>
+            <template #body="{ data }">
+              <span class="font-mono text-sm font-semibold" style="color: #D4A017;">{{ data.mwh.toLocaleString() }}</span>
+            </template>
+          </Column>
+          <Column field="capacity_kwp" header="Cap. (kWp)" style="min-width:100px">
+            <template #body="{ data }">
+              <span class="font-mono text-xs">{{ data.capacity_kwp ? data.capacity_kwp.toLocaleString() : '—' }}</span>
+            </template>
+          </Column>
+          <Column field="days_with_data" header="Días" style="min-width:80px" sortable />
+          <Column field="last_date" header="Último dato" style="min-width:110px">
+            <template #body="{ data }">
+              <span class="text-xs" style="color: #6b5a8a;">{{ data.last_date || '—' }}</span>
+            </template>
+          </Column>
+        </DataTable>
+      </div>
+    </div>
+
+    <!-- Tab 3: Project Detail (selected) -->
+    <div v-if="activeTab === 3" class="space-y-4">
       <div v-if="!selectedProject" class="bg-white rounded-xl shadow-sm p-8 text-center" style="border: 1px solid #e8e0f0;">
         <i class="pi pi-info-circle text-3xl mb-2" style="color: #6b5a8a;" />
         <p class="text-sm" style="color: #6b5a8a;">Selecciona un proyecto de la tabla para ver detalle</p>
@@ -216,6 +322,93 @@
         </div>
       </template>
     </div>
+
+    <!-- Tab 4: Completitud de datos -->
+    <div v-if="activeTab === 4" class="space-y-4">
+      <div class="bg-white rounded-xl shadow-sm p-5" style="border: 1px solid #e8e0f0;">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-sm font-semibold" style="color: #2C2039;">Completitud de Datos — {{ completeness?.month }}/{{ completeness?.year }}</h3>
+          <div class="flex items-center gap-2">
+            <span class="text-xs" style="color: #6b5a8a;">{{ completeness?.days_elapsed || 0 }} días transcurridos</span>
+          </div>
+        </div>
+
+        <!-- Completeness KPIs -->
+        <div v-if="completeness" class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+          <div class="p-3 rounded-lg" style="background: #f8f6fb;">
+            <p class="text-xs" style="color: #6b5a8a;">Proyectos con datos</p>
+            <p class="text-xl font-bold" style="color: #10B981;">{{ completeness.with_data }}</p>
+          </div>
+          <div class="p-3 rounded-lg" :style="completeness.without_data > 0 ? 'background: rgba(214,68,85,0.05)' : 'background: #f8f6fb'">
+            <p class="text-xs" style="color: #6b5a8a;">Sin datos</p>
+            <p class="text-xl font-bold" :style="{ color: completeness.without_data > 0 ? '#D64455' : '#10B981' }">{{ completeness.without_data }}</p>
+          </div>
+          <div class="p-3 rounded-lg" style="background: #f8f6fb;">
+            <p class="text-xs" style="color: #6b5a8a;">Completitud</p>
+            <p class="text-xl font-bold" :style="{ color: completeness.completeness_pct >= 80 ? '#10B981' : completeness.completeness_pct >= 50 ? '#F0C040' : '#D64455' }">
+              {{ completeness.completeness_pct }}%
+            </p>
+          </div>
+          <div class="p-3 rounded-lg" style="background: #f8f6fb;">
+            <p class="text-xs" style="color: #6b5a8a;">Total proyectos</p>
+            <p class="text-xl font-bold" style="color: #2C2039;">{{ completeness.projects_total }}</p>
+          </div>
+        </div>
+
+        <!-- Projects table -->
+        <DataTable v-if="completeness?.projects" :value="completenessProjects" size="small" stripedRows
+                   :paginator="completenessProjects.length > 25" :rows="25"
+                   sortField="completeness_pct" :sortOrder="1" :rowHover="true">
+          <Column field="nombre" header="Proyecto" sortable style="min-width: 180px">
+            <template #body="{ data }">
+              <span class="font-semibold text-sm" style="color: #2C2039;">{{ data.nombre }}</span>
+            </template>
+          </Column>
+          <Column field="completeness_pct" header="Completitud" sortable style="min-width: 160px">
+            <template #body="{ data }">
+              <div class="flex items-center gap-2">
+                <div class="flex-1 h-2.5 rounded-full" style="background: #f3f0f7;">
+                  <div class="h-full rounded-full transition-all"
+                       :style="{ width: data.completeness_pct + '%', backgroundColor: data.completeness_pct >= 80 ? '#10B981' : data.completeness_pct >= 50 ? '#F0C040' : '#D64455' }" />
+                </div>
+                <span class="text-xs font-mono w-10 text-right" :style="{ color: data.completeness_pct >= 80 ? '#10B981' : data.completeness_pct >= 50 ? '#F0C040' : '#D64455' }">
+                  {{ data.completeness_pct }}%
+                </span>
+              </div>
+            </template>
+          </Column>
+          <Column field="days_with_data" header="Días" sortable style="min-width: 80px">
+            <template #body="{ data }">
+              <span class="font-mono text-sm">{{ data.days_with_data }}/{{ data.days_expected }}</span>
+            </template>
+          </Column>
+          <Column field="total_kwh" header="kWh" sortable style="min-width: 100px">
+            <template #body="{ data }">
+              <span class="font-mono text-sm">{{ data.total_kwh > 0 ? data.total_kwh.toLocaleString('es-CO') : '—' }}</span>
+            </template>
+          </Column>
+          <Column field="capacidad_kwp" header="kWp" sortable style="min-width: 80px">
+            <template #body="{ data }">
+              {{ data.capacidad_kwp ? data.capacidad_kwp.toFixed(0) : '—' }}
+            </template>
+          </Column>
+          <Column field="fuente" header="Fuente" sortable style="min-width: 100px">
+            <template #body="{ data }">
+              <span v-if="data.fuente" class="text-xs px-2 py-0.5 rounded-full"
+                    :style="data.fuente === 'solenium' ? 'background: rgba(16,185,129,0.1); color: #10B981' : 'background: rgba(145,91,216,0.1); color: #915BD8'">
+                {{ data.fuente }}
+              </span>
+              <span v-else class="text-xs" style="color: #D64455;">sin datos</span>
+            </template>
+          </Column>
+          <Column field="last_date" header="Último dato" sortable style="min-width: 110px">
+            <template #body="{ data }">
+              <span class="font-mono text-xs">{{ data.last_date || '—' }}</span>
+            </template>
+          </Column>
+        </DataTable>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -225,7 +418,7 @@ import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import api from '@/api/client'
 
-const TABS = ['Flota', 'Disponibilidad', 'Detalle Proyecto']
+const TABS = ['Flota', 'Disponibilidad', 'Histórico', 'Detalle Proyecto', 'Completitud']
 const activeTab = ref(0)
 const loading = ref(true)
 const fleetFilter = ref('all')
@@ -263,6 +456,7 @@ const projectsWithUtil = computed(() => {
   return projects.map(p => ({
     ...p,
     utilization: p.capacity_kwp > 0 ? (p.power_kw / p.capacity_kwp * 100) : 0,
+    kwh_per_kwp: p.capacity_kwp > 0 && p.energy_today_kwh != null ? (p.energy_today_kwh / p.capacity_kwp) : 0,
   }))
 })
 
@@ -314,15 +508,100 @@ const powerCurves = computed(() => {
   return result
 })
 
+function formatLastUpdate(dateStr) {
+  if (!dateStr) return '—'
+  const d = new Date(dateStr)
+  const now = new Date()
+  const diffMs = now - d
+  const mins = Math.floor(diffMs / 60000)
+  if (mins < 1) return 'Ahora'
+  if (mins < 60) return `${mins}min`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h`
+  return d.toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })
+}
+
 async function selectProject(proj) {
   selectedProject.value = proj
-  activeTab.value = 2
+  activeTab.value = 3
   try {
     const res = await api.get(`/generacion-solar/project/${proj.id}`)
     projectDetail.value = res.data
   } catch {
     projectDetail.value = null
   }
+}
+
+const histDays = ref(30)
+const histData = ref([])
+const histByProject = ref([])
+
+const histChartW = 700
+const histChartH = 200
+const histPadL = 50
+
+const histTotal = computed(() => histData.value.reduce((s, d) => s + d.mwh, 0).toFixed(1))
+const histAvg = computed(() => histData.value.length ? (histTotal.value / histData.value.length).toFixed(1) : '0')
+
+const histMaxMwh = computed(() => Math.max(...histData.value.map(d => d.mwh), 1) * 1.1)
+
+const histBars = computed(() => {
+  const n = histData.value.length
+  if (!n) return []
+  const barW = Math.max(2, (histChartW - histPadL - 10) / n - 1)
+  return histData.value.map((d, i) => {
+    const h = (d.mwh / histMaxMwh.value) * (histChartH - 30)
+    return {
+      x: histPadL + i * ((histChartW - histPadL - 10) / n),
+      y: histChartH - 20 - h,
+      w: barW,
+      h: Math.max(0, h),
+    }
+  })
+})
+
+const histGridY = computed(() => {
+  const max = histMaxMwh.value
+  const steps = 4
+  return Array.from({ length: steps + 1 }, (_, i) => {
+    const val = (max * i) / steps
+    const py = histChartH - 20 - (val / max) * (histChartH - 30)
+    return { val, py, label: val.toFixed(0) }
+  })
+})
+
+const histXLabels = computed(() => {
+  const n = histData.value.length
+  if (!n) return []
+  const step = Math.max(1, Math.floor(n / 8))
+  return histData.value.filter((_, i) => i % step === 0).map((d, i) => ({
+    x: histPadL + (i * step) * ((histChartW - histPadL - 10) / n) + ((histChartW - histPadL - 10) / n) / 2,
+    text: d.date.slice(5),
+  }))
+})
+
+async function loadHistory() {
+  try {
+    const [histRes, projRes] = await Promise.all([
+      api.get('/generacion-solar/fleet/history', { params: { days: histDays.value } }).catch(() => null),
+      api.get('/generacion-solar/fleet/history/by-project', { params: { days: histDays.value } }).catch(() => null),
+    ])
+    if (histRes?.data?.days) histData.value = histRes.data.days
+    if (projRes?.data) histByProject.value = projRes.data
+  } catch { /* degrade */ }
+}
+
+const completeness = ref(null)
+const completenessProjects = computed(() => {
+  if (!completeness.value?.projects) return []
+  return [...completeness.value.projects].sort((a, b) => a.completeness_pct - b.completeness_pct)
+})
+
+async function loadCompleteness() {
+  try {
+    const res = await api.get('/generacion-solar/data-completeness').catch(() => null)
+    if (res?.data) completeness.value = res.data
+  } catch { /* degrade */ }
 }
 
 async function loadData() {
@@ -337,6 +616,8 @@ async function loadData() {
   } finally {
     loading.value = false
   }
+  loadHistory()
+  loadCompleteness()
 }
 
 onMounted(loadData)

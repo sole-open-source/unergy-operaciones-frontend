@@ -55,6 +55,18 @@
       <InfoField v-if="falla.resolucion" label="Resolución" :value="falla.resolucion?.etiqueta" />
     </div>
 
+    <!-- Causa raíz y acciones correctivas -->
+    <div v-if="!editMode && (falla.causa_raiz || falla.acciones_correctivas)" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div v-if="falla.causa_raiz" class="bg-white rounded-xl p-4" style="border: 1px solid #e8e0f0;">
+        <p class="text-xs font-semibold uppercase tracking-wide mb-1" style="color: #6b5a8a;">Causa raíz</p>
+        <p class="text-sm leading-relaxed" style="color: #2C2039;">{{ falla.causa_raiz }}</p>
+      </div>
+      <div v-if="falla.acciones_correctivas" class="bg-white rounded-xl p-4" style="border: 1px solid #e8e0f0;">
+        <p class="text-xs font-semibold uppercase tracking-wide mb-1" style="color: #6b5a8a;">Acciones correctivas</p>
+        <p class="text-sm leading-relaxed" style="color: #2C2039;">{{ falla.acciones_correctivas }}</p>
+      </div>
+    </div>
+
     <!-- Seguimientos -->
     <div class="bg-white rounded-xl p-5" style="border: 1px solid #e8e0f0;">
       <h3 class="text-sm font-semibold mb-4" style="color: #2C2039;">

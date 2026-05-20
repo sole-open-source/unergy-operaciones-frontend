@@ -1,20 +1,24 @@
 <template>
   <div v-if="contrato" class="space-y-6">
     <!-- Header -->
-    <div class="flex items-center gap-2">
-      <Button icon="pi pi-arrow-left" text @click="$router.back()" class="-ml-2" />
-      <div>
-        <h2 class="text-xl font-bold text-gray-800">
-          {{ contrato.nombre_interno || contrato.numero_codigo_contrato || 'Contrato PPA' }}
-        </h2>
-        <div class="flex items-center gap-2 mt-0.5">
-          <span v-if="contrato.numero_codigo_contrato" class="text-xs text-gray-400 font-mono">
-            {{ contrato.numero_codigo_contrato }}
-          </span>
-          <Tag value="PPA" severity="warning" class="text-xs" />
-          <span class="text-xs text-gray-400">{{ contrato.proyectos?.length || 0 }} proyectos</span>
+    <div class="flex items-center justify-between gap-2">
+      <div class="flex items-center gap-2">
+        <Button icon="pi pi-arrow-left" text @click="$router.back()" class="-ml-2" />
+        <div>
+          <h2 class="text-xl font-bold text-gray-800">
+            {{ contrato.nombre_interno || contrato.numero_codigo_contrato || 'Contrato PPA' }}
+          </h2>
+          <div class="flex items-center gap-2 mt-0.5">
+            <span v-if="contrato.numero_codigo_contrato" class="text-xs text-gray-400 font-mono">
+              {{ contrato.numero_codigo_contrato }}
+            </span>
+            <Tag value="PPA" severity="warning" class="text-xs" />
+            <span class="text-xs text-gray-400">{{ contrato.proyectos?.length || 0 }} proyectos</span>
+          </div>
         </div>
       </div>
+      <Button label="Editar contrato" icon="pi pi-pencil" severity="secondary" outlined
+        @click="abrirEdicionCompleta" />
     </div>
 
     <!-- Tabs -->
@@ -137,14 +141,50 @@
 
           <!-- GESCON / SIC -->
           <div>
-            <p class="text-xs font-semibold text-amber-600 uppercase tracking-wide mb-3">GESCON / SIC</p>
-            <div class="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+            <div class="flex items-center justify-between mb-3">
+              <p class="text-xs font-semibold text-amber-600 uppercase tracking-wide">GESCON / SIC</p>
+              <Button v-if="!editandoGescon" icon="pi pi-pencil" label="Editar" size="small" text severity="secondary"
+                @click="editandoGescon = true" />
+              <div v-else class="flex gap-2">
+                <Button label="Cancelar" size="small" text severity="secondary" @click="editandoGescon = false" />
+                <Button label="Guardar" size="small" icon="pi pi-check" :loading="guardandoGescon" @click="guardarGescon" />
+              </div>
+            </div>
+            <!-- Modo lectura -->
+            <div v-if="!editandoGescon" class="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
               <InfoField label="Código SIC" :value="contrato.codigo_sic" />
               <InfoField label="Código GESCON" :value="contrato.gescon_codigo" />
               <InfoField label="GESCON inicio" :value="formatFecha(contrato.gescon_fecha_inicio)" />
               <InfoField label="GESCON fin" :value="formatFecha(contrato.gescon_fecha_fin)" />
               <InfoField label="Precio GESCON" :value="contrato.gescon_precio != null ? `$${Number(contrato.gescon_precio).toFixed(4)}` : null" />
               <InfoField label="Cantidades GESCON (kWh)" :value="contrato.gescon_cantidades_kwh != null ? Number(contrato.gescon_cantidades_kwh).toLocaleString('es-CO') : null" />
+            </div>
+            <!-- Modo edición -->
+            <div v-else class="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <div class="flex flex-col gap-1">
+                <label class="text-xs font-medium text-gray-600">Código SIC</label>
+                <InputText v-model="formGescon.codigo_sic" class="w-full" />
+              </div>
+              <div class="flex flex-col gap-1">
+                <label class="text-xs font-medium text-gray-600">Código GESCON</label>
+                <InputText v-model="formGescon.gescon_codigo" class="w-full" />
+              </div>
+              <div class="flex flex-col gap-1">
+                <label class="text-xs font-medium text-gray-600">Precio GESCON ($/kWh)</label>
+                <InputNumber v-model="formGescon.gescon_precio" :maxFractionDigits="4" class="w-full" />
+              </div>
+              <div class="flex flex-col gap-1">
+                <label class="text-xs font-medium text-gray-600">GESCON inicio</label>
+                <DatePicker v-model="formGescon.gescon_fecha_inicio" dateFormat="yy-mm-dd" showIcon class="w-full" />
+              </div>
+              <div class="flex flex-col gap-1">
+                <label class="text-xs font-medium text-gray-600">GESCON fin</label>
+                <DatePicker v-model="formGescon.gescon_fecha_fin" dateFormat="yy-mm-dd" showIcon class="w-full" />
+              </div>
+              <div class="flex flex-col gap-1">
+                <label class="text-xs font-medium text-gray-600">Cantidades GESCON (kWh)</label>
+                <InputNumber v-model="formGescon.gescon_cantidades_kwh" :maxFractionDigits="3" class="w-full" />
+              </div>
             </div>
           </div>
 
@@ -416,6 +456,10 @@
 
       <!-- ══ PROYECTOS ══ -->
       <TabPanel :header="`Proyectos (${contrato.proyectos?.length || 0})`">
+        <div class="flex justify-end mb-3">
+          <Button label="Asociar proyecto" icon="pi pi-plus" size="small" severity="secondary" outlined
+            @click="abrirAsociar" />
+        </div>
         <div v-if="contrato.proyectos?.length" class="p-2">
           <DataTable :value="contrato.proyectos" stripedRows class="text-sm" rowHover>
             <Column field="id" header="ID" style="width:60px" />
@@ -435,6 +479,36 @@
         </div>
       </TabPanel>
     </TabView>
+
+    <!-- Wizard edición completa -->
+    <PPAContratoWizard v-if="showWizard" :visible="showWizard"
+      :initialData="wizardInitialData"
+      :editandoId="wizardEditandoId"
+      @cerrar="showWizard = false"
+      @editado="onWizardEditado"
+      @creado="onWizardCreado" />
+
+    <!-- Dialog asociar proyecto -->
+    <Dialog v-model:visible="showAsociar" header="Asociar proyecto" modal :style="{ width: '420px' }">
+      <div class="flex flex-col gap-2 pt-1">
+        <label class="text-xs font-medium text-gray-600">Buscar proyecto</label>
+        <Select
+          v-model="proyectoSeleccionado"
+          :options="todosProyectosDisponibles"
+          optionLabel="nombre_comercial"
+          placeholder="Seleccionar proyecto…"
+          filter
+          filterPlaceholder="Buscar…"
+          class="w-full"
+          :loading="cargandoProyectos"
+        />
+      </div>
+      <template #footer>
+        <Button label="Cancelar" severity="secondary" outlined @click="showAsociar = false" />
+        <Button label="Asociar" icon="pi pi-check" :loading="asociando"
+          :disabled="!proyectoSeleccionado" @click="asociarProyecto" />
+      </template>
+    </Dialog>
   </div>
 
   <!-- Loading -->
@@ -464,8 +538,13 @@ import Column from 'primevue/column'
 import Divider from 'primevue/divider'
 import SelectButton from 'primevue/selectbutton'
 import InputText from 'primevue/inputtext'
+import InputNumber from 'primevue/inputnumber'
+import DatePicker from 'primevue/datepicker'
 import Textarea from 'primevue/textarea'
+import Dialog from 'primevue/dialog'
+import Select from 'primevue/select'
 import InfoField from '@/components/InfoField.vue'
+import PPAContratoWizard from '@/views/Contratos/PPAContratoWizard.vue'
 import api from '@/api/client'
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
@@ -505,6 +584,46 @@ async function guardarId() {
     toast.add({ severity: 'error', summary: 'Error', detail: e.response?.data?.detail || e.message, life: 4000 })
   } finally {
     guardandoId.value = false
+  }
+}
+
+// Edición inline de GESCON
+const editandoGescon = ref(false)
+const guardandoGescon = ref(false)
+const formGescon = reactive({
+  codigo_sic: null,
+  gescon_codigo: null,
+  gescon_fecha_inicio: null,
+  gescon_fecha_fin: null,
+  gescon_precio: null,
+  gescon_cantidades_kwh: null,
+})
+
+function toISODate(v) {
+  if (!v) return null
+  if (v instanceof Date) return v.toISOString().slice(0, 10)
+  return String(v).slice(0, 10)
+}
+
+async function guardarGescon() {
+  guardandoGescon.value = true
+  try {
+    const payload = {
+      codigo_sic: formGescon.codigo_sic || null,
+      gescon_codigo: formGescon.gescon_codigo || null,
+      gescon_fecha_inicio: toISODate(formGescon.gescon_fecha_inicio),
+      gescon_fecha_fin: toISODate(formGescon.gescon_fecha_fin),
+      gescon_precio: formGescon.gescon_precio,
+      gescon_cantidades_kwh: formGescon.gescon_cantidades_kwh,
+    }
+    await api.patch(`/ppa/${contrato.value.id}`, payload)
+    Object.assign(contrato.value, payload)
+    editandoGescon.value = false
+    toast.add({ severity: 'success', summary: 'GESCON actualizado', life: 2000 })
+  } catch (e) {
+    toast.add({ severity: 'error', summary: 'Error', detail: e.response?.data?.detail || e.message, life: 4000 })
+  } finally {
+    guardandoGescon.value = false
   }
 }
 
@@ -710,11 +829,84 @@ const cantidadesAnuales = computed(() => {
   return agregarPorAño(cantidadesMensuales.value, ['energia_minima', 'energia_maxima'], 'suma')
 })
 
+// Wizard edición completa
+const showWizard = ref(false)
+const wizardInitialData = ref(null)
+const wizardEditandoId = ref(null)
+
+function abrirEdicionCompleta() {
+  wizardInitialData.value = { ...contrato.value }
+  wizardEditandoId.value = contrato.value.id
+  showWizard.value = true
+}
+
+function onWizardEditado() {
+  showWizard.value = false
+  cargar()
+  toast.add({ severity: 'success', summary: 'Contrato actualizado', life: 2000 })
+}
+
+function onWizardCreado() {
+  showWizard.value = false
+  cargar()
+}
+
+// Asociar proyecto
+const showAsociar = ref(false)
+const proyectoSeleccionado = ref(null)
+const todosProyectos = ref([])
+const cargandoProyectos = ref(false)
+const asociando = ref(false)
+
+const todosProyectosDisponibles = computed(() => {
+  const asociadosIds = new Set((contrato.value?.proyectos ?? []).map(p => p.id))
+  return todosProyectos.value.filter(p => !asociadosIds.has(p.id))
+})
+
+async function abrirAsociar() {
+  showAsociar.value = true
+  proyectoSeleccionado.value = null
+  if (todosProyectos.value.length) return
+  cargandoProyectos.value = true
+  try {
+    const { data } = await api.get('/proyectos', { params: { size: 500 } })
+    todosProyectos.value = (data.items ?? data).sort((a, b) =>
+      (a.nombre_comercial ?? '').localeCompare(b.nombre_comercial ?? ''))
+  } catch (e) {
+    toast.add({ severity: 'error', summary: 'Error', detail: e.message, life: 3000 })
+  } finally {
+    cargandoProyectos.value = false
+  }
+}
+
+async function asociarProyecto() {
+  if (!proyectoSeleccionado.value) return
+  asociando.value = true
+  try {
+    await api.post(`/ppa/${contrato.value.id}/proyectos`, { proyecto_id: proyectoSeleccionado.value.id })
+    contrato.value.proyectos = [...(contrato.value.proyectos ?? []), proyectoSeleccionado.value]
+    showAsociar.value = false
+    toast.add({ severity: 'success', summary: 'Proyecto asociado', detail: proyectoSeleccionado.value.nombre_comercial, life: 2500 })
+  } catch (e) {
+    toast.add({ severity: 'error', summary: 'Error', detail: e.response?.data?.detail || e.message, life: 4000 })
+  } finally {
+    asociando.value = false
+  }
+}
+
 async function cargar() {
   loading.value = true
   try {
     const { data } = await api.get(`/ppa/${route.params.id}`)
     contrato.value = data
+    Object.assign(formGescon, {
+      codigo_sic: data.codigo_sic ?? null,
+      gescon_codigo: data.gescon_codigo ?? null,
+      gescon_fecha_inicio: data.gescon_fecha_inicio ?? null,
+      gescon_fecha_fin: data.gescon_fecha_fin ?? null,
+      gescon_precio: data.gescon_precio ?? null,
+      gescon_cantidades_kwh: data.gescon_cantidades_kwh ?? null,
+    })
     if (data.numero_codigo_contrato || data.codigo_sic) cargarAsic(data)
   } catch (e) {
     toast.add({ severity: 'error', summary: 'Error', detail: e.message, life: 3000 })

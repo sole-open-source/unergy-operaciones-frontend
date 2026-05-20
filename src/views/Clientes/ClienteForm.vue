@@ -29,10 +29,40 @@
         <label class="field-label">Ciudad</label>
         <InputText v-model="f.ciudad" class="w-full" />
       </div>
+      <div>
+        <label class="field-label">Departamento</label>
+        <InputText v-model="f.departamento" class="w-full" />
+      </div>
       <div class="col-span-2">
         <label class="field-label">Dirección</label>
         <InputText v-model="f.direccion" class="w-full" />
       </div>
+
+      <!-- Información bancaria -->
+      <div class="col-span-2">
+        <div class="border-t pt-4 mt-1">
+          <p class="text-xs font-semibold uppercase tracking-wide mb-3" style="color: #915BD8;">Información bancaria</p>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="field-label">Banco</label>
+              <InputText v-model="f.banco" class="w-full" placeholder="Ej: Bancolombia" />
+            </div>
+            <div>
+              <label class="field-label">Tipo de cuenta</label>
+              <Select v-model="f.tipo_cuenta" :options="['ahorros', 'corriente']" class="w-full" placeholder="Seleccionar" showClear />
+            </div>
+            <div>
+              <label class="field-label">Número de cuenta</label>
+              <InputText v-model="f.numero_cuenta" class="w-full" />
+            </div>
+            <div>
+              <label class="field-label">Titular de la cuenta</label>
+              <InputText v-model="f.titular_cuenta" class="w-full" />
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div>
         <label class="field-label">IVA %</label>
         <InputNumber v-model="f.iva_pct" :maxFractionDigits="2" class="w-full" />

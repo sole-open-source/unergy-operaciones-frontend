@@ -59,6 +59,10 @@
           </span>
         </div>
         <p v-else class="text-sm" style="color: #6b5a8a;">Solenium no disponible</p>
+        <div v-if="data.gen_solenium_last_date" class="mt-2 text-xs" style="color: #6b5a8a;">
+          <i class="pi pi-database text-[10px] mr-1" style="color: #10B981;" />
+          {{ data.gen_solenium_projects }} plantas sincronizadas · último dato {{ data.gen_solenium_last_date }}
+        </div>
       </div>
 
       <div class="bg-white rounded-xl shadow-sm p-5" style="border: 1px solid #e8e0f0;">
@@ -150,6 +154,49 @@
         </div>
         <div v-else>
           <p class="text-sm" style="color: #6b5a8a;">{{ data.ppa_con_compromisos || 0 }} contratos con compromisos este mes</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Cumplimiento PPA Summary Card -->
+    <div v-if="data.cumplimiento_ppa" class="bg-white rounded-xl shadow-sm p-5" style="border: 1px solid #e8e0f0;">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-sm font-semibold" style="color: #2C2039;">Cumplimiento PPA — Resumen</h3>
+        <RouterLink to="/mem/cumplimiento" class="text-xs font-medium" style="color: #915BD8;">Ver detalle →</RouterLink>
+      </div>
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="rounded-lg p-3" style="background: rgba(214,68,85,0.05);">
+          <p class="text-xs uppercase font-semibold" style="color: #6b5a8a;">Contratos en déficit</p>
+          <p class="text-2xl font-bold mt-1" :style="{ color: data.cumplimiento_ppa.contratos_con_deficit > 0 ? '#D64455' : '#10B981' }">
+            {{ data.cumplimiento_ppa.contratos_con_deficit ?? 0 }}
+          </p>
+        </div>
+        <div class="rounded-lg p-3" style="background: rgba(16,185,129,0.05);">
+          <p class="text-xs uppercase font-semibold" style="color: #6b5a8a;">Contratos cumplidos</p>
+          <p class="text-2xl font-bold mt-1" style="color: #10B981;">
+            {{ data.cumplimiento_ppa.contratos_cumplidos ?? 0 }}
+          </p>
+        </div>
+        <div class="rounded-lg p-3" style="background: rgba(240,192,64,0.08);">
+          <p class="text-xs uppercase font-semibold" style="color: #6b5a8a;">Exposición bolsa</p>
+          <p class="text-lg font-bold mt-1" style="color: #CA8A04;">
+            {{ fmtCOP(data.cumplimiento_ppa.exposicion_bolsa_cop) }}
+          </p>
+        </div>
+        <div class="rounded-lg p-3" style="background: rgba(145,91,216,0.05);">
+          <p class="text-xs uppercase font-semibold" style="color: #6b5a8a;">Cobertura</p>
+          <div class="mt-1">
+            <div class="flex items-center gap-2">
+              <div class="flex-1 h-3 rounded-full overflow-hidden" style="background: #f3f0f7;">
+                <div class="h-full rounded-full transition-all"
+                  :style="{
+                    width: Math.min(data.cumplimiento_ppa.cobertura_pct || 0, 100) + '%',
+                    backgroundColor: (data.cumplimiento_ppa.cobertura_pct || 0) >= 90 ? '#10B981' : (data.cumplimiento_ppa.cobertura_pct || 0) >= 70 ? '#F0C040' : '#D64455'
+                  }" />
+              </div>
+              <span class="text-sm font-bold" style="color: #2C2039;">{{ (data.cumplimiento_ppa.cobertura_pct || 0).toFixed(0) }}%</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -272,6 +319,11 @@ const fallasBreakdown = computed(() => {
   }))
 })
 
+function fmtCOP(v) {
+  if (v == null) return '$0'
+  return '$' + Math.round(v).toLocaleString('es-CO')
+}
+
 const cumplimientoColor = computed(() => {
   const st = cumplimiento.value?.totales?.estado
   if (st === 'deficit') return '#D64455'
@@ -349,12 +401,25 @@ const criticalAlerts = computed(() => {
       to: '/garantias',
     })
   }
+  if (data.value.liquidaciones_pendientes > 0) {
+    alerts.push({
+      key: 'liquidaciones-pendientes',
+      title: `${data.value.liquidaciones_pendientes} proyecto${data.value.liquidaciones_pendientes > 1 ? 's' : ''} sin liquidación este mes`,
+      detail: 'Proyectos en operación que requieren liquidación',
+      icon: 'pi pi-file-edit',
+      iconColor: '#915BD8',
+      bgColor: 'rgba(145,91,216,0.1)',
+      to: '/liquidaciones',
+    })
+  }
   return alerts
 })
 
 const quickLinks = [
   { to: '/generacion-solar', label: 'Generación Solar', icon: 'pi pi-sun', bg: 'rgba(240,192,64,0.15)', color: '#D4A017' },
   { to: '/mem/cumplimiento', label: 'Cumplimiento PPA', icon: 'pi pi-shield', bg: 'rgba(16,185,129,0.1)', color: '#10B981' },
+  { to: '/mem/descubrimientos', label: 'Descubrimientos', icon: 'pi pi-bolt', bg: 'rgba(240,192,64,0.1)', color: '#F0C040' },
+  { to: '/liquidaciones', label: 'Liquidaciones', icon: 'pi pi-file-edit', bg: 'rgba(145,91,216,0.08)', color: '#915BD8' },
   { to: '/garantias', label: 'Garantías', icon: 'pi pi-wallet', bg: 'rgba(145,91,216,0.1)', color: '#915BD8' },
   { to: '/alertas', label: 'Centro de Alertas', icon: 'pi pi-exclamation-circle', bg: 'rgba(214,68,85,0.08)', color: '#D64455' },
 ]

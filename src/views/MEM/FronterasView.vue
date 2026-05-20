@@ -16,8 +16,8 @@
       </div>
     </div>
 
-    <!-- Stats cards -->
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <!-- Resumen Card -->
+    <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
       <div v-for="stat in stats" :key="stat.label"
            class="bg-white rounded-xl shadow-sm p-4" style="border: 1px solid #e8e0f0;">
         <p class="text-xs uppercase tracking-wide font-semibold" style="color: #6b5a8a;">{{ stat.label }}</p>
@@ -60,6 +60,22 @@
             <Tag :value="data.estado" :severity="estadoSeverity(data.estado)" />
           </template>
         </Column>
+        <Column header="Est. Operacional" style="min-width: 130px">
+          <template #body="{ data }">
+            <span v-if="data.estado_operacional"
+              class="text-xs px-2 py-0.5 rounded-full font-semibold"
+              :style="opStyle(data.estado_operacional)">
+              {{ opLabel(data.estado_operacional) }}
+            </span>
+            <span v-else class="text-xs" style="color: #9b89b5;">—</span>
+          </template>
+        </Column>
+        <Column field="quoia_meter_id" header="Medidor Quoia" style="min-width: 120px">
+          <template #body="{ data }">
+            <span v-if="data.quoia_meter_id" class="font-mono text-xs" style="color: #6b5a8a;">{{ data.quoia_meter_id }}</span>
+            <span v-else class="text-xs" style="color: #c4b8d4;">—</span>
+          </template>
+        </Column>
         <Column field="operador_red" header="Operador" sortable style="min-width: 120px" />
         <Column field="capacidad_efectiva_mw" header="Cap. MW" sortable style="min-width: 100px">
           <template #body="{ data }">
@@ -67,31 +83,94 @@
           </template>
         </Column>
         <Column field="municipio" header="Municipio" sortable style="min-width: 130px" />
-        <Column field="departamento" header="Departamento" sortable style="min-width: 130px" />
+        <Column header="" style="width: 90px">
+          <template #body="{ data }">
+            <Button icon="pi pi-pencil" text rounded size="small" severity="secondary"
+              @click="editFrontera(data)" v-tooltip="'Editar'" />
+            <Button icon="pi pi-trash" text rounded size="small" severity="danger"
+              @click="deleteFrontera(data)" v-tooltip="'Eliminar'" />
+          </template>
+        </Column>
       </DataTable>
     </div>
+
+    <!-- Edit Dialog -->
+    <Dialog v-model:visible="showEdit" :header="editingFrontera ? 'Editar Frontera' : 'Frontera'"
+      modal class="w-full max-w-lg">
+      <div v-if="editForm" class="space-y-4 pt-2">
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="text-xs font-semibold uppercase block mb-1" style="color: #6b5a8a;">Código frontera</label>
+            <InputText v-model="editForm.codigo_frontera" class="w-full" />
+          </div>
+          <div>
+            <label class="text-xs font-semibold uppercase block mb-1" style="color: #6b5a8a;">Nombre</label>
+            <InputText v-model="editForm.nombre_frontera" class="w-full" />
+          </div>
+          <div>
+            <label class="text-xs font-semibold uppercase block mb-1" style="color: #6b5a8a;">Estado</label>
+            <Dropdown v-model="editForm.estado" :options="estadoOptions" optionLabel="label" optionValue="value" class="w-full" />
+          </div>
+          <div>
+            <label class="text-xs font-semibold uppercase block mb-1" style="color: #6b5a8a;">Estado operacional</label>
+            <Dropdown v-model="editForm.estado_operacional" :options="opOptions" optionLabel="label" optionValue="value"
+              class="w-full" showClear />
+          </div>
+          <div>
+            <label class="text-xs font-semibold uppercase block mb-1" style="color: #6b5a8a;">Medidor Quoia ID</label>
+            <InputText v-model="editForm.quoia_meter_id" class="w-full" />
+          </div>
+          <div>
+            <label class="text-xs font-semibold uppercase block mb-1" style="color: #6b5a8a;">Operador red</label>
+            <InputText v-model="editForm.operador_red" class="w-full" />
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <Button label="Cancelar" severity="secondary" text @click="showEdit = false" />
+        <Button label="Guardar" :loading="saving" @click="saveFrontera" />
+      </template>
+    </Dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useToast } from 'primevue/usetoast'
+import { useConfirm } from 'primevue/useconfirm'
 import api from '@/api/client'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import InputText from 'primevue/inputtext'
 import Dropdown from 'primevue/dropdown'
 import Tag from 'primevue/tag'
+import Button from 'primevue/button'
+import Dialog from 'primevue/dialog'
+
+const toast = useToast()
+const confirm = useConfirm()
 
 const fronteras = ref([])
 const loading = ref(true)
+const saving = ref(false)
 const search = ref('')
 const estadoFilter = ref(null)
+const showEdit = ref(false)
+const editingFrontera = ref(null)
+const editForm = ref(null)
 
 const estadoOptions = [
   { label: 'Activa', value: 'activa' },
   { label: 'En registro', value: 'en_registro' },
   { label: 'En falla', value: 'en_falla' },
   { label: 'Cancelada', value: 'cancelada' },
+]
+
+const opOptions = [
+  { label: 'Normal', value: 'normal' },
+  { label: 'Degradada', value: 'degradada' },
+  { label: 'Sin datos', value: 'sin_datos' },
+  { label: 'Fuera de servicio', value: 'fuera_servicio' },
 ]
 
 const filteredFronteras = computed(() => {
@@ -104,7 +183,8 @@ const filteredFronteras = computed(() => {
       (f.nombre_frontera || '').toLowerCase().includes(s) ||
       (f.proyecto_nombre || '').toLowerCase().includes(s) ||
       (f.operador_red || '').toLowerCase().includes(s) ||
-      (f.municipio || '').toLowerCase().includes(s)
+      (f.municipio || '').toLowerCase().includes(s) ||
+      (f.quoia_meter_id || '').toLowerCase().includes(s)
     )
   }
   return list
@@ -112,11 +192,13 @@ const filteredFronteras = computed(() => {
 
 const stats = computed(() => {
   const all = fronteras.value
+  const sinDatos = all.filter(f => f.estado_operacional === 'sin_datos' || (!f.quoia_meter_id && f.estado === 'activa')).length
   return [
     { label: 'Total', value: all.length, color: '#2C2039' },
     { label: 'Activas', value: all.filter(f => f.estado === 'activa').length, color: '#10B981' },
     { label: 'En registro', value: all.filter(f => f.estado === 'en_registro').length, color: '#F0C040' },
     { label: 'Cap. total MW', value: all.reduce((s, f) => s + (Number(f.capacidad_efectiva_mw) || 0), 0).toFixed(1), color: '#915BD8' },
+    { label: 'Sin datos', value: sinDatos, color: sinDatos > 0 ? '#D64455' : '#10B981' },
   ]
 })
 
@@ -134,7 +216,69 @@ function estadoSeverity(e) {
   return map[e] || 'info'
 }
 
-onMounted(async () => {
+function opLabel(v) {
+  const map = { normal: 'Normal', degradada: 'Degradada', sin_datos: 'Sin datos', fuera_servicio: 'Fuera de servicio' }
+  return map[v] || v
+}
+function opStyle(v) {
+  const map = {
+    normal: 'background: rgba(16,185,129,0.12); color: #10B981;',
+    degradada: 'background: rgba(240,192,64,0.12); color: #CA8A04;',
+    sin_datos: 'background: rgba(214,68,85,0.12); color: #D64455;',
+    fuera_servicio: 'background: rgba(156,163,175,0.12); color: #6B7280;',
+  }
+  return map[v] || 'color: #6b5a8a;'
+}
+
+function editFrontera(f) {
+  editingFrontera.value = f
+  editForm.value = {
+    codigo_frontera: f.codigo_frontera,
+    nombre_frontera: f.nombre_frontera,
+    estado: f.estado,
+    estado_operacional: f.estado_operacional || null,
+    quoia_meter_id: f.quoia_meter_id || '',
+    operador_red: f.operador_red || '',
+  }
+  showEdit.value = true
+}
+
+async function saveFrontera() {
+  if (!editingFrontera.value || !editForm.value) return
+  saving.value = true
+  try {
+    await api.patch(`/fronteras/${editingFrontera.value.id}`, editForm.value)
+    toast.add({ severity: 'success', summary: 'Frontera actualizada', life: 2000 })
+    showEdit.value = false
+    await loadData()
+  } catch (e) {
+    toast.add({ severity: 'error', summary: 'Error', detail: e.response?.data?.detail || 'Error al guardar', life: 4000 })
+  } finally {
+    saving.value = false
+  }
+}
+
+function deleteFrontera(f) {
+  confirm.require({
+    message: `¿Eliminar la frontera ${f.codigo_frontera}? Esta acción no se puede deshacer.`,
+    header: 'Confirmar eliminación',
+    icon: 'pi pi-exclamation-triangle',
+    rejectProps: { label: 'Cancelar', severity: 'secondary' },
+    acceptProps: { label: 'Eliminar', severity: 'danger' },
+    accept: async () => {
+      try {
+        await api.delete(`/fronteras/${f.id}`)
+        toast.add({ severity: 'success', summary: 'Frontera eliminada', life: 2000 })
+        await loadData()
+      } catch (e) {
+        toast.add({ severity: 'error', summary: 'Error', detail: e.response?.data?.detail || 'Error al eliminar', life: 4000 })
+      }
+    },
+  })
+}
+
+async function loadData() {
+  loading.value = true
   try {
     const { data } = await api.get('/fronteras')
     fronteras.value = data
@@ -143,5 +287,7 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
-})
+}
+
+onMounted(loadData)
 </script>

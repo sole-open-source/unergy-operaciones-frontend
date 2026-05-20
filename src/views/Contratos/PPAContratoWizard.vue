@@ -1,6 +1,6 @@
 <template>
   <Dialog :visible="visible" @update:visible="$emit('update:visible', $event)" modal :style="{ width: '820px' }" :breakpoints="{ '900px': '95vw' }"
-    :header="null" :closable="true" @hide="$emit('cerrar')">
+    :header="editandoId ? 'Editar contrato PPA' : 'Nuevo contrato PPA'" :closable="true" @hide="$emit('cerrar')">
 
     <!-- Step indicator -->
     <div class="px-6 pt-5 pb-4 border-b border-gray-100">
@@ -150,7 +150,11 @@
           <div class="grid grid-cols-3 gap-4">
             <div class="flex flex-col gap-1">
               <label class="field-label">Índice de indexación</label>
-              <InputText v-model="form.indice_indexacion" placeholder="IPP, IPC…" class="w-full" />
+              <Select v-model="form.indice_indexacion"
+                :options="INDICES_INDEXACION"
+                optionLabel="label" optionValue="value"
+                placeholder="Seleccionar índice"
+                showClear class="w-full" />
             </div>
             <div class="flex flex-col gap-1">
               <label class="field-label">Periodicidad indexación</label>
@@ -231,7 +235,7 @@
       <template v-if="step === 4">
         <p class="step-title">Compromisos de energía <span class="normal-case font-normal text-gray-400">(opcional)</span></p>
         <p class="text-xs text-gray-400 mb-3">
-          Copia las columnas <strong>Año · Mes · Mín · Máx</strong> desde Excel y pégalas aquí (valores en MWh/mes).
+          Copia las columnas <strong>Año · Mes · Mín</strong> desde Excel y pégalas aquí (valores en MWh/mes). La columna <strong>Máx</strong> es opcional.
         </p>
         <Textarea
           v-model="energiaPaste"
@@ -347,7 +351,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { useToast } from 'primevue/usetoast'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
@@ -361,8 +365,12 @@ import Textarea from 'primevue/textarea'
 import NuevoClienteDialog from '@/components/NuevoClienteDialog.vue'
 import api from '@/api/client'
 
-defineProps({ visible: Boolean })
-const emit = defineEmits(['update:visible', 'cerrar', 'creado'])
+const props = defineProps({
+  visible: Boolean,
+  initialData: { type: Object, default: null },
+  editandoId: { type: Number, default: null },
+})
+const emit = defineEmits(['update:visible', 'cerrar', 'creado', 'editado'])
 
 const toast = useToast()
 const PREVIEW_ROWS = 5
@@ -381,6 +389,15 @@ const PERIODICIDADES = [
   { label: 'Bimestral', value: 'bimestral' },
   { label: 'Trimestral', value: 'trimestral' },
   { label: 'Anual', value: 'anual' },
+]
+
+const INDICES_INDEXACION = [
+  { label: 'IPP', value: 'IPP' },
+  { label: 'IPC', value: 'IPC' },
+  { label: 'IPC + spread', value: 'IPC + spread' },
+  { label: 'IPP + spread', value: 'IPP + spread' },
+  { label: 'Fijo', value: 'Fijo' },
+  { label: 'Otro', value: 'Otro' },
 ]
 
 const MESES_ES = {
@@ -466,6 +483,44 @@ const form = reactive({
   gescon_precio: null, gescon_cantidades_kwh: null,
 })
 
+const EXCLUIR_DUPLICADO = ['numero_codigo_contrato', 'fecha_inicio', 'fecha_fin',
+  'gescon_fecha_inicio', 'gescon_fecha_fin', 'gescon_codigo']
+
+watch(() => props.visible, (visible) => {
+  if (visible && props.initialData) {
+    const esEdicion = !!props.editandoId
+    Object.keys(form).forEach(k => {
+      const limpiar = !esEdicion && EXCLUIR_DUPLICADO.includes(k)
+      form[k] = limpiar ? null : (props.initialData[k] ?? null)
+    })
+
+    if (esEdicion) {
+      // Tarifas: { año, mes, tarifa } — mismo formato que tarifasRows
+      const tarifasData = props.initialData.tarifas ?? []
+      tarifasRows.value = tarifasData.map(t => ({ año: t.año, mes: t.mes, tarifa: t.tarifa }))
+      tarifasPaste.value = tarifasData.map(t => `${t.año}\t${t.mes}\t${t.tarifa}`).join('\n')
+
+      // Cantidades: { año, mes, energia_minima, energia_maxima }
+      const cantData = props.initialData.compromisos_energia ?? []
+      energiaRows.value = cantData.map(c => ({ año: c.año, mes: c.mes, energia_minima: c.energia_minima, energia_maxima: c.energia_maxima }))
+      energiaPaste.value = cantData.map(c => `${c.año}\t${c.mes}\t${c.energia_minima}\t${c.energia_maxima}`).join('\n')
+
+      // Proyectos: precargar seleccionados cuando todosProyectos esté disponible
+      const proyectosData = props.initialData.proyectos ?? []
+      if (proyectosData.length) {
+        watch(() => todosProyectos.value, (lista) => {
+          if (!lista.length) return
+          proyectosSeleccionados.value = lista.filter(p =>
+            proyectosData.some(pd => pd.id === p.id)
+          )
+        }, { immediate: true })
+      } else {
+        proyectosSeleccionados.value = []
+      }
+    }
+  }
+}, { immediate: true })
+
 // ── Parsers ─────────────────────────────────────────────────────────────────
 
 function splitRow(line) {
@@ -502,13 +557,13 @@ function parseEnergia() {
   const rows = []
   for (const [i, line] of lines.entries()) {
     const cols = splitRow(line)
-    if (cols.length < 4) { energiaError.value = `Fila ${i + 1}: se esperan 4 columnas`; energiaRows.value = []; return }
+    if (cols.length < 3) { energiaError.value = `Fila ${i + 1}: se esperan al menos 3 columnas (Año · Mes · Mín)`; energiaRows.value = []; return }
     const año = parseInt(cols[0].trim(), 10)
     const mes = parseMes(cols[1].trim())
     const min = parseFloat(cols[2].trim().replace(',', '.'))
-    const max = parseFloat(cols[3].trim().replace(',', '.'))
-    if (isNaN(año) || !mes || isNaN(min) || isNaN(max)) { energiaError.value = `Fila ${i + 1}: datos inválidos`; energiaRows.value = []; return }
-    rows.push({ año, mes, energia_minima: min, energia_maxima: max })
+    const max = cols[3] ? parseFloat(cols[3].trim().replace(',', '.')) : null
+    if (isNaN(año) || !mes || isNaN(min)) { energiaError.value = `Fila ${i + 1}: datos inválidos`; energiaRows.value = []; return }
+    rows.push({ año, mes, energia_minima: min, energia_maxima: (max !== null && !isNaN(max)) ? max : null })
   }
   energiaRows.value = rows
 }
@@ -546,23 +601,35 @@ async function guardar() {
     }
     payload.proyecto_ids = proyectosSeleccionados.value.map(p => p.id)
 
-    const { data: contrato } = await api.post('/ppa', payload)
+    let contrato
+    if (props.editandoId) {
+      const { data } = await api.patch(`/ppa/${props.editandoId}`, payload)
+      contrato = data
+    } else {
+      const { data } = await api.post('/ppa', payload)
+      contrato = data
+    }
 
+    const contratoId = contrato?.id ?? props.editandoId
     if (tarifasRows.value.length) {
-      await api.put(`/ppa/${contrato.id}/tarifas`, tarifasRows.value)
+      await api.put(`/ppa/${contratoId}/tarifas`, tarifasRows.value)
     }
     if (energiaRows.value.length) {
-      await api.put(`/ppa/${contrato.id}/compromisos`, energiaRows.value)
+      await api.put(`/ppa/${contratoId}/compromisos`, energiaRows.value)
     }
 
-    const msg = [
-      `Contrato "${contrato.nombre_interno || contrato.numero_codigo_contrato}" creado`,
-      tarifasRows.value.length ? `${tarifasRows.value.length} tarifas` : null,
-      energiaRows.value.length ? `${energiaRows.value.length} compromisos` : null,
-    ].filter(Boolean).join(' · ')
-
-    toast.add({ severity: 'success', summary: 'Contrato creado', detail: msg, life: 4000 })
-    emit('creado', contrato)
+    if (props.editandoId) {
+      toast.add({ severity: 'success', summary: 'Contrato actualizado', life: 3000 })
+      emit('editado', contrato)
+    } else {
+      const msg = [
+        `Contrato "${contrato.nombre_interno || contrato.numero_codigo_contrato}" creado`,
+        tarifasRows.value.length ? `${tarifasRows.value.length} tarifas` : null,
+        energiaRows.value.length ? `${energiaRows.value.length} compromisos` : null,
+      ].filter(Boolean).join(' · ')
+      toast.add({ severity: 'success', summary: 'Contrato creado', detail: msg, life: 4000 })
+      emit('creado', contrato)
+    }
     emit('cerrar')
   } catch (e) {
     toast.add({ severity: 'error', summary: 'Error al guardar', detail: e.response?.data?.detail || e.message, life: 5000 })

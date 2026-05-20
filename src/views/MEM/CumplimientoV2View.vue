@@ -2,9 +2,23 @@
   <div class="p-6 space-y-6 min-h-screen" style="background: #FDFAF7; color: #2C2039;">
 
     <!-- Header -->
-    <div>
-      <h1 class="text-2xl font-bold" style="color: #2C2039;">Cumplimiento PPA</h1>
-      <p class="text-sm mt-0.5" style="color: #7a6e8a;">Generación vs. compromisos contractuales de energía</p>
+    <div class="flex items-start justify-between">
+      <div>
+        <h1 class="text-2xl font-bold" style="color: #2C2039;">Cumplimiento PPA</h1>
+        <p class="text-sm mt-0.5" style="color: #7a6e8a;">Generación vs. compromisos contractuales de energía</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <span v-if="cacheSize" class="text-xs font-mono px-2 py-1 rounded" style="background: rgba(145,91,216,0.08); color: #915BD8;">
+          caché: {{ cacheSize }}
+        </span>
+        <button @click="clearCacheAndReload"
+          class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
+          style="border: 1px solid rgba(214,68,85,0.3); color: #D64455; background: rgba(214,68,85,0.05);"
+          :style="cacheClearing ? 'opacity: 0.6; pointer-events: none;' : ''">
+          <i class="pi pi-refresh text-xs" :class="{ 'pi-spin': cacheClearing }" />
+          Borrar caché y consultar energía
+        </button>
+      </div>
     </div>
 
     <!-- Tab bar -->
@@ -21,7 +35,7 @@
     </div>
 
     <!-- ═══════════════ CUMPLIMIENTO TAB ═══════════════ -->
-    <div v-show="activeTab === 0" class="space-y-6">
+    <div v-show="activeTab === 1" class="space-y-6">
 
       <!-- Selectors -->
       <div class="flex flex-wrap gap-3 items-end">
@@ -213,7 +227,7 @@
     </div>
 
     <!-- ═══════════════ SIMULADOR TAB ═══════════════ -->
-    <div v-show="activeTab === 1" class="space-y-5">
+    <div v-show="activeTab === 0" class="space-y-5">
 
       <!-- Controls -->
       <div class="flex flex-wrap items-end gap-3">
@@ -246,6 +260,15 @@
           style="border-color: rgba(240,192,64,0.5); color: #9a6700; background: rgba(240,192,64,0.08);"
         >
           <i class="pi pi-plus text-xs" />PPA nuevo
+        </button>
+        <button
+          @click="sortDesc = !sortDesc"
+          class="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm border transition"
+          style="border-color: rgba(145,91,216,0.25); color: #915BD8; background: transparent;"
+          v-tooltip="sortDesc ? 'Mayor cumplimiento primero' : 'Menor cumplimiento primero'"
+        >
+          <i class="pi text-xs" :class="sortDesc ? 'pi-sort-amount-down' : 'pi-sort-amount-up'" />
+          {{ sortDesc ? '↓ Mayor %' : '↑ Menor %' }}
         </button>
         <span class="text-xs" style="color: #7a6e8a;">Arrastra las plantas entre contratos para simular</span>
       </div>
@@ -294,7 +317,14 @@
         <p class="text-sm" style="color: #7a6e8a;">Cargando generación promedio de las plantas…</p>
       </div>
 
-      <Message v-else-if="simError" severity="error" :closable="false">{{ simError }}</Message>
+      <div v-else-if="simError" class="flex flex-col items-center gap-3 py-10">
+        <Message severity="error" :closable="false">{{ simError }}</Message>
+        <button @click="loadSimulator()"
+          class="px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+          style="background: #915BD8; color: white;">
+          <i class="pi pi-refresh mr-1" /> Reintentar
+        </button>
+      </div>
 
       <template v-else-if="simData">
 
@@ -306,17 +336,37 @@
               class="rounded-xl border transition-shadow flex flex-col"
               style="border-color: rgba(44,32,57,0.12); background: white;"
               :style="dragOver === c.id ? 'border-color: #915BD8; box-shadow: 0 0 0 2px rgba(145,91,216,0.18);' : ''"
-              @dragover.prevent="dragOver = c.id"
+              @dragover.prevent="onDragOver(c.id)"
               @drop.prevent="onDrop(c.id)"
             >
               <!-- Contract header -->
-              <div class="px-4 pt-3 pb-2 border-b flex items-start justify-between gap-2" style="border-color: rgba(44,32,57,0.07);">
-                <div class="min-w-0">
-                  <div class="flex items-center gap-1.5">
-                    <span class="font-bold text-sm truncate" style="color: #2C2039;">{{ c.nombre }}</span>
-                    <span v-if="c._ficticio" class="text-xs px-1.5 py-0.5 rounded font-medium flex-shrink-0" style="background: rgba(240,192,64,0.18); color: #9a6700;">Nuevo</span>
+              <div
+                class="px-4 pt-3 pb-2 border-b flex items-start justify-between gap-2 cursor-pointer select-none"
+                style="border-color: rgba(44,32,57,0.07);"
+                @click="toggleExpand(c.id)"
+              >
+                <div class="flex items-center gap-2 min-w-0">
+                  <i
+                    class="pi text-xs transition-transform flex-shrink-0"
+                    :class="expandedContratos.includes(c.id) ? 'pi-chevron-down' : 'pi-chevron-right'"
+                    style="color: #915BD8;"
+                  />
+                  <div class="min-w-0">
+                    <div class="flex items-center gap-1.5">
+                      <span class="font-bold text-sm truncate" style="color: #2C2039;">{{ c.nombre }}</span>
+                      <span v-if="c._ficticio" class="text-xs px-1.5 py-0.5 rounded font-medium flex-shrink-0" style="background: rgba(240,192,64,0.18); color: #9a6700;">Nuevo</span>
+                      <span class="text-xs font-mono flex-shrink-0" style="color: #7a6e8a;">{{ (simAssignments[c.id] || []).length }} plantas</span>
+                      <span v-if="simResults[c.id]?.pct !== null && simResults[c.id]?.pct !== undefined"
+                        class="text-xs font-semibold px-1.5 py-0.5 rounded flex-shrink-0"
+                        :style="simResults[c.id].estado === 'ok'
+                          ? 'background: rgba(46,125,50,0.12); color: #2e7d32;'
+                          : simResults[c.id].estado === 'deficit'
+                          ? 'background: rgba(214,68,85,0.12); color: #D64455;'
+                          : 'background: rgba(240,192,64,0.18); color: #9a6700;'"
+                      >{{ Math.round(simResults[c.id].pct) }}%</span>
+                    </div>
+                    <div class="text-xs mt-0.5 truncate" style="color: #7a6e8a;">{{ c.comprador_nombre }}</div>
                   </div>
-                  <div class="text-xs mt-0.5 truncate" style="color: #7a6e8a;">{{ c.comprador_nombre }}</div>
                 </div>
                 <div class="flex items-center gap-0.5 flex-shrink-0">
                   <button
@@ -380,8 +430,8 @@
                 </div>
               </div>
 
-              <!-- Plant drop zone -->
-              <div class="p-3 space-y-1.5 overflow-y-auto sim-plant-zone" style="min-height: 64px; max-height: 220px;">
+              <!-- Plant drop zone (collapsible) -->
+              <div v-show="expandedContratos.includes(c.id)" class="p-3 space-y-1.5 overflow-y-auto sim-plant-zone" style="min-height: 64px; max-height: 220px;">
                 <div
                   v-for="p in (simAssignments[c.id] || [])"
                   :key="p.id"
@@ -389,12 +439,26 @@
                   @dragstart="onDragStart(p, c.id)"
                   @dragend="onDragEnd"
                   class="flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg text-xs select-none"
-                  style="background: rgba(145,91,216,0.08); cursor: grab; border: 1px solid rgba(145,91,216,0.15);"
-                  :style="dragPlanta && dragPlanta.id === p.id ? 'opacity: 0.35;' : ''"
+                  :style="[
+                    p.comprado_por_unergy
+                      ? 'background: rgba(240,192,64,0.12); cursor: grab; border: 1px solid rgba(240,192,64,0.4);'
+                      : 'background: rgba(145,91,216,0.08); cursor: grab; border: 1px solid rgba(145,91,216,0.15);',
+                    dragPlanta && dragPlanta.id === p.id ? 'opacity: 0.35;' : '',
+                  ]"
                 >
-                  <span class="font-medium truncate" style="color: #2C2039; max-width: 128px;">{{ p.nombre }}</span>
+                  <div class="min-w-0">
+                    <span class="font-medium truncate block" style="color: #2C2039; max-width: 128px;">{{ p.nombre }}</span>
+                    <span v-if="p.es_duplicado" class="text-[10px] font-semibold px-1.5 py-0.5 rounded mt-0.5 inline-block"
+                      style="background: rgba(214,68,85,0.12); color: #D64455;"
+                      v-tooltip="'Duplicado — exposición en bolsa'"
+                    >Exp. bolsa</span>
+                    <span v-else-if="p.comprado_por_unergy" class="text-[10px] font-semibold px-1.5 py-0.5 rounded mt-0.5 inline-block"
+                      style="background: rgba(240,192,64,0.25); color: #9a6700;"
+                      v-tooltip="p.contrato_compra_nombre || 'Contrato de compra'"
+                    >Compra Unergy</span>
+                  </div>
                   <div class="text-right flex-shrink-0">
-                    <div class="font-mono font-semibold" style="color: #915BD8;">
+                    <div class="font-mono font-semibold" :style="p.es_duplicado ? 'color: #D64455;' : p.comprado_por_unergy ? 'color: #9a6700;' : 'color: #915BD8;'">
                       {{ p.avg_daily_mwh != null ? fmtMwh(p.avg_daily_mwh * simData.dias_mes * p.pct_despacho) : '—' }}
                     </div>
                     <div style="color: #7a6e8a;">{{ (p.pct_despacho * 100).toFixed(0) }}%</div>
@@ -438,11 +502,22 @@
               @dragstart="onDragStart(p, null)"
               @dragend="onDragEnd"
               class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs select-none"
-              style="background: rgba(44,32,57,0.06); cursor: grab; border: 1px solid rgba(44,32,57,0.10);"
-              :style="dragPlanta && dragPlanta.id === p.id ? 'opacity: 0.35;' : ''"
+              :style="[
+                p.comprado_por_unergy
+                  ? 'background: rgba(240,192,64,0.15); cursor: grab; border: 1px solid rgba(240,192,64,0.4);'
+                  : 'background: rgba(44,32,57,0.06); cursor: grab; border: 1px solid rgba(44,32,57,0.10);',
+                dragPlanta && dragPlanta.id === p.id ? 'opacity: 0.35;' : '',
+              ]"
             >
               <span class="font-medium" style="color: #2C2039;">{{ p.nombre }}</span>
-              <span class="font-mono" style="color: #7a6e8a;">
+              <span v-if="p.es_duplicado" class="font-semibold px-1.5 py-0.5 rounded"
+                style="background: rgba(214,68,85,0.12); color: #D64455;"
+              >Dup.</span>
+              <span v-else-if="p.comprado_por_unergy" class="font-semibold px-1.5 py-0.5 rounded"
+                style="background: rgba(240,192,64,0.25); color: #9a6700;"
+                v-tooltip="p.contrato_compra_nombre || 'Contrato de compra'"
+              >Compra</span>
+              <span class="font-mono" :style="p.es_duplicado ? 'color: #D64455;' : p.comprado_por_unergy ? 'color: #9a6700;' : 'color: #7a6e8a;'">
                 {{ p.avg_daily_mwh != null ? fmtMwh(p.avg_daily_mwh * simData.dias_mes) : '—' }}
               </span>
             </div>
@@ -461,6 +536,138 @@
 
       </template>
 
+    </div>
+
+    <!-- ═══════════════ PROYECTOS TAB ═══════════════ -->
+    <div v-show="activeTab === 2" class="space-y-5">
+
+      <!-- Month selector + mode switch -->
+      <div class="flex flex-wrap items-end gap-4">
+        <div class="flex flex-col gap-1">
+          <label class="text-xs font-semibold uppercase tracking-wider" style="color: #915BD8;">Año</label>
+          <Select v-model="pcYear" :options="years" class="w-24" @change="loadPlantasContratos" />
+        </div>
+        <div class="flex flex-col gap-1">
+          <label class="text-xs font-semibold uppercase tracking-wider" style="color: #915BD8;">Mes</label>
+          <Select v-model="pcMonth" :options="MESES_OPTIONS" optionLabel="label" optionValue="value" class="w-40" @change="loadPlantasContratos" />
+        </div>
+        <div class="flex rounded-lg overflow-hidden border" style="border-color: rgba(44,32,57,0.15);">
+          <button
+            v-for="mode in PC_MODES" :key="mode.key"
+            @click="pcMode = mode.key"
+            class="px-4 py-2 text-sm font-semibold transition-colors"
+            :style="pcMode === mode.key
+              ? `background: ${mode.bg}; color: ${mode.color};`
+              : 'background: transparent; color: #7a6e8a;'"
+          >{{ mode.label }}</button>
+        </div>
+        <span class="text-xs" style="color: #7a6e8a;">
+          {{ pcMode === 'venta' ? 'Plantas inscritas en GESCON por contrato de venta'
+           : pcMode === 'compra' ? 'Plantas que Unergy compra energía'
+           : 'Plantas sin asignación GESCON este mes (van a bolsa)' }}
+        </span>
+      </div>
+
+      <div v-if="pcLoading" class="flex flex-col items-center justify-center py-20 gap-3">
+        <ProgressSpinner style="width:48px;height:48px;" strokeWidth="4" animationDuration=".8s" />
+        <p class="text-sm" style="color: #7a6e8a;">Cargando plantas y contratos…</p>
+      </div>
+
+      <Message v-else-if="pcError" severity="error" :closable="false">{{ pcError }}</Message>
+
+      <template v-else-if="pcData">
+
+        <!-- VENTA mode -->
+        <template v-if="pcMode === 'venta'">
+          <div v-for="c in pcData.venta" :key="c.id"
+            class="rounded-xl border overflow-hidden" style="border-color: rgba(44,32,57,0.12); background: white;">
+            <div class="px-4 py-3 flex items-center justify-between"
+              style="background: rgba(145,91,216,0.04); border-bottom: 1px solid rgba(44,32,57,0.07);">
+              <div>
+                <span class="font-bold text-sm" style="color: #2C2039;">{{ c.nombre }}</span>
+                <span class="ml-2 text-xs" style="color: #7a6e8a;">{{ c.comprador_nombre }}</span>
+              </div>
+              <span class="text-xs font-mono px-2 py-0.5 rounded"
+                style="background: rgba(145,91,216,0.10); color: #915BD8;">
+                {{ c.plantas.length }} plantas
+              </span>
+            </div>
+            <div v-if="c.plantas.length" class="divide-y" style="border-color: rgba(44,32,57,0.05);">
+              <div v-for="p in c.plantas" :key="p.id" class="px-4 py-2.5 flex items-center justify-between text-sm"
+                :style="p.es_duplicado ? 'background: rgba(214,68,85,0.04);' : ''">
+                <div class="flex items-center gap-2">
+                  <span class="font-medium" style="color: #2C2039;">{{ p.nombre }}</span>
+                  <span v-if="p.es_duplicado" class="text-[10px] font-semibold px-1.5 py-0.5 rounded"
+                    style="background: rgba(214,68,85,0.12); color: #D64455;">Exp. bolsa</span>
+                  <span v-if="p.codigo_sic" class="text-xs font-mono px-1.5 py-0.5 rounded" style="background: rgba(44,32,57,0.06); color: #7a6e8a;">{{ p.codigo_sic }}</span>
+                  <span v-if="p.pct_despacho != null" class="text-xs font-mono" style="color: #915BD8;">{{ (p.pct_despacho * 100).toFixed(0) }}%</span>
+                </div>
+                <div class="text-xs font-mono text-right" style="color: #7a6e8a;">
+                  <span v-if="p.fecha_inicio">{{ p.fecha_inicio }}</span>
+                  <span v-if="p.fecha_inicio && p.fecha_fin"> → </span>
+                  <span v-if="p.fecha_fin" :style="isExpiringSoon(p.fecha_fin) ? 'color: #D64455; font-weight: 600;' : ''">{{ p.fecha_fin }}</span>
+                </div>
+              </div>
+            </div>
+            <div v-else class="px-4 py-4 text-xs text-center" style="color: rgba(44,32,57,0.3);">
+              Sin plantas asignadas en GESCON para {{ MESES[pcMonth - 1] }} {{ pcYear }}
+            </div>
+          </div>
+        </template>
+
+        <!-- COMPRA mode -->
+        <template v-if="pcMode === 'compra'">
+          <div v-if="!pcData.compra.length" class="text-center py-12 text-sm" style="color: #7a6e8a;">
+            No hay contratos de compra vigentes en {{ MESES[pcMonth - 1] }} {{ pcYear }}
+          </div>
+          <div v-for="c in pcData.compra" :key="c.id"
+            class="rounded-xl border overflow-hidden" style="border-color: rgba(240,192,64,0.4); background: white;">
+            <div class="px-4 py-3 flex items-center justify-between"
+              style="background: rgba(240,192,64,0.08); border-bottom: 1px solid rgba(240,192,64,0.2);">
+              <div>
+                <span class="font-bold text-sm" style="color: #9a6700;">{{ c.nombre }}</span>
+                <span class="ml-2 text-xs" style="color: #7a6e8a;">Vendedor: {{ c.vendedor_nombre }}</span>
+              </div>
+              <span class="text-xs font-mono px-2 py-0.5 rounded"
+                style="background: rgba(240,192,64,0.18); color: #9a6700;">
+                {{ c.plantas.length }} plantas
+              </span>
+            </div>
+            <div v-if="c.plantas.length" class="divide-y" style="border-color: rgba(44,32,57,0.05);">
+              <div v-for="p in c.plantas" :key="p.id" class="px-4 py-2.5 flex items-center justify-between text-sm">
+                <span class="font-medium" style="color: #2C2039;">{{ p.nombre }}</span>
+                <div class="text-xs font-mono text-right" style="color: #7a6e8a;">
+                  <span v-if="p.fecha_inicio">{{ p.fecha_inicio }}</span>
+                  <span v-if="p.fecha_inicio && p.fecha_fin"> → </span>
+                  <span v-if="p.fecha_fin" :style="isExpiringSoon(p.fecha_fin) ? 'color: #D64455; font-weight: 600;' : ''">{{ p.fecha_fin }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
+
+        <!-- BOLSA mode -->
+        <template v-if="pcMode === 'bolsa'">
+          <div class="rounded-xl border overflow-hidden" style="border-color: rgba(44,32,57,0.12); background: white;">
+            <div class="px-4 py-3" style="background: rgba(44,32,57,0.04); border-bottom: 1px solid rgba(44,32,57,0.07);">
+              <span class="font-bold text-sm" style="color: #2C2039;">Plantas en bolsa</span>
+              <span class="ml-2 text-xs" style="color: #7a6e8a;">Sin asignación GESCON en {{ MESES[pcMonth - 1] }} {{ pcYear }}</span>
+              <span class="ml-2 text-xs font-mono px-2 py-0.5 rounded" style="background: rgba(44,32,57,0.08); color: #7a6e8a;">
+                {{ pcData.bolsa.length }}
+              </span>
+            </div>
+            <div v-if="pcData.bolsa.length" class="divide-y" style="border-color: rgba(44,32,57,0.05);">
+              <div v-for="p in pcData.bolsa" :key="p.id" class="px-4 py-2.5 text-sm font-medium" style="color: #2C2039;">
+                {{ p.nombre }}
+              </div>
+            </div>
+            <div v-else class="px-4 py-8 text-xs text-center" style="color: rgba(44,32,57,0.3);">
+              Todas las plantas tienen asignación GESCON este mes
+            </div>
+          </div>
+        </template>
+
+      </template>
     </div>
 
     <!-- Floating month breakdown -->
@@ -493,21 +700,29 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="(p, pi) in anualData.meses[selectedMonthIdx].plantas" :key="pi" style="border-top: 1px solid rgba(44,32,57,0.06);">
+                <tr v-for="(p, pi) in anualData.meses[selectedMonthIdx].plantas" :key="pi"
+                  style="border-top: 1px solid rgba(44,32,57,0.06);"
+                  :style="p.es_duplicado ? 'background: rgba(214,68,85,0.04);' : ''"
+                >
                   <td class="py-2 pr-2 font-medium" style="color: #2C2039;">
                     {{ p.nombre }}
+                    <span v-if="p.es_duplicado" class="ml-1 text-[10px] font-semibold px-1.5 py-0.5 rounded" style="background: rgba(214,68,85,0.12); color: #D64455;">Exp. bolsa</span>
                     <span v-if="p.contrato" class="ml-1 text-xs font-normal px-1.5 py-0.5 rounded" style="color: #915BD8; background: rgba(145,91,216,0.08);">{{ p.contrato }}</span>
                     <span v-if="p.dias_en_contrato && p.dias_mes && p.dias_en_contrato < p.dias_mes" class="ml-1 text-xs font-normal" style="color: #7a6e8a;">{{ p.dias_en_contrato }}/{{ p.dias_mes }} días</span>
                   </td>
                   <td class="py-2 px-2 text-right font-mono text-xs" style="color: #7a6e8a;">{{ (p.pct_despacho * 100).toFixed(0) }}%</td>
                   <td class="py-2 px-2 text-right font-mono" style="color: #2C2039;">{{ p.gen_planta_mwh !== null ? fmtMwh(p.gen_planta_mwh) : '—' }}</td>
-                  <td class="py-2 pl-2 text-right font-mono font-semibold" style="color: #915BD8;">{{ p.gen_contrato_mwh !== null ? fmtMwh(p.gen_contrato_mwh) : '—' }}</td>
+                  <td class="py-2 pl-2 text-right font-mono font-semibold" :style="p.es_duplicado ? 'color: #D64455;' : 'color: #915BD8;'">{{ p.gen_contrato_mwh !== null ? fmtMwh(p.gen_contrato_mwh) : '—' }}</td>
                 </tr>
               </tbody>
               <tfoot>
                 <tr style="border-top: 2px solid rgba(44,32,57,0.12);">
                   <td colspan="3" class="pt-3 text-sm font-semibold" style="color: #2C2039;">Total al contrato</td>
                   <td class="pt-3 text-right font-mono font-bold" style="color: #2C2039;">{{ fmtMwh(genVal(anualData.meses[selectedMonthIdx])) }}</td>
+                </tr>
+                <tr v-if="anualData.meses[selectedMonthIdx].exposicion_bolsa_duplicados_mwh">
+                  <td colspan="3" class="pt-1 text-sm font-semibold" style="color: #D64455;">Exposición bolsa (duplicados)</td>
+                  <td class="pt-1 text-right font-mono font-bold" style="color: #D64455;">{{ fmtMwh(anualData.meses[selectedMonthIdx].exposicion_bolsa_duplicados_mwh) }}</td>
                 </tr>
               </tfoot>
             </table>
@@ -529,8 +744,89 @@ import Message from 'primevue/message'
 import ProgressSpinner from 'primevue/progressspinner'
 import client from '@/api/client'
 
+// ── LocalStorage cache ───────────────────────────────────────────────────────
+const CACHE_PREFIX = 'cumpl_'
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000
+
+function cacheKey(endpoint, params) {
+  return CACHE_PREFIX + endpoint + '|' + JSON.stringify(params)
+}
+
+function cacheGet(endpoint, params) {
+  try {
+    const raw = localStorage.getItem(cacheKey(endpoint, params))
+    if (!raw) return null
+    const { ts, data } = JSON.parse(raw)
+    if (Date.now() - ts > CACHE_TTL_MS) {
+      localStorage.removeItem(cacheKey(endpoint, params))
+      return null
+    }
+    return data
+  } catch { return null }
+}
+
+function cacheSet(endpoint, params, data) {
+  try {
+    localStorage.setItem(cacheKey(endpoint, params), JSON.stringify({ ts: Date.now(), data }))
+  } catch { /* quota exceeded — ignore */ }
+}
+
+function cacheClearAll() {
+  const keys = []
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i)
+    if (k && k.startsWith(CACHE_PREFIX)) keys.push(k)
+  }
+  keys.forEach(k => localStorage.removeItem(k))
+}
+
+function cacheGetSize() {
+  let bytes = 0, count = 0
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i)
+    if (k && k.startsWith(CACHE_PREFIX)) {
+      bytes += (localStorage.getItem(k) || '').length * 2
+      count++
+    }
+  }
+  if (!count) return ''
+  const mb = bytes / (1024 * 1024)
+  return mb >= 1 ? `${mb.toFixed(1)} MB (${count})` : `${(bytes / 1024).toFixed(0)} KB (${count})`
+}
+
+async function cachedGet(endpoint, params = {}) {
+  const cached = cacheGet(endpoint, params)
+  if (cached) return cached
+  const res = await client.get(endpoint, { params, timeout: 120000 })
+  cacheSet(endpoint, params, res.data)
+  return res.data
+}
+
+const cacheSize = ref(cacheGetSize())
+const cacheClearing = ref(false)
+
+function updateCacheSize() { cacheSize.value = cacheGetSize() }
+
+async function clearCacheAndReload() {
+  cacheClearing.value = true
+  cacheClearAll()
+  cacheSize.value = ''
+  anualData.value = null
+  simData.value = null
+  pcData.value = null
+  tableData.value = []
+  try {
+    await Promise.all([loadAnnualData(), loadTableData()])
+    if (activeTab.value === 0) await loadSimulator()
+    if (activeTab.value === 2) await loadPlantasContratos()
+  } finally {
+    cacheClearing.value = false
+    updateCacheSize()
+  }
+}
+
 // ── Tabs ──────────────────────────────────────────────────────────────────────
-const TABS      = ['Cumplimiento', 'Estrategia']
+const TABS      = ['Estrategia', 'Cumplimiento', 'Proyectos']
 const activeTab = ref(0)
 
 // ── Chart constants ───────────────────────────────────────────────────────────
@@ -584,9 +880,24 @@ const ficticioNombre   = ref('')
 const ficticioMin      = ref(0)
 const ficticioMax      = ref(0)
 let ficticioNextId     = 1
+const expandedContratos = ref([])
+const sortDesc         = ref(true)
 const dragPlanta       = ref(null)
 const dragFromContrato = ref(undefined)
 const dragOver         = ref(null)
+
+// ── Proyectos tab state ──────────────────────────────────────────────────────
+const PC_MODES = [
+  { key: 'venta',  label: 'Venta',  bg: 'rgba(145,91,216,0.12)', color: '#915BD8' },
+  { key: 'compra', label: 'Compra', bg: 'rgba(240,192,64,0.18)', color: '#9a6700' },
+  { key: 'bolsa',  label: 'Bolsa',  bg: 'rgba(44,32,57,0.10)',   color: '#2C2039' },
+]
+const pcYear    = ref(now.getFullYear())
+const pcMonth   = ref(now.getMonth() + 1)
+const pcMode    = ref('venta')
+const pcData    = ref(null)
+const pcLoading = ref(false)
+const pcError   = ref(null)
 
 const allContratos = computed(() => {
   if (!simData.value) return []
@@ -594,7 +905,13 @@ const allContratos = computed(() => {
 })
 
 const visibleContratos = computed(() => {
-  return allContratos.value.filter(c => !hiddenContratos.value.has(c.id))
+  const filtered = allContratos.value.filter(c => !hiddenContratos.value.has(c.id))
+  const res = simResults.value
+  return filtered.slice().sort((a, b) => {
+    const pctA = res[a.id]?.pct ?? -1
+    const pctB = res[b.id]?.pct ?? -1
+    return sortDesc.value ? pctB - pctA : pctA - pctB
+  })
 })
 
 // ── Table with consolidated row ──────────────────────────────────────────────
@@ -712,6 +1029,7 @@ function resetSim() {
   if (simData.value) initAssignments(simData.value)
   ficticioContratos.value = []
   hiddenContratos.value = new Set()
+  expandedContratos.value = []
 }
 
 function crearNuevo() {
@@ -744,12 +1062,25 @@ function eliminarNuevo(contratoId) {
   hiddenContratos.value = new Set([...hiddenContratos.value].filter(id => id !== contratoId))
 }
 
+function toggleExpand(contratoId) {
+  const idx = expandedContratos.value.indexOf(contratoId)
+  if (idx >= 0) expandedContratos.value.splice(idx, 1)
+  else expandedContratos.value.push(contratoId)
+}
+
 function hideContrato(contratoId) {
   hiddenContratos.value = new Set([...hiddenContratos.value, contratoId])
 }
 
 function showAllContratos() {
   hiddenContratos.value = new Set()
+}
+
+function onDragOver(contratoId) {
+  dragOver.value = contratoId
+  if (!expandedContratos.value.includes(contratoId)) {
+    expandedContratos.value.push(contratoId)
+  }
 }
 
 function onDragStart(planta, fromContratoId) {
@@ -830,11 +1161,12 @@ async function loadAnnualData() {
     if (selectedContratoId.value === CONSOLIDADO_ID) {
       await loadConsolidado()
     } else {
-      const res = await client.get(`/cumplimiento/ppa/${selectedContratoId.value}/anual`, {
-        params: { year: selectedYear.value },
-      })
-      anualData.value = res.data
+      anualData.value = await cachedGet(
+        `/cumplimiento/ppa/${selectedContratoId.value}/anual`,
+        { year: selectedYear.value },
+      )
     }
+    updateCacheSize()
   } catch (e) {
     chartError.value = e.response?.data?.detail || 'Error al cargar los datos anuales.'
   } finally {
@@ -848,13 +1180,14 @@ async function loadConsolidado() {
 
   const results = await Promise.allSettled(
     realContratos.map(c =>
-      client.get(`/cumplimiento/ppa/${c.id}/anual`, { params: { year: selectedYear.value } })
+      cachedGet(`/cumplimiento/ppa/${c.id}/anual`, { year: selectedYear.value })
     )
   )
+  updateCacheSize()
 
   const successful = results
     .filter(r => r.status === 'fulfilled')
-    .map(r => r.value.data)
+    .map(r => r.value)
 
   if (!successful.length) {
     chartError.value = 'No se pudo cargar ningún contrato.'
@@ -864,7 +1197,7 @@ async function loadConsolidado() {
   const meses = []
   for (let i = 0; i < 12; i++) {
     let totalGen = 0, totalProy = null, totalMin = 0, totalMax = 0
-    let hasMin = false, hasMax = false
+    let hasMin = false, hasMax = false, totalBolsaDup = 0
     const allPlantas = []
 
     for (const data of successful) {
@@ -875,6 +1208,7 @@ async function loadConsolidado() {
       }
       if (mes.min_mwh !== null) { totalMin += mes.min_mwh; hasMin = true }
       if (mes.max_mwh !== null) { totalMax += mes.max_mwh; hasMax = true }
+      if (mes.exposicion_bolsa_duplicados_mwh) totalBolsaDup += mes.exposicion_bolsa_duplicados_mwh
       for (const p of (mes.plantas || [])) {
         allPlantas.push({
           ...p,
@@ -906,6 +1240,7 @@ async function loadConsolidado() {
       tipo_datos: ref.tipo_datos,
       compras_bolsa_mwh: compras,
       excedentes_bolsa_mwh: excedentes,
+      exposicion_bolsa_duplicados_mwh: totalBolsaDup > 0 ? Math.round(totalBolsaDup * 1000) / 1000 : null,
       plantas: allPlantas,
       n_plantas: allPlantas.length,
     })
@@ -926,8 +1261,8 @@ async function loadConsolidado() {
 async function loadTableData() {
   tableLoading.value = true
   try {
-    const res = await client.get('/cumplimiento/ppa/resumen-anual', { params: { year: selectedYear.value } })
-    tableData.value = res.data
+    tableData.value = await cachedGet('/cumplimiento/ppa/resumen-anual', { year: selectedYear.value })
+    updateCacheSize()
   } catch (e) {
     console.error('Error loading table data', e)
   } finally {
@@ -941,27 +1276,60 @@ function selectContrato(id) {
   loadAnnualData()
 }
 
-async function loadSimulator() {
+async function loadSimulator(retry = true) {
   simLoading.value = true
   simError.value   = null
   try {
-    const res = await client.get('/cumplimiento/simulador', {
-      params: { year: simYear.value, month: simMonth.value },
-    })
-    simData.value = res.data
-    initAssignments(res.data)
+    const data = await cachedGet('/cumplimiento/simulador', { year: simYear.value, month: simMonth.value })
+    simData.value = data
+    initAssignments(data)
+    updateCacheSize()
   } catch (e) {
-    simError.value = e.response?.data?.detail || 'Error al cargar el simulador.'
+    if (retry && (!e.response || e.code === 'ECONNABORTED' || e.response?.status >= 500)) {
+      console.warn('Simulador: reintentando tras error', e.message)
+      return loadSimulator(false)
+    }
+    const detail = e.response?.data?.detail
+    const status = e.response?.status
+    simError.value = detail
+      || (status === 401 ? 'Sesión expirada — inicia sesión de nuevo.'
+         : status === 503 ? 'API de generación no disponible temporalmente. Intenta en unos minutos.'
+         : e.code === 'ECONNABORTED' ? 'Tiempo de espera agotado — el servidor tardó demasiado.'
+         : 'Error al cargar el simulador.')
   } finally {
     simLoading.value = false
   }
 }
 
-watch(activeTab, (tab) => { if (tab === 1 && !simData.value) loadSimulator() })
+async function loadPlantasContratos() {
+  pcLoading.value = true
+  pcError.value   = null
+  try {
+    pcData.value = await cachedGet('/cumplimiento/plantas-contratos', { year: pcYear.value, month: pcMonth.value })
+    updateCacheSize()
+  } catch (e) {
+    pcError.value = e.response?.data?.detail || 'Error al cargar plantas y contratos.'
+  } finally {
+    pcLoading.value = false
+  }
+}
+
+function isExpiringSoon(dateStr) {
+  if (!dateStr) return false
+  const end = new Date(dateStr + 'T00:00:00')
+  const diff = (end - now) / (1000 * 60 * 60 * 24)
+  return diff >= 0 && diff <= 60
+}
+
+watch(activeTab, (tab) => {
+  if (tab === 0 && !simData.value) loadSimulator()
+  if (tab === 1 && !anualData.value) { loadAnnualData(); loadTableData() }
+  if (tab === 2 && !pcData.value) loadPlantasContratos()
+})
 
 onMounted(async () => {
   await loadContratos()
-  await Promise.all([loadAnnualData(), loadTableData()])
+  loadSimulator()
 })
 </script>
 
