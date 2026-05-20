@@ -26,7 +26,7 @@ import AppTopbar from '@/components/AppTopbar.vue'
 
 const route = useRoute()
 const toast = useToast()
-const isLoginPage = computed(() => route.name === 'Login')
+const isLoginPage = computed(() => ['Login', 'ForgotPassword', 'ResetPassword'].includes(route.name))
 const isMonitoreo = computed(() => route.name === 'Fallas')
 const isSolar     = computed(() => route.name === 'Solar')
 

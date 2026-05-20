@@ -97,6 +97,33 @@
             </div>
           </template>
         </Column>
+        <Column header="kWh/kWp" style="min-width:90px" sortable sortField="kwh_per_kwp">
+          <template #body="{ data }">
+            <span v-if="data.capacity_kwp > 0 && data.energy_today_kwh != null"
+              class="font-mono text-xs font-semibold" style="color: #915BD8;">
+              {{ (data.energy_today_kwh / data.capacity_kwp).toFixed(2) }}
+            </span>
+            <span v-else class="text-xs" style="color: #9CA3AF;">—</span>
+          </template>
+        </Column>
+        <Column header="Fuente" style="min-width:90px">
+          <template #body="{ data }">
+            <span class="text-xs px-2 py-0.5 rounded-full"
+              :style="data.data_source === 'quoia'
+                ? 'background: rgba(145,91,216,0.1); color: #915BD8'
+                : 'background: rgba(16,185,129,0.1); color: #10B981'">
+              {{ data.data_source === 'quoia' ? 'Quoia' : 'Solenium' }}
+            </span>
+          </template>
+        </Column>
+        <Column header="Últ. dato" style="min-width:110px" sortable sortField="last_update">
+          <template #body="{ data }">
+            <span v-if="data.last_update" class="text-xs font-mono" style="color: #6b5a8a;">
+              {{ formatLastUpdate(data.last_update) }}
+            </span>
+            <span v-else class="text-xs" style="color: #D64455;">sin datos</span>
+          </template>
+        </Column>
         <Column field="irradiance_w_m2" header="Irrad. (W/m²)" style="min-width:110px" sortable>
           <template #body="{ data }">
             <span class="font-mono text-xs" :style="{ color: data.irradiance_w_m2 ? '#D4A017' : '#9CA3AF' }">
@@ -429,6 +456,7 @@ const projectsWithUtil = computed(() => {
   return projects.map(p => ({
     ...p,
     utilization: p.capacity_kwp > 0 ? (p.power_kw / p.capacity_kwp * 100) : 0,
+    kwh_per_kwp: p.capacity_kwp > 0 && p.energy_today_kwh != null ? (p.energy_today_kwh / p.capacity_kwp) : 0,
   }))
 })
 
@@ -479,6 +507,19 @@ const powerCurves = computed(() => {
   }
   return result
 })
+
+function formatLastUpdate(dateStr) {
+  if (!dateStr) return '—'
+  const d = new Date(dateStr)
+  const now = new Date()
+  const diffMs = now - d
+  const mins = Math.floor(diffMs / 60000)
+  if (mins < 1) return 'Ahora'
+  if (mins < 60) return `${mins}min`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h`
+  return d.toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })
+}
 
 async function selectProject(proj) {
   selectedProject.value = proj

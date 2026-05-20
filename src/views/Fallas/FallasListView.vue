@@ -22,6 +22,9 @@
       <Select v-model="filters.prioridad_id" :options="catalogos.prioridades" optionLabel="etiqueta"
         optionValue="id" placeholder="Prioridad" showClear class="min-w-[140px]" @change="load" />
 
+      <Select v-model="filters.proyecto_id" :options="proyectos" optionLabel="nombre_comercial"
+        optionValue="id" placeholder="Proyecto" showClear filter class="min-w-[180px]" @change="load" />
+
       <Button v-if="hasFilters" label="Limpiar" icon="pi pi-times" severity="secondary"
         size="small" @click="clearFilters" />
     </div>
@@ -79,6 +82,27 @@
           </template>
         </Column>
 
+        <Column header="SLA" style="width: 100px;">
+          <template #body="{ data }">
+            <span v-if="data.sla_cumplido === true"
+              class="text-xs px-2 py-0.5 rounded-full font-semibold"
+              style="background: rgba(16,185,129,0.12); color: #10B981;">
+              OK
+            </span>
+            <span v-else-if="data.sla_cumplido === false"
+              class="text-xs px-2 py-0.5 rounded-full font-semibold"
+              style="background: rgba(214,68,85,0.12); color: #D64455;">
+              Vencido
+            </span>
+            <span v-else-if="slaAtRisk(data)"
+              class="text-xs px-2 py-0.5 rounded-full font-semibold"
+              style="background: rgba(240,192,64,0.12); color: #CA8A04;">
+              En riesgo
+            </span>
+            <span v-else class="text-xs" style="color: #9b89b5;">—</span>
+          </template>
+        </Column>
+
         <Column header="Asignado a" style="min-width: 120px;">
           <template #body="{ data }">
             <span v-if="data.asignado_a" class="text-xs" style="color: #2C2039;">
@@ -132,9 +156,20 @@ const loading = ref(false)
 const saving = ref(false)
 const dialogVisible = ref(false)
 const catalogos = ref({ estados: [], prioridades: [], tipos: [], resoluciones: [] })
+const proyectos = ref([])
 
-const filters = ref({ q: '', estado_id: null, prioridad_id: null })
-const hasFilters = computed(() => filters.value.q || filters.value.estado_id || filters.value.prioridad_id)
+const filters = ref({ q: '', estado_id: null, prioridad_id: null, proyecto_id: null })
+const hasFilters = computed(() => filters.value.q || filters.value.estado_id || filters.value.prioridad_id || filters.value.proyecto_id)
+
+function slaAtRisk(data) {
+  if (!data.sla_limite_horas || data.sla_cumplido !== null) return false
+  if (!data.fecha_identificacion) return false
+  const created = new Date(data.fecha_identificacion + 'T00:00:00')
+  const deadline = new Date(created.getTime() + data.sla_limite_horas * 3600000)
+  const now = new Date()
+  const remaining = (deadline - now) / 3600000
+  return remaining > 0 && remaining < data.sla_limite_horas * 0.25
+}
 
 let debounceTimer = null
 function debouncedLoad() {
@@ -170,6 +205,7 @@ async function load() {
     if (filters.value.q) params.q = filters.value.q
     if (filters.value.estado_id) params.estado_id = filters.value.estado_id
     if (filters.value.prioridad_id) params.prioridad_id = filters.value.prioridad_id
+    if (filters.value.proyecto_id) params.proyecto_id = filters.value.proyecto_id
     const { data } = await api.get('/fallas', { params })
     items.value = data.items
     total.value = data.total
@@ -181,7 +217,7 @@ async function load() {
 }
 
 function clearFilters() {
-  filters.value = { q: '', estado_id: null, prioridad_id: null }
+  filters.value = { q: '', estado_id: null, prioridad_id: null, proyecto_id: null }
   page.value = 1
   load()
 }
@@ -220,8 +256,18 @@ async function onCreate(payload) {
   }
 }
 
+async function loadProyectos() {
+  try {
+    const { data } = await api.get('/proyectos', { params: { size: 500 } })
+    proyectos.value = data.items ?? []
+  } catch {
+    // non-critical
+  }
+}
+
 onMounted(() => {
   loadCatalogos()
+  loadProyectos()
   load()
 })
 </script>

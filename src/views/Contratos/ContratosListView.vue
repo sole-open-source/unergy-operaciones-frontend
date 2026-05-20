@@ -93,6 +93,38 @@
         <Column field="fecha_fin" header="Fin" sortable style="width:100px">
           <template #body="{ data }">{{ formatFecha(data.fecha_fin) }}</template>
         </Column>
+        <Column header="Días rest." style="width:90px">
+          <template #body="{ data }">
+            <span v-if="data.dias_restantes != null" class="font-mono text-xs"
+              :style="{ color: data.dias_restantes <= 30 ? '#D64455' : data.dias_restantes <= 90 ? '#CA8A04' : '#6b5a8a' }">
+              {{ data.dias_restantes }}d
+            </span>
+            <span v-else class="text-xs" style="color: #9CA3AF;">—</span>
+          </template>
+        </Column>
+        <Column header="Cumplimiento" style="width:120px">
+          <template #body="{ data }">
+            <Tag v-if="data.estado_cumplimiento"
+              :value="CUMPLIMIENTO_LABELS[data.estado_cumplimiento] || data.estado_cumplimiento"
+              :severity="CUMPLIMIENTO_SEVERITY[data.estado_cumplimiento] || 'secondary'" class="text-xs" />
+            <span v-else class="text-xs" style="color: #9CA3AF;">—</span>
+          </template>
+        </Column>
+        <Column header="Cobertura" style="width:120px">
+          <template #body="{ data }">
+            <div v-if="data.cobertura_actual_pct != null" class="flex items-center gap-1.5">
+              <div class="flex-1 h-2 rounded-full overflow-hidden" style="background: #f3f0f7;">
+                <div class="h-full rounded-full"
+                  :style="{
+                    width: Math.min(data.cobertura_actual_pct, 100) + '%',
+                    backgroundColor: data.cobertura_actual_pct >= 90 ? '#10B981' : data.cobertura_actual_pct >= 70 ? '#F0C040' : '#D64455'
+                  }" />
+              </div>
+              <span class="text-[10px] font-mono w-8 text-right" style="color: #6b5a8a;">{{ data.cobertura_actual_pct }}%</span>
+            </div>
+            <span v-else class="text-xs" style="color: #9CA3AF;">—</span>
+          </template>
+        </Column>
         <Column style="width:90px">
           <template #body="{ data }">
             <Button icon="pi pi-copy" text size="small" severity="secondary"
@@ -302,6 +334,17 @@ const MODALIDAD_LABELS = {
   bolsa_comercializador:'Bolsa comercializador',
   ppa:                  'PPA',
   interna:              'Interna',
+}
+
+const CUMPLIMIENTO_LABELS = {
+  on_track: 'Al día',
+  at_risk: 'En riesgo',
+  deficit: 'Déficit',
+}
+const CUMPLIMIENTO_SEVERITY = {
+  on_track: 'success',
+  at_risk: 'warn',
+  deficit: 'danger',
 }
 
 const servicioActivo = ref('ppa')

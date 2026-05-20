@@ -3,6 +3,8 @@ import { useAuthStore } from '@/stores/auth'
 
 const routes = [
   { path: '/login', name: 'Login', component: () => import('@/views/LoginView.vue'), meta: { public: true } },
+  { path: '/forgot-password', name: 'ForgotPassword', component: () => import('@/views/ForgotPasswordView.vue'), meta: { public: true } },
+  { path: '/reset-password/:token', name: 'ResetPassword', component: () => import('@/views/ResetPasswordView.vue'), meta: { public: true } },
   { path: '/', redirect: '/dashboard' },
   { path: '/dashboard', name: 'Dashboard', component: () => import('@/views/DashboardView.vue') },
   { path: '/clientes', name: 'Clientes', component: () => import('@/views/Clientes/ClientesListView.vue') },
@@ -13,6 +15,7 @@ const routes = [
   { path: '/servicios', name: 'Servicios', component: () => import('@/views/Contratos/ContratosListView.vue') },
   { path: '/contratos/:id', name: 'ContratoDetalle', component: () => import('@/views/Contratos/ContratoDetailView.vue') },
   { path: '/fallas', name: 'Fallas', component: () => import('@/views/Fallas/MonitoreoView.vue'), meta: { roles: ['admin', 'operaciones', 'monitoreo'] } },
+  { path: '/fallas/lista', name: 'FallasLista', component: () => import('@/views/Fallas/FallasListView.vue'), meta: { roles: ['admin', 'operaciones', 'monitoreo'] } },
   { path: '/fallas/:id', name: 'FallaDetalle', component: () => import('@/views/Fallas/FallaDetailView.vue'), meta: { roles: ['admin', 'operaciones', 'monitoreo'] } },
   { path: '/solar', name: 'Solar', component: () => import('@/views/Solar/SolarView.vue'), meta: { roles: ['admin', 'operaciones', 'monitoreo'] } },
   { path: '/liquidaciones', name: 'Liquidaciones', component: () => import('@/views/Liquidaciones/LiquidacionesListView.vue'), meta: { roles: ['admin', 'liquidaciones'] } },

@@ -127,6 +127,30 @@
         <small v-if="errors.descripcion" class="text-red-500 text-xs">{{ errors.descripcion }}</small>
       </div>
 
+      <!-- Causa raíz -->
+      <div class="sm:col-span-2 flex flex-col gap-1">
+        <label class="text-xs font-medium" style="color: #6b5a8a;">Causa raíz</label>
+        <Textarea
+          v-model="form.causa_raiz"
+          rows="2"
+          autoResize
+          placeholder="Descripción de la causa raíz identificada..."
+          class="w-full"
+        />
+      </div>
+
+      <!-- Acciones correctivas -->
+      <div class="sm:col-span-2 flex flex-col gap-1">
+        <label class="text-xs font-medium" style="color: #6b5a8a;">Acciones correctivas</label>
+        <Textarea
+          v-model="form.acciones_correctivas"
+          rows="2"
+          autoResize
+          placeholder="Acciones correctivas tomadas o planeadas..."
+          class="w-full"
+        />
+      </div>
+
       <!-- Nota inicial -->
       <div class="sm:col-span-2 flex flex-col gap-1">
         <label class="text-xs font-medium" style="color: #6b5a8a;">
@@ -185,6 +209,8 @@ const form = ref({
   fecha_identificacion: props.initial?.fecha_identificacion ? new Date(props.initial.fecha_identificacion) : null,
   fecha_ocurrencia: props.initial?.fecha_ocurrencia ? new Date(props.initial.fecha_ocurrencia) : null,
   sla_limite_horas: props.initial?.sla_limite_horas ?? null,
+  causa_raiz: props.initial?.causa_raiz ?? '',
+  acciones_correctivas: props.initial?.acciones_correctivas ?? '',
   nota_inicial: '',
 })
 
@@ -225,6 +251,8 @@ async function submit() {
     if (form.value.asignado_a_id) payload.asignado_a_id = form.value.asignado_a_id
     if (form.value.sla_limite_horas) payload.sla_limite_horas = form.value.sla_limite_horas
     if (form.value.fecha_ocurrencia) payload.fecha_ocurrencia = form.value.fecha_ocurrencia.toISOString()
+    if (form.value.causa_raiz?.trim()) payload.causa_raiz = form.value.causa_raiz.trim()
+    if (form.value.acciones_correctivas?.trim()) payload.acciones_correctivas = form.value.acciones_correctivas.trim()
     if (form.value.nota_inicial?.trim()) payload.nota_inicial = form.value.nota_inicial.trim()
 
     emit('save', payload)
