@@ -34,6 +34,7 @@ const routes = [
   { path: '/mem/cumplimiento', name: 'MemCumplimiento',  component: () => import('@/views/MEM/CumplimientoV2View.vue') },
   { path: '/mem/descubrimientos', name: 'MemDescubrimientos', component: () => import('@/views/MEM/DescubrimientosView.vue') },
   { path: '/mem/cumplimiento-v2', redirect: '/mem/cumplimiento' },
+  { path: '/admin/usuarios', name: 'AdminUsuarios', component: () => import('@/views/Admin/AdminUsuariosView.vue'), meta: { roles: ['admin'], requireEmail: 'juanjose@unergy.io' } },
   { path: '/:pathMatch(.*)*', redirect: '/dashboard' },
 ]
 
@@ -46,6 +47,7 @@ router.beforeEach((to) => {
   const auth = useAuthStore()
   if (!to.meta.public && !auth.isAuthenticated) return '/login'
   if (to.meta.roles && !auth.can(...to.meta.roles)) return '/dashboard'
+  if (to.meta.requireEmail && auth.user?.email !== to.meta.requireEmail) return '/dashboard'
 })
 
 export default router

@@ -23,11 +23,11 @@ export default defineConfig(({ mode }) => {
             : {},
         },
         '/api': {
-          target: 'https://backend-production-63d8.up.railway.app',
+          target: env.VITE_API_URL || 'http://localhost:8000',
           changeOrigin: true,
         },
         '/monitoreo': {
-          target: 'https://backend-production-63d8.up.railway.app',
+          target: env.VITE_API_URL || 'http://localhost:8000',
           changeOrigin: true,
         },
       },

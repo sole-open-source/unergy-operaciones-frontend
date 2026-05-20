@@ -113,12 +113,21 @@ const ALL_GROUPS = [
       { to: '/alertas', label: 'Centro de Alertas', icon: 'pi pi-exclamation-circle' },
     ],
   },
+  {
+    label: 'Admin',
+    items: [
+      { to: '/admin/usuarios', label: 'Usuarios', icon: 'pi pi-users', requireEmail: 'juanjose@unergy.io' },
+    ],
+  },
 ]
 
 const navGroups = computed(() =>
   ALL_GROUPS.map(g => ({
     ...g,
-    items: g.items.filter(i => !i.roles || auth.can(...i.roles)),
+    items: g.items.filter(i =>
+      (!i.roles || auth.can(...i.roles)) &&
+      (!i.requireEmail || auth.user?.email === i.requireEmail)
+    ),
   })).filter(g => g.items.length > 0)
 )
 </script>
