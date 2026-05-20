@@ -38,6 +38,7 @@ const routes = [
   { path: '/mem/descubrimientos', name: 'MemDescubrimientos', component: () => import('@/views/MEM/DescubrimientosView.vue') },
   { path: '/mem/cumplimiento-v2', redirect: '/mem/cumplimiento' },
   { path: '/admin/usuarios', name: 'AdminUsuarios', component: () => import('@/views/Admin/AdminUsuariosView.vue'), meta: { roles: ['admin'], requireEmail: 'juanjose@unergy.io' } },
+  { path: '/admin/diagnostico', name: 'AdminDiagnostico', component: () => import('@/views/Admin/DiagnosticoEnlacesView.vue'), meta: { roles: ['admin'], requireEmail: 'juanjose@unergy.io' } },
   { path: '/:pathMatch(.*)*', redirect: '/dashboard' },
 ]
 

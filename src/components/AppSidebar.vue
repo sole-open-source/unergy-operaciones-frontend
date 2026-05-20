@@ -118,6 +118,7 @@ const ALL_GROUPS = [
     label: 'Admin',
     items: [
       { to: '/admin/usuarios', label: 'Usuarios', icon: 'pi pi-users', requireEmail: 'juanjose@unergy.io' },
+      { to: '/admin/diagnostico', label: 'Diagnóstico', icon: 'pi pi-link', requireEmail: 'juanjose@unergy.io' },
     ],
   },
 ]
