@@ -9,6 +9,20 @@
         <p class="text-xs" style="color: #6b5a8a;">Mapeo Contrato → GESCON → Planta → sub_project (API Unergy)</p>
       </div>
       <Button icon="pi pi-refresh" severity="secondary" text :loading="loading" @click="load" class="ml-auto" />
+      <Button label="Auto-Fix Enlaces" icon="pi pi-wrench" severity="warn" :loading="fixing" @click="fixEnlaces" />
+    </div>
+
+    <!-- Fix results -->
+    <div v-if="fixResult" class="bg-white rounded-xl shadow-sm p-4" style="border: 1px solid #e8e0f0;">
+      <h2 class="text-sm font-bold mb-3" style="color: #2C2039;">Resultado del Fix</h2>
+      <div v-for="(a, i) in fixResult.actions" :key="i" class="text-xs py-1 border-b" style="border-color: #f0e8f8;">
+        <Tag :value="a.action" :severity="actionSev(a.action)" class="text-xs mr-2" />
+        <b>{{ a.contrato }}</b>
+        <span v-if="a.planta"> → {{ a.planta }}</span>
+        <span v-if="a.sub_project" class="font-mono ml-1" style="color: #059669;">({{ a.sub_project }})</span>
+        <span v-if="a.reason" class="ml-1" style="color: #dc2626;">{{ a.reason }}</span>
+        <span v-if="a.asic_id" class="ml-1 opacity-50">id={{ a.asic_id }}</span>
+      </div>
     </div>
 
     <div v-if="loading" class="flex items-center justify-center py-20">
@@ -137,9 +151,15 @@ import Tag from 'primevue/tag'
 
 const data = ref(null)
 const loading = ref(false)
+const fixing = ref(false)
+const fixResult = ref(null)
 
 function tipoSev(tipo) {
   return { registro: 'success', modificacion: 'info', terminacion: 'danger', desistimiento: 'secondary' }[tipo] || 'secondary'
+}
+
+function actionSev(action) {
+  return { created: 'success', exists: 'info', skip: 'warn', delete_duplicate: 'danger', unflag_duplicate: 'success' }[action] || 'secondary'
 }
 
 async function load() {
@@ -151,6 +171,21 @@ async function load() {
     console.error('Failed to load diagnostic', e)
   } finally {
     loading.value = false
+  }
+}
+
+async function fixEnlaces() {
+  fixing.value = true
+  fixResult.value = null
+  try {
+    const { data: d } = await api.post('/cumplimiento/fix-enlaces')
+    fixResult.value = d
+    await load()
+  } catch (e) {
+    console.error('Fix failed', e)
+    fixResult.value = { actions: [{ action: 'error', reason: e.response?.data?.detail || e.message, contrato: '—' }] }
+  } finally {
+    fixing.value = false
   }
 }
 
