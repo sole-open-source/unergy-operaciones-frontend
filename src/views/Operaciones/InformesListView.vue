@@ -1,131 +1,179 @@
 <template>
-  <div class="inf-list-wrapper">
+  <div class="inf-page">
 
-    <!-- Header -->
-    <div class="inf-list-header">
-      <div>
-        <div class="inf-list-title">📁 Informes guardados</div>
-        <div class="inf-list-sub">Informes operacionales y FMO generados por el equipo Unergy</div>
+    <!-- ══ Hero Header ══════════════════════════════════════════════ -->
+    <div class="inf-hero">
+      <div class="inf-hero-left">
+        <h1 class="inf-hero-title">Informes</h1>
+        <p class="inf-hero-sub">Informes operacionales y FMO · equipo Unergy</p>
       </div>
-      <button class="inf-btn inf-btn-ghost" :disabled="loading" @click="cargar">↻ Actualizar</button>
-    </div>
-
-    <!-- KPIs -->
-    <div class="inf-kpis">
-      <div class="inf-kpi inf-kpi-total" @click="filtroEstado = ''" :class="{ active: filtroEstado === '' }">
-        <div class="inf-kpi-num">{{ todosLoaded.length }}</div>
-        <div class="inf-kpi-label">Total</div>
-      </div>
-      <div class="inf-kpi inf-kpi-borrador" @click="filtroEstado = 'borrador'" :class="{ active: filtroEstado === 'borrador' }">
-        <div class="inf-kpi-num">{{ kpis.borrador }}</div>
-        <div class="inf-kpi-label">Borrador</div>
-      </div>
-      <div class="inf-kpi inf-kpi-revisado" @click="filtroEstado = 'revisado'" :class="{ active: filtroEstado === 'revisado' }">
-        <div class="inf-kpi-num">{{ kpis.revisado }}</div>
-        <div class="inf-kpi-label">Revisado</div>
-      </div>
-      <div class="inf-kpi inf-kpi-aprobado" @click="filtroEstado = 'aprobado'" :class="{ active: filtroEstado === 'aprobado' }">
-        <div class="inf-kpi-num">{{ kpis.aprobado }}</div>
-        <div class="inf-kpi-label">Aprobado</div>
-      </div>
-    </div>
-
-    <!-- Filtros -->
-    <div class="inf-filtros">
-      <select v-model="filtroAnio" class="inf-select">
-        <option value="">Todos los años</option>
-        <option v-for="a in aniosDisponibles" :key="a" :value="a">{{ a }}</option>
-      </select>
-      <select v-model="filtroMes" class="inf-select">
-        <option value="">Todos los meses</option>
-        <option v-for="m in meses" :key="m.v" :value="m.v">{{ m.label }}</option>
-      </select>
-      <select v-model="filtroEstado" class="inf-select">
-        <option value="">Todos los estados</option>
-        <option value="borrador">Borrador</option>
-        <option value="revisado">Revisado</option>
-        <option value="aprobado">Aprobado</option>
-      </select>
-      <button v-if="filtroAnio || filtroMes || filtroEstado" class="inf-btn inf-btn-clear" @click="limpiarFiltros">
-        ✕ Limpiar
+      <button class="inf-refresh-btn" :disabled="loading" @click="cargar" title="Actualizar">
+        <span :class="loading ? 'spin-icon' : ''">↻</span>
+        Actualizar
       </button>
     </div>
 
-    <!-- Loading -->
-    <div v-if="loading" class="inf-estado-carga">
+    <!-- ══ KPIs ═════════════════════════════════════════════════════ -->
+    <div class="inf-kpis">
+      <button
+        class="kpi-card kpi-total"
+        :class="{ 'kpi-active': !filtroEstado }"
+        @click="setFiltroEstado('')"
+      >
+        <span class="kpi-num">{{ todosLoaded.length }}</span>
+        <span class="kpi-label">Total</span>
+      </button>
+      <button
+        class="kpi-card kpi-borrador"
+        :class="{ 'kpi-active': filtroEstado === 'borrador' }"
+        @click="setFiltroEstado('borrador')"
+      >
+        <span class="kpi-num">{{ kpis.borrador }}</span>
+        <span class="kpi-label">Borrador</span>
+      </button>
+      <button
+        class="kpi-card kpi-revisado"
+        :class="{ 'kpi-active': filtroEstado === 'revisado' }"
+        @click="setFiltroEstado('revisado')"
+      >
+        <span class="kpi-num">{{ kpis.revisado }}</span>
+        <span class="kpi-label">Revisado</span>
+      </button>
+      <button
+        class="kpi-card kpi-aprobado"
+        :class="{ 'kpi-active': filtroEstado === 'aprobado' }"
+        @click="setFiltroEstado('aprobado')"
+      >
+        <span class="kpi-num">{{ kpis.aprobado }}</span>
+        <span class="kpi-label">Aprobado</span>
+      </button>
+    </div>
+
+    <!-- ══ Filtros ═══════════════════════════════════════════════════ -->
+    <div class="inf-filtros-bar">
+      <div class="inf-filtros-group">
+        <label class="inf-filtro-label">Año</label>
+        <select v-model="filtroAnio" class="inf-select">
+          <option value="">Todos</option>
+          <option v-for="a in aniosDisponibles" :key="a" :value="a">{{ a }}</option>
+        </select>
+      </div>
+      <div class="inf-filtros-group">
+        <label class="inf-filtro-label">Mes</label>
+        <select v-model="filtroMes" class="inf-select">
+          <option value="">Todos</option>
+          <option v-for="m in meses" :key="m.v" :value="m.v">{{ m.label }}</option>
+        </select>
+      </div>
+      <div class="inf-filtros-group">
+        <label class="inf-filtro-label">Estado</label>
+        <select v-model="filtroEstado" class="inf-select">
+          <option value="">Todos</option>
+          <option value="borrador">Borrador</option>
+          <option value="revisado">Revisado</option>
+          <option value="aprobado">Aprobado</option>
+        </select>
+      </div>
+      <button v-if="filtroAnio || filtroMes || filtroEstado" class="inf-clear-btn" @click="limpiarFiltros">
+        ✕ Limpiar filtros
+      </button>
+
+      <!-- contador -->
+      <span class="inf-count-label" v-if="!loading">
+        {{ informesFiltrados.length }} resultado{{ informesFiltrados.length !== 1 ? 's' : '' }}
+      </span>
+    </div>
+
+    <!-- ══ Loading ═══════════════════════════════════════════════════ -->
+    <div v-if="loading" class="inf-loading">
       <div class="spin-ring" />
       <span>Cargando informes…</span>
     </div>
 
-    <!-- Error -->
-    <div v-else-if="error" class="inf-estado-error">
-      ⚠️ {{ error }}
+    <!-- ══ Error ═════════════════════════════════════════════════════ -->
+    <div v-else-if="error" class="inf-error-box">
+      <span class="inf-error-icon">⚠️</span>
+      <div>
+        <div class="inf-error-title">Error al cargar informes</div>
+        <div class="inf-error-msg">{{ error }}</div>
+      </div>
+      <button class="inf-refresh-btn" @click="cargar">Reintentar</button>
     </div>
 
-    <!-- Empty -->
-    <div v-else-if="!informesFiltrados.length" class="inf-estado-empty">
+    <!-- ══ Empty ═════════════════════════════════════════════════════ -->
+    <div v-else-if="!informesFiltrados.length" class="inf-empty">
       <div class="inf-empty-icon">📄</div>
-      <div class="inf-empty-title">No hay informes</div>
+      <div class="inf-empty-title">
+        {{ (filtroAnio || filtroMes || filtroEstado) ? 'Sin resultados para los filtros aplicados' : 'No hay informes guardados' }}
+      </div>
       <div class="inf-empty-sub">
-        {{ (filtroEstado || filtroAnio || filtroMes) ? 'No hay informes con los filtros seleccionados' : 'Genera un informe desde la sección Monitoreo Fallas' }}
+        {{ (filtroAnio || filtroMes || filtroEstado) ? 'Prueba con otros filtros' : 'Genera un informe desde Monitoreo Fallas' }}
       </div>
+      <button v-if="filtroAnio || filtroMes || filtroEstado" class="inf-clear-btn" style="margin-top:12px" @click="limpiarFiltros">
+        ✕ Limpiar filtros
+      </button>
     </div>
 
-    <!-- Contador resultados -->
-    <div v-else-if="(filtroAnio || filtroMes || filtroEstado)" class="inf-resultados-label">
-      {{ informesFiltrados.length }} informe{{ informesFiltrados.length !== 1 ? 's' : '' }} encontrado{{ informesFiltrados.length !== 1 ? 's' : '' }}
-    </div>
-
-    <!-- Lista -->
-    <div v-if="!loading && !error && informesFiltrados.length" class="inf-cards-list">
-      <div
-        v-for="inf in informesFiltrados"
-        :key="inf.id"
-        class="inf-card"
-      >
-        <!-- Estado badge -->
-        <span :class="['inf-estado-badge', estadoClass(inf.estado)]">
-          {{ estadoLabel(inf.estado) }}
-        </span>
-
-        <!-- Info -->
-        <div class="inf-card-info">
-          <div class="inf-card-nombre">
-            {{ inf.proyecto_nombre || inf.sub_project }}
-            <span v-if="inf.tipo" class="inf-tipo-tag">{{ inf.tipo === 'fmo' ? 'FMO' : 'Oper.' }}</span>
-            <span v-if="inf.correo_enviado" class="inf-enviado-tag">📧 enviado</span>
-          </div>
-          <div class="inf-card-meta">
-            <span v-if="inf.periodo_display || inf.periodo_desde">
-              📅 {{ inf.periodo_display || inf.periodo_desde }}
-            </span>
-            <span v-if="inf.editado_en">
-              · {{ formatFecha(inf.editado_en) }}
-            </span>
-            <span v-if="inf.editado_por_nombre">
-              · ✏️ {{ inf.editado_por_nombre }}
-            </span>
-            <span v-if="inf.aprobado_por_nombre">
-              · ✅ {{ inf.aprobado_por_nombre }}
-            </span>
-          </div>
-        </div>
-
-        <!-- Acciones -->
-        <div class="inf-card-btns">
-          <button class="inf-btn inf-btn-ghost" @click="abrirInforme(inf.id)">
-            Abrir →
-          </button>
-          <button
-            v-if="inf.estado !== 'aprobado'"
-            class="inf-btn inf-btn-delete"
-            :title="`Eliminar informe ${inf.proyecto_nombre || inf.sub_project}`"
-            @click="eliminarInforme(inf)"
+    <!-- ══ Lista ═════════════════════════════════════════════════════ -->
+    <div v-else class="inf-table-wrapper">
+      <table class="inf-table">
+        <thead>
+          <tr>
+            <th>Estado</th>
+            <th>Proyecto</th>
+            <th>Tipo</th>
+            <th>Periodo</th>
+            <th>Última edición</th>
+            <th>Aprobado por</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            v-for="inf in informesFiltrados"
+            :key="inf.id"
+            class="inf-row"
+            @click="abrirInforme(inf.id)"
           >
-            🗑
-          </button>
-        </div>
-      </div>
+            <td>
+              <span :class="['estado-pill', 'pill-' + inf.estado]">
+                {{ estadoLabel(inf.estado) }}
+              </span>
+            </td>
+            <td class="td-proyecto">
+              <div class="td-nombre">{{ inf.proyecto_nombre || inf.sub_project }}</div>
+              <div class="td-sub" v-if="inf.proyecto_nombre && inf.sub_project !== inf.proyecto_nombre">{{ inf.sub_project }}</div>
+            </td>
+            <td>
+              <span class="tipo-tag">{{ inf.tipo === 'fmo' ? 'FMO' : 'Oper.' }}</span>
+            </td>
+            <td class="td-periodo">
+              {{ inf.periodo_display || formatPeriodo(inf.periodo_desde) }}
+              <span v-if="inf.correo_enviado" class="enviado-dot" title="Correo enviado">📧</span>
+            </td>
+            <td class="td-fecha">
+              <div>{{ inf.editado_en ? formatFecha(inf.editado_en) : '—' }}</div>
+              <div class="td-autor" v-if="inf.editado_por_nombre">{{ inf.editado_por_nombre }}</div>
+            </td>
+            <td class="td-fecha">
+              <div v-if="inf.aprobado_por_nombre" class="td-autor">{{ inf.aprobado_por_nombre }}</div>
+              <div v-else class="td-empty">—</div>
+            </td>
+            <td class="td-acciones" @click.stop>
+              <button class="action-btn action-open" @click="abrirInforme(inf.id)" title="Abrir informe">
+                →
+              </button>
+              <button
+                class="action-btn action-del"
+                :title="`Eliminar ${inf.proyecto_nombre || inf.sub_project}`"
+                @click="eliminarInforme(inf)"
+              >
+                🗑
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
 
   </div>
@@ -144,10 +192,9 @@ function authHeaders() {
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
-const todosLoaded = ref([])   // todos los informes sin filtro (para KPIs)
-const loading     = ref(false)
-const error       = ref(null)
-
+const todosLoaded  = ref([])
+const loading      = ref(false)
+const error        = ref(null)
 const filtroEstado = ref('')
 const filtroAnio   = ref('')
 const filtroMes    = ref('')
@@ -161,31 +208,31 @@ const meses = [
   { v: '11', label: 'Noviembre' }, { v: '12', label: 'Diciembre' },
 ]
 
-// KPIs calculados sobre TODOS los informes (sin filtro de año/mes/estado)
 const kpis = computed(() => ({
   borrador: todosLoaded.value.filter(i => i.estado === 'borrador').length,
   revisado: todosLoaded.value.filter(i => i.estado === 'revisado').length,
   aprobado: todosLoaded.value.filter(i => i.estado === 'aprobado').length,
 }))
 
-// Años disponibles extraídos de periodo_desde (YYYY-MM-DD)
 const aniosDisponibles = computed(() => {
   const set = new Set()
-  todosLoaded.value.forEach(i => {
-    if (i.periodo_desde) set.add(i.periodo_desde.slice(0, 4))
-  })
+  todosLoaded.value.forEach(i => { if (i.periodo_desde) set.add(i.periodo_desde.slice(0, 4)) })
   return [...set].sort((a, b) => b - a)
 })
 
-// Lista filtrada (cliente)
-const informesFiltrados = computed(() => {
-  return todosLoaded.value.filter(i => {
+const informesFiltrados = computed(() =>
+  todosLoaded.value.filter(i => {
     if (filtroEstado.value && i.estado !== filtroEstado.value) return false
     if (filtroAnio.value && (!i.periodo_desde || !i.periodo_desde.startsWith(filtroAnio.value))) return false
     if (filtroMes.value && (!i.periodo_desde || i.periodo_desde.slice(5, 7) !== filtroMes.value)) return false
     return true
   })
-})
+)
+
+function setFiltroEstado(val) {
+  // toggle: si ya está activo, lo quita
+  filtroEstado.value = filtroEstado.value === val ? '' : val
+}
 
 async function cargar() {
   loading.value = true
@@ -198,10 +245,8 @@ async function cargar() {
     todosLoaded.value = data
   } catch (e) {
     if (e.response?.status === 401) {
-      localStorage.removeItem('token')
-      localStorage.removeItem('user')
-      window.location.href = '/login'
-      return
+      localStorage.removeItem('token'); localStorage.removeItem('user')
+      window.location.href = '/login'; return
     }
     error.value = e.response?.data?.detail || e.message
   } finally {
@@ -210,308 +255,362 @@ async function cargar() {
 }
 
 function limpiarFiltros() {
-  filtroEstado.value = ''
-  filtroAnio.value   = ''
-  filtroMes.value    = ''
+  filtroEstado.value = ''; filtroAnio.value = ''; filtroMes.value = ''
 }
 
-function abrirInforme(id) {
-  router.push(`/informes/${id}`)
-}
+function abrirInforme(id) { router.push(`/informes/${id}`) }
 
 async function eliminarInforme(inf) {
-  const nombre = `${inf.proyecto_nombre || inf.sub_project} · ${inf.periodo_display || inf.periodo_desde || ''}`
-  if (!confirm(`¿Eliminar el informe "${nombre}"?\nEsta acción no se puede deshacer.`)) return
+  const nombre = inf.proyecto_nombre || inf.sub_project
+  const periodo = inf.periodo_display || inf.periodo_desde || ''
+  if (!confirm(`¿Eliminar el informe "${nombre} · ${periodo}"?\n\nEsta acción no se puede deshacer.`)) return
   try {
     await axios.delete(`${BACKEND}/api/v1/informes/${inf.id}`, { headers: authHeaders() })
     todosLoaded.value = todosLoaded.value.filter(i => i.id !== inf.id)
   } catch (e) {
-    const msg = e.response?.data?.detail || e.message
-    alert('⚠️ ' + (e.response?.status === 400 ? 'No se puede eliminar un informe aprobado' : msg))
+    alert('⚠️ ' + (e.response?.data?.detail || e.message))
   }
 }
 
-function estadoClass(estado) {
-  return { borrador: 'badge-borrador', revisado: 'badge-revisado', aprobado: 'badge-aprobado' }[estado] || ''
-}
-function estadoLabel(estado) {
-  return { borrador: 'Borrador', revisado: 'Revisado', aprobado: '✅ Aprobado' }[estado] || estado
+function estadoLabel(e) {
+  return { borrador: 'Borrador', revisado: 'Revisado', aprobado: 'Aprobado' }[e] || e
 }
 function formatFecha(iso) {
   return new Date(iso).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })
+}
+function formatPeriodo(iso) {
+  if (!iso) return '—'
+  const [y, m] = iso.split('-')
+  const mes = ['', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'][+m] || m
+  return `${mes} ${y}`
 }
 
 onMounted(cargar)
 </script>
 
 <style scoped>
-.inf-list-wrapper {
-  max-width: 1060px;
-  margin: 0 auto;
-  padding: 24px 20px 80px;
-  font-family: 'Sora', sans-serif;
-  color: #FDFAF7;
+/* ── Página ─────────────────────────────────────────────────────── */
+.inf-page {
+  min-height: 100%;
+  background: #f8f7fa;
+  padding: 0;
+  font-family: 'Sora', system-ui, sans-serif;
 }
 
-/* Header */
-.inf-list-header {
+/* ── Hero ───────────────────────────────────────────────────────── */
+.inf-hero {
+  background: linear-gradient(135deg, #2C2039 0%, #3d2b52 60%, #4a2d6e 100%);
+  padding: 28px 32px 24px;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
+  gap: 16px;
   flex-wrap: wrap;
-  gap: 12px;
-  margin-bottom: 20px;
+  border-bottom: 1px solid rgba(145,91,216,.2);
 }
-.inf-list-title {
-  font-size: 20px;
-  font-weight: 800;
+.inf-hero-title {
+  font-size: 24px;
+  font-weight: 900;
   color: #FDFAF7;
-  margin-bottom: 4px;
+  margin: 0 0 4px;
+  letter-spacing: -0.3px;
 }
-.inf-list-sub {
-  font-size: 12px;
-  color: #6B5F80;
+.inf-hero-sub {
+  font-size: 13px;
+  color: rgba(253,250,247,.55);
+  margin: 0;
 }
 
-/* ── KPIs ──────────────────────────────────────────────────────── */
+/* ── KPIs ───────────────────────────────────────────────────────── */
 .inf-kpis {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-  margin-bottom: 18px;
+  gap: 0;
+  border-bottom: 1px solid #e5e2ec;
 }
-@media (max-width: 600px) {
-  .inf-kpis { grid-template-columns: repeat(2, 1fr); }
-}
-.inf-kpi {
-  border-radius: 12px;
-  padding: 16px 18px;
-  border: 1px solid #4A3560;
+@media (max-width: 640px) { .inf-kpis { grid-template-columns: repeat(2, 1fr); } }
+
+.kpi-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px 16px;
+  border: none;
+  background: #fff;
   cursor: pointer;
-  transition: border-color 0.18s, transform 0.12s;
-  user-select: none;
+  transition: background .15s;
+  border-right: 1px solid #e5e2ec;
+  position: relative;
+  font-family: inherit;
 }
-.inf-kpi:hover { transform: translateY(-1px); }
-.inf-kpi.active { border-width: 2px; }
+.kpi-card:last-child { border-right: none; }
+.kpi-card:hover { background: #f4f1fa; }
 
-.inf-kpi-total  { background: #2C2039; }
-.inf-kpi-total.active  { border-color: #915BD8; }
-.inf-kpi-total:not(.active):hover { border-color: rgba(145,91,216,.5); }
+.kpi-card::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 3px;
+  border-radius: 3px 3px 0 0;
+  opacity: 0;
+  transition: opacity .15s;
+}
+.kpi-card.kpi-active::after { opacity: 1; }
+.kpi-card.kpi-active { background: #f9f7ff; }
 
-.inf-kpi-borrador { background: rgba(246,255,114,.06); }
-.inf-kpi-borrador.active  { border-color: #B8A800; }
-.inf-kpi-borrador:not(.active):hover { border-color: rgba(184,168,0,.5); }
+.kpi-total::after    { background: #915BD8; }
+.kpi-borrador::after { background: #d4a017; }
+.kpi-revisado::after { background: #2563EB; }
+.kpi-aprobado::after { background: #16a34a; }
 
-.inf-kpi-revisado { background: rgba(37,99,235,.07); }
-.inf-kpi-revisado.active  { border-color: #2563EB; }
-.inf-kpi-revisado:not(.active):hover { border-color: rgba(37,99,235,.5); }
-
-.inf-kpi-aprobado { background: rgba(74,222,128,.07); }
-.inf-kpi-aprobado.active  { border-color: #2D8A4E; }
-.inf-kpi-aprobado:not(.active):hover { border-color: rgba(45,138,78,.5); }
-
-.inf-kpi-num {
-  font-size: 30px;
+.kpi-num {
+  font-size: 32px;
   font-weight: 900;
   line-height: 1;
   margin-bottom: 5px;
 }
-.inf-kpi-total  .inf-kpi-num  { color: #915BD8; }
-.inf-kpi-borrador .inf-kpi-num { color: #B8A800; }
-.inf-kpi-revisado .inf-kpi-num { color: #2563EB; }
-.inf-kpi-aprobado .inf-kpi-num { color: #2D8A4E; }
+.kpi-total    .kpi-num { color: #6d28d9; }
+.kpi-borrador .kpi-num { color: #d4a017; }
+.kpi-revisado .kpi-num { color: #2563EB; }
+.kpi-aprobado .kpi-num { color: #16a34a; }
 
-.inf-kpi-label {
+.kpi-label {
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: .5px;
   text-transform: uppercase;
-  color: #6B5F80;
+  letter-spacing: .6px;
+  color: #9ca3af;
 }
+.kpi-card.kpi-active .kpi-label { color: #6b7280; }
 
 /* ── Filtros ────────────────────────────────────────────────────── */
-.inf-filtros {
+.inf-filtros-bar {
   display: flex;
+  align-items: flex-end;
+  gap: 16px;
   flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 18px;
+  padding: 18px 32px;
+  background: #fff;
+  border-bottom: 1px solid #e5e2ec;
 }
-
-/* Select */
+.inf-filtros-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.inf-filtro-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: #9ca3af;
+}
 .inf-select {
-  background: #1a1025;
-  border: 1px solid #4A3560;
+  background: #fff;
+  border: 1.5px solid #e5e2ec;
   border-radius: 8px;
   padding: 7px 12px;
-  color: #FDFAF7;
-  font-size: 12px;
-  font-family: 'Sora', sans-serif;
+  color: #2C2039;
+  font-size: 13px;
+  font-family: inherit;
   outline: none;
   cursor: pointer;
+  min-width: 130px;
+  transition: border-color .15s;
 }
 .inf-select:focus { border-color: #915BD8; }
 
-/* Buttons */
-.inf-btn {
+.inf-clear-btn {
+  background: transparent;
+  border: 1.5px solid #e5e2ec;
   border-radius: 8px;
-  padding: 6px 14px;
+  padding: 7px 14px;
   font-size: 12px;
   font-weight: 700;
-  border: none;
+  color: #6b7280;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all .15s;
+  align-self: flex-end;
+}
+.inf-clear-btn:hover { border-color: #915BD8; color: #6d28d9; }
+
+.inf-count-label {
+  margin-left: auto;
+  align-self: flex-end;
+  font-size: 12px;
+  color: #9ca3af;
+  font-weight: 600;
+}
+
+/* ── Refresh btn ────────────────────────────────────────────────── */
+.inf-refresh-btn {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  cursor: pointer;
-  transition: all 0.18s;
-  font-family: 'Sora', sans-serif;
-}
-.inf-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.inf-btn-ghost {
-  background: #422D57;
+  gap: 6px;
+  background: rgba(255,255,255,.12);
+  border: 1px solid rgba(255,255,255,.25);
+  border-radius: 8px;
+  padding: 8px 16px;
   color: #FDFAF7;
-  border: 1px solid #5B4272;
-}
-.inf-btn-ghost:hover:not(:disabled) { border-color: #915BD8; }
-.inf-btn-clear {
-  background: transparent;
-  color: #A89EC0;
-  border: 1px solid #4A3560;
-  font-size: 11px;
-  padding: 6px 10px;
-}
-.inf-btn-clear:hover { color: #FDFAF7; border-color: #915BD8; }
-.inf-btn-delete {
-  background: transparent;
-  color: #FF5757;
-  border: 1px solid #FF575730;
-  padding: 5px 10px;
   font-size: 13px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background .15s;
 }
-.inf-btn-delete:hover { background: #FF575718; border-color: #FF5757; }
+.inf-refresh-btn:hover:not(:disabled) { background: rgba(255,255,255,.2); }
+.inf-refresh-btn:disabled { opacity: .5; cursor: not-allowed; }
 
-/* Contador resultados */
-.inf-resultados-label {
-  font-size: 11px;
-  color: #6B5F80;
-  margin-bottom: 10px;
-}
-
-/* Estados de carga */
-.inf-estado-carga {
+/* ── Loading ─────────────────────────────────────────────────────── */
+.inf-loading {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 14px;
-  padding: 80px 20px;
-  color: #A89EC0;
+  padding: 80px 32px;
+  color: #9ca3af;
   font-size: 13px;
 }
-.inf-estado-error {
-  text-align: center;
-  padding: 60px 20px;
-  color: #FF5757;
-  font-size: 13px;
-}
-.inf-estado-empty {
-  text-align: center;
-  padding: 80px 20px;
-}
-.inf-empty-icon { font-size: 44px; margin-bottom: 14px; opacity: 0.4; }
-.inf-empty-title { font-size: 16px; font-weight: 700; color: #A89EC0; margin-bottom: 8px; }
-.inf-empty-sub { font-size: 12px; color: #6B5F80; }
-
-/* Cards */
-.inf-cards-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.inf-card {
-  background: #362848;
-  border: 1px solid #4A3560;
-  border-radius: 10px;
-  padding: 12px 16px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  transition: border-color 0.2s;
-}
-.inf-card:hover { border-color: rgba(145, 91, 216, 0.4); }
-
-.inf-card-info {
-  flex: 1;
-  min-width: 0;
-}
-.inf-card-nombre {
-  font-size: 13px;
-  font-weight: 700;
-  color: #FDFAF7;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  flex-wrap: wrap;
-}
-.inf-tipo-tag {
-  font-size: 10px;
-  font-weight: 700;
-  background: rgba(145, 91, 216, 0.2);
-  color: #915BD8;
-  border: 1px solid rgba(145, 91, 216, 0.3);
-  border-radius: 4px;
-  padding: 1px 6px;
-}
-.inf-enviado-tag {
-  font-size: 10px;
-  color: #2D8A4E;
-}
-.inf-card-meta {
-  font-size: 11px;
-  color: #6B5F80;
-  margin-top: 3px;
-}
-.inf-card-btns {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-  flex-shrink: 0;
-}
-
-/* Estado badges */
-.inf-estado-badge {
-  font-size: 10px;
-  font-weight: 800;
-  padding: 3px 9px;
-  border-radius: 20px;
-  letter-spacing: 0.5px;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-.badge-borrador {
-  background: rgba(246, 255, 114, 0.12);
-  color: #B8A800;
-  border: 1px solid rgba(246, 255, 114, 0.25);
-}
-.badge-revisado {
-  background: rgba(37, 99, 235, 0.12);
-  color: #2563EB;
-  border: 1px solid rgba(37, 99, 235, 0.25);
-}
-.badge-aprobado {
-  background: rgba(74, 222, 128, 0.12);
-  color: #2D8A4E;
-  border: 1px solid rgba(74, 222, 128, 0.25);
-}
-
-/* Spinner */
 .spin-ring {
-  width: 32px;
-  height: 32px;
-  border: 3px solid rgba(145, 91, 216, 0.2);
+  width: 32px; height: 32px;
+  border: 3px solid #e5e2ec;
   border-top-color: #915BD8;
   border-radius: 50%;
-  animation: spin 0.8s linear infinite;
+  animation: spin .8s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+.spin-icon { display: inline-block; animation: spin .8s linear infinite; }
+
+/* ── Error ───────────────────────────────────────────────────────── */
+.inf-error-box {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 24px 32px;
+  background: #fff5f5;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  padding: 16px 20px;
+}
+.inf-error-icon { font-size: 22px; flex-shrink: 0; }
+.inf-error-title { font-size: 13px; font-weight: 700; color: #dc2626; margin-bottom: 2px; }
+.inf-error-msg { font-size: 12px; color: #ef4444; }
+
+/* ── Empty ───────────────────────────────────────────────────────── */
+.inf-empty {
+  text-align: center;
+  padding: 80px 32px;
+}
+.inf-empty-icon { font-size: 48px; margin-bottom: 14px; opacity: .3; }
+.inf-empty-title { font-size: 16px; font-weight: 700; color: #6b7280; margin-bottom: 6px; }
+.inf-empty-sub { font-size: 13px; color: #9ca3af; }
+
+/* ── Tabla ───────────────────────────────────────────────────────── */
+.inf-table-wrapper {
+  padding: 24px 32px;
+  overflow-x: auto;
+}
+.inf-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,.07), 0 1px 2px rgba(0,0,0,.04);
+}
+.inf-table thead tr {
+  background: #f8f7fa;
+  border-bottom: 2px solid #e5e2ec;
+}
+.inf-table thead th {
+  padding: 12px 16px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: #9ca3af;
+  white-space: nowrap;
+}
+.inf-row {
+  border-bottom: 1px solid #f0edf7;
+  cursor: pointer;
+  transition: background .12s;
+}
+.inf-row:last-child { border-bottom: none; }
+.inf-row:hover { background: #f9f7ff; }
+.inf-row td {
+  padding: 13px 16px;
+  vertical-align: middle;
+}
+
+.td-proyecto { min-width: 180px; }
+.td-nombre {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1a1025;
+}
+.td-sub {
+  font-size: 11px;
+  color: #9ca3af;
+  margin-top: 2px;
+}
+.td-periodo {
+  font-size: 13px;
+  color: #374151;
+  white-space: nowrap;
+}
+.td-fecha { min-width: 120px; }
+.td-fecha > div:first-child { font-size: 12px; color: #374151; }
+.td-autor { font-size: 11px; color: #9ca3af; margin-top: 2px; }
+.td-empty { color: #d1d5db; font-size: 13px; }
+
+/* Estado pills */
+.estado-pill {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 3px 10px;
+  border-radius: 20px;
+  letter-spacing: .4px;
+  white-space: nowrap;
+  text-transform: uppercase;
+}
+.pill-borrador { background: #fef9c3; color: #854d0e; border: 1px solid #fde68a; }
+.pill-revisado { background: #dbeafe; color: #1d4ed8; border: 1px solid #bfdbfe; }
+.pill-aprobado { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+
+/* Tipo tag */
+.tipo-tag {
+  font-size: 11px;
+  font-weight: 700;
+  background: #f3f0ff;
+  color: #7c3aed;
+  border: 1px solid #e9d5ff;
+  border-radius: 5px;
+  padding: 2px 7px;
+}
+
+.enviado-dot { margin-left: 5px; font-size: 12px; }
+
+/* Acciones */
+.td-acciones {
+  width: 80px;
+  white-space: nowrap;
+}
+.action-btn {
+  background: transparent;
+  border: 1px solid #e5e2ec;
+  border-radius: 6px;
+  padding: 4px 9px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all .14s;
+  font-family: inherit;
+}
+.action-open { color: #6d28d9; margin-right: 4px; font-weight: 800; }
+.action-open:hover { background: #f3f0ff; border-color: #7c3aed; }
+.action-del { color: #ef4444; }
+.action-del:hover { background: #fff5f5; border-color: #ef4444; }
 </style>
