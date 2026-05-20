@@ -1,4 +1,6 @@
 import axios from 'axios'
+import router from '@/router'
+import { useAuthStore } from '@/stores/auth'
 
 const api = axios.create({
   baseURL: '/api/v1',
@@ -11,13 +13,16 @@ api.interceptors.request.use((config) => {
   return config
 })
 
+let redirecting = false
+
 api.interceptors.response.use(
   (r) => r,
   (err) => {
-    if (err.response?.status === 401) {
-      localStorage.removeItem('token')
-      localStorage.removeItem('user')
-      window.location.href = '/login'
+    if (err.response?.status === 401 && !redirecting) {
+      redirecting = true
+      const auth = useAuthStore()
+      auth.logout()
+      router.replace('/login').finally(() => { redirecting = false })
     }
     if (err.response?.status === 403) {
       const msg = err.response.data?.detail || 'No tienes permisos para esta acción'

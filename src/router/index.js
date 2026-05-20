@@ -50,6 +50,7 @@ const router = createRouter({
 router.beforeEach((to) => {
   const auth = useAuthStore()
   if (!to.meta.public && !auth.isAuthenticated) return '/login'
+  if (to.path === '/login' && auth.isAuthenticated) return '/dashboard'
   if (to.meta.roles && !auth.can(...to.meta.roles)) return '/dashboard'
   if (to.meta.requireEmail && auth.user?.email !== to.meta.requireEmail) return '/dashboard'
 })

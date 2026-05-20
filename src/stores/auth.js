@@ -3,11 +3,27 @@ import { ref, computed } from 'vue'
 
 const BASE = import.meta.env.VITE_API_URL || ''
 
+function tokenExpired(jwt) {
+  if (!jwt) return true
+  try {
+    const b64 = jwt.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
+    const { exp } = JSON.parse(atob(b64.padEnd(b64.length + (4 - b64.length % 4) % 4, '=')))
+    return !exp || Date.now() >= exp * 1000
+  } catch { return true }
+}
+
 export const useAuthStore = defineStore('auth', () => {
-  const token = ref(localStorage.getItem('token') || null)
+  const stored = localStorage.getItem('token')
+  const token = ref(stored && !tokenExpired(stored) ? stored : null)
   const user = ref(JSON.parse(localStorage.getItem('user') || 'null'))
 
-  const isAuthenticated = computed(() => !!token.value)
+  if (!token.value && stored) {
+    localStorage.removeItem('token')
+    localStorage.removeItem('user')
+    user.value = null
+  }
+
+  const isAuthenticated = computed(() => !!token.value && !tokenExpired(token.value))
   const role = computed(() => user.value?.rol || null)
 
   function can(...roles) {

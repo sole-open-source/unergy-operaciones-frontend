@@ -25,4 +25,4 @@ app.use(ToastService)
 app.use(ConfirmationService)
 app.component('InfoField', InfoField)
 
-app.mount('#app')
+router.isReady().then(() => app.mount('#app'))
