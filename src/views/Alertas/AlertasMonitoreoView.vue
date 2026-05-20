@@ -373,15 +373,15 @@ const dbAlarms = ref([])
 onMounted(async () => {
   try {
     const [statsRes, fallasRes, mgsRes, plantsRes, historyRes] = await Promise.all([
-      api.get('/fallas/stats/resumen'),
-      api.get('/fallas', { params: { size: 500 } }),
+      api.get('/fallas/stats/resumen').catch(() => ({ data: {} })),
+      api.get('/fallas', { params: { size: 100, solo_alerta: false } }).catch(() => ({ data: { items: [] } })),
       api.get('/mgs/status').catch(() => null),
       api.get('/mgs/plants').catch(() => null),
-      api.get('/mgs/alarms/history', { params: { limit: 200 } }).catch(() => null),
+      api.get('/mgs/alarms/history', { params: { page_size: 200 } }).catch(() => null),
     ])
     stats.value = statsRes.data
 
-    const items = fallasRes.data.items ?? fallasRes.data
+    const items = fallasRes.data.items ?? fallasRes.data ?? []
     fallas.value = items
       .filter(f => !f.estado?.es_estado_final)
       .sort((a, b) => (b.dias_abierta ?? 0) - (a.dias_abierta ?? 0))
