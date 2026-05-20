@@ -16,6 +16,7 @@ const routes = [
   { path: '/contratos/:id', name: 'ContratoDetalle', component: () => import('@/views/Contratos/ContratoDetailView.vue') },
   { path: '/informes', name: 'Informes', component: () => import('@/views/Operaciones/InformesListView.vue'), meta: { roles: ['admin', 'operaciones', 'monitoreo'] } },
   { path: '/informes/:id', name: 'InformeDetalle', component: () => import('@/views/Operaciones/InformeDetailView.vue'), meta: { roles: ['admin', 'operaciones', 'monitoreo'] } },
+  /* vistas legacy en /Informes — no usadas, rutas activas usan /Operaciones */
   { path: '/fallas', name: 'Fallas', component: () => import('@/views/Fallas/MonitoreoView.vue'), meta: { roles: ['admin', 'operaciones', 'monitoreo'] } },
   { path: '/fallas/lista', name: 'FallasLista', component: () => import('@/views/Fallas/FallasListView.vue'), meta: { roles: ['admin', 'operaciones', 'monitoreo'] } },
   { path: '/fallas/:id', name: 'FallaDetalle', component: () => import('@/views/Fallas/FallaDetailView.vue'), meta: { roles: ['admin', 'operaciones', 'monitoreo'] } },
@@ -36,8 +37,6 @@ const routes = [
   { path: '/mem/cumplimiento', name: 'MemCumplimiento',  component: () => import('@/views/MEM/CumplimientoV2View.vue') },
   { path: '/mem/descubrimientos', name: 'MemDescubrimientos', component: () => import('@/views/MEM/DescubrimientosView.vue') },
   { path: '/mem/cumplimiento-v2', redirect: '/mem/cumplimiento' },
-  { path: '/informes', name: 'Informes', component: () => import('@/views/Informes/InformesListView.vue'), meta: { roles: ['admin', 'operaciones'] } },
-  { path: '/informes/:id', name: 'InformeDetalle', component: () => import('@/views/Informes/InformeDetailView.vue'), meta: { roles: ['admin', 'operaciones'] } },
   { path: '/admin/usuarios', name: 'AdminUsuarios', component: () => import('@/views/Admin/AdminUsuariosView.vue'), meta: { roles: ['admin'], requireEmail: 'juanjose@unergy.io' } },
   { path: '/:pathMatch(.*)*', redirect: '/dashboard' },
 ]
