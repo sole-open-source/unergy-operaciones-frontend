@@ -550,7 +550,7 @@ function parseMonthArray(val) {
 
 function serializeMonthArray(arr) {
   if (arr.every(v => v === null || v === undefined)) return null
-  return JSON.stringify(arr.map(v => v ?? null))
+  return arr.map(v => v ?? null)
 }
 
 function populateEditForm() {
@@ -600,7 +600,9 @@ async function saveEdit() {
     router.push({ query: {} })
     toast.add({ severity: 'success', summary: 'Proyecto actualizado', life: 3000 })
   } catch (e) {
-    toast.add({ severity: 'error', summary: 'Error', detail: e.response?.data?.detail, life: 4000 })
+    const errDetail = e.response?.data?.detail
+    const msg = Array.isArray(errDetail) ? errDetail.map(d => d.msg || d).join('; ') : (errDetail || e.message)
+    toast.add({ severity: 'error', summary: 'Error', detail: msg, life: 6000 })
   } finally {
     guardando.value = false
   }
