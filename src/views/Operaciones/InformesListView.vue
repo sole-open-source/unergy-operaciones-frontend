@@ -109,7 +109,7 @@ async function cargar() {
   try {
     const params = { limit: 100 }
     if (filtroEstado.value) params.estado = filtroEstado.value
-    const { data } = await api.get('/informes/', { params })
+    const { data } = await api.get('/informes', { params })
     informes.value = data
   } catch (e) {
     error.value = e.response?.data?.detail || e.message
