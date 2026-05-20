@@ -317,7 +317,14 @@
         <p class="text-sm" style="color: #7a6e8a;">Cargando generación promedio de las plantas…</p>
       </div>
 
-      <Message v-else-if="simError" severity="error" :closable="false">{{ simError }}</Message>
+      <div v-else-if="simError" class="flex flex-col items-center gap-3 py-10">
+        <Message severity="error" :closable="false">{{ simError }}</Message>
+        <button @click="loadSimulator()"
+          class="px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+          style="background: #915BD8; color: white;">
+          <i class="pi pi-refresh mr-1" /> Reintentar
+        </button>
+      </div>
 
       <template v-else-if="simData">
 
@@ -790,7 +797,7 @@ function cacheGetSize() {
 async function cachedGet(endpoint, params = {}) {
   const cached = cacheGet(endpoint, params)
   if (cached) return cached
-  const res = await client.get(endpoint, { params })
+  const res = await client.get(endpoint, { params, timeout: 120000 })
   cacheSet(endpoint, params, res.data)
   return res.data
 }
@@ -1269,7 +1276,7 @@ function selectContrato(id) {
   loadAnnualData()
 }
 
-async function loadSimulator() {
+async function loadSimulator(retry = true) {
   simLoading.value = true
   simError.value   = null
   try {
@@ -1278,7 +1285,17 @@ async function loadSimulator() {
     initAssignments(data)
     updateCacheSize()
   } catch (e) {
-    simError.value = e.response?.data?.detail || 'Error al cargar el simulador.'
+    if (retry && (!e.response || e.code === 'ECONNABORTED' || e.response?.status >= 500)) {
+      console.warn('Simulador: reintentando tras error', e.message)
+      return loadSimulator(false)
+    }
+    const detail = e.response?.data?.detail
+    const status = e.response?.status
+    simError.value = detail
+      || (status === 401 ? 'Sesión expirada — inicia sesión de nuevo.'
+         : status === 503 ? 'API de generación no disponible temporalmente. Intenta en unos minutos.'
+         : e.code === 'ECONNABORTED' ? 'Tiempo de espera agotado — el servidor tardó demasiado.'
+         : 'Error al cargar el simulador.')
   } finally {
     simLoading.value = false
   }
