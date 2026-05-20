@@ -34,6 +34,8 @@ const routes = [
   { path: '/mem/cumplimiento', name: 'MemCumplimiento',  component: () => import('@/views/MEM/CumplimientoV2View.vue') },
   { path: '/mem/descubrimientos', name: 'MemDescubrimientos', component: () => import('@/views/MEM/DescubrimientosView.vue') },
   { path: '/mem/cumplimiento-v2', redirect: '/mem/cumplimiento' },
+  { path: '/informes', name: 'Informes', component: () => import('@/views/Informes/InformesListView.vue'), meta: { roles: ['admin', 'operaciones'] } },
+  { path: '/informes/:id', name: 'InformeDetalle', component: () => import('@/views/Informes/InformeDetailView.vue'), meta: { roles: ['admin', 'operaciones'] } },
   { path: '/admin/usuarios', name: 'AdminUsuarios', component: () => import('@/views/Admin/AdminUsuariosView.vue'), meta: { roles: ['admin'], requireEmail: 'juanjose@unergy.io' } },
   { path: '/:pathMatch(.*)*', redirect: '/dashboard' },
 ]
