@@ -94,41 +94,25 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
+import api from '@/api/client'
 
 const router = useRouter()
-const auth = useAuthStore()
 
 const informes = ref([])
 const loading = ref(false)
 const error = ref(null)
 const filtroEstado = ref('')
 
-async function apiFetch(method, url, body) {
-  const resp = await fetch(url, {
-    method,
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${auth.token}`,
-    },
-    ...(body ? { body: JSON.stringify(body) } : {}),
-  })
-  if (!resp.ok) {
-    const d = await resp.json().catch(() => ({}))
-    throw new Error(d.detail || `HTTP ${resp.status}`)
-  }
-  if (resp.status === 204) return null
-  return resp.json()
-}
-
 async function cargar() {
   loading.value = true
   error.value = null
   try {
-    const url = `/api/v1/informes/?limit=100${filtroEstado.value ? '&estado=' + filtroEstado.value : ''}`
-    informes.value = await apiFetch('GET', url)
+    const params = { limit: 100 }
+    if (filtroEstado.value) params.estado = filtroEstado.value
+    const { data } = await api.get('/informes/', { params })
+    informes.value = data
   } catch (e) {
-    error.value = e.message
+    error.value = e.response?.data?.detail || e.message
   } finally {
     loading.value = false
   }
@@ -142,10 +126,11 @@ async function eliminarInforme(inf) {
   const nombre = `${inf.proyecto_nombre || inf.sub_project} · ${inf.periodo_display || inf.periodo_desde || ''}`
   if (!confirm(`¿Eliminar el informe "${nombre}"?\nEsta acción no se puede deshacer.`)) return
   try {
-    await apiFetch('DELETE', `/api/v1/informes/${inf.id}`)
+    await api.delete(`/informes/${inf.id}`)
     informes.value = informes.value.filter(i => i.id !== inf.id)
   } catch (e) {
-    alert('⚠️ ' + (e.message.includes('400') ? 'No se puede eliminar un informe aprobado' : e.message))
+    const msg = e.response?.data?.detail || e.message
+    alert('⚠️ ' + (e.response?.status === 400 ? 'No se puede eliminar un informe aprobado' : msg))
   }
 }
 

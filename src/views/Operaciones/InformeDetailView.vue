@@ -1,5 +1,13 @@
 <template>
   <div class="inf-detail-wrapper">
+
+    <!-- Toast -->
+    <transition name="fade">
+      <div v-if="toastMsg" :class="['inf-toast', toastError ? 'inf-toast-err' : 'inf-toast-ok']">
+        {{ toastMsg }}
+      </div>
+    </transition>
+
     <!-- Breadcrumb -->
     <div class="inf-breadcrumb">
       <RouterLink to="/informes" class="inf-back">← Informes</RouterLink>
@@ -15,9 +23,13 @@
     </div>
 
     <!-- Error -->
-    <div v-else-if="error" class="inf-estado-error">⚠️ {{ error }}</div>
+    <div v-else-if="error" class="inf-estado-error">
+      ⚠️ {{ error }}
+      <br><small style="color:#6B5F80;font-size:11px">Verifica que el informe exista y tengas permisos.</small>
+    </div>
 
     <template v-else-if="informe">
+
       <!-- ══ Toolbar ══ -->
       <div class="inf-toolbar">
         <!-- Izq: edición -->
@@ -28,7 +40,8 @@
           <button v-if="editMode" class="inf-btn inf-btn-ghost inf-btn-danger" @click="discardEdit">
             ↩ Descartar cambios
           </button>
-          <button v-if="editMode" class="inf-btn inf-btn-ghost inf-btn-success" :disabled="saving" @click="saveEdit">
+          <button v-if="editMode" class="inf-btn inf-btn-ghost inf-btn-success"
+                  :disabled="saving" @click="saveEdit">
             {{ saving ? '…' : '💾 Guardar versión' }}
           </button>
         </div>
@@ -36,18 +49,25 @@
         <!-- Der: flujo de aprobación -->
         <div class="inf-toolbar-right">
           <span :class="['inf-estado-badge', estadoClass]">{{ estadoLabel }}</span>
-          <button
-            v-if="informe.estado === 'borrador'"
-            class="inf-btn inf-btn-ghost inf-btn-blue"
-            :disabled="changingEstado"
-            @click="changeEstado('revisado')"
-          >👁 Marcar revisado</button>
-          <button
-            v-if="informe.estado === 'revisado'"
-            class="inf-btn inf-btn-ghost inf-btn-purple"
-            :disabled="changingEstado"
-            @click="changeEstado('aprobado')"
-          >✅ Aprobar y enviar</button>
+          <button v-if="informe.estado === 'borrador'"
+                  class="inf-btn inf-btn-ghost inf-btn-blue"
+                  :disabled="changingEstado"
+                  @click="changeEstado('revisado')">
+            👁 Marcar revisado
+          </button>
+          <button v-if="informe.estado === 'revisado'"
+                  class="inf-btn inf-btn-ghost inf-btn-purple"
+                  :disabled="changingEstado"
+                  @click="changeEstado('aprobado')">
+            ✅ Aprobar y enviar
+          </button>
+          <button v-if="informe.estado === 'revisado'"
+                  class="inf-btn inf-btn-ghost"
+                  :disabled="changingEstado"
+                  @click="changeEstado('borrador')"
+                  style="color:#FF5757;border-color:#FF575740">
+            ↩ Devolver a borrador
+          </button>
           <button class="inf-btn inf-btn-yellow" @click="printInforme">
             🖨 Imprimir / PDF
           </button>
@@ -67,6 +87,7 @@
         :contenteditable="editMode ? 'true' : 'false'"
         v-html="htmlContent"
       />
+
     </template>
   </div>
 </template>
@@ -74,48 +95,32 @@
 <script setup>
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
+import api from '@/api/client'
 
 const route = useRoute()
-const auth = useAuthStore()
 
-const informe = ref(null)
-const loading = ref(false)
-const error = ref(null)
-const editMode = ref(false)
-const saving = ref(false)
+const informe    = ref(null)
+const loading    = ref(false)
+const error      = ref(null)
+const editMode   = ref(false)
+const saving     = ref(false)
 const changingEstado = ref(false)
 const contentRef = ref(null)
 const htmlContent = ref('')
+const toastMsg   = ref('')
+const toastError = ref(false)
+let _toastTimer  = null
 
-// ── API helper ──────────────────────────────────────────────────
-async function apiFetch(method, url, body) {
-  const resp = await fetch(url, {
-    method,
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${auth.token}`,
-    },
-    ...(body ? { body: JSON.stringify(body) } : {}),
-  })
-  if (!resp.ok) {
-    const d = await resp.json().catch(() => ({}))
-    throw new Error(d.detail || `HTTP ${resp.status}`)
-  }
-  if (resp.status === 204) return null
-  return resp.json()
-}
-
-// ── Cargar informe ───────────────────────────────────────────────
+// ── Cargar ───────────────────────────────────────────────────────
 async function cargar() {
   loading.value = true
-  error.value = null
+  error.value   = null
   try {
-    const data = await apiFetch('GET', `/api/v1/informes/${route.params.id}`)
-    informe.value = data
+    const { data } = await api.get(`/informes/${route.params.id}`)
+    informe.value   = data
     htmlContent.value = data.html_content || ''
   } catch (e) {
-    error.value = e.message
+    error.value = e.response?.data?.detail || e.message
   } finally {
     loading.value = false
   }
@@ -124,11 +129,11 @@ async function cargar() {
 // ── Edición ──────────────────────────────────────────────────────
 function enterEdit() {
   editMode.value = true
-  nextTick(() => { if (contentRef.value) contentRef.value.focus() })
+  nextTick(() => contentRef.value?.focus())
 }
 
 function discardEdit() {
-  editMode.value = false
+  editMode.value  = false
   htmlContent.value = informe.value.html_content || ''
 }
 
@@ -137,7 +142,7 @@ async function saveEdit() {
   saving.value = true
   try {
     const newHtml = contentRef.value.innerHTML
-    const data = await apiFetch('POST', `/api/v1/informes/`, {
+    const { data } = await api.post('/informes/', {
       tipo: informe.value.tipo,
       sub_project: informe.value.sub_project,
       periodo_desde: informe.value.periodo_desde,
@@ -145,14 +150,14 @@ async function saveEdit() {
       periodo_display: informe.value.periodo_display,
       proyecto_nombre: informe.value.proyecto_nombre,
       html_content: newHtml,
-      estado: informe.value.estado,
     })
-    informe.value = { ...informe.value, html_content: newHtml, ...(data || {}) }
+    informe.value   = { ...informe.value, ...data }
     htmlContent.value = newHtml
-    editMode.value = false
-    showToast('💾 Informe guardado')
+    editMode.value  = false
+    toast('💾 Informe guardado')
   } catch (e) {
-    showToast('⚠️ ' + e.message, true)
+    const msg = e.response?.data?.detail || e.message
+    toast('⚠️ ' + msg, true)
   } finally {
     saving.value = false
   }
@@ -160,24 +165,23 @@ async function saveEdit() {
 
 // ── Cambiar estado ───────────────────────────────────────────────
 async function changeEstado(nuevoEstado) {
-  if (changingEstado.value) return
   changingEstado.value = true
   try {
-    const data = await apiFetch('PATCH', `/api/v1/informes/${informe.value.id}/estado`, { estado: nuevoEstado })
-    informe.value = { ...informe.value, ...(data || {}), estado: nuevoEstado }
+    const { data } = await api.patch(`/informes/${informe.value.id}/estado`, { estado: nuevoEstado })
+    informe.value = { ...informe.value, ...data }
     if (nuevoEstado === 'aprobado') {
-      // Intentar enviar correo
       try {
-        await apiFetch('POST', `/api/v1/informes/${informe.value.id}/enviar`, {})
-        showToast('✅ Informe aprobado y correo enviado')
-      } catch {
-        showToast('✅ Aprobado — SMTP no configurado, no se envió correo')
+        const { data: envData } = await api.post(`/informes/${informe.value.id}/enviar`)
+        toast(`✅ Aprobado y enviado a ${envData.enviado_a}`)
+      } catch (err) {
+        const msg = err.response?.data?.detail || ''
+        toast('✅ Aprobado' + (msg ? ' — ' + msg : ' (correo no enviado)'))
       }
     } else {
-      showToast(`👁 Estado actualizado: ${nuevoEstado}`)
+      toast(`👁 Estado: ${nuevoEstado}`)
     }
   } catch (e) {
-    showToast('⚠️ ' + e.message, true)
+    toast('⚠️ ' + (e.response?.data?.detail || e.message), true)
   } finally {
     changingEstado.value = false
   }
@@ -189,15 +193,14 @@ function printInforme() {
 }
 
 // ── Toast ────────────────────────────────────────────────────────
-const toast = ref({ visible: false, msg: '', isError: false })
-let _toastTimer = null
-function showToast(msg, isError = false) {
-  toast.value = { visible: true, msg, isError }
+function toast(msg, isErr = false) {
+  toastMsg.value   = msg
+  toastError.value = isErr
   clearTimeout(_toastTimer)
-  _toastTimer = setTimeout(() => { toast.value.visible = false }, 4000)
+  _toastTimer = setTimeout(() => { toastMsg.value = '' }, 5000)
 }
 
-// ── Computed estado ──────────────────────────────────────────────
+// ── Estado computed ──────────────────────────────────────────────
 const estadoClass = computed(() => ({
   borrador: 'badge-borrador',
   revisado: 'badge-revisado',
@@ -213,9 +216,7 @@ const estadoLabel = computed(() => ({
 onMounted(cargar)
 </script>
 
-<!-- ════════════════════════════════════════════
-     Estilos de la interfaz (dark theme)
-════════════════════════════════════════════ -->
+<!-- ══ Estilos interfaz (dark — idéntico al monitoreo) ══ -->
 <style scoped>
 .inf-detail-wrapper {
   max-width: 1100px;
@@ -223,162 +224,110 @@ onMounted(cargar)
   padding: 20px 20px 80px;
   font-family: 'Sora', sans-serif;
   color: #FDFAF7;
+  position: relative;
 }
+
+/* Toast */
+.inf-toast {
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  padding: 10px 22px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  box-shadow: 0 6px 24px #00000060;
+  pointer-events: none;
+}
+.inf-toast-ok  { background: #2D8A4E; color: #fff; }
+.inf-toast-err { background: #992222; color: #fff; }
+.fade-enter-active, .fade-leave-active { transition: opacity .3s; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
 
 /* Breadcrumb */
 .inf-breadcrumb {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 12px;
-  color: #6B5F80;
-  margin-bottom: 16px;
-  flex-wrap: wrap;
+  display: flex; align-items: center; gap: 7px;
+  font-size: 12px; color: #6B5F80;
+  margin-bottom: 16px; flex-wrap: wrap;
 }
-.inf-back {
-  color: #915BD8;
-  text-decoration: none;
-  font-weight: 700;
-}
+.inf-back { color: #915BD8; text-decoration: none; font-weight: 700; }
 .inf-back:hover { text-decoration: underline; }
 .inf-sep { color: #4A3560; }
 .inf-bc-nombre { color: #A89EC0; font-weight: 600; }
 .inf-bc-periodo { color: #6B5F80; }
 
-/* Estados de carga */
+/* Estados */
 .inf-estado-carga {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 14px;
-  padding: 80px 20px;
-  color: #A89EC0;
-  font-size: 13px;
+  display: flex; flex-direction: column; align-items: center;
+  gap: 14px; padding: 80px 20px; color: #A89EC0; font-size: 13px;
 }
 .inf-estado-error {
-  text-align: center;
-  padding: 60px 20px;
-  color: #FF5757;
-  font-size: 13px;
+  text-align: center; padding: 60px 20px;
+  color: #FF5757; font-size: 13px;
 }
 
-/* ── Toolbar ── */
+/* Toolbar */
 .inf-toolbar {
-  background: #362848;
-  border: 1px solid #4A3560;
-  border-radius: 12px;
-  padding: 12px 16px;
-  margin-bottom: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 8px;
+  background: #362848; border: 1px solid #4A3560; border-radius: 12px;
+  padding: 12px 16px; margin-bottom: 14px;
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 8px;
 }
-.inf-toolbar-left,
-.inf-toolbar-right {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
+.inf-toolbar-left, .inf-toolbar-right {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
 }
 
-/* Hint edición */
+/* Hint */
 .inf-edit-hint {
-  margin-bottom: 12px;
-  padding: 8px 12px;
-  background: rgba(145, 91, 216, 0.06);
-  border: 1px solid rgba(145, 91, 216, 0.2);
-  border-radius: 8px;
-  font-size: 11px;
-  color: #A89EC0;
-  line-height: 1.5;
+  margin-bottom: 12px; padding: 8px 12px;
+  background: rgba(145,91,216,0.06); border: 1px solid rgba(145,91,216,0.2);
+  border-radius: 8px; font-size: 11px; color: #A89EC0; line-height: 1.5;
 }
 
 /* Botones */
 .inf-btn {
-  border-radius: 8px;
-  padding: 6px 13px;
-  font-size: 11px;
-  font-weight: 700;
-  border: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  cursor: pointer;
-  transition: all 0.18s;
-  font-family: 'Sora', sans-serif;
-  white-space: nowrap;
+  border-radius: 8px; padding: 6px 13px; font-size: 11px; font-weight: 700;
+  border: none; display: inline-flex; align-items: center; gap: 5px;
+  cursor: pointer; transition: all 0.18s;
+  font-family: 'Sora', sans-serif; white-space: nowrap;
 }
 .inf-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.inf-btn-ghost {
-  background: #422D57;
-  color: #FDFAF7;
-  border: 1px solid #5B4272;
-}
+.inf-btn-ghost { background: #422D57; color: #FDFAF7; border: 1px solid #5B4272; }
 .inf-btn-ghost:hover:not(:disabled) { border-color: #915BD8; }
-.inf-btn-danger { color: #FF5757 !important; border-color: rgba(255,87,87,0.25) !important; }
+.inf-btn-danger  { color: #FF5757 !important; border-color: rgba(255,87,87,0.25) !important; }
 .inf-btn-success { color: #2D8A4E !important; border-color: rgba(74,222,128,0.25) !important; }
-.inf-btn-blue { color: #2563EB !important; border-color: rgba(37,99,235,0.25) !important; }
-.inf-btn-purple { color: #915BD8 !important; border-color: rgba(145,91,216,0.25) !important; }
-.inf-btn-yellow {
-  background: #F6FF72;
-  color: #1A0F2E;
-  font-weight: 800;
-}
+.inf-btn-blue    { color: #2563EB !important; border-color: rgba(37,99,235,0.25) !important; }
+.inf-btn-purple  { color: #915BD8 !important; border-color: rgba(145,91,216,0.25) !important; }
+.inf-btn-yellow  { background: #F6FF72; color: #1A0F2E; font-weight: 800; }
 .inf-btn-yellow:hover { background: #e8f060; }
 
-/* Estado badges */
+/* Badges */
 .inf-estado-badge {
-  font-size: 10px;
-  font-weight: 800;
-  padding: 3px 10px;
-  border-radius: 20px;
-  letter-spacing: 0.5px;
-  white-space: nowrap;
+  font-size: 10px; font-weight: 800; padding: 3px 10px;
+  border-radius: 20px; letter-spacing: 0.5px; white-space: nowrap;
 }
-.badge-borrador {
-  background: rgba(246,255,114,0.12);
-  color: #B8A800;
-  border: 1px solid rgba(246,255,114,0.25);
-}
-.badge-revisado {
-  background: rgba(37,99,235,0.12);
-  color: #2563EB;
-  border: 1px solid rgba(37,99,235,0.25);
-}
-.badge-aprobado {
-  background: rgba(74,222,128,0.12);
-  color: #2D8A4E;
-  border: 1px solid rgba(74,222,128,0.25);
-}
+.badge-borrador { background: rgba(246,255,114,0.12); color: #B8A800; border: 1px solid rgba(246,255,114,0.25); }
+.badge-revisado { background: rgba(37,99,235,0.12);   color: #2563EB; border: 1px solid rgba(37,99,235,0.25); }
+.badge-aprobado { background: rgba(74,222,128,0.12);  color: #2D8A4E; border: 1px solid rgba(74,222,128,0.25); }
 
-/* Contenido del informe */
-.inf-report-content {
-  outline: none;
-}
-.inf-report-content[contenteditable="true"] {
-  cursor: text;
-}
+/* Contenido */
+.inf-report-content { outline: none; }
+.inf-report-content[contenteditable="true"] { cursor: text; }
 
 /* Spinner */
 .spin-ring {
-  width: 32px;
-  height: 32px;
-  border: 3px solid rgba(145,91,216,0.2);
-  border-top-color: #915BD8;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
+  width: 32px; height: 32px;
+  border: 3px solid rgba(145,91,216,0.2); border-top-color: #915BD8;
+  border-radius: 50%; animation: spin 0.8s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 </style>
 
-<!-- ════════════════════════════════════════════
-     Estilos del INFORME (no scoped — aplican
-     al HTML inyectado con v-html)
-════════════════════════════════════════════ -->
+<!-- ══ CSS del INFORME (no-scoped: aplica al v-html) ══ -->
 <style>
-/* Página del informe */
+/* Páginas del informe */
 .rpt-page{background:#fff;color:#1A0F2E;font-family:'Sora',sans-serif;font-size:12px;border-radius:12px;overflow:hidden;box-shadow:0 4px 30px rgba(0,0,0,.25);margin-bottom:24px}
 .rpt-header{background:#1A0F2E;padding:18px 28px}
 .rpt-meta-grid{display:grid;grid-template-columns:repeat(4,1fr);margin-top:14px;border:1px solid #2D1F45;border-radius:8px;overflow:hidden}
@@ -413,27 +362,22 @@ onMounted(cargar)
 .fmo-kpi{background:#F7F4FD;border:1px solid #EDE8F5;border-radius:10px;padding:12px 14px}
 .fmo-kpi-lbl{font-size:9px;font-weight:700;color:#A89EC0;letter-spacing:.7px;text-transform:uppercase;margin-bottom:3px}
 .fmo-kpi-val{font-size:18px;font-weight:800;color:#1A0F2E;font-family:'JetBrains Mono',monospace}
-.fmo-ok-box{background:#F0FFF4;border:1px solid #4ADE8040;border-radius:10px;padding:14px 18px;color:#2D5A3D;font-size:12px}
-.fmo-multa-box{background:#FFF5F5;border:1px solid #FF575740;border-radius:10px;padding:14px 18px;color:#7A1E1E;font-size:12px}
+.fmo-ok-box{background:#F0FFF4;border:1px solid rgba(74,222,128,0.25);border-radius:10px;padding:14px 18px;color:#2D5A3D;font-size:12px}
+.fmo-multa-box{background:#FFF5F5;border:1px solid rgba(255,87,87,0.25);border-radius:10px;padding:14px 18px;color:#7A1E1E;font-size:12px}
 .fmo-inv-table,.fmo-mant-table{width:100%;border-collapse:collapse;font-size:11px}
 .fmo-inv-table th,.fmo-mant-table th{background:#1A0F2E;color:#F6FF72;font-size:9px;font-weight:700;letter-spacing:.8px;padding:8px 10px;text-align:left}
 .fmo-inv-table td,.fmo-mant-table td{padding:7px 10px;border-bottom:1px solid #F0EBF8;vertical-align:top;line-height:1.5}
-
 /* Print */
 @media print {
-  *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important}
-  .inf-breadcrumb,.inf-toolbar,.inf-edit-hint{display:none!important}
+  *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+  .inf-breadcrumb,.inf-toolbar,.inf-edit-hint,.inf-toast{display:none!important}
   body{background:#fff!important}
   .inf-detail-wrapper{padding:0!important;max-width:100%!important}
-  .inf-report-content{display:block!important}
-  .rpt-page,.fmo-page{box-shadow:none!important;border-radius:0!important;margin-bottom:0!important;page-break-after:always;break-after:page;border:none!important}
+  .rpt-page,.fmo-page{box-shadow:none!important;border-radius:0!important;margin-bottom:0!important;page-break-after:always;break-after:page}
   .rpt-page:last-child,.fmo-page:last-child{page-break-after:auto!important}
-  .rpt-header{background:#1A0F2E!important}
+  .rpt-header,.fmo-header{background:#1A0F2E!important}
   .rpt-meta-item{background:#221533!important}
   .rpt-table th,.fmo-inv-table th,.fmo-mant-table th{background:#1A0F2E!important;color:#E8C840!important}
-  .rpt-kpi{background:#F7F4FD!important}
-  .rpt-obs-text{background:#F0FFF4!important}
-  .rpt-footer{background:#F7F4FD!important}
   .rpt-total-row td{background:#EDE8F5!important}
 }
 </style>
