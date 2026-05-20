@@ -94,9 +94,16 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import api from '@/api/client'
+import axios from 'axios'
 
 const router = useRouter()
+
+// Cliente directo al backend — bypasea proxy de Vercel/Vite para evitar 404 de infraestructura
+const BACKEND = 'https://backend-production-63d8.up.railway.app'
+function authHeaders() {
+  const token = localStorage.getItem('token')
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
 
 const informes = ref([])
 const loading = ref(false)
@@ -109,9 +116,18 @@ async function cargar() {
   try {
     const params = { limit: 100 }
     if (filtroEstado.value) params.estado = filtroEstado.value
-    const { data } = await api.get('/informes/', { params })
+    const { data } = await axios.get(`${BACKEND}/api/v1/informes/`, {
+      params,
+      headers: authHeaders(),
+    })
     informes.value = data
   } catch (e) {
+    if (e.response?.status === 401) {
+      localStorage.removeItem('token')
+      localStorage.removeItem('user')
+      window.location.href = '/login'
+      return
+    }
     error.value = e.response?.data?.detail || e.message
   } finally {
     loading.value = false
@@ -126,7 +142,7 @@ async function eliminarInforme(inf) {
   const nombre = `${inf.proyecto_nombre || inf.sub_project} · ${inf.periodo_display || inf.periodo_desde || ''}`
   if (!confirm(`¿Eliminar el informe "${nombre}"?\nEsta acción no se puede deshacer.`)) return
   try {
-    await api.delete(`/informes/${inf.id}`)
+    await axios.delete(`${BACKEND}/api/v1/informes/${inf.id}`, { headers: authHeaders() })
     informes.value = informes.value.filter(i => i.id !== inf.id)
   } catch (e) {
     const msg = e.response?.data?.detail || e.message
