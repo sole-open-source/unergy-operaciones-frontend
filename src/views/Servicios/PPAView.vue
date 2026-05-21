@@ -434,7 +434,13 @@ function confirmarEliminar(contrato) {
         contratos.value = contratos.value.filter(c => c.id !== contrato.id)
         toast.add({ severity: 'success', summary: 'Contrato eliminado', life: 2000 })
       } catch (e) {
-        toast.add({ severity: 'error', summary: 'Error al eliminar', detail: e.response?.data?.detail, life: 3000 })
+        const detail = e.response?.data?.detail
+        toast.add({
+          severity: 'error',
+          summary: 'Error al eliminar',
+          detail: detail || 'Error al eliminar el contrato.',
+          life: 3000,
+        })
       }
     },
   })
