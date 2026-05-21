@@ -116,7 +116,7 @@
           </template>
         </Column>
 
-        <Column header="" style="width:72px;">
+        <Column header="" style="width:100px;">
           <template #body="{ data }">
             <div class="flex items-center gap-1">
               <button @click="abrirEditar(data)" class="p-1 rounded hover:bg-purple-50 transition-colors"
@@ -127,11 +127,17 @@
                 class="p-1 rounded hover:bg-purple-50 transition-colors text-purple-500 hover:text-purple-700">
                 <i class="pi pi-external-link text-xs" />
               </a>
+              <button @click="confirmarEliminar(data)" class="p-1 rounded hover:bg-red-50 transition-colors"
+                title="Eliminar" style="color: #ef4444;">
+                <i class="pi pi-trash text-xs" />
+              </button>
             </div>
           </template>
         </Column>
       </DataTable>
     </div>
+
+    <ConfirmDialog />
 
     <!-- ── Dialog Registro ─────────────────────────────────────── -->
     <Dialog v-model:visible="dialogVisible" :header="editandoId ? 'Editar contrato ASIC' : 'Registrar contrato ASIC'" modal
@@ -307,9 +313,12 @@ import Dialog from 'primevue/dialog'
 import DatePicker from 'primevue/datepicker'
 import Textarea from 'primevue/textarea'
 import Checkbox from 'primevue/checkbox'
+import ConfirmDialog from 'primevue/confirmdialog'
 import { useToast } from 'primevue/usetoast'
+import { useConfirm } from 'primevue/useconfirm'
 
 const toast = useToast()
+const confirm = useConfirm()
 
 // ── Tabla ─────────────────────────────────────────────────────────
 const loading = ref(false)
@@ -361,6 +370,34 @@ async function cargar() {
   }
 }
 function limpiar() { filtroTexto.value = ''; filtroTipo.value = null }
+
+function confirmarEliminar(row) {
+  const label = row.codigo_sic_contrato || row.contrato_interno || `ID ${row.id}`
+  const planta = row.planta_nombre ? ` (${row.planta_nombre})` : ''
+  confirm.require({
+    message: `¿Eliminar el registro GESCON "${label}"${planta}? Esta acción no se puede deshacer.`,
+    header: 'Confirmar eliminación',
+    icon: 'pi pi-exclamation-triangle',
+    acceptSeverity: 'danger',
+    acceptLabel: 'Eliminar',
+    rejectLabel: 'Cancelar',
+    accept: async () => {
+      try {
+        await api.delete(`/asic/${row.id}`)
+        rows.value = rows.value.filter(r => r.id !== row.id)
+        toast.add({ severity: 'success', summary: 'Registro eliminado', life: 2000 })
+      } catch (e) {
+        const detail = e.response?.data?.detail
+        toast.add({
+          severity: 'error',
+          summary: 'No se puede eliminar',
+          detail: detail || 'Error al eliminar el registro GESCON.',
+          life: 6000,
+        })
+      }
+    },
+  })
+}
 
 // ── Proyectos ─────────────────────────────────────────────────────
 const proyectos = ref([])
