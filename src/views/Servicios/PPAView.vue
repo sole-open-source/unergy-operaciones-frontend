@@ -110,6 +110,12 @@
                 <span v-else class="text-gray-300">—</span>
               </template>
             </Column>
+            <Column style="min-width:60px">
+              <template #body="{ data }">
+                <Button icon="pi pi-trash" text size="small" severity="danger"
+                  v-tooltip.top="'Eliminar registro'" @click="confirmarEliminarAsic(data)" />
+              </template>
+            </Column>
           </DataTable>
         </div>
       </TabPanel>
@@ -437,9 +443,36 @@ function confirmarEliminar(contrato) {
         const detail = e.response?.data?.detail
         toast.add({
           severity: 'error',
-          summary: 'Error al eliminar',
+          summary: 'No se puede eliminar',
           detail: detail || 'Error al eliminar el contrato.',
-          life: 3000,
+          life: 6000,
+        })
+      }
+    },
+  })
+}
+
+function confirmarEliminarAsic(registro) {
+  const label = registro.codigo_sic_contrato || registro.contrato_interno || `ID ${registro.id}`
+  confirm.require({
+    message: `¿Eliminar el registro GESCON "${label}"? Esta acción no se puede deshacer.`,
+    header: 'Confirmar eliminación GESCON',
+    icon: 'pi pi-exclamation-triangle',
+    acceptSeverity: 'danger',
+    acceptLabel: 'Eliminar',
+    rejectLabel: 'Cancelar',
+    accept: async () => {
+      try {
+        await api.delete(`/asic/${registro.id}`)
+        asicRows.value = asicRows.value.filter(r => r.id !== registro.id)
+        toast.add({ severity: 'success', summary: 'Registro GESCON eliminado', life: 2000 })
+      } catch (e) {
+        const detail = e.response?.data?.detail
+        toast.add({
+          severity: 'error',
+          summary: 'No se puede eliminar',
+          detail: detail || 'Error al eliminar el registro GESCON.',
+          life: 6000,
         })
       }
     },

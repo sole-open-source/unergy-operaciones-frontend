@@ -382,9 +382,9 @@ function confirmarEliminar(contrato) {
         const detail = e.response?.data?.detail
         toast.add({
           severity: 'error',
-          summary: 'Error al eliminar',
+          summary: 'No se puede eliminar',
           detail: detail || 'Error al eliminar el contrato.',
-          life: 3000,
+          life: 6000,
         })
       }
     },
