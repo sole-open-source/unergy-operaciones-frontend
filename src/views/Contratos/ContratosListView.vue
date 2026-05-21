@@ -125,13 +125,16 @@
             <span v-else class="text-xs" style="color: #9CA3AF;">—</span>
           </template>
         </Column>
-        <Column style="width:90px">
+        <Column style="width:120px">
           <template #body="{ data }">
             <Button icon="pi pi-copy" text size="small" severity="secondary"
               v-tooltip.top="'Duplicar contrato'"
               @click.stop="duplicarContrato(data)" />
             <Button icon="pi pi-arrow-right" text size="small" severity="secondary"
               @click.stop="irAContrato(data)" v-tooltip="'Ver detalle'" />
+            <Button icon="pi pi-trash" text size="small" severity="danger"
+              v-tooltip.top="'Eliminar contrato'"
+              @click.stop="confirmarEliminar(data)" />
           </template>
         </Column>
       </DataTable>
@@ -275,6 +278,8 @@
       :tipo="servicioActivo"
       @cerrar="showServicioWizard = false"
       @creado="onServicioCreado" />
+
+    <ConfirmDialog />
   </div>
 </template>
 
@@ -282,6 +287,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
+import { useConfirm } from 'primevue/useconfirm'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Tag from 'primevue/tag'
@@ -289,12 +295,14 @@ import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import IconField from 'primevue/iconfield'
 import InputIcon from 'primevue/inputicon'
+import ConfirmDialog from 'primevue/confirmdialog'
 import PPAContratoWizard from './PPAContratoWizard.vue'
 import ContratoServicioWizard from './ContratoServicioWizard.vue'
 import api from '@/api/client'
 
 const router = useRouter()
 const toast = useToast()
+const confirm = useConfirm()
 
 const SERVICIOS = [
   { key: 'ppa',           label: 'PPA',           icon: 'pi pi-bolt',      color: '#f59e0b', bg: '#fffbeb' },
@@ -355,6 +363,32 @@ const contratoADuplicar = ref(null)
 function duplicarContrato(contrato) {
   contratoADuplicar.value = contrato
   showWizard.value = true
+}
+
+function confirmarEliminar(contrato) {
+  confirm.require({
+    message: `¿Seguro que deseas eliminar el contrato "${contrato.nombre_interno || contrato.numero_codigo_contrato || 'sin nombre'}"? Esta acción no se puede deshacer.`,
+    header: 'Confirmar eliminación',
+    icon: 'pi pi-exclamation-triangle',
+    acceptSeverity: 'danger',
+    acceptLabel: 'Eliminar',
+    rejectLabel: 'Cancelar',
+    accept: async () => {
+      try {
+        await api.delete(`/ppa/${contrato.id}`)
+        contratos.value = contratos.value.filter(c => c.id !== contrato.id)
+        toast.add({ severity: 'success', summary: 'Contrato eliminado', life: 2000 })
+      } catch (e) {
+        const detail = e.response?.data?.detail
+        toast.add({
+          severity: 'error',
+          summary: 'Error al eliminar',
+          detail: detail || 'Error al eliminar el contrato.',
+          life: 3000,
+        })
+      }
+    },
+  })
 }
 
 function onWizardCerrar() {
