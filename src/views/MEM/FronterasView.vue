@@ -13,6 +13,10 @@
         </span>
         <Dropdown v-model="estadoFilter" :options="estadoOptions" optionLabel="label" optionValue="value"
                   placeholder="Estado" class="w-40" showClear />
+        <Button icon="pi pi-chart-scatter" label="Diagrama Fasorial"
+                @click="showFasorial = true"
+                style="background: #915BD8; border-color: #915BD8;"
+                class="whitespace-nowrap" />
       </div>
     </div>
 
@@ -94,6 +98,54 @@
       </DataTable>
     </div>
 
+    <!-- Diagrama Fasorial Dialog -->
+    <Dialog v-model:visible="showFasorial" header="Diagrama Fasorial — Sistema Trifásico"
+      modal class="w-full max-w-lg">
+      <div class="space-y-5 pt-2">
+
+        <!-- Título -->
+        <div>
+          <label class="text-xs font-semibold uppercase block mb-1" style="color: #6b5a8a;">Título / Identificación</label>
+          <InputText v-model="fasorial.titulo" class="w-full" placeholder="Ej: GD Agustín 2 Principal" />
+        </div>
+
+        <!-- Tensiones -->
+        <div>
+          <p class="text-xs font-semibold uppercase mb-2" style="color: #6b5a8a;">Tensiones de fase (V)</p>
+          <div class="grid grid-cols-3 gap-3">
+            <div v-for="(fase, i) in ['R', 'S', 'T']" :key="'v'+i">
+              <label class="text-xs block mb-1 font-medium" :style="{ color: fasColors[i] }">Fase {{ fase }}</label>
+              <InputText v-model.number="fasorial['vp'+(i+1)]" type="number" step="0.01" class="w-full" :placeholder="'V' + (i+1)" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Corrientes -->
+        <div>
+          <p class="text-xs font-semibold uppercase mb-2" style="color: #6b5a8a;">Corrientes de fase (A)</p>
+          <div class="grid grid-cols-3 gap-3">
+            <div v-for="(fase, i) in ['R', 'S', 'T']" :key="'c'+i">
+              <label class="text-xs block mb-1 font-medium" :style="{ color: fasColorsC[i] }">Fase {{ fase }}</label>
+              <InputText v-model.number="fasorial['cp'+(i+1)]" type="number" step="0.001" class="w-full" :placeholder="'I' + (i+1)" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Alerta si faltan datos -->
+        <p v-if="fasorialError" class="text-xs rounded-lg px-3 py-2"
+           style="background: rgba(214,68,85,0.08); color: #D64455; border: 1px solid rgba(214,68,85,0.2);">
+          {{ fasorialError }}
+        </p>
+      </div>
+
+      <template #footer>
+        <Button label="Cancelar" severity="secondary" text @click="showFasorial = false" />
+        <Button icon="pi pi-download" label="Generar y Descargar"
+                :loading="generandoFasorial" @click="generarFasorial"
+                style="background: #915BD8; border-color: #915BD8;" />
+      </template>
+    </Dialog>
+
     <!-- Edit Dialog -->
     <Dialog v-model:visible="showEdit" :header="editingFrontera ? 'Editar Frontera' : 'Frontera'"
       modal class="w-full max-w-lg">
@@ -146,6 +198,59 @@ import Dropdown from 'primevue/dropdown'
 import Tag from 'primevue/tag'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
+
+// ── Fasorial ──────────────────────────────────────────────────────────────────
+const fasColors  = ['#E84040', '#2ECC71', '#3B82F6']
+const fasColorsC = ['#FF8C8C', '#7EEFC1', '#93C5FD']
+
+const showFasorial      = ref(false)
+const generandoFasorial = ref(false)
+const fasorialError     = ref('')
+
+const fasorial = ref({
+  titulo: '',
+  vp1: null, vp2: null, vp3: null,
+  cp1: null, cp2: null, cp3: null,
+})
+
+async function generarFasorial() {
+  fasorialError.value = ''
+  const f = fasorial.value
+  if (!f.titulo?.trim()) { fasorialError.value = 'El título es obligatorio.'; return }
+  const nums = [f.vp1, f.vp2, f.vp3, f.cp1, f.cp2, f.cp3]
+  if (nums.some(v => v === null || v === '' || isNaN(Number(v)) || Number(v) <= 0)) {
+    fasorialError.value = 'Todos los valores de tensión y corriente deben ser mayores a 0.'
+    return
+  }
+  generandoFasorial.value = true
+  try {
+    const token = localStorage.getItem('token')
+    const response = await fetch('/api/v1/fronteras/fasorial/generar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        titulo: f.titulo.trim(),
+        vp1: Number(f.vp1), vp2: Number(f.vp2), vp3: Number(f.vp3),
+        cp1: Number(f.cp1), cp2: Number(f.cp2), cp3: Number(f.cp3),
+      }),
+    })
+    if (!response.ok) throw new Error(`Error ${response.status}`)
+    const blob = await response.blob()
+    const url  = URL.createObjectURL(blob)
+    const a    = document.createElement('a')
+    a.href     = url
+    a.download = f.titulo.trim().replace(/\s+/g, '_').replace(/\//g, '-') + '_Fasorial.jpg'
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.add({ severity: 'success', summary: 'Diagrama generado', detail: 'El JPG se descargó correctamente.', life: 3000 })
+    showFasorial.value = false
+  } catch (e) {
+    fasorialError.value = 'No se pudo generar el diagrama. Verifica la conexión con el servidor.'
+    toast.add({ severity: 'error', summary: 'Error', detail: fasorialError.value, life: 4000 })
+  } finally {
+    generandoFasorial.value = false
+  }
+}
 
 const toast = useToast()
 const confirm = useConfirm()
