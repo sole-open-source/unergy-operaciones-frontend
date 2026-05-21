@@ -96,7 +96,7 @@
       <div class="space-y-3 py-2">
         <div>
           <label class="field-label">Proyecto</label>
-          <Select v-model="nueva.proyecto_id" :options="proyectosOpciones"
+          <Select v-model="nueva.proyecto_id" :options="proyectosOpcionesFiltradas"
             optionLabel="nombre_comercial" optionValue="id"
             placeholder="Seleccionar proyecto" filter class="w-full" />
         </div>
@@ -132,6 +132,7 @@ import InputIcon from 'primevue/inputicon'
 import InputText from 'primevue/inputtext'
 import { useToast } from 'primevue/usetoast'
 import api from '@/api/client'
+import { proyectoActivoEnMes } from '@/utils/proyectoActivo'
 
 const toast = useToast()
 const router = useRouter()
@@ -139,6 +140,14 @@ const router = useRouter()
 const vistaProyectos = ref([])
 const loadingVista = ref(false)
 const proyectosOpciones = ref([])
+
+const proyectosOpcionesFiltradas = computed(() => {
+  if (!nueva.value.periodo) return proyectosOpciones.value
+  const d = new Date(nueva.value.periodo)
+  const anio = d.getFullYear()
+  const mes = d.getMonth() + 1
+  return proyectosOpciones.value.filter(p => proyectoActivoEnMes(p, anio, mes))
+})
 
 const filtros = ref({ q: '', desde: null, hasta: null, estado: null, tipo_venta: null })
 

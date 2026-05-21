@@ -736,6 +736,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+import { proyectoActivoEnMes } from '@/utils/proyectoActivo'
 import Select from 'primevue/select'
 import InputText from 'primevue/inputtext'
 import DataTable from 'primevue/datatable'
@@ -865,6 +866,16 @@ const tooltipX           = ref(0)
 const tooltipY           = ref(0)
 const selectedMonthIdx   = ref(null)
 const chartBox           = ref(null)
+
+// ── Backend proyectos (para filtrar por fecha_fin_representacion) ─────────────
+const backendProyectos = ref([])
+
+async function loadBackendProyectos() {
+  try {
+    const res = await client.get('/proyectos', { params: { size: 200 } })
+    backendProyectos.value = res.data.items || []
+  } catch { /* degradar silenciosamente */ }
+}
 
 // ── Simulador state ───────────────────────────────────────────────────────────
 const simYear          = ref(now.getFullYear())
@@ -1015,9 +1026,12 @@ const simResults = computed(() => {
 
 // ── Simulador drag-and-drop ───────────────────────────────────────────────────
 function initAssignments(data) {
+  const proyMap = Object.fromEntries(backendProyectos.value.map(p => [p.id, p]))
   const a = { none: [] }
   for (const c of data.contratos) a[c.id] = []
   for (const p of data.plantas) {
+    const proy = proyMap[p.id]
+    if (proy && !proyectoActivoEnMes(proy, simYear.value, simMonth.value)) continue
     const key = p.contrato_id ?? 'none'
     if (!a[key]) a[key] = []
     a[key].push({ ...p })
@@ -1328,7 +1342,7 @@ watch(activeTab, (tab) => {
 })
 
 onMounted(async () => {
-  await loadContratos()
+  await Promise.all([loadContratos(), loadBackendProyectos()])
   loadSimulator()
 })
 </script>

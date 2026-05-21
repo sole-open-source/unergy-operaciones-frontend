@@ -417,6 +417,7 @@ import { ref, computed, onMounted } from 'vue'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import api from '@/api/client'
+import { proyectoActivoEnMes } from '@/utils/proyectoActivo'
 
 const TABS = ['Flota', 'Disponibilidad', 'Histórico', 'Detalle Proyecto', 'Completitud']
 const activeTab = ref(0)
@@ -428,6 +429,7 @@ const fleet = ref({})
 const availability = ref(null)
 const selectedProject = ref(null)
 const projectDetail = ref(null)
+const backendProyectos = ref([])
 
 const catLabels = { high: '> 90%', medium: '66-90%', low: '33-66%', critical: '< 33%', disconnect: 'Sin datos' }
 const catColors = {
@@ -461,7 +463,16 @@ const projectsWithUtil = computed(() => {
 })
 
 const filteredProjects = computed(() => {
+  const today = new Date()
+  const anio = today.getFullYear()
+  const mes = today.getMonth() + 1
+  const inactiveNames = new Set(
+    backendProyectos.value
+      .filter(p => !proyectoActivoEnMes(p, anio, mes))
+      .map(p => (p.nombre_comercial || '').toLowerCase()),
+  )
   let list = projectsWithUtil.value
+  if (inactiveNames.size) list = list.filter(p => !inactiveNames.has((p.name || '').toLowerCase()))
   if (fleetFilter.value === 'minifarm') list = list.filter(p => p.is_minifarm)
   if (fleetFilter.value === 'gd') list = list.filter(p => !p.is_minifarm)
   if (searchText.value) {
@@ -607,12 +618,14 @@ async function loadCompleteness() {
 async function loadData() {
   loading.value = true
   try {
-    const [fleetRes, availRes] = await Promise.all([
+    const [fleetRes, availRes, proyRes] = await Promise.all([
       api.get('/generacion-solar/fleet').catch(() => null),
       api.get('/generacion-solar/availability').catch(() => null),
+      api.get('/proyectos', { params: { size: 200 } }).catch(() => null),
     ])
     if (fleetRes?.data) fleet.value = fleetRes.data
     if (availRes?.data) availability.value = availRes.data
+    if (proyRes?.data) backendProyectos.value = proyRes.data.items || []
   } finally {
     loading.value = false
   }
