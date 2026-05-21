@@ -401,10 +401,10 @@
                   />
                   <!-- Min marker -->
                   <div
-                    v-if="simResults[c.id].min !== null && simResults[c.id].max > 0"
+                    v-if="simResults[c.id].min !== null && simResults[c.id].min > 0"
                     class="absolute top-0 h-full w-0.5"
                     style="background: rgba(44,32,57,0.35);"
-                    :style="{ left: Math.min(simResults[c.id].min / simResults[c.id].max * 100, 100) + '%' }"
+                    :style="{ left: simResults[c.id].max != null ? Math.min(simResults[c.id].min / simResults[c.id].max * 100, 100) + '%' : '100%' }"
                   />
                 </div>
                 <div class="flex items-center justify-between gap-2">
@@ -425,8 +425,10 @@
                      : '— Sin datos' }}
                   </span>
                 </div>
-                <div v-if="simResults[c.id].min !== null" class="text-xs mt-0.5" style="color: #7a6e8a;">
-                  {{ fmtMwh(simResults[c.id].min) }} – {{ fmtMwh(simResults[c.id].max) }}
+                <div v-if="simResults[c.id].min !== null || simResults[c.id].max !== null" class="text-xs mt-0.5" style="color: #7a6e8a;">
+                  <template v-if="simResults[c.id].min !== null && simResults[c.id].max !== null">{{ fmtMwh(simResults[c.id].min) }} – {{ fmtMwh(simResults[c.id].max) }}</template>
+                  <template v-else-if="simResults[c.id].min !== null">Mín: {{ fmtMwh(simResults[c.id].min) }}</template>
+                  <template v-else>Máx: {{ fmtMwh(simResults[c.id].max) }}</template>
                 </div>
               </div>
 
@@ -1014,12 +1016,14 @@ const simResults = computed(() => {
     }, 0)
     const { min_mwh: min, max_mwh: max } = c
     let estado = 'sin_compromisos'
-    if (min !== null && max !== null) {
-      if (gen < min) estado = 'deficit'
-      else if (gen > max) estado = 'excedente'
+    if (min !== null || max !== null) {
+      const effectiveMin = min ?? 0
+      if (gen < effectiveMin) estado = 'deficit'
+      else if (max !== null && gen > max) estado = 'excedente'
       else estado = 'ok'
     }
-    out[c.id] = { gen: Math.round(gen * 10) / 10, estado, pct: max ? (gen / max * 100) : null, min, max }
+    const pct = max != null ? (gen / max * 100) : min != null ? (gen / min * 100) : null
+    out[c.id] = { gen: Math.round(gen * 10) / 10, estado, pct, min, max }
   }
   return out
 })
@@ -1237,9 +1241,10 @@ async function loadConsolidado() {
     const val = totalProy !== null ? Math.round(totalProy * 1000) / 1000 : gen
 
     let estado = 'sin_compromisos', compras = null, excedentes = null
-    if (minMwh !== null && maxMwh !== null) {
-      if (val < minMwh) { estado = 'deficit'; compras = Math.round((minMwh - val) * 1000) / 1000; excedentes = 0 }
-      else if (val > maxMwh) { estado = 'excedente'; compras = 0; excedentes = Math.round((val - maxMwh) * 1000) / 1000 }
+    if (minMwh !== null || maxMwh !== null) {
+      const effectiveMin = minMwh ?? 0
+      if (val < effectiveMin) { estado = 'deficit'; compras = Math.round((effectiveMin - val) * 1000) / 1000; excedentes = 0 }
+      else if (maxMwh !== null && val > maxMwh) { estado = 'excedente'; compras = 0; excedentes = Math.round((val - maxMwh) * 1000) / 1000 }
       else { estado = 'ok'; compras = 0; excedentes = 0 }
     }
 
