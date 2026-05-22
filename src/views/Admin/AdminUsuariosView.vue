@@ -27,8 +27,9 @@
             <Tag :value="data.activo ? 'Activo' : 'Inactivo'" :severity="data.activo ? 'success' : 'danger'" />
           </template>
         </Column>
-        <Column header="Acciones" style="width: 100px">
+        <Column header="Acciones" style="width: 140px">
           <template #body="{ data }">
+            <Button icon="pi pi-key" text rounded size="small" v-tooltip.top="'API Keys'" @click="openApiKeys(data)" />
             <Button icon="pi pi-pencil" text rounded size="small" v-tooltip.top="'Editar'" @click="openEdit(data)" />
           </template>
         </Column>
@@ -39,6 +40,8 @@
       modal class="w-full max-w-lg">
       <UsuarioForm :initial="form" @save="onSave" @cancel="dialogVisible = false" />
     </Dialog>
+
+    <ApiKeysDialog v-model:visible="apiKeysVisible" :usuario="apiKeysUser" />
   </div>
 </template>
 
@@ -55,6 +58,7 @@ import Tag from 'primevue/tag'
 import { useToast } from 'primevue/usetoast'
 import api from '@/api/client'
 import UsuarioForm from './UsuarioForm.vue'
+import ApiKeysDialog from './ApiKeysDialog.vue'
 
 const toast = useToast()
 const items = ref([])
@@ -63,6 +67,8 @@ const q = ref('')
 const dialogVisible = ref(false)
 const editingId = ref(null)
 const form = ref({})
+const apiKeysVisible = ref(false)
+const apiKeysUser = ref(null)
 
 const ROL_LABELS = {
   admin: 'Admin',
@@ -118,6 +124,11 @@ function openEdit(row) {
   editingId.value = row.id
   form.value = { ...row }
   dialogVisible.value = true
+}
+
+function openApiKeys(row) {
+  apiKeysUser.value = row
+  apiKeysVisible.value = true
 }
 
 async function onSave(payload) {
