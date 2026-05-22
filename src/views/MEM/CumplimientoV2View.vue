@@ -506,6 +506,33 @@
                 </div>
               </div>
 
+              <!-- Projection bar (current month only) -->
+              <div class="px-4 py-2 border-b" style="border-color: rgba(44,32,57,0.07);" v-if="simResults[c.id]?.genProy != null && simResults[c.id].genProy > 0">
+                <div class="flex items-center gap-2 mb-1">
+                  <span class="text-[10px] font-medium" style="color: #3bbadcee;">Proy. cierre (promedio 30d)</span>
+                </div>
+                <div class="relative h-1.5 rounded-full overflow-hidden" style="background: rgba(59,186,220,0.10);">
+                  <div
+                    class="absolute left-0 top-0 h-full rounded-full transition-all duration-300"
+                    :style="{
+                      width: simResults[c.id].proyPct !== null ? Math.min(simResults[c.id].proyPct, 100) + '%' : '0%',
+                      background: 'rgba(59,186,220,0.65)',
+                    }"
+                  />
+                  <!-- Min marker -->
+                  <div
+                    v-if="simResults[c.id].min !== null && simResults[c.id].min > 0"
+                    class="absolute top-0 h-full w-0.5"
+                    style="background: rgba(44,32,57,0.25);"
+                    :style="{ left: simResults[c.id].max != null ? Math.min(simResults[c.id].min / simResults[c.id].max * 100, 100) + '%' : '100%' }"
+                  />
+                </div>
+                <div class="flex items-center justify-between mt-0.5">
+                  <span class="font-mono text-[10px] font-semibold" style="color: #3bbadcee;">{{ fmtMwh(simResults[c.id].genProy) }}</span>
+                  <span class="text-[10px]" style="color: #7a6e8a;">día {{ simResults[c.id].diaActual }} · quedan {{ simResults[c.id].diasRestantes }}d</span>
+                </div>
+              </div>
+
               <!-- Plant drop zone (collapsible) -->
               <div v-show="expandedContratos.includes(c.id)" class="p-3 space-y-1.5 overflow-y-auto sim-plant-zone" style="min-height: 64px; max-height: 220px;">
                 <div
@@ -1089,14 +1116,21 @@ function onSvgClick(event) {
 const simResults = computed(() => {
   if (!simData.value || !Object.keys(simAssignments.value).length) return {}
   const out = {}
+  const esActual = simData.value.es_mes_actual
+  const diaAct = simData.value.dia_actual
+  const diasRest = simData.value.dias_restantes
   for (const c of allContratos.value) {
     const plantas = simAssignments.value[c.id] || []
-    let genReal = 0, genDup = 0
+    let genReal = 0, genDup = 0, genProy = 0
     for (const p of plantas) {
       if (p.month_mwh == null) continue
       const mwh = p.month_mwh * p.pct_despacho
       if (p.es_duplicado) genDup += mwh
       else genReal += mwh
+      if (esActual && p.month_mwh_proyectado != null) {
+        const mwhProy = p.month_mwh_proyectado * p.pct_despacho
+        if (!p.es_duplicado) genProy += mwhProy
+      }
     }
     const gen = genReal
     const { min_mwh: min, max_mwh: max } = c
@@ -1110,10 +1144,14 @@ const simResults = computed(() => {
     const pct = max != null ? (gen / max * 100) : min != null ? (gen / min * 100) : null
     const dupPct = genDup > 0 && (max != null || min != null)
       ? (genDup / (max ?? min) * 100) : null
+    const proyPct = esActual && genProy > 0 && (max != null || min != null)
+      ? (genProy / (max ?? min) * 100) : null
     out[c.id] = {
       gen: Math.round(gen * 10) / 10,
       genDup: Math.round(genDup * 10) / 10,
-      estado, pct, dupPct, min, max,
+      genProy: esActual ? Math.round(genProy * 10) / 10 : null,
+      estado, pct, dupPct, proyPct, min, max,
+      diaActual: diaAct, diasRestantes: diasRest,
     }
   }
   return out
