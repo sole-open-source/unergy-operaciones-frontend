@@ -399,6 +399,16 @@
                       background: simResults[c.id].estado === 'ok' ? '#2e7d32' : simResults[c.id].estado === 'deficit' ? '#D64455' : '#F0C040',
                     }"
                   />
+                  <!-- Duplicado segment (red, stacked after real gen) -->
+                  <div
+                    v-if="simResults[c.id].dupPct"
+                    class="absolute top-0 h-full transition-all duration-300"
+                    style="background: repeating-linear-gradient(135deg, #D64455, #D64455 2px, #e8697a 2px, #e8697a 4px); opacity: 0.85;"
+                    :style="{
+                      left: simResults[c.id].pct !== null ? Math.min(simResults[c.id].pct, 100) + '%' : '0%',
+                      width: Math.min(simResults[c.id].dupPct, 100 - Math.min(simResults[c.id].pct || 0, 100)) + '%',
+                    }"
+                  />
                   <!-- Min marker -->
                   <div
                     v-if="simResults[c.id].min !== null && simResults[c.id].min > 0"
@@ -408,7 +418,14 @@
                   />
                 </div>
                 <div class="flex items-center justify-between gap-2">
-                  <span class="font-mono text-xs font-bold" style="color: #2C2039;">{{ fmtMwh(simResults[c.id].gen) }}</span>
+                  <div class="flex items-center gap-1.5">
+                    <span class="font-mono text-xs font-bold" style="color: #2C2039;">{{ fmtMwh(simResults[c.id].gen) }}</span>
+                    <span v-if="simResults[c.id].genDup > 0"
+                      class="font-mono text-[10px] font-semibold px-1.5 py-0.5 rounded"
+                      style="background: rgba(214,68,85,0.12); color: #D64455;"
+                      v-tooltip="'Exposición bolsa por duplicados'"
+                    >+{{ fmtMwh(simResults[c.id].genDup) }} dup</span>
+                  </div>
                   <span
                     class="text-xs font-semibold px-2 py-0.5 rounded-full"
                     :style="simResults[c.id].estado === 'ok'
@@ -1010,10 +1027,14 @@ const simResults = computed(() => {
   const out = {}
   for (const c of allContratos.value) {
     const plantas = simAssignments.value[c.id] || []
-    const gen = plantas.reduce((sum, p) => {
-      if (p.avg_daily_mwh == null) return sum
-      return sum + p.avg_daily_mwh * simData.value.dias_mes * p.pct_despacho
-    }, 0)
+    let genReal = 0, genDup = 0
+    for (const p of plantas) {
+      if (p.avg_daily_mwh == null) continue
+      const mwh = p.avg_daily_mwh * simData.value.dias_mes * p.pct_despacho
+      if (p.es_duplicado) genDup += mwh
+      else genReal += mwh
+    }
+    const gen = genReal
     const { min_mwh: min, max_mwh: max } = c
     let estado = 'sin_compromisos'
     if (min !== null || max !== null) {
@@ -1023,7 +1044,13 @@ const simResults = computed(() => {
       else estado = 'ok'
     }
     const pct = max != null ? (gen / max * 100) : min != null ? (gen / min * 100) : null
-    out[c.id] = { gen: Math.round(gen * 10) / 10, estado, pct, min, max }
+    const dupPct = genDup > 0 && (max != null || min != null)
+      ? (genDup / (max ?? min) * 100) : null
+    out[c.id] = {
+      gen: Math.round(gen * 10) / 10,
+      genDup: Math.round(genDup * 10) / 10,
+      estado, pct, dupPct, min, max,
+    }
   }
   return out
 })
