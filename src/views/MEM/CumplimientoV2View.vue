@@ -478,7 +478,7 @@
                   </div>
                   <div class="text-right flex-shrink-0">
                     <div class="font-mono font-semibold" :style="p.es_duplicado ? 'color: #D64455;' : p.comprado_por_unergy ? 'color: #9a6700;' : 'color: #915BD8;'">
-                      {{ p.avg_daily_mwh != null ? fmtMwh(p.avg_daily_mwh * simData.dias_mes * p.pct_despacho) : '—' }}
+                      {{ p.month_mwh != null ? fmtMwh(p.month_mwh * p.pct_despacho) : '—' }}
                     </div>
                     <div style="color: #7a6e8a;">{{ (p.pct_despacho * 100).toFixed(0) }}%</div>
                   </div>
@@ -537,7 +537,7 @@
                 v-tooltip="p.contrato_compra_nombre || 'Contrato de compra'"
               >Compra</span>
               <span class="font-mono" :style="p.es_duplicado ? 'color: #D64455;' : p.comprado_por_unergy ? 'color: #9a6700;' : 'color: #7a6e8a;'">
-                {{ p.avg_daily_mwh != null ? fmtMwh(p.avg_daily_mwh * simData.dias_mes) : '—' }}
+                {{ p.month_mwh != null ? fmtMwh(p.month_mwh) : '—' }}
               </span>
             </div>
             <div
@@ -1029,8 +1029,8 @@ const simResults = computed(() => {
     const plantas = simAssignments.value[c.id] || []
     let genReal = 0, genDup = 0
     for (const p of plantas) {
-      if (p.avg_daily_mwh == null) continue
-      const mwh = p.avg_daily_mwh * simData.value.dias_mes * p.pct_despacho
+      if (p.month_mwh == null) continue
+      const mwh = p.month_mwh * p.pct_despacho
       if (p.es_duplicado) genDup += mwh
       else genReal += mwh
     }
