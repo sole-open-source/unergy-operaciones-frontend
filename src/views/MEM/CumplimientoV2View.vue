@@ -507,21 +507,16 @@
               </div>
 
               <!-- Projection bar (current month only) -->
-              <div class="px-4 py-2 border-b" style="border-color: rgba(44,32,57,0.07);" v-if="simResults[c.id]?.genProy != null && simResults[c.id].genProy > 0">
-                <div class="flex items-center gap-2 mb-1">
-                  <span class="text-[10px] font-medium" style="color: #7a6e8a;">Proy. cierre (promedio 30d)</span>
-                </div>
-                <div class="relative h-1.5 rounded-full overflow-hidden" style="background: rgba(44,32,57,0.06);">
+              <div class="px-4 pb-3 border-b" style="border-color: rgba(44,32,57,0.07);" v-if="simResults[c.id]?.genProy != null && simResults[c.id].genProy > 0">
+                <span class="text-[10px] font-medium" style="color: #7a6e8a;">Proy. cierre</span>
+                <div class="relative h-1.5 rounded-full overflow-hidden mt-0.5 mb-1" style="background: rgba(44,32,57,0.06);">
                   <div
                     class="absolute left-0 top-0 h-full rounded-full transition-all duration-300"
                     :style="{
                       width: simResults[c.id].proyPct !== null ? Math.min(simResults[c.id].proyPct, 100) + '%' : '0%',
-                      background: simResults[c.id].estadoProy === 'ok' ? '#2e7d32'
-                        : simResults[c.id].estadoProy === 'deficit' ? '#D64455'
-                        : '#F0C040',
+                      background: simResults[c.id].estadoProy === 'ok' ? '#2e7d32' : simResults[c.id].estadoProy === 'deficit' ? '#D64455' : '#F0C040',
                     }"
                   />
-                  <!-- Min marker -->
                   <div
                     v-if="simResults[c.id].min !== null && simResults[c.id].min > 0"
                     class="absolute top-0 h-full w-0.5"
@@ -529,26 +524,23 @@
                     :style="{ left: simResults[c.id].max != null ? Math.min(simResults[c.id].min / simResults[c.id].max * 100, 100) + '%' : '100%' }"
                   />
                 </div>
-                <div class="flex items-center justify-between mt-0.5">
-                  <div class="flex items-center gap-1.5">
-                    <span class="font-mono text-[10px] font-semibold" style="color: #2C2039;">{{ fmtMwh(simResults[c.id].genProy) }}</span>
-                    <span
-                      class="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
-                      :style="simResults[c.id].estadoProy === 'ok'
-                        ? 'background: rgba(46,125,50,0.12); color: #2e7d32;'
-                        : simResults[c.id].estadoProy === 'deficit'
-                        ? 'background: rgba(214,68,85,0.12); color: #D64455;'
-                        : simResults[c.id].estadoProy === 'excedente'
-                        ? 'background: rgba(240,192,64,0.18); color: #9a6700;'
-                        : 'background: rgba(44,32,57,0.06); color: #7a6e8a;'"
-                    >
-                      {{ simResults[c.id].estadoProy === 'ok' ? '✓ Cumple'
-                       : simResults[c.id].estadoProy === 'deficit' ? '↓ Déficit'
-                       : simResults[c.id].estadoProy === 'excedente' ? '↑ Excedente'
-                       : '—' }}
-                    </span>
-                  </div>
-                  <span class="text-[10px]" style="color: #7a6e8a;">día {{ simResults[c.id].diaActual }} · quedan {{ simResults[c.id].diasRestantes }}d</span>
+                <div class="flex items-center justify-between">
+                  <span class="font-mono text-xs font-bold" style="color: #2C2039;">{{ fmtMwh(simResults[c.id].genProy) }}</span>
+                  <span
+                    class="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
+                    :style="simResults[c.id].estadoProy === 'ok'
+                      ? 'background: rgba(46,125,50,0.12); color: #2e7d32;'
+                      : simResults[c.id].estadoProy === 'deficit'
+                      ? 'background: rgba(214,68,85,0.12); color: #D64455;'
+                      : simResults[c.id].estadoProy === 'excedente'
+                      ? 'background: rgba(240,192,64,0.18); color: #9a6700;'
+                      : 'background: rgba(44,32,57,0.06); color: #7a6e8a;'"
+                  >
+                    {{ simResults[c.id].estadoProy === 'ok' ? '✓ OK'
+                     : simResults[c.id].estadoProy === 'deficit' ? '↓ Déficit'
+                     : simResults[c.id].estadoProy === 'excedente' ? '↑ Excedente'
+                     : '— Sin datos' }}
+                  </span>
                 </div>
               </div>
 
