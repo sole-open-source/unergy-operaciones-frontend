@@ -97,21 +97,60 @@
               </g>
 
               <g v-for="(mes, i) in anualData.meses" :key="i">
-                <rect v-if="isCurrentMonth(mes)" :x="slotX(i)" y="0" :width="slotW" :height="SVG_H - PAD_B + 2" fill="rgba(145,91,216,0.04)" />
+                <!-- Background highlights -->
+                <rect v-if="isCurrentMonth(mes)" :x="slotX(i)" y="0" :width="slotW" :height="SVG_H - PAD_B + 2" fill="rgba(145,91,216,0.06)" />
                 <rect v-if="selectedMonthIdx === i" :x="slotX(i)" y="0" :width="slotW" :height="SVG_H - PAD_B + 2" fill="rgba(240,192,64,0.08)" />
+                <!-- Commitment zone (green band) -->
                 <rect v-if="mes.min_mwh !== null && mes.max_mwh !== null" :x="slotX(i)" :y="toY(mes.max_mwh)" :width="slotW" :height="toY(mes.min_mwh) - toY(mes.max_mwh)" fill="rgba(46,125,50,0.10)" />
-                <rect v-if="genVal(mes) > 0" :x="barX(i)" :y="toY(genVal(mes))" :width="barW" :height="toY(0) - toY(genVal(mes))" fill="#915BD8" :opacity="mes.tipo_datos === 'proyeccion_historica' ? 0.55 : 1" />
-                <rect v-if="genVal(mes) > 0 && mes.tipo_datos === 'proyeccion_historica'" :x="barX(i)" :y="toY(genVal(mes))" :width="barW" :height="toY(0) - toY(genVal(mes))" fill="none" stroke="#915BD8" stroke-width="1" stroke-dasharray="3,2" />
-                <rect v-if="mes.estado === 'deficit' && mes.min_mwh !== null && genVal(mes) > 0 && genVal(mes) < mes.min_mwh" :x="barX(i)" :y="toY(mes.min_mwh)" :width="barW" :height="toY(genVal(mes)) - toY(mes.min_mwh)" fill="rgba(214,68,85,0.32)" />
-                <rect v-if="mes.estado === 'excedente' && mes.max_mwh !== null && genVal(mes) > mes.max_mwh" :x="barX(i)" :y="toY(genVal(mes))" :width="barW" :height="toY(mes.max_mwh) - toY(genVal(mes))" fill="rgba(240,192,64,0.55)" />
+
+                <!-- CURRENT MONTH: two bars side by side -->
+                <template v-if="mes.tipo_datos === 'mes_actual'">
+                  <!-- Left bar: actual generation (solid) -->
+                  <rect v-if="mes.gen_mwh > 0"
+                    :x="dualBarLeftX(i)" :y="toY(mes.gen_mwh)" :width="dualBarW" :height="toY(0) - toY(mes.gen_mwh)"
+                    fill="#915BD8" rx="1" />
+                  <!-- Right bar: projected close (lighter + pattern) -->
+                  <rect v-if="cierreVal(mes) > 0"
+                    :x="dualBarRightX(i)" :y="toY(cierreVal(mes))" :width="dualBarW" :height="toY(0) - toY(cierreVal(mes))"
+                    fill="rgba(59,186,220,0.65)" rx="1" />
+                  <rect v-if="cierreVal(mes) > 0"
+                    :x="dualBarRightX(i)" :y="toY(cierreVal(mes))" :width="dualBarW" :height="toY(0) - toY(cierreVal(mes))"
+                    fill="none" stroke="rgba(59,186,220,0.9)" stroke-width="1" stroke-dasharray="3,2" rx="1" />
+                  <!-- Deficit/excedent shading on projection bar -->
+                  <rect v-if="mes.estado === 'deficit' && mes.min_mwh !== null && cierreVal(mes) > 0 && cierreVal(mes) < mes.min_mwh"
+                    :x="dualBarRightX(i)" :y="toY(mes.min_mwh)" :width="dualBarW" :height="toY(cierreVal(mes)) - toY(mes.min_mwh)"
+                    fill="rgba(214,68,85,0.32)" />
+                  <rect v-if="mes.estado === 'excedente' && mes.max_mwh !== null && cierreVal(mes) > mes.max_mwh"
+                    :x="dualBarRightX(i)" :y="toY(cierreVal(mes))" :width="dualBarW" :height="toY(mes.max_mwh) - toY(cierreVal(mes))"
+                    fill="rgba(240,192,64,0.55)" />
+                </template>
+
+                <!-- PAST / FUTURE months: single bar -->
+                <template v-else>
+                  <rect v-if="genVal(mes) > 0" :x="barX(i)" :y="toY(genVal(mes))" :width="barW" :height="toY(0) - toY(genVal(mes))"
+                    :fill="mes.tipo_datos === 'proyeccion_historica' ? 'rgba(59,186,220,0.55)' : '#915BD8'" />
+                  <rect v-if="genVal(mes) > 0 && mes.tipo_datos === 'proyeccion_historica'" :x="barX(i)" :y="toY(genVal(mes))" :width="barW" :height="toY(0) - toY(genVal(mes))"
+                    fill="none" stroke="rgba(59,186,220,0.9)" stroke-width="1" stroke-dasharray="3,2" />
+                  <rect v-if="mes.estado === 'deficit' && mes.min_mwh !== null && genVal(mes) > 0 && genVal(mes) < mes.min_mwh"
+                    :x="barX(i)" :y="toY(mes.min_mwh)" :width="barW" :height="toY(genVal(mes)) - toY(mes.min_mwh)"
+                    fill="rgba(214,68,85,0.32)" />
+                  <rect v-if="mes.estado === 'excedente' && mes.max_mwh !== null && genVal(mes) > mes.max_mwh"
+                    :x="barX(i)" :y="toY(genVal(mes))" :width="barW" :height="toY(mes.max_mwh) - toY(genVal(mes))"
+                    fill="rgba(240,192,64,0.55)" />
+                </template>
+
+                <!-- Min/max lines -->
                 <line v-if="mes.min_mwh !== null" :x1="slotX(i)" :y1="toY(mes.min_mwh)" :x2="slotX(i) + slotW" :y2="toY(mes.min_mwh)" stroke="rgba(214,68,85,0.50)" stroke-width="1" />
                 <line v-if="mes.max_mwh !== null" :x1="slotX(i)" :y1="toY(mes.max_mwh)" :x2="slotX(i) + slotW" :y2="toY(mes.max_mwh)" stroke="rgba(145,91,216,0.50)" stroke-width="1" />
+                <!-- Hover highlight -->
                 <rect v-if="hovered === i && selectedMonthIdx !== i" :x="slotX(i)" :y="PAD_T" :width="slotW" :height="PLOT_H" fill="rgba(145,91,216,0.07)" />
-                <circle v-if="selectedMonthIdx === i" :cx="barX(i) + barW / 2" :cy="SVG_H - PAD_B + 30" r="3" fill="#F0C040" />
-                <text :x="barX(i) + barW / 2" :y="SVG_H - PAD_B + 17" text-anchor="middle" font-size="11"
+                <!-- Month label -->
+                <circle v-if="selectedMonthIdx === i" :cx="slotX(i) + slotW / 2" :cy="SVG_H - PAD_B + 30" r="3" fill="#F0C040" />
+                <text :x="slotX(i) + slotW / 2" :y="SVG_H - PAD_B + 17" text-anchor="middle" font-size="11"
                   :fill="selectedMonthIdx === i ? '#F0C040' : isCurrentMonth(mes) ? '#2C2039' : '#7a6e8a'"
                   :font-weight="selectedMonthIdx === i || isCurrentMonth(mes) ? '700' : '400'"
                 >{{ MESES_CORTOS[i] }}</text>
+                <!-- Clickable area -->
                 <rect :x="slotX(i)" :y="PAD_T" :width="slotW" :height="PLOT_H" fill="transparent" style="cursor: pointer;" />
               </g>
 
@@ -128,13 +167,31 @@
             >
               <div class="font-bold mb-2" style="color: #F0C040;">
                 {{ MESES[hovered] }} {{ selectedYear }}
-                <span v-if="anualData.meses[hovered].tipo_datos !== 'real'" class="ml-1 text-xs font-normal" style="color: rgba(253,250,247,0.55);">proyección</span>
+                <span v-if="anualData.meses[hovered].tipo_datos === 'mes_actual'" class="ml-1 text-xs font-normal" style="color: rgba(59,186,220,0.85);">mes en curso</span>
+                <span v-else-if="anualData.meses[hovered].tipo_datos === 'proyeccion_historica'" class="ml-1 text-xs font-normal" style="color: rgba(253,250,247,0.55);">proyección</span>
               </div>
               <div class="space-y-1">
-                <div class="flex justify-between gap-6">
-                  <span style="color: rgba(253,250,247,0.65);">Generación</span>
-                  <span class="font-mono font-semibold">{{ fmtMwh(genVal(anualData.meses[hovered])) }}</span>
-                </div>
+                <!-- Current month: show both actual and projection -->
+                <template v-if="anualData.meses[hovered].tipo_datos === 'mes_actual'">
+                  <div class="flex justify-between gap-6">
+                    <span style="color: #c4a1f0;">Generación actual</span>
+                    <span class="font-mono font-semibold" style="color: #c4a1f0;">{{ fmtMwh(anualData.meses[hovered].gen_mwh) }}</span>
+                  </div>
+                  <div v-if="cierreVal(anualData.meses[hovered])" class="flex justify-between gap-6">
+                    <span style="color: rgba(59,186,220,0.9);">Proy. cierre</span>
+                    <span class="font-mono font-bold" style="color: rgba(59,186,220,0.95);">{{ fmtMwh(cierreVal(anualData.meses[hovered])) }}</span>
+                  </div>
+                  <div v-if="anualData.meses[hovered].dias_restantes != null" class="text-xs mt-0.5" style="color: rgba(253,250,247,0.40);">
+                    {{ anualData.meses[hovered].dia_actual }}d transcurridos · {{ anualData.meses[hovered].dias_restantes }}d restantes
+                  </div>
+                </template>
+                <!-- Past / Future: single value -->
+                <template v-else>
+                  <div class="flex justify-between gap-6">
+                    <span style="color: rgba(253,250,247,0.65);">Generación</span>
+                    <span class="font-mono font-semibold">{{ fmtMwh(genVal(anualData.meses[hovered])) }}</span>
+                  </div>
+                </template>
                 <div v-if="anualData.meses[hovered].min_mwh !== null" class="flex justify-between gap-6">
                   <span style="color: rgba(253,250,247,0.65);">Mínimo</span>
                   <span class="font-mono">{{ fmtMwh(anualData.meses[hovered].min_mwh) }}</span>
@@ -144,11 +201,11 @@
                   <span class="font-mono">{{ fmtMwh(anualData.meses[hovered].max_mwh) }}</span>
                 </div>
                 <div v-if="anualData.meses[hovered].estado === 'deficit'" class="flex justify-between gap-6 mt-2 pt-2" style="border-top: 1px solid rgba(255,255,255,0.1);">
-                  <span style="color: #D64455;">Déficit</span>
+                  <span style="color: #D64455;">Déficit (proy.)</span>
                   <span class="font-mono font-bold" style="color: #D64455;">{{ fmtMwh(anualData.meses[hovered].compras_bolsa_mwh) }}</span>
                 </div>
                 <div v-if="anualData.meses[hovered].estado === 'excedente'" class="flex justify-between gap-6 mt-2 pt-2" style="border-top: 1px solid rgba(255,255,255,0.1);">
-                  <span style="color: #F0C040;">Excedente</span>
+                  <span style="color: #F0C040;">Excedente (proy.)</span>
                   <span class="font-mono font-bold" style="color: #F0C040;">{{ fmtMwh(anualData.meses[hovered].excedentes_bolsa_mwh) }}</span>
                 </div>
               </div>
@@ -160,9 +217,9 @@
           <div class="flex flex-wrap gap-5 mt-3 pl-1">
             <div class="flex items-center gap-2 text-xs" style="color: #7a6e8a;"><div class="w-4 h-4 rounded-sm" style="background: rgba(46,125,50,0.18); border: 1px solid rgba(46,125,50,0.45);"></div>Zona de cumplimiento</div>
             <div class="flex items-center gap-2 text-xs" style="color: #7a6e8a;"><div class="w-4 h-4 rounded-sm" style="background: #915BD8;"></div>Generación real</div>
+            <div class="flex items-center gap-2 text-xs" style="color: #7a6e8a;"><div class="w-4 h-4 rounded-sm" style="background: rgba(59,186,220,0.65); border: 1px dashed rgba(59,186,220,0.9);"></div>Proyección cierre (prom. 30d)</div>
             <div class="flex items-center gap-2 text-xs" style="color: #7a6e8a;"><div class="w-4 h-4 rounded-sm" style="background: rgba(214,68,85,0.38);"></div>Brecha de déficit</div>
             <div class="flex items-center gap-2 text-xs" style="color: #7a6e8a;"><div class="w-4 h-4 rounded-sm" style="background: rgba(240,192,64,0.6);"></div>Excedente contractual</div>
-            <div class="flex items-center gap-2 text-xs" style="color: #7a6e8a;"><div class="w-4 h-4 rounded-sm" style="background: rgba(145,91,216,0.45); border: 1px dashed #915BD8;"></div>Proyección</div>
           </div>
         </div>
       </template>
@@ -970,7 +1027,7 @@ const tableDataWithTotal = computed(() => {
 const yMaxVal = computed(() => {
   if (!anualData.value) return 1000
   let m = 0
-  for (const mes of anualData.value.meses) m = Math.max(m, mes.max_mwh || 0, genVal(mes))
+  for (const mes of anualData.value.meses) m = Math.max(m, mes.max_mwh || 0, genVal(mes), cierreVal(mes))
   return m > 0 ? m * 1.18 : 1000
 })
 
@@ -995,7 +1052,14 @@ function toY(val)  { return PAD_T + PLOT_H * (1 - (val || 0) / yMaxVal.value) }
 function slotX(i)  { return PAD_L + i * slotW }
 function barX(i)   { return PAD_L + i * slotW + (slotW - barW) / 2 }
 function genVal(mes) { return mes.gen_proyectada_mwh ?? mes.gen_mwh ?? 0 }
+function cierreVal(mes) { return mes.gen_proyectada_cierre ?? 0 }
 function isCurrentMonth(mes) { return selectedYear.value === now.getFullYear() && mes.month === (now.getMonth() + 1) }
+
+// Dual-bar geometry for current month (two narrower bars side by side)
+const dualBarW = slotW * 0.26
+const dualGap  = slotW * 0.03
+function dualBarLeftX(i)  { return PAD_L + i * slotW + (slotW - dualBarW * 2 - dualGap) / 2 }
+function dualBarRightX(i) { return dualBarLeftX(i) + dualBarW + dualGap }
 
 // ── Chart interaction ─────────────────────────────────────────────────────────
 function monthIdxFromEvent(event) {
@@ -1241,8 +1305,9 @@ async function loadConsolidado() {
 
   const meses = []
   for (let i = 0; i < 12; i++) {
-    let totalGen = 0, totalProy = null, totalMin = 0, totalMax = 0
+    let totalGen = 0, totalProy = null, totalCierre = null, totalMin = 0, totalMax = 0
     let hasMin = false, hasMax = false, totalBolsaDup = 0
+    let diaActual = null, diasRestantes = null
     const allPlantas = []
 
     for (const data of successful) {
@@ -1251,9 +1316,14 @@ async function loadConsolidado() {
       if (mes.gen_proyectada_mwh !== null && mes.gen_proyectada_mwh !== undefined) {
         totalProy = (totalProy || 0) + mes.gen_proyectada_mwh
       }
+      if (mes.gen_proyectada_cierre !== null && mes.gen_proyectada_cierre !== undefined) {
+        totalCierre = (totalCierre || 0) + mes.gen_proyectada_cierre
+      }
       if (mes.min_mwh !== null) { totalMin += mes.min_mwh; hasMin = true }
       if (mes.max_mwh !== null) { totalMax += mes.max_mwh; hasMax = true }
       if (mes.exposicion_bolsa_duplicados_mwh) totalBolsaDup += mes.exposicion_bolsa_duplicados_mwh
+      if (mes.dia_actual != null) diaActual = mes.dia_actual
+      if (mes.dias_restantes != null) diasRestantes = mes.dias_restantes
       for (const p of (mes.plantas || [])) {
         allPlantas.push({
           ...p,
@@ -1265,7 +1335,8 @@ async function loadConsolidado() {
     const minMwh = hasMin ? Math.round(totalMin * 1000) / 1000 : null
     const maxMwh = hasMax ? Math.round(totalMax * 1000) / 1000 : null
     const gen = Math.round(totalGen * 1000) / 1000
-    const val = totalProy !== null ? Math.round(totalProy * 1000) / 1000 : gen
+    const cierre = totalCierre !== null ? Math.round(totalCierre * 1000) / 1000 : null
+    const val = cierre ?? (totalProy !== null ? Math.round(totalProy * 1000) / 1000 : gen)
 
     let estado = 'sin_compromisos', compras = null, excedentes = null
     if (minMwh !== null || maxMwh !== null) {
@@ -1280,6 +1351,9 @@ async function loadConsolidado() {
       month: i + 1,
       gen_mwh: gen,
       gen_proyectada_mwh: totalProy !== null ? Math.round(totalProy * 1000) / 1000 : null,
+      gen_proyectada_cierre: cierre,
+      dia_actual: diaActual,
+      dias_restantes: diasRestantes,
       min_mwh: minMwh,
       max_mwh: maxMwh,
       estado,
