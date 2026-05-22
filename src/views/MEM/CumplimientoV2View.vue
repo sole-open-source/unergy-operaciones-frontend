@@ -509,14 +509,16 @@
               <!-- Projection bar (current month only) -->
               <div class="px-4 py-2 border-b" style="border-color: rgba(44,32,57,0.07);" v-if="simResults[c.id]?.genProy != null && simResults[c.id].genProy > 0">
                 <div class="flex items-center gap-2 mb-1">
-                  <span class="text-[10px] font-medium" style="color: #3bbadcee;">Proy. cierre (promedio 30d)</span>
+                  <span class="text-[10px] font-medium" style="color: #7a6e8a;">Proy. cierre (promedio 30d)</span>
                 </div>
-                <div class="relative h-1.5 rounded-full overflow-hidden" style="background: rgba(59,186,220,0.10);">
+                <div class="relative h-1.5 rounded-full overflow-hidden" style="background: rgba(44,32,57,0.06);">
                   <div
                     class="absolute left-0 top-0 h-full rounded-full transition-all duration-300"
                     :style="{
                       width: simResults[c.id].proyPct !== null ? Math.min(simResults[c.id].proyPct, 100) + '%' : '0%',
-                      background: 'rgba(59,186,220,0.65)',
+                      background: simResults[c.id].estadoProy === 'ok' ? '#2e7d32'
+                        : simResults[c.id].estadoProy === 'deficit' ? '#D64455'
+                        : '#F0C040',
                     }"
                   />
                   <!-- Min marker -->
@@ -528,7 +530,24 @@
                   />
                 </div>
                 <div class="flex items-center justify-between mt-0.5">
-                  <span class="font-mono text-[10px] font-semibold" style="color: #3bbadcee;">{{ fmtMwh(simResults[c.id].genProy) }}</span>
+                  <div class="flex items-center gap-1.5">
+                    <span class="font-mono text-[10px] font-semibold" style="color: #2C2039;">{{ fmtMwh(simResults[c.id].genProy) }}</span>
+                    <span
+                      class="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
+                      :style="simResults[c.id].estadoProy === 'ok'
+                        ? 'background: rgba(46,125,50,0.12); color: #2e7d32;'
+                        : simResults[c.id].estadoProy === 'deficit'
+                        ? 'background: rgba(214,68,85,0.12); color: #D64455;'
+                        : simResults[c.id].estadoProy === 'excedente'
+                        ? 'background: rgba(240,192,64,0.18); color: #9a6700;'
+                        : 'background: rgba(44,32,57,0.06); color: #7a6e8a;'"
+                    >
+                      {{ simResults[c.id].estadoProy === 'ok' ? '✓ Cumple'
+                       : simResults[c.id].estadoProy === 'deficit' ? '↓ Déficit'
+                       : simResults[c.id].estadoProy === 'excedente' ? '↑ Excedente'
+                       : '—' }}
+                    </span>
+                  </div>
                   <span class="text-[10px]" style="color: #7a6e8a;">día {{ simResults[c.id].diaActual }} · quedan {{ simResults[c.id].diasRestantes }}d</span>
                 </div>
               </div>
@@ -1146,11 +1165,18 @@ const simResults = computed(() => {
       ? (genDup / (max ?? min) * 100) : null
     const proyPct = esActual && genProy > 0 && (max != null || min != null)
       ? (genProy / (max ?? min) * 100) : null
+    let estadoProy = 'sin_compromisos'
+    if (esActual && genProy > 0 && (min !== null || max !== null)) {
+      const effMin = min ?? 0
+      if (genProy < effMin) estadoProy = 'deficit'
+      else if (max !== null && genProy > max) estadoProy = 'excedente'
+      else estadoProy = 'ok'
+    }
     out[c.id] = {
       gen: Math.round(gen * 10) / 10,
       genDup: Math.round(genDup * 10) / 10,
       genProy: esActual ? Math.round(genProy * 10) / 10 : null,
-      estado, pct, dupPct, proyPct, min, max,
+      estado, estadoProy, pct, dupPct, proyPct, min, max,
       diaActual: diaAct, diasRestantes: diasRest,
     }
   }
