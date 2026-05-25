@@ -1,0 +1,1 @@
+import{_ as s,o as a,c as r,a as t}from"./index-CsB--eZJ.js";const o={},c={class:"flex flex-col items-center justify-center py-24 gap-3 text-gray-400"};function l(n,e){return a(),r("div",c,[...e[0]||(e[0]=[t("i",{class:"pi pi-sun text-4xl text-amber-300"},null,-1),t("p",{class:"text-sm"},"Módulo solar — próximamente.",-1)])])}const x=s(o,[["render",l]]);export{x as default};
