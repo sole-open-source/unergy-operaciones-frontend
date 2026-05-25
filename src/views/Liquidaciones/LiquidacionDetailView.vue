@@ -33,7 +33,7 @@
           <div class="text-xs text-gray-500 mb-1">Ingresos brutos</div>
           <div class="text-base font-semibold text-green-700">{{ fmt(resumenCalculado.ingresos_brutos) }}</div>
         </div>
-        <div class="bg-white rounded-xl shadow-sm p-4 text-center border-t-4" style="border-color:#ef4444">
+        <div v-if="liq.tipo_venta !== 'autoconsumo'" class="bg-white rounded-xl shadow-sm p-4 text-center border-t-4" style="border-color:#ef4444">
           <div class="text-xs text-gray-500 mb-1">Comercialización XM</div>
           <div class="text-base font-semibold text-red-600">{{ fmt(resumenCalculado.comercializacion) }}</div>
         </div>
@@ -196,7 +196,7 @@
       </div>
 
       <!-- ══ DATOS XM (Mercado) ══ -->
-      <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+      <div v-if="liq.tipo_venta !== 'autoconsumo'" class="bg-white rounded-xl shadow-sm overflow-hidden">
         <div class="px-4 py-2.5 flex items-center gap-3 cursor-pointer select-none"
           style="background:rgba(59,130,246,0.06); color:#1e40af; border-left:3px solid #3B82F6"
           @click="toggleSeccion('xm_datos')">
@@ -902,13 +902,23 @@ function abrirDialogLinea(mandatoId, mandatoTipo, l = null) {
 const TIPOS_INGRESO_BRUTO = new Set(['ingreso_bruto', 'despacho', 'ventas_en_bolsa', 'redistribucion_ingresos'])
 const TIPOS_COMERCIALIZACION = new Set(['ajuste_comercializacion', 'comercializacion', 'compras_en_bolsa'])
 
+// El backend serializa enums como "TipoLineaMandatoEnum.foo" — normalizar a "foo"
+const normTipo = t => (t || '').replace(/^TipoLineaMandatoEnum\./, '')
+
 const resumenCalculado = computed(() => {
   const mandatos = liq.value?.mandatos || []
   const costos = liq.value?.costos || []
 
-  // Preferir mandatos del "Total" (inversionista null) para el nivel proyecto
-  const ingTotal = mandatos.filter(m => m.tipo === 'ingresos' && !m.inversionista)
-  const ingInv   = mandatos.filter(m => m.tipo === 'ingresos' &&  m.inversionista)
+  // Preferir mandatos del "Total" (sin inversionista) para el nivel proyecto
+  const ingTotal = mandatos.filter(m =>
+    m.tipo === 'ingresos' &&
+    !m.inversionista &&
+    m.inversionista_id == null
+  )
+  const ingInv = mandatos.filter(m =>
+    m.tipo === 'ingresos' &&
+    (m.inversionista || m.inversionista_id != null)
+  )
   const ingMandatos = ingTotal.length ? ingTotal : ingInv
 
   let ingresos_brutos = 0
@@ -917,14 +927,24 @@ const resumenCalculado = computed(() => {
 
   for (const m of ingMandatos) {
     for (const l of m.lineas) {
-      if (TIPOS_INGRESO_BRUTO.has(l.tipo_linea))   ingresos_brutos += l.valor_cop
-      if (TIPOS_COMERCIALIZACION.has(l.tipo_linea)) comercializacion += Math.abs(l.valor_cop)
+      const t = normTipo(l.tipo_linea)
+      if (TIPOS_INGRESO_BRUTO.has(t))    ingresos_brutos += l.valor_cop
+      if (TIPOS_COMERCIALIZACION.has(t)) comercializacion += Math.abs(l.valor_cop)
     }
     if (m.valor_neto_cop != null) neto += m.valor_neto_cop
   }
 
   // Costos operativos fijos = LiquidacionCosto a nivel proyecto
   const costos_op = costos.reduce((acc, c) => acc + c.valor_cop, 0)
+
+  // Autoconsumo: neto = ingresos_brutos − retenciones (sin comercialización XM)
+  if (liq.value?.tipo_venta === 'autoconsumo') {
+    const retenciones = ingMandatos
+      .flatMap(m => m.lineas || [])
+      .filter(l => ['retencion_fuente', 'ica_opex'].includes(normTipo(l.tipo_linea)))
+      .reduce((acc, l) => acc + Math.abs(l.valor_cop), 0)
+    return { ingresos_brutos, comercializacion: 0, costos_op, neto: ingresos_brutos - retenciones }
+  }
 
   // Si no hay datos en mandatos, caer al campo almacenado manualmente
   if (!ingresos_brutos && !comercializacion && !neto) {
