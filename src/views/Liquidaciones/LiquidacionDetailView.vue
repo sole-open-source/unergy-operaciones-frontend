@@ -27,6 +27,24 @@
 
     <template v-if="!loading && liq">
 
+      <!-- Banner filtro por inversionista -->
+      <div v-if="invFiltroId && invFiltrado"
+        class="flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm flex-wrap"
+        style="background:rgba(145,91,216,0.08); border:1px solid rgba(145,91,216,0.2)">
+        <i class="pi pi-user shrink-0" style="color:#915BD8" />
+        <span style="color:#2C2039">
+          Mostrando datos de:
+          <strong>{{ invFiltrado.cliente_nombre }}</strong>
+          ({{ pct(invFiltrado.porcentaje_participacion) }})
+        </span>
+        <button class="ml-auto flex items-center gap-1.5 text-xs font-semibold hover:opacity-70 shrink-0"
+          style="color:#915BD8"
+          @click="router.push(`/liquidaciones/${route.params.id}`)">
+          <i class="pi pi-times-circle text-xs" />
+          Ver proyecto completo
+        </button>
+      </div>
+
       <!-- Tarjetas resumen financiero -->
       <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div class="bg-white rounded-xl shadow-sm p-4 text-center border-t-4" style="border-color:#22c55e">
@@ -89,7 +107,7 @@
             </thead>
             <tbody>
               <!-- Fila total proyecto -->
-              <tr class="font-semibold border-b-2" style="background:rgba(145,91,216,0.08); border-color:rgba(145,91,216,0.3)">
+              <tr v-if="!invFiltroId" class="font-semibold border-b-2" style="background:rgba(145,91,216,0.08); border-color:rgba(145,91,216,0.3)">
                 <td class="px-3 py-1.5 font-bold" style="color:#2C2039" colspan="2">Total Proyecto</td>
                 <td class="px-3 py-1.5" />
                 <td class="px-3 py-1.5" />
@@ -260,7 +278,7 @@
 
         <div v-if="seccionesAbiertas.has('costos')">
           <!-- Costos de proyecto (LiquidacionCosto) -->
-          <div class="overflow-x-auto border-b border-gray-200">
+          <div v-if="!invFiltroId" class="overflow-x-auto border-b border-gray-200">
             <table class="w-full text-xs">
               <thead>
                 <tr class="text-gray-600" style="background:#f1f5f9">
@@ -687,7 +705,7 @@
 
 <script setup>
 import { ref, computed, onMounted, reactive } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
@@ -702,6 +720,7 @@ import Checkbox from 'primevue/checkbox'
 import api from '@/api/client'
 
 const route = useRoute()
+const router = useRouter()
 const toast = useToast()
 
 const liq = ref(null)
@@ -899,6 +918,14 @@ function abrirDialogLinea(mandatoId, mandatoTipo, l = null) {
 
 // ─── Computed ─────────────────────────────────────────────────────────────────
 
+// Filtro de inversionista desde query param ?inv=<proyecto_inversionista_id>
+const invFiltroId = computed(() => route.query.inv ? Number(route.query.inv) : null)
+const invFiltrado = computed(() =>
+  invFiltroId.value != null
+    ? (proyectoInversionistas.value.find(pi => pi.id === invFiltroId.value) ?? null)
+    : null
+)
+
 const TIPOS_INGRESO_BRUTO = new Set(['ingreso_bruto', 'despacho', 'ventas_en_bolsa', 'redistribucion_ingresos'])
 const TIPOS_COMERCIALIZACION = new Set(['ajuste_comercializacion', 'comercializacion', 'compras_en_bolsa'])
 
@@ -962,7 +989,7 @@ const resumenCalculado = computed(() => {
 const inversionistasConDetalle = computed(() => {
   if (!proyectoInversionistas.value.length) return []
   const mandatos = liq.value?.mandatos || []
-  return proyectoInversionistas.value.map(pi => ({
+  const all = proyectoInversionistas.value.map(pi => ({
     id: pi.id,
     nombre: pi.cliente_nombre,
     porcentaje: pi.porcentaje_participacion,
@@ -970,6 +997,8 @@ const inversionistasConDetalle = computed(() => {
     mandatosIngresos: mandatos.filter(m => m.inversionista?.id === pi.id && m.tipo === 'ingresos'),
     mandatosCostos: mandatos.filter(m => m.inversionista?.id === pi.id && m.tipo === 'costos'),
   }))
+  if (invFiltroId.value != null) return all.filter(inv => inv.id === invFiltroId.value)
+  return all
 })
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
