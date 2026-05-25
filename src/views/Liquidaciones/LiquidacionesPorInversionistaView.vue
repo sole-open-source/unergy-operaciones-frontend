@@ -27,8 +27,8 @@
       <div v-if="chartTooltip.visible"
         :style="{ position:'fixed', left: chartTooltip.x + 'px', top: chartTooltip.y + 'px', zIndex: 9999 }"
         class="bg-white shadow-xl rounded-lg py-2 px-3 text-xs border border-gray-100 pointer-events-none">
-        <div class="font-semibold text-gray-800 mb-0.5 max-w-[180px] truncate">{{ chartTooltip.proy }}</div>
-        <div class="font-bold text-sm" style="color:#915BD8">{{ fmt(chartTooltip.val) }}</div>
+        <div class="font-semibold text-gray-800 mb-0.5 max-w-[200px] truncate">{{ chartTooltip.proy }}</div>
+        <div class="font-bold text-sm text-gray-900">{{ fmt(chartTooltip.val) }}</div>
         <div class="text-gray-400 text-[10px] mt-0.5">{{ chartTooltip.mes }}</div>
       </div>
     </Teleport>
@@ -42,17 +42,16 @@
 
       <div v-for="cliente in vista" :key="cliente.cliente_id">
 
-        <!-- Nivel 1: Inversionista -->
-        <div class="flex items-center gap-2 px-4 py-2.5 cursor-pointer select-none"
-          style="background:#2C2039"
+        <!-- ── Nivel 1: Inversionista ── FIX 3: bg-gray-900 ── -->
+        <div class="flex items-center gap-2 px-4 py-2.5 cursor-pointer select-none bg-gray-900"
           @click="toggleCliente(cliente.cliente_id)">
           <i :class="expandidosCliente[cliente.cliente_id] ? 'pi pi-chevron-down' : 'pi pi-chevron-right'"
-            class="text-[10px] text-white" />
+            class="text-[10px] text-white/60" />
           <span class="flex-1 text-sm font-bold text-white uppercase tracking-wide">
             {{ cliente.cliente_nombre }}
           </span>
           <span class="text-[11px] px-2 py-0.5 rounded-full font-semibold"
-            style="background:rgba(255,255,255,0.15); color:#fff">
+            style="background:rgba(255,255,255,0.12); color:rgba(255,255,255,0.7)">
             {{ cliente.proyectos.length }} proyectos
           </span>
         </div>
@@ -62,66 +61,91 @@
           <!-- ─── Panel resumen financiero ──────────────────────────────── -->
           <div class="bg-white rounded-xl shadow-sm p-4 mx-3 my-2">
 
-            <!-- KPIs -->
-            <div class="flex gap-3 mb-4 flex-wrap">
-              <div class="flex-1 min-w-[130px] border border-gray-200 rounded-xl p-3">
-                <div class="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Ingresos totales</div>
-                <div class="text-lg font-bold" style="color:#915BD8">
-                  {{ fmt(resumenMap[cliente.cliente_id].ingresosTotales) }}
+            <!-- FIX 3: 4 KPI cards -->
+            <div class="flex gap-3 mb-5 flex-wrap">
+              <!-- Ingresos totales -->
+              <div class="flex-1 min-w-[140px] bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
+                <div class="flex items-start justify-between mb-2">
+                  <span class="text-xs font-medium text-gray-400 uppercase tracking-wide">Ingresos totales</span>
+                  <i class="pi pi-trending-up text-gray-300 text-[11px]" />
+                </div>
+                <div class="text-xl font-bold text-gray-900">
+                  {{ fmtCompact(resumenMap[cliente.cliente_id].ingresosTotales) }}
                 </div>
               </div>
-              <div class="flex-1 min-w-[100px] border border-gray-200 rounded-xl p-3">
-                <div class="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Meses activos</div>
-                <div class="text-lg font-bold" style="color:#915BD8">
+              <!-- Promedio mensual -->
+              <div class="flex-1 min-w-[140px] bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
+                <div class="flex items-start justify-between mb-2">
+                  <span class="text-xs font-medium text-gray-400 uppercase tracking-wide">Promedio mensual</span>
+                  <i class="pi pi-chart-line text-gray-300 text-[11px]" />
+                </div>
+                <div class="text-xl font-bold text-gray-900">
+                  {{ fmtCompact(resumenMap[cliente.cliente_id].promedioMensual) }}
+                </div>
+              </div>
+              <!-- Meses activos -->
+              <div class="flex-1 min-w-[110px] bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
+                <div class="flex items-start justify-between mb-2">
+                  <span class="text-xs font-medium text-gray-400 uppercase tracking-wide">Meses activos</span>
+                  <i class="pi pi-calendar text-gray-300 text-[11px]" />
+                </div>
+                <div class="text-xl font-bold text-gray-900">
                   {{ resumenMap[cliente.cliente_id].mesesActivos }}
                 </div>
               </div>
-              <div class="flex-1 min-w-[100px] border border-gray-200 rounded-xl p-3">
-                <div class="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Proyectos</div>
-                <div class="text-lg font-bold" style="color:#915BD8">
+              <!-- Proyectos -->
+              <div class="flex-1 min-w-[110px] bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
+                <div class="flex items-start justify-between mb-2">
+                  <span class="text-xs font-medium text-gray-400 uppercase tracking-wide">Proyectos</span>
+                  <i class="pi pi-bolt text-gray-300 text-[11px]" />
+                </div>
+                <div class="text-xl font-bold text-gray-900">
                   {{ resumenMap[cliente.cliente_id].proyectosCnt }}
                 </div>
               </div>
             </div>
 
-            <!-- Gráfico de barras apiladas (SVG responsivo) -->
-            <div v-if="resumenMap[cliente.cliente_id].meses.length" class="mb-3">
+            <!-- FIX 4: Gráfico h=280, FIX 2: scroll horizontal sin límite de proyectos -->
+            <div v-if="resumenMap[cliente.cliente_id].meses.length" class="overflow-x-auto mb-3">
               <svg
-                width="100%"
-                height="220"
-                :viewBox="`0 0 ${resumenMap[cliente.cliente_id].svgW} 220`"
-                preserveAspectRatio="xMidYMid meet"
-                style="display:block; overflow:visible"
+                :width="resumenMap[cliente.cliente_id].svgW"
+                height="280"
+                :viewBox="`0 0 ${resumenMap[cliente.cliente_id].svgW} 280`"
+                style="display:block"
               >
                 <!-- Y-axis gridlines -->
-                <line
-                  v-for="f in [0.25, 0.5, 0.75, 1]" :key="f"
+                <line v-for="f in [0.25, 0.5, 0.75, 1]" :key="f"
                   x1="0" :x2="resumenMap[cliente.cliente_id].svgW"
-                  :y1="8 + (1 - f) * 180" :y2="8 + (1 - f) * 180"
-                  stroke="#F1F5F9" stroke-width="1"
-                />
+                  :y1="8 + (1 - f) * 248" :y2="8 + (1 - f) * 248"
+                  stroke="#F1F5F9" stroke-width="1" />
                 <!-- Baseline -->
-                <line
-                  x1="0" :x2="resumenMap[cliente.cliente_id].svgW"
-                  y1="188" y2="188"
-                  stroke="#E2E8F0" stroke-width="1"
-                />
+                <line x1="0" :x2="resumenMap[cliente.cliente_id].svgW"
+                  y1="256" y2="256" stroke="#E2E8F0" stroke-width="1.5" />
 
-                <!-- Barras apiladas + labels del mes -->
+                <!-- Barras + labels de mes -->
                 <g v-for="(bar, bi) in resumenMap[cliente.cliente_id].barData" :key="bar.mes">
-                  <rect
-                    v-for="seg in svgBarSegments(bar, resumenMap[cliente.cliente_id], bi)"
-                    :key="seg.proy"
-                    :x="seg.x" :y="seg.y" :width="seg.w" :height="seg.h"
-                    :fill="CHART_COLORS[seg.colorIdx % CHART_COLORS.length]"
-                    rx="2"
-                    style="cursor:pointer"
-                    @mousemove="(e) => { chartTooltip.visible=true; chartTooltip.x=e.clientX+14; chartTooltip.y=e.clientY-72; chartTooltip.proy=seg.proy; chartTooltip.val=seg.val; chartTooltip.mes=shortMes(bar.mes) }"
-                    @mouseleave="chartTooltip.visible = false"
-                  />
+                  <template v-for="seg in svgBarSegments(bar, resumenMap[cliente.cliente_id], bi)" :key="seg.proy">
+                    <!-- Segmento superior: esquinas superiores redondeadas -->
+                    <path v-if="seg.isTop"
+                      :d="roundedTopPath(seg.x, seg.y, seg.w, seg.h)"
+                      :fill="CHART_COLORS[seg.colorIdx % CHART_COLORS.length]"
+                      style="cursor:pointer"
+                      @mousemove="(e) => { chartTooltip.visible=true; chartTooltip.x=e.clientX+14; chartTooltip.y=e.clientY-80; chartTooltip.proy=seg.proy; chartTooltip.val=seg.val; chartTooltip.mes=shortMes(bar.mes) }"
+                      @mouseleave="chartTooltip.visible=false"
+                    />
+                    <!-- Segmentos intermedios/base: planos -->
+                    <rect v-else
+                      :x="seg.x" :y="seg.y" :width="seg.w" :height="seg.h"
+                      :fill="CHART_COLORS[seg.colorIdx % CHART_COLORS.length]"
+                      style="cursor:pointer"
+                      @mousemove="(e) => { chartTooltip.visible=true; chartTooltip.x=e.clientX+14; chartTooltip.y=e.clientY-80; chartTooltip.proy=seg.proy; chartTooltip.val=seg.val; chartTooltip.mes=shortMes(bar.mes) }"
+                      @mouseleave="chartTooltip.visible=false"
+                    />
+                  </template>
+                  <!-- Label del mes en el eje X -->
                   <text
                     :x="svgGroupCenterX(bi, resumenMap[cliente.cliente_id])"
-                    y="212"
+                    y="272"
                     text-anchor="middle"
                     font-size="9.5"
                     fill="#9CA3AF"
@@ -133,18 +157,18 @@
 
             <!-- Leyenda -->
             <div v-if="resumenMap[cliente.cliente_id].proyNames.length > 1"
-              class="flex flex-wrap gap-x-4 gap-y-1 mb-3">
+              class="flex flex-wrap gap-x-4 gap-y-1 mb-4">
               <div v-for="(proy, i) in resumenMap[cliente.cliente_id].proyNames" :key="proy"
-                class="flex items-center gap-1.5 text-xs text-gray-600">
+                class="flex items-center gap-1.5 text-xs text-gray-500">
                 <div class="w-2.5 h-2.5 rounded-sm shrink-0"
                   :style="{ background: CHART_COLORS[i % CHART_COLORS.length] }" />
-                <span class="truncate max-w-[150px]" :title="proy">{{ proy }}</span>
+                <span class="truncate max-w-[160px]" :title="proy">{{ proy }}</span>
               </div>
             </div>
 
-            <!-- Tabla colapsable por proyecto -->
+            <!-- Tabla colapsable -->
             <div>
-              <button class="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 mb-2"
+              <button class="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 mb-2"
                 @click="toggleTabla(cliente.cliente_id)">
                 <i :class="tablasAbiertas[cliente.cliente_id] ? 'pi pi-chevron-down' : 'pi pi-chevron-right'"
                   class="text-[9px]" />
@@ -169,21 +193,21 @@
                         :title="row.nombre">{{ row.nombre }}</td>
                       <td v-for="(val, mi) in row.meses" :key="mi"
                         class="px-2 py-1.5 text-right font-mono whitespace-nowrap"
-                        :style="val && val > 0 ? 'color:#2C2039' : 'color:#D1D5DB'">
+                        :style="val && val > 0 ? 'color:#111827' : 'color:#D1D5DB'">
                         {{ val != null && val !== 0 ? fmtCompact(val) : '—' }}
                       </td>
-                      <td class="px-2 py-1.5 text-right font-mono font-semibold whitespace-nowrap border-l border-gray-100" style="color:#915BD8">
+                      <td class="px-2 py-1.5 text-right font-mono font-semibold whitespace-nowrap border-l border-gray-100 text-gray-900">
                         {{ fmtCompact(row.total) }}
                       </td>
                     </tr>
                     <!-- Fila de totales -->
-                    <tr class="border-t-2" style="background:rgba(145,91,216,0.05); border-color:rgba(145,91,216,0.25)">
-                      <td class="px-2 py-1.5 font-bold sticky left-0 border-r border-purple-100" style="background:rgba(145,91,216,0.08); color:#2C2039">TOTAL</td>
+                    <tr class="border-t-2 border-gray-300">
+                      <td class="px-2 py-1.5 font-bold text-gray-700 sticky left-0 bg-gray-50 border-r border-gray-200">TOTAL</td>
                       <td v-for="(val, mi) in resumenMap[cliente.cliente_id].totalRow.meses" :key="mi"
-                        class="px-2 py-1.5 text-right font-mono font-bold whitespace-nowrap" style="color:#915BD8">
+                        class="px-2 py-1.5 text-right font-mono font-bold whitespace-nowrap text-gray-900">
                         {{ fmtCompact(val) }}
                       </td>
-                      <td class="px-2 py-1.5 text-right font-mono font-bold whitespace-nowrap border-l border-purple-100" style="color:#915BD8">
+                      <td class="px-2 py-1.5 text-right font-mono font-bold whitespace-nowrap border-l border-gray-200 text-gray-900">
                         {{ fmtCompact(resumenMap[cliente.cliente_id].totalRow.total) }}
                       </td>
                     </tr>
@@ -215,7 +239,7 @@
               </span>
             </div>
 
-            <!-- Nivel 3: Liquidaciones -->
+            <!-- Nivel 3: Liquidaciones (FIX 1: valor proporcional al %) -->
             <template v-if="expandidosProy[proy.proyecto_inversionista_id]">
               <div v-for="liq in proy.liquidaciones" :key="liq.liquidacion_id"
                 class="flex items-center gap-4 py-1.5 px-4 border-b text-xs"
@@ -223,7 +247,7 @@
                 <span class="w-20 shrink-0 text-gray-600">{{ formatPeriodo(liq.periodo) }}</span>
                 <Tag :value="liq.estado" :severity="estadoSeverity(liq.estado)" class="text-[10px] shrink-0" />
                 <span class="flex-1 text-right font-mono" style="color:#2C2039">
-                  {{ fmt(liq.ingreso_neto_cop) }}
+                  {{ fmt((liq.ingreso_neto_cop || 0) * (proy.porcentaje_participacion || 1)) }}
                 </span>
                 <button
                   class="inline-flex items-center justify-center w-6 h-6 rounded hover:bg-gray-200 transition-colors shrink-0"
@@ -340,8 +364,8 @@ function estadoSeverity(e) {
 const CHART_COLORS = [
   '#915BD8', '#22c55e', '#f59e0b', '#3b82f6',
   '#ef4444', '#ec4899', '#14b8a6', '#f97316',
+  '#8b5cf6', '#06b6d4', '#84cc16', '#a855f7',
 ]
-const MAX_PROYECTOS_CHART = 8
 
 // Tooltip reactivo del gráfico
 const chartTooltip = ref({ visible: false, x: 0, y: 0, proy: '', val: 0, mes: '' })
@@ -353,11 +377,12 @@ function shortMes(ym) {
 }
 
 function fmtCompact(v) {
-  if (v == null) return '—'
+  if (v == null || v === 0) return v === 0 ? '$0' : '—'
   const abs = Math.abs(v)
   const sign = v < 0 ? '-' : ''
-  if (abs >= 1_000_000) return sign + '$' + (abs / 1_000_000).toFixed(1) + 'M'
-  if (abs >= 1_000)     return sign + '$' + (abs / 1_000).toFixed(0) + 'K'
+  if (abs >= 1_000_000_000) return sign + '$' + (abs / 1_000_000_000).toFixed(1) + 'B'
+  if (abs >= 1_000_000)     return sign + '$' + (abs / 1_000_000).toFixed(1) + 'M'
+  if (abs >= 1_000)         return sign + '$' + (abs / 1_000).toFixed(0) + 'K'
   return sign + '$' + abs.toFixed(0)
 }
 
@@ -367,23 +392,24 @@ function toggleTabla(id) {
   else tablasAbiertas[id] = true
 }
 
-// Precomputa datos de resumen para cada cliente al cargar la vista.
-// FIX 1: los valores se multiplican por el porcentaje de participación del inversionista.
+// ─── resumenMap ───────────────────────────────────────────────────────────────
+// FIX 1: usar `||` (no `??`) para que participation=0 caiga en fallback 1
+// FIX 2: sin límite de proyectos (todos incluidos, sin "Otros")
 const resumenMap = computed(() => {
   const map = {}
   for (const cliente of vista.value) {
-    const proyMap = {}   // { proyNombre: { 'YYYY-MM': valor } }
+    const proyMap = {}   // { proyNombre: { 'YYYY-MM': valor_proporcional } }
     const mesSet = new Set()
     let ingresosTotales = 0
 
     for (const proy of cliente.proyectos) {
-      // porcentaje_participacion viene como decimal (0.77 = 77%)
-      const participacion = proy.porcentaje_participacion ?? 1
+      // FIX 1: || en lugar de ?? para que participation=0 use 1
+      const ptj = proy.porcentaje_participacion || 1
       for (const liq of proy.liquidaciones) {
         const mes = liq.periodo?.substring(0, 7)
         if (!mes) continue
         mesSet.add(mes)
-        const valor = (liq.ingreso_neto_cop || 0) * participacion
+        const valor = (liq.ingreso_neto_cop || 0) * ptj
         if (!proyMap[proy.proyecto_nombre]) proyMap[proy.proyecto_nombre] = {}
         proyMap[proy.proyecto_nombre][mes] =
           (proyMap[proy.proyecto_nombre][mes] || 0) + valor
@@ -392,28 +418,13 @@ const resumenMap = computed(() => {
     }
 
     const meses = [...mesSet].sort()
-    let proyNames = Object.keys(proyMap)
+    // FIX 2: todos los proyectos, sin agrupación en "Otros"
+    const proyNames = Object.keys(proyMap)
 
-    // Agrupar en "Otros" si hay más de MAX_PROYECTOS_CHART proyectos
-    if (proyNames.length > MAX_PROYECTOS_CHART) {
-      // Ordenar por total descendente y tomar los top 8
-      const totalPorProy = (p) => meses.reduce((acc, m) => acc + (proyMap[p][m] || 0), 0)
-      proyNames.sort((a, b) => totalPorProy(b) - totalPorProy(a))
-      const rest = proyNames.splice(MAX_PROYECTOS_CHART)
-      proyMap['Otros'] = {}
-      for (const p of rest) {
-        for (const m of meses) {
-          proyMap['Otros'][m] = (proyMap['Otros'][m] || 0) + (proyMap[p][m] || 0)
-        }
-        delete proyMap[p]
-      }
-      proyNames.push('Otros')
-    }
+    // Ancho SVG: 80px por mes, mínimo 500 — el wrapper tiene overflow-x-auto
+    const svgW = Math.max(meses.length * 80, 500)
 
-    // Ancho SVG: 72 unidades por mes, mínimo 400
-    const svgW = Math.max(meses.length * 72, 400)
-
-    // Datos de barras para el gráfico
+    // Datos para el gráfico
     let maxValMes = 0
     const barData = meses.map(mes => {
       const segs = proyNames.map(p => ({
@@ -440,6 +451,7 @@ const resumenMap = computed(() => {
 
     map[cliente.cliente_id] = {
       ingresosTotales,
+      promedioMensual: mesSet.size > 0 ? ingresosTotales / mesSet.size : 0,
       mesesActivos: mesSet.size,
       proyectosCnt: cliente.proyectos.length,
       meses,
@@ -454,15 +466,16 @@ const resumenMap = computed(() => {
   return map
 })
 
-// Calcula los segmentos SVG con coordenadas absolutas (x, y, w, h)
-// para una barra del gráfico dado su índice de mes
+// ─── Helpers del gráfico SVG ──────────────────────────────────────────────────
+
+// FIX 4: CHART_H=248 (alto total 280), esquinas superiores redondeadas en el top seg
 function svgBarSegments(bar, res, bi) {
   if (res.maxValMes <= 0) return []
   const nMes = res.meses.length
-  const gW = res.svgW / nMes          // ancho del grupo de mes
-  const bW = Math.min(gW * 0.72, 52)  // ancho de la barra (máx 52px)
-  const gX = bi * gW + (gW - bW) / 2  // x centrado en el grupo
-  const CHART_H = 180                  // área vertical disponible (y 8..188)
+  const gW = res.svgW / nMes
+  const bW = Math.min(gW * 0.70, 60)
+  const gX = bi * gW + (gW - bW) / 2
+  const CHART_H = 248  // y:[8..256]
 
   let cumH = 0
   const segs = []
@@ -478,13 +491,22 @@ function svgBarSegments(bar, res, bi) {
       y:        8 + CHART_H - cumH - h,
       w:        bW,
       h,
+      isTop:    false,
     })
     cumH += h
   }
+  // Solo el segmento más alto de la barra lleva esquinas redondeadas arriba
+  if (segs.length > 0) segs[segs.length - 1].isTop = true
   return segs
 }
 
-// Centro X de un grupo de mes para el label del eje X
+// Path SVG con solo las esquinas superiores redondeadas (radius=3)
+function roundedTopPath(x, y, w, h, r = 3) {
+  if (h <= r * 2) return `M${x} ${y} H${x + w} V${y + h} H${x} Z`
+  return `M${x} ${y + r} Q${x} ${y} ${x + r} ${y} H${x + w - r} Q${x + w} ${y} ${x + w} ${y + r} V${y + h} H${x} Z`
+}
+
+// Centro X del grupo de mes para el label del eje X
 function svgGroupCenterX(bi, res) {
   const gW = res.svgW / res.meses.length
   return bi * gW + gW / 2
