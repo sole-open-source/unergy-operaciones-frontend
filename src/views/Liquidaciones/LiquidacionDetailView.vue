@@ -31,19 +31,19 @@
       <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div class="bg-white rounded-xl shadow-sm p-4 text-center border-t-4" style="border-color:#22c55e">
           <div class="text-xs text-gray-500 mb-1">Ingresos brutos</div>
-          <div class="text-base font-semibold text-green-700">{{ fmt(resumenAuto.ingresos) }}</div>
+          <div class="text-base font-semibold text-green-700">{{ fmt(resumenCalculado.ingresos_brutos) }}</div>
         </div>
         <div class="bg-white rounded-xl shadow-sm p-4 text-center border-t-4" style="border-color:#ef4444">
           <div class="text-xs text-gray-500 mb-1">Comercialización XM</div>
-          <div class="text-base font-semibold text-red-600">{{ fmt(resumenAuto.comercializacion) }}</div>
+          <div class="text-base font-semibold text-red-600">{{ fmt(resumenCalculado.comercializacion) }}</div>
         </div>
         <div class="bg-white rounded-xl shadow-sm p-4 text-center border-t-4" style="border-color:#ef4444">
           <div class="text-xs text-gray-500 mb-1">Costos operativos</div>
-          <div class="text-base font-semibold text-red-600">{{ fmt(resumenAuto.costos_op) }}</div>
+          <div class="text-base font-semibold text-red-600">{{ fmt(resumenCalculado.costos_op) }}</div>
         </div>
         <div class="bg-white rounded-xl shadow-sm p-4 text-center border-t-4" style="border-color:#915BD8">
           <div class="text-xs text-gray-500 mb-1">Ingreso neto</div>
-          <div class="text-base font-semibold" style="color:#915BD8">{{ fmt(resumenAuto.neto) }}</div>
+          <div class="text-base font-semibold" style="color:#915BD8">{{ fmt(resumenCalculado.neto) }}</div>
         </div>
       </div>
 
@@ -63,12 +63,12 @@
 
       <!-- ══ INGRESOS ══ -->
       <div class="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div class="px-4 py-2.5 flex items-center gap-3 cursor-pointer select-none"
-          style="background:#f0fdf4; color:#166534; border-left:3px solid #22c55e"
+        <div class="text-white px-4 py-2.5 flex items-center gap-3 cursor-pointer select-none"
+          style="background:#1e5c2e"
           @click="toggleSeccion('ingresos')">
           <i :class="seccionesAbiertas.has('ingresos') ? 'pi pi-chevron-down' : 'pi pi-chevron-right'" class="text-xs" />
           <span class="font-semibold">Ingresos</span>
-          <span class="text-xs ml-auto" style="color:#16a34a">
+          <span class="text-green-300 text-xs ml-auto">
             {{ inversionistasConDetalle.length }} inversionista(s)
           </span>
         </div>
@@ -107,7 +107,9 @@
                     {{ inv.nombre }}
                   </td>
                   <td class="px-3 py-1.5 text-right text-gray-300 font-semibold">{{ pct(inv.porcentaje) }}</td>
-                  <td class="px-3 py-1.5" colspan="4" />
+                  <td class="px-3 py-1.5" colspan="2" />
+                  <td class="px-3 py-1.5 text-gray-300">Porcentaje de Participación</td>
+                  <td class="px-3 py-1.5 text-right font-semibold">{{ pct(inv.porcentaje) }}</td>
                   <td class="px-3 py-1.5" />
                   <td class="px-3 py-1.5 text-center">
                     <Button icon="pi pi-plus" text size="small" class="!text-green-300"
@@ -172,15 +174,6 @@
                       style="background:rgba(240,253,244,0.5)">
                       Sin líneas — usa el botón + para añadir
                     </td>
-                  </tr>
-                  <tr v-if="m.valor_neto_cop != null"
-                    style="background:rgba(145,91,216,0.08); border-top: 1px solid rgba(145,91,216,0.2)">
-                    <td class="px-3 py-1.5" colspan="4" />
-                    <td class="px-3 py-1.5 font-semibold" style="color:#915BD8">Valor a Pagar</td>
-                    <td class="px-3 py-1.5 text-right font-mono font-semibold" style="color:#915BD8">
-                      {{ fmt(m.valor_neto_cop) }}
-                    </td>
-                    <td colspan="2" />
                   </tr>
                 </template>
 
@@ -253,14 +246,14 @@
 
       <!-- ══ COSTOS ══ -->
       <div class="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div class="px-4 py-2.5 flex items-center gap-3 cursor-pointer select-none"
-          style="background:#fff1f2; color:#991b1b; border-left:3px solid #ef4444"
+        <div class="text-white px-4 py-2.5 flex items-center gap-3 cursor-pointer select-none"
+          style="background:#7f1d1d"
           @click="toggleSeccion('costos')">
           <i :class="seccionesAbiertas.has('costos') ? 'pi pi-chevron-down' : 'pi pi-chevron-right'" class="text-xs" />
           <span class="font-semibold">Costos</span>
           <div class="ml-auto flex items-center gap-2">
             <Button icon="pi pi-plus" label="Agregar costo" text size="small"
-              style="color:#991b1b"
+              class="!text-red-200 hover:!text-white"
               @click.stop="abrirDialogCosto()" />
           </div>
         </div>
@@ -390,15 +383,6 @@
                         Sin líneas — usa el botón + para añadir
                       </td>
                     </tr>
-                    <tr v-if="m.valor_neto_cop != null"
-                      style="background:rgba(145,91,216,0.08); border-top: 1px solid rgba(145,91,216,0.2)">
-                      <td class="px-3 py-1.5" colspan="4" />
-                      <td class="px-3 py-1.5 font-semibold" style="color:#915BD8">Valor a Pagar</td>
-                      <td class="px-3 py-1.5 text-right font-mono font-semibold" style="color:#915BD8">
-                        {{ fmt(m.valor_neto_cop) }}
-                      </td>
-                      <td colspan="2" />
-                    </tr>
                   </template>
 
                   <tr v-if="!inv.mandatosCostos.length">
@@ -416,13 +400,13 @@
 
       <!-- ══ SERVICIOS ══ -->
       <div class="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div class="px-4 py-2.5 flex items-center gap-3 cursor-pointer select-none"
-          style="background:#fffbeb; color:#92400e; border-left:3px solid #f59e0b"
+        <div class="text-white px-4 py-2.5 flex items-center gap-3 cursor-pointer select-none"
+          style="background:#78350f"
           @click="toggleSeccion('servicios')">
           <i :class="seccionesAbiertas.has('servicios') ? 'pi pi-chevron-down' : 'pi pi-chevron-right'" class="text-xs" />
           <span class="font-semibold">Servicios (Facturas)</span>
           <Button icon="pi pi-plus" label="Agregar" text size="small"
-            class="ml-auto" style="color:#92400e"
+            class="ml-auto !text-yellow-200 hover:!text-white"
             @click.stop="abrirDialogFactura()" />
         </div>
 
@@ -492,22 +476,6 @@
     <!-- ─── Dialog: Resumen financiero ──────────────────────────────────── -->
     <Dialog v-model:visible="dialogResumen" header="Editar resumen financiero" modal class="w-full max-w-lg">
       <div class="grid grid-cols-2 gap-3 py-2">
-        <div class="flex flex-col gap-1">
-          <label class="text-xs text-gray-600">Ingresos energía (COP)</label>
-          <InputNumber v-model="resumenForm.ingresos_energia_cop" :maxFractionDigits="2" class="w-full" />
-        </div>
-        <div class="flex flex-col gap-1">
-          <label class="text-xs text-gray-600">Comercialización XM (COP)</label>
-          <InputNumber v-model="resumenForm.costos_comercializacion_xm_cop" :maxFractionDigits="2" class="w-full" />
-        </div>
-        <div class="flex flex-col gap-1">
-          <label class="text-xs text-gray-600">Costos operativos (COP)</label>
-          <InputNumber v-model="resumenForm.costos_operativos_cop" :maxFractionDigits="2" class="w-full" />
-        </div>
-        <div class="flex flex-col gap-1">
-          <label class="text-xs text-gray-600">Ingreso neto (COP)</label>
-          <InputNumber v-model="resumenForm.ingreso_neto_cop" :maxFractionDigits="2" class="w-full" />
-        </div>
         <div class="flex flex-col gap-1">
           <label class="text-xs text-gray-600">Tasa de cambio (USD/COP)</label>
           <InputNumber v-model="resumenForm.tasa_cambio" :maxFractionDigits="4" class="w-full" />
@@ -806,8 +774,7 @@ const nuevoEstado = ref('')
 // ─── Dialog resumen ───────────────────────────────────────────────────────────
 const dialogResumen = ref(false)
 const resumenForm = reactive({
-  ingresos_energia_cop: null, costos_comercializacion_xm_cop: null,
-  costos_operativos_cop: null, ingreso_neto_cop: null, tasa_cambio: null,
+  tasa_cambio: null,
   comprobante_contable_ref: '', consecutivo_inicial_ingresos: null,
   consecutivo_inicial_costos: null, fecha_inicio_proceso: null,
   fecha_firma: null, estado_resultados_url: '', observaciones_resultados: '',
@@ -815,10 +782,6 @@ const resumenForm = reactive({
 
 function abrirEditResumen() {
   Object.assign(resumenForm, {
-    ingresos_energia_cop: liq.value.ingresos_energia_cop ?? null,
-    costos_comercializacion_xm_cop: liq.value.costos_comercializacion_xm_cop ?? null,
-    costos_operativos_cop: liq.value.costos_operativos_cop ?? null,
-    ingreso_neto_cop: liq.value.ingreso_neto_cop ?? null,
     tasa_cambio: liq.value.tasa_cambio ?? null,
     comprobante_contable_ref: liq.value.comprobante_contable_ref ?? '',
     consecutivo_inicial_ingresos: liq.value.consecutivo_inicial_ingresos ?? null,
@@ -935,42 +898,45 @@ function abrirDialogLinea(mandatoId, mandatoTipo, l = null) {
 }
 
 // ─── Computed ─────────────────────────────────────────────────────────────────
-const resumenAuto = computed(() => {
+
+const TIPOS_INGRESO_BRUTO = new Set(['ingreso_bruto', 'despacho', 'ventas_en_bolsa', 'redistribucion_ingresos'])
+const TIPOS_COMERCIALIZACION = new Set(['ajuste_comercializacion', 'comercializacion', 'compras_en_bolsa'])
+
+const resumenCalculado = computed(() => {
   const mandatos = liq.value?.mandatos || []
+  const costos = liq.value?.costos || []
 
-  const lineasIngresos = mandatos
-    .filter(m => m.tipo === 'ingresos')
-    .flatMap(m => m.lineas || [])
+  // Preferir mandatos del "Total" (inversionista null) para el nivel proyecto
+  const ingTotal = mandatos.filter(m => m.tipo === 'ingresos' && !m.inversionista)
+  const ingInv   = mandatos.filter(m => m.tipo === 'ingresos' &&  m.inversionista)
+  const ingMandatos = ingTotal.length ? ingTotal : ingInv
 
-  const tieneTotal = mandatos.some(
-    m => m.tipo === 'ingresos' && !m.inversionista?.id
-  )
-  const lineasFiltradas = tieneTotal
-    ? mandatos
-        .filter(m => m.tipo === 'ingresos' && !m.inversionista?.id)
-        .flatMap(m => m.lineas || [])
-    : lineasIngresos
+  let ingresos_brutos = 0
+  let comercializacion = 0
+  let neto = 0
 
-  const ingBruto = lineasFiltradas
-    .filter(l => l.tipo_linea === 'ingreso_bruto')
-    .reduce((s, l) => s + (l.valor_cop || 0), 0)
-
-  const comercializacion = lineasFiltradas
-    .filter(l => ['ajuste_comercializacion', 'ajuste_xm'].includes(l.tipo_linea))
-    .reduce((s, l) => s + Math.abs(l.valor_cop || 0), 0)
-
-  const costosOp = [
-    ...(liq.value?.costos || []),
-    ...(liq.value?.facturas || []),
-  ].reduce((s, c) => s + (c.valor_cop || 0), 0)
-
-  return {
-    ingresos:         (liq.value?.ingresos_energia_cop          || null) ?? ingBruto,
-    comercializacion: (liq.value?.costos_comercializacion_xm_cop || null) ?? comercializacion,
-    costos_op:        (liq.value?.costos_operativos_cop          || null) ?? costosOp,
-    neto:             (liq.value?.ingreso_neto_cop               || null)
-                        ?? (ingBruto - comercializacion - costosOp),
+  for (const m of ingMandatos) {
+    for (const l of m.lineas) {
+      if (TIPOS_INGRESO_BRUTO.has(l.tipo_linea))   ingresos_brutos += l.valor_cop
+      if (TIPOS_COMERCIALIZACION.has(l.tipo_linea)) comercializacion += Math.abs(l.valor_cop)
+    }
+    if (m.valor_neto_cop != null) neto += m.valor_neto_cop
   }
+
+  // Costos operativos fijos = LiquidacionCosto a nivel proyecto
+  const costos_op = costos.reduce((acc, c) => acc + c.valor_cop, 0)
+
+  // Si no hay datos en mandatos, caer al campo almacenado manualmente
+  if (!ingresos_brutos && !comercializacion && !neto) {
+    return {
+      ingresos_brutos: liq.value?.ingresos_energia_cop,
+      comercializacion: liq.value?.costos_comercializacion_xm_cop,
+      costos_op: costos_op || liq.value?.costos_operativos_cop,
+      neto: liq.value?.ingreso_neto_cop,
+    }
+  }
+
+  return { ingresos_brutos, comercializacion, costos_op, neto }
 })
 
 const inversionistasConDetalle = computed(() => {
@@ -1025,15 +991,21 @@ async function load() {
     const { data } = await api.get(`/liquidaciones/${route.params.id}`)
     liq.value = data
     nuevoEstado.value = data.estado
-    if (data.proyecto_id) {
-      const r = await api.get(`/proyectos/${data.proyecto_id}/inversionistas`)
-      const raw = r.data
-      proyectoInversionistas.value = Array.isArray(raw) ? raw : (raw.items ?? [])
-    }
-  } catch {
+  } catch (e) {
+    console.error('[LiquidacionDetail] Error cargando liquidación:', e?.response?.status, e?.response?.data ?? e)
     toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo cargar la liquidación', life: 3000 })
   } finally {
     loading.value = false
+  }
+
+  if (liq.value?.proyecto_id) {
+    try {
+      const r = await api.get(`/proyectos/${liq.value.proyecto_id}/inversionistas`)
+      const raw = r.data
+      proyectoInversionistas.value = Array.isArray(raw) ? raw : (raw.items ?? [])
+    } catch (e) {
+      console.error('[LiquidacionDetail] Error cargando inversionistas:', e?.response?.status, e?.response?.data ?? e)
+    }
   }
 }
 
@@ -1141,7 +1113,6 @@ async function guardarCosto() {
 }
 
 async function eliminarCosto(id) {
-  if (!confirm('¿Estás seguro de que deseas eliminar este costo?')) return
   try {
     await api.delete(`/liquidaciones/${route.params.id}/costos/${id}`)
     liq.value.costos = liq.value.costos.filter(c => c.id !== id)
@@ -1181,7 +1152,6 @@ async function guardarFactura() {
 }
 
 async function eliminarFactura(id) {
-  if (!confirm('¿Estás seguro de que deseas eliminar esta factura?')) return
   try {
     await api.delete(`/liquidaciones/${route.params.id}/facturas/${id}`)
     liq.value.facturas = liq.value.facturas.filter(f => f.id !== id)
@@ -1222,7 +1192,6 @@ async function guardarMandato() {
 }
 
 async function eliminarMandato(id) {
-  if (!confirm('¿Estás seguro de que deseas eliminar este mandato?')) return
   try {
     await api.delete(`/liquidaciones/${route.params.id}/mandatos/${id}`)
     toast.add({ severity: 'success', summary: 'Mandato eliminado', life: 2000 })
@@ -1265,7 +1234,6 @@ async function guardarLinea() {
 }
 
 async function eliminarLinea(mandatoId, lineaId) {
-  if (!confirm('¿Estás seguro de que deseas eliminar esta línea?')) return
   try {
     await api.delete(`/liquidaciones/${route.params.id}/mandatos/${mandatoId}/lineas/${lineaId}`)
     toast.add({ severity: 'success', summary: 'Línea eliminada', life: 2000 })
