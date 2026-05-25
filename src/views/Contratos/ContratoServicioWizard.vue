@@ -59,6 +59,21 @@
               <Select v-model="form.estado" :options="ESTADOS" optionLabel="label" optionValue="value" class="w-full" />
             </div>
           </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div class="flex flex-col gap-1">
+              <label class="field-label">Fecha firma <span class="text-gray-400">(opcional)</span></label>
+              <DatePicker v-model="form.fecha_firma_contrato" dateFormat="yy-mm-dd" class="w-full" showClear />
+            </div>
+            <div class="flex flex-col gap-1">
+              <label class="field-label">Estado del pago <span class="text-gray-400">(opcional)</span></label>
+              <Select v-model="form.estado_pago" :options="[{label:'Pendiente',value:'pendiente'},{label:'Revisado',value:'revisado'},{label:'Aprobado',value:'aprobado'}]"
+                optionLabel="label" optionValue="value" placeholder="Seleccionar" showClear class="w-full" />
+            </div>
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="field-label">Enlace contrato en Drive <span class="text-gray-400">(opcional)</span></label>
+            <InputText v-model="form.enlace_drive" placeholder="https://drive.google.com/…" class="w-full" />
+          </div>
         </div>
       </template>
 
@@ -302,6 +317,9 @@ const TIPO_CONFIG = {
   representacion: { label: 'Representación', color: '#3b82f6' },
   operacion:      { label: 'Operación',       color: '#10b981' },
   rec:            { label: 'REC',             color: '#14b8a6' },
+  mantenimiento:  { label: 'Mantenimiento',   color: '#f59e0b' },
+  arriendo:       { label: 'Arriendo',        color: '#8b5cf6' },
+  internet:       { label: 'Internet',        color: '#06b6d4' },
 }
 
 const tipoColor = computed(() => TIPO_CONFIG[props.tipo]?.color ?? '#6b7280')
@@ -347,6 +365,9 @@ const form = reactive({
   periodicidad_pago: null,
   indice_indexacion: '',
   canones_otros: null,
+  fecha_firma_contrato: null,
+  enlace_drive: '',
+  estado_pago: null,
   tiene_cgm: false,
   cgm_codigo_sic: '',
   cgm_porcentaje_fncer: null,
@@ -417,6 +438,9 @@ async function guardar() {
       prestador_id: form.prestador_id ?? null,
       prestador_nombre: form.prestador_nombre || null,
       prestador_nit: form.prestador_nit?.trim() || null,
+      fecha_firma_contrato: formatFecha(form.fecha_firma_contrato),
+      enlace_drive: form.enlace_drive?.trim() || null,
+      estado_pago: form.estado_pago ?? null,
       fecha_inicio: formatFecha(form.fecha_inicio),
       fecha_fin: formatFecha(form.fecha_fin),
       tarifa_base: form.tarifa_base ?? null,

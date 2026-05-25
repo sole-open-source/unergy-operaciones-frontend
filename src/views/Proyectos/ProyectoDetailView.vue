@@ -38,7 +38,6 @@
             <InfoField label="Carpeta Drive" :value="proyecto.carpeta_drive_codigo" />
             <InfoField label="API ID Unergy" :value="proyecto.sub_project" />
             <InfoField label="Código TSF" :value="proyecto.codigo_tsf" />
-            <InfoField label="Fin representación" :value="proyecto.fecha_fin_representacion" />
           </template>
           <template v-else>
             <div class="flex flex-col gap-1">
@@ -80,10 +79,6 @@
             <div class="flex flex-col gap-1">
               <label class="field-label">Código TSF</label>
               <InputText v-model="editForm.codigo_tsf" class="w-full" />
-            </div>
-            <div class="flex flex-col gap-1">
-              <label class="field-label">Fin representación</label>
-              <DatePicker v-model="editForm.fecha_fin_representacion" dateFormat="yy-mm-dd" showButtonBar class="w-full" placeholder="Dejar vacío si sigue activo" />
             </div>
           </template>
         </div>
@@ -439,7 +434,6 @@ import Row from 'primevue/row'
 import Select from 'primevue/select'
 import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
-import DatePicker from 'primevue/datepicker'
 import Divider from 'primevue/divider'
 import { useToast } from 'primevue/usetoast'
 import api from '@/api/client'
@@ -524,7 +518,6 @@ const editForm = reactive({
   codigo_tsf: null,
   cantidad_total_paneles: null,
   produccion_especifica_kwh_kwp: null,
-  fecha_fin_representacion: null,
 })
 
 // ── Simulación P90 / P50 / P99 ───────────────────────────────────────────────
@@ -557,7 +550,7 @@ function parseMonthArray(val) {
 
 function serializeMonthArray(arr) {
   if (arr.every(v => v === null || v === undefined)) return null
-  return arr.map(v => v ?? null)
+  return JSON.stringify(arr.map(v => v ?? null))
 }
 
 function populateEditForm() {
@@ -607,9 +600,7 @@ async function saveEdit() {
     router.push({ query: {} })
     toast.add({ severity: 'success', summary: 'Proyecto actualizado', life: 3000 })
   } catch (e) {
-    const errDetail = e.response?.data?.detail
-    const msg = Array.isArray(errDetail) ? errDetail.map(d => d.msg || d).join('; ') : (errDetail || e.message)
-    toast.add({ severity: 'error', summary: 'Error', detail: msg, life: 6000 })
+    toast.add({ severity: 'error', summary: 'Error', detail: e.response?.data?.detail, life: 4000 })
   } finally {
     guardando.value = false
   }
@@ -712,6 +703,10 @@ async function toggleServicio(key, value) {
 function clickServicio(srv) {
   if (srv.key === 'srv_ppa') {
     router.push(`/proyectos/${route.params.id}/ppa`)
+    return
+  }
+  if (srv.key === 'srv_operacion') {
+    router.push(`/proyectos/${route.params.id}/operacion`)
     return
   }
   if (!srv.tipo) return
