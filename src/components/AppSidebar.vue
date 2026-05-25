@@ -106,7 +106,6 @@ const ALL_GROUPS = [
     items: [
       { to: '/liquidaciones', label: 'Liquidaciones', icon: 'pi pi-dollar', roles: ['admin', 'liquidaciones'] },
       { to: '/liquidaciones/inversionista', label: 'Por Inversionista', icon: 'pi pi-users', roles: ['admin', 'liquidaciones'] },
-      { to: '/liquidaciones/minigranjas', label: 'Minigranjas', icon: 'pi pi-th-large', roles: ['admin', 'liquidaciones'] },
     ],
   },
   {

@@ -5,6 +5,19 @@
       <Button label="Nueva liquidación" icon="pi pi-plus" @click="dialogNueva = true" />
     </div>
 
+    <!-- Tabs -->
+    <div class="flex gap-0 border-b" style="border-color: rgba(44,32,57,0.10);">
+      <button
+        v-for="(tab, i) in TABS"
+        :key="i"
+        @click="tabActivo = i"
+        class="px-5 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors"
+        :style="tabActivo === i
+          ? 'color: #915BD8; border-color: #915BD8;'
+          : 'color: #7a6e8a; border-color: transparent;'"
+      >{{ tab.label }}</button>
+    </div>
+
     <!-- Filtros -->
     <div class="bg-white rounded-xl shadow-sm p-4 flex flex-wrap gap-3 items-end">
       <div>
@@ -26,7 +39,7 @@
         <label class="field-label">Estado</label>
         <Select v-model="filtros.estado" :options="estadosOpciones" showClear placeholder="Todos" class="w-44" />
       </div>
-      <div v-if="props.tipoProyecto !== 'minigranja'">
+      <div>
         <label class="field-label">Tipo venta</label>
         <Select v-model="filtros.tipo_venta" :options="tiposVentaOpciones" showClear placeholder="Todos" class="w-36" />
       </div>
@@ -119,8 +132,6 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-
-const props = defineProps({ tipoProyecto: String })
 import { useRouter } from 'vue-router'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
@@ -135,6 +146,13 @@ import InputText from 'primevue/inputtext'
 import { useToast } from 'primevue/usetoast'
 import api from '@/api/client'
 import { proyectoActivoEnMes } from '@/utils/proyectoActivo'
+
+const TABS = [
+  { label: 'Todas',       filter: null },
+  { label: 'Minigranjas', filter: 'minigranja' },
+  { label: 'Autoconsumo', filter: 'autoconsumo' },
+]
+const tabActivo = ref(0)
 
 const toast = useToast()
 const router = useRouter()
@@ -206,12 +224,17 @@ const filasResumen = computed(() => {
 const filasResumenFiltradas = computed(() => {
   const q = (filtros.value.q || '').toLowerCase().trim()
   const tv = filtros.value.tipo_venta
+  const tabFilter = TABS[tabActivo.value].filter
+
+  const proyTipo = {}
+  for (const p of vistaProyectos.value) proyTipo[String(p.proyecto_id)] = p.tipo_proyecto
 
   const proyMatching = new Set(
     filasResumen.value
       .filter(f => f.tipo === 'mes'
         && (!q || f.proyecto.toLowerCase().includes(q))
-        && (!tv || f.tipo_venta === tv))
+        && (!tv || f.tipo_venta === tv)
+        && (!tabFilter || proyTipo[f.proyKey] === tabFilter))
       .map(f => f.proyKey)
   )
 
@@ -259,7 +282,6 @@ function buildParams() {
   if (filtros.value.desde) p.periodo_desde = toISOMonth(filtros.value.desde)
   if (filtros.value.hasta) p.periodo_hasta = toISOMonth(filtros.value.hasta)
   if (filtros.value.estado) p.estado = filtros.value.estado
-  if (props.tipoProyecto) p.tipo_proyecto = props.tipoProyecto
   return p
 }
 
