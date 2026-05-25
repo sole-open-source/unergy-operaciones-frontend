@@ -992,8 +992,13 @@ async function load() {
     liq.value = data
     nuevoEstado.value = data.estado
   } catch (e) {
-    console.error('[LiquidacionDetail] Error cargando liquidación:', e?.response?.status, e?.response?.data ?? e)
-    toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo cargar la liquidación', life: 3000 })
+    console.error('[LiquidacionDetail] Error:', e?.response?.status, e?.response?.data ?? e)
+    toast.add({
+      severity: 'error',
+      summary: `Error ${e?.response?.status || 'red'} — liq ${route.params.id}`,
+      detail: JSON.stringify(e?.response?.data ?? e?.message ?? 'sin detalle').slice(0, 300),
+      life: 10000
+    })
   } finally {
     loading.value = false
   }
