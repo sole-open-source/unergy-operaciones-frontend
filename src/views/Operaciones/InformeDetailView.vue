@@ -34,7 +34,7 @@
       <div class="inf-toolbar">
         <!-- Izq: edición -->
         <div class="inf-toolbar-left">
-          <button v-if="!editMode" class="inf-btn inf-btn-ghost" @click="enterEdit">
+          <button v-if="!editMode && informe.estado === 'borrador'" class="inf-btn inf-btn-ghost" @click="enterEdit">
             ✏️ Editar informe
           </button>
           <button v-if="editMode" class="inf-btn inf-btn-ghost inf-btn-danger" @click="discardEdit">

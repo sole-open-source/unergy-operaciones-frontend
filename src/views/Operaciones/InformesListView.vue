@@ -164,6 +164,7 @@
                 →
               </button>
               <button
+                v-if="inf.estado !== 'aprobado'"
                 class="action-btn action-del"
                 :title="`Eliminar ${inf.proyecto_nombre || inf.sub_project}`"
                 @click="eliminarInforme(inf)"

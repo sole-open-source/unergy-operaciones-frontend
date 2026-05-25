@@ -13,6 +13,8 @@ const routes = [
   { path: '/proyectos/:id/operacion', name: 'ProyectoOperacion', component: () => import('@/views/Servicios/OperacionView.vue') },
   { path: '/servicios', name: 'Servicios', component: () => import('@/views/Contratos/ContratosListView.vue') },
   { path: '/contratos/:id', name: 'ContratoDetalle', component: () => import('@/views/Contratos/ContratoDetailView.vue') },
+  { path: '/informes', name: 'Informes', component: () => import('@/views/Operaciones/InformesListView.vue'), meta: { roles: ['admin', 'operaciones', 'monitoreo'] } },
+  { path: '/informes/:id', name: 'InformeDetalle', component: () => import('@/views/Operaciones/InformeDetailView.vue'), meta: { roles: ['admin', 'operaciones', 'monitoreo'] } },
   { path: '/fallas', name: 'Fallas', component: () => import('@/views/Fallas/MonitoreoView.vue'), meta: { roles: ['admin', 'operaciones', 'monitoreo'] } },
   { path: '/fallas/:id', name: 'FallaDetalle', component: () => import('@/views/Fallas/FallaDetailView.vue'), meta: { roles: ['admin', 'operaciones', 'monitoreo'] } },
   { path: '/solar', name: 'Solar', component: () => import('@/views/Solar/SolarView.vue'), meta: { roles: ['admin', 'operaciones', 'monitoreo'] } },
@@ -43,8 +45,22 @@ const router = createRouter({
 
 router.beforeEach((to) => {
   const auth = useAuthStore()
+
+  // No autenticado → login
   if (!to.meta.public && !auth.isAuthenticated) return '/login'
+
+  // Ya logueado intentando ir a /login → dashboard
+  if (to.path === '/login' && auth.isAuthenticated) return '/dashboard'
+
+  // Verificación de rol: si está autenticado pero sin datos de usuario
+  // (puede pasar si localStorage.user se borró pero el token sigue vivo),
+  // mandarlo a login para forzar un nuevo inicio de sesión limpio.
+  if (to.meta.roles && auth.isAuthenticated && !auth.user) return '/login'
+
+  // Verificación de rol normal
   if (to.meta.roles && !auth.can(...to.meta.roles)) return '/dashboard'
+
+  if (to.meta.requireEmail && auth.user?.email !== to.meta.requireEmail) return '/dashboard'
 })
 
 export default router
