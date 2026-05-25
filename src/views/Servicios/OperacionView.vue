@@ -55,20 +55,18 @@
                   style="border-color:#f59e0b;color:#f59e0b"
                   @click="openWizard('mantenimiento')" />
               </div>
-              <div class="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-5">
-                <InfoIcon icon="pi pi-hashtag" color="#f59e0b" label="N° contrato"
-                  :value="contratos.mantenimiento.numero_contrato" />
+              <div class="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-5">
                 <InfoIcon icon="pi pi-user" color="#f59e0b" label="Contratante"
                   :value="contratos.mantenimiento.contratante_nombre" />
                 <InfoIcon icon="pi pi-briefcase" color="#f59e0b" label="Prestador"
                   :value="contratos.mantenimiento.prestador_nombre" />
-                <InfoIcon icon="pi pi-calendar-plus" color="#f59e0b" label="Fecha firma"
-                  :value="formatFecha(contratos.mantenimiento.fecha_firma_contrato)" />
-                <InfoIcon icon="pi pi-dollar" color="#f59e0b" label="Valor facturado"
+                <InfoIcon icon="pi pi-calendar" color="#f59e0b" label="Fecha de inicio O&M"
+                  :value="formatFecha(contratos.mantenimiento.fecha_inicio)" />
+                <InfoIcon icon="pi pi-dollar" color="#f59e0b" label="Valor O&M Anual (BASE)"
                   :value="formatCOP(contratos.mantenimiento.tarifa_base)" />
-                <InfoBadge color="#f59e0b" label="Estado del pago"
-                  :estado="contratos.mantenimiento.estado_pago" />
-                <InfoLink color="#f59e0b" label="Contrato en Drive"
+                <InfoIcon icon="pi pi-calculator" color="#f59e0b" label="Valor mensual"
+                  :value="formatCOP(contratos.mantenimiento.tarifa_base != null ? contratos.mantenimiento.tarifa_base / 12 : null)" />
+                <InfoLink color="#f59e0b" label="Enlace del contrato en Drive"
                   :href="contratos.mantenimiento.enlace_drive" />
               </div>
             </div>
@@ -128,20 +126,18 @@
                   style="border-color:#8b5cf6;color:#8b5cf6"
                   @click="openWizard('arriendo')" />
               </div>
-              <div class="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-5">
-                <InfoIcon icon="pi pi-hashtag" color="#8b5cf6" label="N° contrato"
-                  :value="contratos.arriendo.numero_contrato" />
+              <div class="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-5">
                 <InfoIcon icon="pi pi-user" color="#8b5cf6" label="Contratante"
                   :value="contratos.arriendo.contratante_nombre" />
                 <InfoIcon icon="pi pi-briefcase" color="#8b5cf6" label="Prestador"
                   :value="contratos.arriendo.prestador_nombre" />
-                <InfoIcon icon="pi pi-calendar-plus" color="#8b5cf6" label="Fecha firma"
+                <InfoIcon icon="pi pi-calendar-plus" color="#8b5cf6" label="Fecha firma contrato"
                   :value="formatFecha(contratos.arriendo.fecha_firma_contrato)" />
-                <InfoIcon icon="pi pi-dollar" color="#8b5cf6" label="Valor arriendo"
+                <InfoIcon icon="pi pi-dollar" color="#8b5cf6" label="Valor anual (BASE)"
                   :value="formatCOP(contratos.arriendo.tarifa_base)" />
-                <InfoBadge color="#8b5cf6" label="Estado del pago"
-                  :estado="contratos.arriendo.estado_pago" />
-                <InfoLink color="#8b5cf6" label="Contrato en Drive"
+                <InfoIcon icon="pi pi-calculator" color="#8b5cf6" label="Valor arriendo mensual"
+                  :value="formatCOP(contratos.arriendo.tarifa_base != null ? contratos.arriendo.tarifa_base / 12 : null)" />
+                <InfoLink color="#8b5cf6" label="Enlace del contrato en Drive"
                   :href="contratos.arriendo.enlace_drive" />
               </div>
             </div>
@@ -264,14 +260,19 @@
       </template>
       <div class="space-y-4 pt-1">
         <div class="grid grid-cols-2 gap-4">
-          <div v-if="dialogEdit.tipo !== 'internet'" class="col-span-2 md:col-span-1 flex flex-col gap-1">
+          <div v-if="dialogEdit.tipo === 'mantenimiento'" class="col-span-2 md:col-span-1 flex flex-col gap-1">
+            <label class="text-xs font-medium text-gray-600">Fecha de inicio O&amp;M</label>
+            <DatePicker v-model="dialogEdit.form.fecha_inicio"
+              dateFormat="yy-mm-dd" class="w-full" showClear placeholder="aaaa-mm-dd" />
+          </div>
+          <div v-else-if="dialogEdit.tipo === 'arriendo'" class="col-span-2 md:col-span-1 flex flex-col gap-1">
             <label class="text-xs font-medium text-gray-600">Fecha firma contrato</label>
             <DatePicker v-model="dialogEdit.form.fecha_firma_contrato"
               dateFormat="yy-mm-dd" class="w-full" showClear placeholder="aaaa-mm-dd" />
           </div>
           <div class="flex flex-col gap-1" :class="dialogEdit.tipo === 'internet' ? 'col-span-2 md:col-span-1' : ''">
             <label class="text-xs font-medium text-gray-600">
-              {{ dialogEdit.tipo === 'arriendo' ? 'Valor arriendo (COP)' : 'Valor facturado (COP)' }}
+              {{ dialogEdit.tipo === 'mantenimiento' ? 'Valor O&M Anual BASE (COP)' : dialogEdit.tipo === 'arriendo' ? 'Valor anual BASE (COP)' : 'Valor facturado (COP)' }}
             </label>
             <InputNumber v-model="dialogEdit.form.tarifa_base"
               mode="currency" currency="COP" locale="es-CO" :maxFractionDigits="0"
@@ -403,7 +404,7 @@ const wizardTipo    = ref('mantenimiento')
 const dialogEdit = reactive({
   visible: false,
   tipo: 'mantenimiento',
-  form: { tarifa_base: null, fecha_firma_contrato: null, enlace_drive: '', estado_pago: null },
+  form: { tarifa_base: null, fecha_firma_contrato: null, fecha_inicio: null, enlace_drive: '', estado_pago: null },
 })
 
 const dialogPago = reactive({
@@ -514,6 +515,7 @@ function openEditContrato(tipo) {
   dialogEdit.tipo = tipo
   dialogEdit.form.tarifa_base = c.tarifa_base
   dialogEdit.form.fecha_firma_contrato = c.fecha_firma_contrato ? new Date(c.fecha_firma_contrato) : null
+  dialogEdit.form.fecha_inicio = c.fecha_inicio ? new Date(c.fecha_inicio) : null
   dialogEdit.form.enlace_drive = c.enlace_drive || ''
   dialogEdit.form.estado_pago = c.estado_pago || null
   dialogEdit.visible = true
@@ -524,13 +526,18 @@ async function saveContrato() {
   if (!contratos[tipo]) return
   guardandoContrato.value = true
   try {
-    const fecha = dialogEdit.form.fecha_firma_contrato
-    const { data } = await api.patch(`/contratos-servicio/${contratos[tipo].id}`, {
+    const toISO = d => d instanceof Date ? d.toISOString().slice(0, 10) : (d || null)
+    const payload = {
       tarifa_base: dialogEdit.form.tarifa_base,
-      fecha_firma_contrato: fecha instanceof Date ? fecha.toISOString().slice(0, 10) : (fecha || null),
       enlace_drive: dialogEdit.form.enlace_drive?.trim() || null,
       estado_pago: dialogEdit.form.estado_pago || null,
-    })
+    }
+    if (tipo === 'mantenimiento') {
+      payload.fecha_inicio = toISO(dialogEdit.form.fecha_inicio)
+    } else {
+      payload.fecha_firma_contrato = toISO(dialogEdit.form.fecha_firma_contrato)
+    }
+    const { data } = await api.patch(`/contratos-servicio/${contratos[tipo].id}`, payload)
     contratos[tipo] = { ...contratos[tipo], ...data }
     dialogEdit.visible = false
     toast.add({ severity: 'success', summary: 'Contrato actualizado', life: 2500 })
