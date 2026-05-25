@@ -237,6 +237,13 @@ async function loadVista() {
   try {
     const { data } = await api.get('/liquidaciones/vistas/por-inversionista', { params: buildParams() })
     vista.value = data
+    // DEBUG: mostrar campos de la primera liquidación disponible
+    const primeraLiq = data?.[0]?.proyectos?.[0]?.liquidaciones?.[0]
+    if (primeraLiq) {
+      console.log('[DEBUG por-inversionista] campos de liq[0]:', JSON.stringify(primeraLiq, null, 2))
+    } else {
+      console.log('[DEBUG por-inversionista] sin liquidaciones en la respuesta', data)
+    }
   } catch (e) {
     console.error('Vista por inversionista:', e)
     vista.value = []
