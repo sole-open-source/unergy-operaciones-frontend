@@ -26,7 +26,7 @@
         <label class="field-label">Estado</label>
         <Select v-model="filtros.estado" :options="estadosOpciones" showClear placeholder="Todos" class="w-44" />
       </div>
-      <div>
+      <div v-if="props.tipoProyecto !== 'minigranja'">
         <label class="field-label">Tipo venta</label>
         <Select v-model="filtros.tipo_venta" :options="tiposVentaOpciones" showClear placeholder="Todos" class="w-36" />
       </div>
@@ -119,6 +119,8 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+
+const props = defineProps({ tipoProyecto: String })
 import { useRouter } from 'vue-router'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
@@ -257,6 +259,7 @@ function buildParams() {
   if (filtros.value.desde) p.periodo_desde = toISOMonth(filtros.value.desde)
   if (filtros.value.hasta) p.periodo_hasta = toISOMonth(filtros.value.hasta)
   if (filtros.value.estado) p.estado = filtros.value.estado
+  if (props.tipoProyecto) p.tipo_proyecto = props.tipoProyecto
   return p
 }
 
