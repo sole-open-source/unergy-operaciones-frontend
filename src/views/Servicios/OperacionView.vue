@@ -97,8 +97,16 @@
                     <i class="pi pi-dollar text-xs" style="color:#f59e0b" />Valor O&amp;M Anual (BASE)
                   </p>
                   <p class="text-base font-bold" style="color:#d97706">
-                    {{ formatCOP(contratos.mantenimiento.tarifa_base) || '—' }}
+                    {{ formatCOP(getValorVigente(contratos.mantenimiento.indexacion_anual)?.valor ?? contratos.mantenimiento.tarifa_base) || '—' }}
                   </p>
+                  <button type="button"
+                    class="mt-2 flex items-center gap-1 text-xs font-medium hover:opacity-75 transition-opacity"
+                    style="background:none;border:none;padding:0;cursor:pointer;color:#f59e0b"
+                    @click="showIndexacion.anual = !showIndexacion.anual">
+                    <i class="pi pi-chevron-down text-xs transition-transform duration-200"
+                      :style="showIndexacion.anual ? 'transform:rotate(180deg)' : ''" />
+                    {{ showIndexacion.anual ? 'Ocultar' : 'Ver indexación' }}
+                  </button>
                 </div>
                 <!-- Valor mensual -->
                 <div class="rounded-lg p-3.5" style="background:#fffbeb;border:1px solid #fde68a">
@@ -106,8 +114,16 @@
                     <i class="pi pi-calculator text-xs" style="color:#f59e0b" />Valor mensual
                   </p>
                   <p class="text-base font-bold" style="color:#d97706">
-                    {{ formatCOP(contratos.mantenimiento.tarifa_mensual ?? (contratos.mantenimiento.tarifa_base != null ? Math.round(contratos.mantenimiento.tarifa_base / 12) : null)) || '—' }}
+                    {{ formatCOP(getValorVigente(contratos.mantenimiento.indexacion_mensual)?.valor ?? contratos.mantenimiento.tarifa_mensual ?? (contratos.mantenimiento.tarifa_base != null ? Math.round(contratos.mantenimiento.tarifa_base / 12) : null)) || '—' }}
                   </p>
+                  <button type="button"
+                    class="mt-2 flex items-center gap-1 text-xs font-medium hover:opacity-75 transition-opacity"
+                    style="background:none;border:none;padding:0;cursor:pointer;color:#f59e0b"
+                    @click="showIndexacion.mensual = !showIndexacion.mensual">
+                    <i class="pi pi-chevron-down text-xs transition-transform duration-200"
+                      :style="showIndexacion.mensual ? 'transform:rotate(180deg)' : ''" />
+                    {{ showIndexacion.mensual ? 'Ocultar' : 'Ver indexación' }}
+                  </button>
                 </div>
                 <!-- Enlace Drive -->
                 <div class="rounded-lg p-3.5" style="background:#fffbeb;border:1px solid #fde68a">
@@ -125,6 +141,175 @@
                   </button>
                 </div>
               </div>
+
+              <!-- ── Paneles de indexación O&M ─────────────────────────────────── -->
+
+              <!-- Panel ANUAL -->
+              <div :style="{ overflow: 'hidden', transition: 'max-height 0.35s ease', maxHeight: showIndexacion.anual ? '800px' : '0px' }">
+                <div class="pt-3">
+                  <div class="rounded-xl border border-amber-200 overflow-hidden">
+                    <div class="flex items-center justify-between px-4 py-2.5 bg-amber-50">
+                      <span class="text-xs font-semibold" style="color:#92400e">
+                        <i class="pi pi-dollar text-xs mr-1.5" style="color:#f59e0b" />Indexación anual O&M
+                      </span>
+                      <span class="text-xs text-gray-400">Año vigente: {{ ANIO_ACTUAL }}</span>
+                    </div>
+                    <table class="w-full text-sm border-collapse">
+                      <thead>
+                        <tr class="bg-gray-50 border-b border-gray-100">
+                          <th class="px-4 py-2 text-left text-xs font-semibold text-gray-500">Año</th>
+                          <th class="px-4 py-2 text-left text-xs font-semibold text-gray-500">IPC aplicado</th>
+                          <th class="px-4 py-2 text-right text-xs font-semibold text-gray-500">Valor anual</th>
+                          <th class="px-4 py-2 text-center text-xs font-semibold text-gray-500">Estado</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-if="!contratos.mantenimiento.indexacion_anual?.length">
+                          <td colspan="4" class="px-4 py-6 text-center text-xs text-gray-400">
+                            Sin datos de indexación — carga un archivo JSON con el botón de abajo.
+                          </td>
+                        </tr>
+                        <tr v-for="fila in (contratos.mantenimiento.indexacion_anual || [])" :key="fila.anio"
+                          class="border-b border-gray-50 hover:bg-amber-50/20 transition-colors"
+                          :class="fila.anio === ANIO_ACTUAL ? 'bg-amber-50/50' : ''">
+                          <td class="px-4 py-2.5">
+                            <div class="flex items-center gap-1.5">
+                              <span class="font-mono font-semibold"
+                                :style="fila.anio === ANIO_ACTUAL ? 'color:#d97706' : 'color:#2C2039'">
+                                {{ fila.anio }}
+                              </span>
+                              <span v-if="fila.anio === ANIO_ACTUAL"
+                                class="text-xs px-1.5 py-0.5 rounded font-bold leading-none"
+                                style="background:#fef3c7;color:#d97706">actual</span>
+                              <i v-if="fila.anio === ANIO_ACTUAL" class="pi pi-arrow-left text-xs" style="color:#d97706" />
+                            </div>
+                          </td>
+                          <td class="px-4 py-2.5">
+                            <span v-if="fila.ipc_aplicado == null" class="text-gray-400 text-xs">— (base)</span>
+                            <span v-else class="font-mono tabular-nums" style="color:#374151">{{ fila.ipc_aplicado }}%</span>
+                          </td>
+                          <td class="px-4 py-2.5 text-right font-semibold tabular-nums"
+                            :style="fila.anio === ANIO_ACTUAL ? 'color:#d97706' : 'color:#2C2039'">
+                            {{ formatCOP(fila.valor) }}
+                          </td>
+                          <td class="px-4 py-2.5 text-center">
+                            <span v-if="fila.ipc_aplicado == null || fila.anio < ANIO_ACTUAL"
+                              class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full"
+                              style="background:#dcfce7;color:#166534">
+                              <i class="pi pi-check text-xs" />Pagado
+                            </span>
+                            <span v-else-if="fila.anio === ANIO_ACTUAL"
+                              class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full"
+                              style="background:#fef3c7;color:#d97706">
+                              Vigente
+                            </span>
+                            <span v-else
+                              class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full"
+                              style="background:#f3f4f6;color:#9ca3af">
+                              Pendiente
+                            </span>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                    <div class="flex items-center justify-end px-4 py-2.5 border-t border-gray-100 bg-gray-50/60">
+                      <button type="button"
+                        class="flex items-center gap-1.5 text-xs font-medium hover:underline transition-colors"
+                        style="background:none;border:none;padding:0;cursor:pointer;color:#f59e0b"
+                        @click="idxInputAnualRef?.click()">
+                        <i class="pi pi-upload text-xs" />
+                        Cargar indexación anual desde JSON
+                      </button>
+                      <input ref="idxInputAnualRef" type="file" accept=".json" class="hidden"
+                        @change="e => importarIndexacion(e, 'anual')" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Panel MENSUAL -->
+              <div :style="{ overflow: 'hidden', transition: 'max-height 0.35s ease', maxHeight: showIndexacion.mensual ? '800px' : '0px' }">
+                <div class="pt-3">
+                  <div class="rounded-xl border border-amber-200 overflow-hidden">
+                    <div class="flex items-center justify-between px-4 py-2.5 bg-amber-50">
+                      <span class="text-xs font-semibold" style="color:#92400e">
+                        <i class="pi pi-calculator text-xs mr-1.5" style="color:#f59e0b" />Indexación mensual O&M
+                      </span>
+                      <span class="text-xs text-gray-400">Año vigente: {{ ANIO_ACTUAL }}</span>
+                    </div>
+                    <table class="w-full text-sm border-collapse">
+                      <thead>
+                        <tr class="bg-gray-50 border-b border-gray-100">
+                          <th class="px-4 py-2 text-left text-xs font-semibold text-gray-500">Año</th>
+                          <th class="px-4 py-2 text-left text-xs font-semibold text-gray-500">IPC aplicado</th>
+                          <th class="px-4 py-2 text-right text-xs font-semibold text-gray-500">Valor mensual</th>
+                          <th class="px-4 py-2 text-center text-xs font-semibold text-gray-500">Estado</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-if="!contratos.mantenimiento.indexacion_mensual?.length">
+                          <td colspan="4" class="px-4 py-6 text-center text-xs text-gray-400">
+                            Sin datos de indexación — carga un archivo JSON con el botón de abajo.
+                          </td>
+                        </tr>
+                        <tr v-for="fila in (contratos.mantenimiento.indexacion_mensual || [])" :key="fila.anio"
+                          class="border-b border-gray-50 hover:bg-amber-50/20 transition-colors"
+                          :class="fila.anio === ANIO_ACTUAL ? 'bg-amber-50/50' : ''">
+                          <td class="px-4 py-2.5">
+                            <div class="flex items-center gap-1.5">
+                              <span class="font-mono font-semibold"
+                                :style="fila.anio === ANIO_ACTUAL ? 'color:#d97706' : 'color:#2C2039'">
+                                {{ fila.anio }}
+                              </span>
+                              <span v-if="fila.anio === ANIO_ACTUAL"
+                                class="text-xs px-1.5 py-0.5 rounded font-bold leading-none"
+                                style="background:#fef3c7;color:#d97706">actual</span>
+                              <i v-if="fila.anio === ANIO_ACTUAL" class="pi pi-arrow-left text-xs" style="color:#d97706" />
+                            </div>
+                          </td>
+                          <td class="px-4 py-2.5">
+                            <span v-if="fila.ipc_aplicado == null" class="text-gray-400 text-xs">— (base)</span>
+                            <span v-else class="font-mono tabular-nums" style="color:#374151">{{ fila.ipc_aplicado }}%</span>
+                          </td>
+                          <td class="px-4 py-2.5 text-right font-semibold tabular-nums"
+                            :style="fila.anio === ANIO_ACTUAL ? 'color:#d97706' : 'color:#2C2039'">
+                            {{ formatCOP(fila.valor) }}
+                          </td>
+                          <td class="px-4 py-2.5 text-center">
+                            <span v-if="fila.ipc_aplicado == null || fila.anio < ANIO_ACTUAL"
+                              class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full"
+                              style="background:#dcfce7;color:#166534">
+                              <i class="pi pi-check text-xs" />Pagado
+                            </span>
+                            <span v-else-if="fila.anio === ANIO_ACTUAL"
+                              class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full"
+                              style="background:#fef3c7;color:#d97706">
+                              Vigente
+                            </span>
+                            <span v-else
+                              class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full"
+                              style="background:#f3f4f6;color:#9ca3af">
+                              Pendiente
+                            </span>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                    <div class="flex items-center justify-end px-4 py-2.5 border-t border-gray-100 bg-gray-50/60">
+                      <button type="button"
+                        class="flex items-center gap-1.5 text-xs font-medium hover:underline transition-colors"
+                        style="background:none;border:none;padding:0;cursor:pointer;color:#f59e0b"
+                        @click="idxInputMensualRef?.click()">
+                        <i class="pi pi-upload text-xs" />
+                        Cargar indexación mensual desde JSON
+                      </button>
+                      <input ref="idxInputMensualRef" type="file" accept=".json" class="hidden"
+                        @change="e => importarIndexacion(e, 'mensual')" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
             </div>
           </template>
           <template v-else>
@@ -535,10 +720,14 @@ const loading          = ref(true)
 const proyectoNombre   = ref('')
 const guardandoPago    = ref(false)
 const guardandoContrato = ref(false)
-const guardandoMant    = ref(false)
-const excelInputRef    = ref(null)
-const facturasCobradas = ref([])
-const facturasEmitidas = ref([])
+const guardandoMant      = ref(false)
+const excelInputRef      = ref(null)
+const idxInputAnualRef   = ref(null)
+const idxInputMensualRef = ref(null)
+const ANIO_ACTUAL        = new Date().getFullYear()
+const showIndexacion     = reactive({ anual: false, mensual: false })
+const facturasCobradas   = ref([])
+const facturasEmitidas   = ref([])
 
 const dialogMant = reactive({
   visible: false,
@@ -863,6 +1052,43 @@ async function cargarDesdeExcel(event) {
     toast.add({ severity: 'info', summary: 'Datos cargados desde Excel', detail: 'Revisa los datos y confirma para guardar.', life: 4000 })
   } catch (e) {
     toast.add({ severity: 'error', summary: 'Error al leer el Excel', detail: e.message, life: 4000 })
+  }
+}
+
+// ── Indexación O&M ────────────────────────────────────────────────────────────
+function getValorVigente(filas) {
+  if (!filas || !filas.length) return null
+  return filas.find(f => f.anio === ANIO_ACTUAL) ?? filas[filas.length - 1]
+}
+
+async function importarIndexacion(event, tipo) {
+  const file = event.target.files?.[0]
+  if (!file) return
+  event.target.value = ''
+  try {
+    const text = await file.text()
+    const data = JSON.parse(text)
+    const { data: result } = await api.post('/contratos-servicio/importar-indexacion', data, {
+      params: { tipo },
+    })
+    // Recargar el contrato para reflejar los nuevos datos de indexación
+    const { data: contratoData } = await api.get('/contratos-servicio', {
+      params: { tipo: 'mantenimiento', proyecto_id: route.params.id },
+    })
+    contratos.mantenimiento = contratoData.length ? contratoData[0] : null
+    const total       = result.actualizados?.length ?? 0
+    const sinEncontrar = result.no_encontrados ?? []
+    const detalle = sinEncontrar.length
+      ? `${sinEncontrar.length} no encontrado${sinEncontrar.length > 1 ? 's' : ''}: ${sinEncontrar.slice(0, 4).join(', ')}${sinEncontrar.length > 4 ? '…' : ''}`
+      : undefined
+    toast.add({
+      severity: 'success',
+      summary: `✓ ${total} proyecto${total !== 1 ? 's' : ''} actualizado${total !== 1 ? 's' : ''}`,
+      detail: detalle,
+      life: 6000,
+    })
+  } catch (e) {
+    toast.add({ severity: 'error', summary: 'Error al importar indexación', detail: e.message, life: 4000 })
   }
 }
 
