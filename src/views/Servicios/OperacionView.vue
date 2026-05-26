@@ -349,7 +349,7 @@
           />
 
           <!-- ── Facturas Solenium + Inversionistas (CRUD completo) ───────────── -->
-          <FacturasMantenimiento :contrato-id="contratos.mantenimiento?.id ?? null" />
+          <FacturasMantenimiento :contrato-id="contratos.mantenimiento?.id ?? null" :proyecto-nombre="proyectoNombre" />
         </div>
       </TabPanel>
 

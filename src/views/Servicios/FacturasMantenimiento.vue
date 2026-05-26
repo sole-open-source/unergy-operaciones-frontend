@@ -99,12 +99,20 @@
                 </tr>
                 <!-- Filas -->
                 <tr v-for="fac in solFiltradas" :key="fac.id"
-                  class="border-b border-gray-50 hover:bg-amber-50/30 transition-colors duration-100">
+                  class="border-b border-gray-50 transition-colors duration-100"
+                  :class="isPending(fac) ? 'fila-pendiente' : 'hover:bg-amber-50/30'">
                   <td class="px-4 py-2.5">
                     <span class="font-mono text-[13px]" style="color:#2C2039">{{ fac.fecha }}</span>
                   </td>
                   <td class="px-4 py-2.5">
-                    <span class="text-sm" style="color:#374151">{{ fac.numero_factura || '—' }}</span>
+                    <div class="flex items-center gap-2">
+                      <span class="text-sm" style="color:#374151">{{ fac.numero_factura || '—' }}</span>
+                      <span v-if="isPending(fac)"
+                        class="inline-flex items-center rounded-full text-[10px] font-semibold px-1.5 py-0.5 leading-none flex-shrink-0"
+                        style="background:#fff7ed;color:#c2410c;border:1px solid #fed7aa">
+                        Pendiente
+                      </span>
+                    </div>
                   </td>
                   <td class="px-4 py-2.5 text-right">
                     <span class="font-semibold tabular-nums text-sm" style="color:#2C2039">
@@ -121,7 +129,7 @@
                     <span v-else class="text-gray-300 text-xs">—</span>
                   </td>
                   <td class="px-4 py-2.5 text-center">
-                    <button type="button"
+                    <button v-if="!fac.id?.startsWith('sol_static_')" type="button"
                       class="w-7 h-7 rounded-lg inline-flex items-center justify-center text-red-300 hover:text-red-500 hover:bg-red-50 transition-colors"
                       style="background:none;border:none;cursor:pointer"
                       @click="eliminarFactura('solenium', fac.id)">
@@ -385,10 +393,12 @@ import InputNumber from 'primevue/inputnumber'
 import Select from 'primevue/select'
 import { useToast } from 'primevue/usetoast'
 import api from '@/api/client'
+import FACTURAS_SOL_ESTATICAS from '@/assets/facturas_solenium_data.js'
 
 // ── Props ──────────────────────────────────────────────────────────────────────
 const props = defineProps({
-  contratoId: { type: Number, default: null },
+  contratoId:    { type: Number, default: null },
+  proyectoNombre: { type: String, default: '' },
 })
 
 const toast = useToast()
@@ -420,6 +430,24 @@ const modal = reactive({
   errores: {},
 })
 
+// ── Helpers: datos estáticos ───────────────────────────────────────────────────
+/**
+ * Filtra los registros estáticos de Solenium por el nombre del proyecto activo.
+ * Comparación case-insensitive y con trim.
+ */
+const staticSolForProject = computed(() => {
+  const nombre = (props.proyectoNombre || '').trim().toLowerCase()
+  if (!nombre) return []
+  return FACTURAS_SOL_ESTATICAS.filter(r => r.proyecto.trim().toLowerCase() === nombre)
+})
+
+/**
+ * Una fila está "pendiente" si no tiene número de factura, monto ni soporte.
+ */
+function isPending(fac) {
+  return !fac.numero_factura && fac.monto == null && !fac.enlace_soporte
+}
+
 // ── Computed ───────────────────────────────────────────────────────────────────
 function filtrarPeriodo(lista, f) {
   let r = lista
@@ -444,10 +472,15 @@ async function load() {
   loading.value = true
   try {
     const { data } = await api.get(`/contratos-servicio/${props.contratoId}`)
-    facturasSol.value = data.facturas_solenium       || []
+    // Si el contrato ya tiene facturas guardadas en la BD → usarlas.
+    // Si no → mostrar los datos estáticos del JSON filtrados por proyecto.
+    facturasSol.value = (data.facturas_solenium && data.facturas_solenium.length)
+      ? data.facturas_solenium
+      : staticSolForProject.value
     facturasInv.value = data.facturas_inversionistas || []
   } catch {
-    facturasSol.value = []
+    // En caso de error de red → mostrar datos estáticos de igual forma
+    facturasSol.value = staticSolForProject.value
     facturasInv.value = []
   } finally {
     loading.value = false
@@ -559,5 +592,14 @@ function formatCOP(val) {
 .factura-collapse.open {
   max-height: 3600px;
   transition: max-height 0.45s ease-in;
+}
+
+/* Filas pendientes (sin factura, monto ni soporte) */
+.fila-pendiente {
+  opacity: 0.48;
+}
+.fila-pendiente:hover {
+  opacity: 0.72;
+  background-color: #fffbeb;
 }
 </style>
