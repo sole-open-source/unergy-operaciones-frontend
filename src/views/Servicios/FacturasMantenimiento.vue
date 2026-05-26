@@ -229,6 +229,7 @@
               <thead>
                 <tr class="border-b border-gray-100" style="background:#fafafa">
                   <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 whitespace-nowrap">Fecha</th>
+                  <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 whitespace-nowrap">Inversionista</th>
                   <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 whitespace-nowrap">N° Factura</th>
                   <th class="px-4 py-2.5 text-right text-xs font-semibold text-gray-500 whitespace-nowrap">Monto</th>
                   <th class="px-4 py-2.5 text-center text-xs font-semibold text-gray-500 whitespace-nowrap" style="width:80px">Soporte</th>
@@ -238,13 +239,13 @@
               <tbody>
                 <!-- Loading -->
                 <tr v-if="loading">
-                  <td colspan="5" class="px-4 py-8 text-center text-gray-400 text-xs">
+                  <td colspan="6" class="px-4 py-8 text-center text-gray-400 text-xs">
                     <i class="pi pi-spin pi-spinner mr-1" />Cargando…
                   </td>
                 </tr>
                 <!-- Empty state -->
                 <tr v-else-if="!invFiltradas.length">
-                  <td colspan="5" class="px-4 py-10 text-center">
+                  <td colspan="6" class="px-4 py-10 text-center">
                     <div class="flex flex-col items-center gap-2.5">
                       <div class="w-10 h-10 rounded-full flex items-center justify-center" style="background:#dbeafe">
                         <i class="pi pi-users text-lg" style="color:#3b82f6" />
@@ -260,12 +261,23 @@
                 </tr>
                 <!-- Filas -->
                 <tr v-for="fac in invFiltradas" :key="fac.id"
-                  class="border-b border-gray-50 hover:bg-blue-50/30 transition-colors duration-100">
+                  class="border-b border-gray-50 transition-colors duration-100"
+                  :class="isPending(fac) ? 'fila-pendiente' : 'hover:bg-blue-50/30'">
                   <td class="px-4 py-2.5">
                     <span class="font-mono text-[13px]" style="color:#2C2039">{{ fac.fecha }}</span>
                   </td>
                   <td class="px-4 py-2.5">
-                    <span class="text-sm" style="color:#374151">{{ fac.numero_factura || '—' }}</span>
+                    <span class="text-sm" style="color:#374151">{{ fac.inversionista || '—' }}</span>
+                  </td>
+                  <td class="px-4 py-2.5">
+                    <div class="flex items-center gap-2">
+                      <span class="text-sm" style="color:#374151">{{ fac.numero_factura || '—' }}</span>
+                      <span v-if="isPending(fac)"
+                        class="inline-flex items-center rounded-full text-[10px] font-semibold px-1.5 py-0.5 leading-none flex-shrink-0"
+                        style="background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe">
+                        Pendiente
+                      </span>
+                    </div>
                   </td>
                   <td class="px-4 py-2.5 text-right">
                     <span class="font-semibold tabular-nums text-sm" style="color:#2C2039">
@@ -294,7 +306,7 @@
               <!-- Fila de totales -->
               <tfoot v-if="!loading && invFiltradas.length">
                 <tr style="background:#eff6ff;border-top:1px solid #bfdbfe">
-                  <td colspan="2" class="px-4 py-2.5">
+                  <td colspan="3" class="px-4 py-2.5">
                     <span class="text-xs font-semibold text-gray-500">
                       Total {{ filtroInv.año || filtroInv.mes ? 'filtrado' : '' }}
                       · {{ invFiltradas.length }} factura{{ invFiltradas.length !== 1 ? 's' : '' }}
@@ -349,6 +361,12 @@
               placeholder="FE-001234" class="w-full" />
           </div>
         </div>
+        <!-- Inversionista (solo para sección inversionistas) -->
+        <div v-if="modal.tipo === 'inversionistas'" class="flex flex-col gap-1">
+          <label class="text-xs font-medium text-gray-600">Inversionista</label>
+          <InputText v-model="modal.form.inversionista"
+            placeholder="Nombre del inversionista" class="w-full" />
+        </div>
         <!-- Monto -->
         <div class="flex flex-col gap-1">
           <label class="text-xs font-medium text-gray-600">
@@ -394,6 +412,7 @@ import Select from 'primevue/select'
 import { useToast } from 'primevue/usetoast'
 import api from '@/api/client'
 import FACTURAS_SOL_ESTATICAS from '@/assets/facturas_solenium_data.js'
+import FACTURAS_INV_ESTATICAS from '@/assets/facturas_inversionistas_data.js'
 
 // ── Props ──────────────────────────────────────────────────────────────────────
 const props = defineProps({
@@ -475,6 +494,33 @@ const staticSolForProject = computed(() => {
   return FACTURAS_SOL_ESTATICAS.filter(r => r.proyecto === mejorProyecto)
 })
 
+const staticInvForProject = computed(() => {
+  const nombre = (props.proyectoNombre || '').trim()
+  if (!nombre) return []
+  const nombreLower = nombre.toLowerCase()
+  const exactos = FACTURAS_INV_ESTATICAS.filter(
+    r => r.proyecto.trim().toLowerCase() === nombreLower,
+  )
+  if (exactos.length) return exactos
+  const STOP = new Set([
+    'mgs', 'de', 'la', 'el', 'los', 'las', 'del', 'solar', 'minigranja', 'y', 'con',
+  ])
+  const keywords = nombreLower
+    .split(/\s+/)
+    .filter(w => w.length >= 3 && !STOP.has(w) && !/^\d+$/.test(w))
+  if (!keywords.length) return []
+  const proyectosUnicos = [...new Set(FACTURAS_INV_ESTATICAS.map(r => r.proyecto))]
+  let mejorProyecto = null
+  let mejorScore = 0
+  for (const p of proyectosUnicos) {
+    const pLower = p.toLowerCase()
+    const score = keywords.filter(kw => pLower.includes(kw)).length
+    if (score > mejorScore) { mejorScore = score; mejorProyecto = p }
+  }
+  if (!mejorProyecto || mejorScore === 0) return []
+  return FACTURAS_INV_ESTATICAS.filter(r => r.proyecto === mejorProyecto)
+})
+
 /**
  * Una fila está "pendiente" si no tiene número de factura, monto ni soporte.
  */
@@ -511,11 +557,13 @@ async function load() {
     facturasSol.value = (data.facturas_solenium && data.facturas_solenium.length)
       ? data.facturas_solenium
       : staticSolForProject.value
-    facturasInv.value = data.facturas_inversionistas || []
+    facturasInv.value = (data.facturas_inversionistas && data.facturas_inversionistas.length)
+      ? data.facturas_inversionistas
+      : staticInvForProject.value
   } catch {
     // En caso de error de red → mostrar datos estáticos de igual forma
     facturasSol.value = staticSolForProject.value
-    facturasInv.value = []
+    facturasInv.value = staticInvForProject.value
   } finally {
     loading.value = false
   }
@@ -524,18 +572,19 @@ async function load() {
 onMounted(() => { if (props.contratoId) load() })
 watch(() => props.contratoId, (id) => { if (id) load() })
 
-// Si el nombre del proyecto llega después de la carga inicial y la lista Solenium
-// sigue vacía (sin datos de API ni estáticos), rellenar con datos estáticos.
 watch(() => props.proyectoNombre, () => {
   if (!loading.value && facturasSol.value.length === 0) {
     facturasSol.value = staticSolForProject.value
+  }
+  if (!loading.value && facturasInv.value.length === 0) {
+    facturasInv.value = staticInvForProject.value
   }
 })
 
 // ── Modal ──────────────────────────────────────────────────────────────────────
 function abrirModal(tipo) {
   modal.tipo    = tipo
-  modal.form    = { fecha: '', numero_factura: '', monto: null, enlace_soporte: '' }
+  modal.form    = { fecha: '', inversionista: '', numero_factura: '', monto: null, enlace_soporte: '' }
   modal.errores = {}
   modal.visible = true
 }
@@ -567,11 +616,12 @@ async function guardarFactura() {
   saving.value = true
   try {
     const nueva = {
-      id:              Date.now().toString() + Math.random().toString(36).slice(2, 6),
-      fecha:           modal.form.fecha.trim(),
-      numero_factura:  modal.form.numero_factura?.trim() || '',
-      monto:           modal.form.monto ?? 0,
-      enlace_soporte:  modal.form.enlace_soporte?.trim() || null,
+      id:             Date.now().toString() + Math.random().toString(36).slice(2, 6),
+      fecha:          modal.form.fecha.trim(),
+      inversionista:  modal.form.inversionista?.trim() || null,
+      numero_factura: modal.form.numero_factura?.trim() || '',
+      monto:          modal.form.monto ?? 0,
+      enlace_soporte: modal.form.enlace_soporte?.trim() || null,
     }
 
     if (modal.tipo === 'solenium') {
