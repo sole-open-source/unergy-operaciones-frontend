@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 
-const BASE = import.meta.env.VITE_API_URL || 'https://backend-production-63d8.up.railway.app'
+const BASE = import.meta.env.VITE_API_URL || ''
 
 /** Lee el tiempo de expiración del JWT sin verificar firma. */
 function tokenExpired(jwt) {
