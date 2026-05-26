@@ -12,8 +12,11 @@
           <span :class="(loadingStats || loadingFallas) ? 'spin' : ''">↻</span>
           Actualizar
         </button>
-        <button class="mon-btn mon-btn-primary" @click="showDialog = true">
+        <button v-if="activeTab === 0" class="mon-btn mon-btn-primary" @click="showDialog = true">
           <i class="pi pi-plus" /> Registrar falla
+        </button>
+        <button v-if="activeTab === 4" class="mon-btn mon-btn-primary" @click="showCrearInforme = !showCrearInforme">
+          <i class="pi pi-plus" /> {{ showCrearInforme ? 'Ocultar formulario' : 'Crear informe' }}
         </button>
       </div>
     </div>
@@ -67,7 +70,7 @@
 
     <!-- ══ BANDA SLA ═══════════════════════════════════════════════════════ -->
     <div v-if="sla && (sla.fallas_sla_vencido > 0 || sla.fallas_en_riesgo_sla > 0)" class="mon-sla-band">
-      <div class="sla-chip sla-chip--red" @click="toggleEstadoCodigo('abierta')">
+      <div class="sla-chip sla-chip--red" @click="toggleEstado('abierta')">
         <i class="pi pi-exclamation-triangle" />
         <span><b>{{ sla.fallas_sla_vencido }}</b> SLA vencido</span>
       </div>
@@ -132,7 +135,7 @@
           <div class="mon-error-title">Error al cargar</div>
           <div class="mon-error-msg">{{ error }}</div>
         </div>
-        <button class="mon-btn mon-btn-ghost-dark" @click="recargar">Reintentar</button>
+        <button class="mon-btn mon-btn-ghost-dark" @click="cargarFallas()">Reintentar</button>
       </div>
 
       <!-- Vacío -->
@@ -231,7 +234,7 @@
     </template><!-- /TAB 0 -->
 
     <!-- ══ TAB 1: GENERACIÓN ════════════════════════════════════════════════ -->
-    <div v-else-if="activeTab === 1" class="mon-tab-view">
+    <div v-else-if="activeTab === 1" class="mon-tab-view mon-tab-view--flush">
       <Suspense>
         <GeneracionSolarView />
         <template #fallback>
@@ -354,26 +357,200 @@
 
     <!-- ══ TAB 3: CLIENTES ══════════════════════════════════════════════════ -->
     <div v-else-if="activeTab === 3" class="mon-tab-view">
-      <Suspense>
-        <ClientesListView />
-        <template #fallback>
-          <div class="mon-tab-loading">
-            <div class="mon-spinner" /><span>Cargando clientes…</span>
+
+      <div class="tab-section-header">
+        <div>
+          <h2 class="section-title">Generación por cliente</h2>
+          <p class="section-sub">Producción energética agrupada por propietario · datos de hoy</p>
+        </div>
+        <button class="mon-btn-outline" @click="clientesFleet = null; cargarClientes()">↻ Actualizar</button>
+      </div>
+
+      <!-- Loading -->
+      <div v-if="clientesLoading" class="mon-tab-loading">
+        <div class="mon-spinner" /><span>Cargando generación…</span>
+      </div>
+
+      <!-- Error -->
+      <div v-else-if="clientesError" class="mon-tab-error-block">
+        <span>⚠️</span>
+        <div>
+          <div class="mon-error-title">Error al cargar generación</div>
+          <div class="mon-error-msg">{{ clientesError }}</div>
+        </div>
+        <button class="mon-btn-outline" @click="cargarClientes()">Reintentar</button>
+      </div>
+
+      <!-- Vacío -->
+      <div v-else-if="!clientesFleet || !Object.keys(clientesGrouped).length" class="mon-tab-empty">
+        <div class="mon-empty-icon">🏢</div>
+        <p class="mon-empty-title">Sin datos de generación</p>
+        <p class="mon-empty-sub">No se encontraron proyectos con datos de generación activos</p>
+      </div>
+
+      <!-- Datos -->
+      <div v-else>
+
+        <!-- Barra de resumen -->
+        <div class="cli-summary-bar">
+          <div class="cli-sum-item">
+            <div class="cli-sum-val">{{ Object.keys(clientesGrouped).length }}</div>
+            <div class="cli-sum-label">Clientes</div>
           </div>
-        </template>
-      </Suspense>
+          <div class="cli-sum-item">
+            <div class="cli-sum-val">{{ clientesFleet?.projects?.length ?? 0 }}</div>
+            <div class="cli-sum-label">Proyectos</div>
+          </div>
+          <div class="cli-sum-item">
+            <div class="cli-sum-val">{{ formatKwh(totalGenHoy) }}</div>
+            <div class="cli-sum-label">Generación total hoy</div>
+          </div>
+          <div class="cli-sum-item">
+            <div class="cli-sum-val">{{ (clientesFleet?.total_power_kw ?? 0).toFixed(1) }} kW</div>
+            <div class="cli-sum-label">Potencia instalada</div>
+          </div>
+          <div class="cli-sum-item" v-if="clientesFleet?.online != null">
+            <div class="cli-sum-val" :class="clientesFleet.online === clientesFleet.total_projects ? 'cli-val--green' : 'cli-val--orange'">
+              {{ clientesFleet.online }}/{{ clientesFleet.total_projects }}
+            </div>
+            <div class="cli-sum-label">Online</div>
+          </div>
+        </div>
+
+        <!-- Cards de clientes -->
+        <div class="clientes-grid">
+          <div v-for="(grupo, nombre) in clientesGrouped" :key="nombre" class="cliente-card">
+            <div class="cliente-card-header">
+              <div class="cliente-avatar">{{ nombre.charAt(0).toUpperCase() }}</div>
+              <div class="cliente-info">
+                <div class="cliente-nombre">{{ nombre }}</div>
+                <div class="cliente-sub">{{ grupo.proyectos.length }} proyecto{{ grupo.proyectos.length !== 1 ? 's' : '' }} · {{ (grupo.totalKw).toFixed(1) }} kW instalado</div>
+              </div>
+              <div class="cliente-gen-total">
+                <div class="cliente-gen-val">{{ formatKwh(grupo.totalKwh) }}</div>
+                <div class="cliente-gen-label">hoy</div>
+              </div>
+            </div>
+
+            <div class="cliente-proyectos-list">
+              <div v-for="p in grupo.proyectos" :key="p.id || p.name" class="cp-row">
+                <div class="cp-dot" :class="p.is_minifarm ? 'cp-dot--mini' : 'cp-dot--farm'" />
+                <div class="cp-name">{{ p.name }}</div>
+                <div class="cp-kw">{{ (p.power_kw || 0).toFixed(1) }} kW</div>
+                <div class="cp-kwh">{{ formatKwh(p.energy_today_kwh) }}</div>
+                <div class="cp-util" :class="utilClass(p.utilization)">
+                  {{ p.utilization != null ? Math.round(p.utilization * 100) + '%' : '—' }}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
     </div>
 
     <!-- ══ TAB 4: INFORMES ══════════════════════════════════════════════════ -->
     <div v-else-if="activeTab === 4" class="mon-tab-view">
-      <Suspense>
-        <InformesListView />
-        <template #fallback>
-          <div class="mon-tab-loading">
-            <div class="mon-spinner" /><span>Cargando informes…</span>
+
+      <!-- Panel crear informe -->
+      <div class="inf-create-panel" :class="{ 'inf-create-panel--open': showCrearInforme }">
+        <div class="inf-create-toggle" @click="showCrearInforme = !showCrearInforme">
+          <div class="inf-create-toggle-left">
+            <span class="inf-create-icon">📋</span>
+            <span class="inf-create-toggle-label">Crear nuevo informe</span>
           </div>
-        </template>
-      </Suspense>
+          <span class="inf-create-chevron">{{ showCrearInforme ? '▲' : '▼' }}</span>
+        </div>
+
+        <div v-if="showCrearInforme" class="inf-create-body">
+          <div class="inf-form-row">
+            <div class="inf-form-field inf-form-field--wide">
+              <label class="inf-form-label">Proyecto</label>
+              <select v-model="crearForm.proyectoId" class="mon-select">
+                <option value="">Seleccionar proyecto…</option>
+                <option v-for="p in proyectos" :key="p.id" :value="p.id">{{ p.nombre_comercial }}</option>
+              </select>
+            </div>
+            <div class="inf-form-field">
+              <label class="inf-form-label">Tipo</label>
+              <select v-model="crearForm.tipo" class="mon-select">
+                <option value="fmo">FMO</option>
+                <option value="operaciones">Operaciones</option>
+              </select>
+            </div>
+            <div class="inf-form-field">
+              <label class="inf-form-label">Mes</label>
+              <select v-model="crearForm.mes" class="mon-select">
+                <option v-for="(m, i) in MESES" :key="i + 1" :value="i + 1">{{ m }}</option>
+              </select>
+            </div>
+            <div class="inf-form-field">
+              <label class="inf-form-label">Año</label>
+              <select v-model="crearForm.anio" class="mon-select">
+                <option v-for="y in ANIOS" :key="y" :value="y">{{ y }}</option>
+              </select>
+            </div>
+          </div>
+          <div class="inf-form-footer">
+            <div v-if="crearForm.proyectoId" class="inf-form-preview">
+              <span class="inf-tipo-badge" :class="'inf-tipo-' + crearForm.tipo">
+                {{ crearForm.tipo.toUpperCase() }}
+              </span>
+              {{ proyectos.find(p => p.id === crearForm.proyectoId)?.nombre_comercial }}
+              · {{ MESES[crearForm.mes - 1] }} {{ crearForm.anio }}
+            </div>
+            <button class="mon-btn mon-btn-primary"
+                    :disabled="creando || !crearForm.proyectoId"
+                    @click="crearInforme">
+              <span v-if="creando" class="spin">↻</span>
+              {{ creando ? 'Creando…' : '+ Crear informe' }}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Lista informes -->
+      <div class="inf-list-section">
+        <div class="inf-list-header">
+          <h3 class="inf-list-title">Informes generados</h3>
+          <button class="mon-btn-outline" @click="cargarInformes(true)">↻ Actualizar</button>
+        </div>
+
+        <div v-if="informesLoading" class="mon-tab-loading">
+          <div class="mon-spinner" /><span>Cargando informes…</span>
+        </div>
+        <div v-else-if="informesError" class="mon-tab-error-block">
+          <span>⚠️</span>
+          <div>
+            <div class="mon-error-title">Error al cargar</div>
+            <div class="mon-error-msg">{{ informesError }}</div>
+          </div>
+          <button class="mon-btn-outline" @click="cargarInformes(true)">Reintentar</button>
+        </div>
+        <div v-else-if="!informes.length" class="inf-empty">
+          <div class="mon-empty-icon">📋</div>
+          <p class="mon-empty-title">No hay informes generados</p>
+          <p class="mon-empty-sub">Usa el botón "Crear informe" para generar el primero</p>
+        </div>
+        <div v-else class="inf-list">
+          <div v-for="inf in informes" :key="inf.id" class="inf-row" @click="router.push(`/informes/${inf.id}`)">
+            <div class="inf-row-left">
+              <span class="inf-tipo-badge" :class="'inf-tipo-' + (inf.tipo || 'fmo')">
+                {{ (inf.tipo || 'fmo').toUpperCase() }}
+              </span>
+              <div class="inf-row-info">
+                <div class="inf-row-nombre">{{ inf.proyecto_nombre || '—' }}</div>
+                <div class="inf-row-periodo">{{ inf.periodo_display || fmtPeriodo(inf.periodo_desde) }}</div>
+              </div>
+            </div>
+            <div class="inf-row-right">
+              <span class="inf-row-fecha">{{ fmtFechaCorta(inf.created_at) }}</span>
+              <span class="inf-row-arrow">→</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
 
   </div>
@@ -397,9 +574,13 @@ const TABS = [
 ]
 const activeTab = ref(0)
 
+// GeneracionSolarView usa async setup → necesita Suspense
 const GeneracionSolarView = defineAsyncComponent(() => import('@/views/GeneracionSolarView.vue'))
-const ClientesListView    = defineAsyncComponent(() => import('@/views/Clientes/ClientesListView.vue'))
-const InformesListView    = defineAsyncComponent(() => import('@/views/Operaciones/InformesListView.vue'))
+
+// ── Constantes de informes ─────────────────────────────────────────────
+const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+const _now  = new Date()
+const ANIOS = [_now.getFullYear() - 1, _now.getFullYear(), _now.getFullYear() + 1].filter(y => y >= 2024)
 
 // ── Gráficos: carga lazy al activar tab 2 ──────────────────────────────
 const chartsFallas   = ref([])
@@ -446,7 +627,125 @@ async function cargarCharts() {
   } catch { /* silent */ } finally { chartsLoading.value = false }
 }
 
-watch(activeTab, (val) => { if (val === 2) cargarCharts() })
+// ── Clientes: generación por propietario ──────────────────────────────
+const clientesFleet   = ref(null)
+const clientesLoading = ref(false)
+const clientesError   = ref(null)
+
+const totalGenHoy = computed(() =>
+  (clientesFleet.value?.projects || []).reduce((s, p) => s + (p.energy_today_kwh || 0), 0)
+)
+
+const clientesGrouped = computed(() => {
+  if (!clientesFleet.value?.projects) return {}
+  // Mapa de proyectos por nombre (para obtener info de propietario/cliente)
+  const proyMap = {}
+  proyectos.value.forEach(p => {
+    const key = (p.nombre_comercial || '').toLowerCase().trim()
+    if (key) proyMap[key] = p
+    proyMap[p.id] = p
+  })
+  const groups = {}
+  for (const fp of clientesFleet.value.projects) {
+    const pData = proyMap[(fp.name || '').toLowerCase().trim()] || proyMap[fp.id]
+    const clienteNombre =
+      pData?.propietario ||
+      pData?.cliente_nombre ||
+      pData?.cliente?.nombre ||
+      pData?.responsable ||
+      'Sin cliente asignado'
+    if (!groups[clienteNombre]) {
+      groups[clienteNombre] = { nombre: clienteNombre, proyectos: [], totalKwh: 0, totalKw: 0 }
+    }
+    groups[clienteNombre].proyectos.push({ ...fp, pData })
+    groups[clienteNombre].totalKwh += fp.energy_today_kwh || 0
+    groups[clienteNombre].totalKw  += fp.power_kw || 0
+  }
+  // Ordenar por generación descendente
+  return Object.fromEntries(
+    Object.entries(groups).sort((a, b) => b[1].totalKwh - a[1].totalKwh)
+  )
+})
+
+async function cargarClientes() {
+  if (clientesLoading.value) return
+  clientesLoading.value = true
+  clientesError.value   = null
+  try {
+    const { data } = await api.get('/generacion-solar/fleet')
+    clientesFleet.value = data
+    // Si no hay propietario en los proyectos, asegurarse de tener proyectos cargados
+    if (!proyectos.value.length) await cargarProyectos()
+  } catch (e) {
+    clientesError.value = e.response?.data?.detail || e.message || 'Error al cargar generación'
+  } finally {
+    clientesLoading.value = false
+  }
+}
+
+// ── Informes ──────────────────────────────────────────────────────────
+const informes        = ref([])
+const informesLoading = ref(false)
+const informesError   = ref(null)
+const showCrearInforme = ref(false)
+const creando          = ref(false)
+const crearForm = ref({
+  proyectoId: '',
+  tipo: 'fmo',
+  mes: _now.getMonth() + 1,
+  anio: _now.getFullYear(),
+})
+
+async function cargarInformes(force = false) {
+  if (informesLoading.value && !force) return
+  informesLoading.value = true
+  informesError.value   = null
+  try {
+    const { data } = await api.get('/informes/', { params: { limit: 200 } })
+    informes.value = Array.isArray(data) ? data : (data.items ?? [])
+  } catch (e) {
+    informesError.value = e.response?.data?.detail || e.message || 'Error de conexión'
+  } finally {
+    informesLoading.value = false
+  }
+}
+
+async function crearInforme() {
+  const proyecto = proyectos.value.find(p => p.id === crearForm.value.proyectoId)
+  if (!proyecto) return
+  creando.value = true
+  try {
+    const firstDay = new Date(crearForm.value.anio, crearForm.value.mes - 1, 1)
+    const lastDay  = new Date(crearForm.value.anio, crearForm.value.mes, 0)
+    const periodo_desde   = firstDay.toISOString().split('T')[0]
+    const periodo_hasta   = lastDay.toISOString().split('T')[0]
+    const periodo_display = `${MESES[crearForm.value.mes - 1]} ${crearForm.value.anio}`
+    const sub_project = proyecto.solenium_id || proyecto.codigo_solenium || proyecto.sub_project || proyecto.nombre_comercial
+    const { data: newInforme } = await api.post('/informes/', {
+      tipo: crearForm.value.tipo,
+      sub_project,
+      periodo_desde,
+      periodo_hasta,
+      periodo_display,
+      proyecto_nombre: proyecto.nombre_comercial,
+      html_content: '',
+    })
+    toast.add({ severity: 'success', summary: 'Informe creado', detail: `${periodo_display} · ${proyecto.nombre_comercial}`, life: 3000 })
+    showCrearInforme.value = false
+    router.push(`/informes/${newInforme.id}`)
+  } catch (err) {
+    toast.add({ severity: 'error', summary: 'Error al crear informe', detail: err?.response?.data?.detail ?? 'No se pudo crear el informe', life: 5000 })
+  } finally {
+    creando.value = false
+  }
+}
+
+// ── Watch tabs ─────────────────────────────────────────────────────────
+watch(activeTab, (val) => {
+  if (val === 2) cargarCharts()
+  if (val === 3 && !clientesFleet.value) cargarClientes()
+  if (val === 4 && !informes.value.length) cargarInformes()
+})
 
 const router = useRouter()
 const toast  = useToast()
@@ -473,7 +772,6 @@ const filtroPrioridadId  = ref('')
 const filtroProyectoId   = ref('')
 const filtroAlerta       = ref(false)
 
-// Código del estado seleccionado (para KPI toggle)
 const filtroEstadoCodigo = computed(() => {
   if (!filtroEstadoId.value) return ''
   return catalogos.value.estados.find(e => e.id === filtroEstadoId.value)?.codigo || ''
@@ -497,10 +795,12 @@ const slaBarClass = computed(() => {
   return 'kpi-bar--red'
 })
 
-// ── Carga fallas (paginada, server-side) ──────────────────────────────
-async function cargarFallas() {
-  loadingFallas.value = true
-  error.value = null
+// ── Carga fallas con retry para Railway cold-start ──────────────────
+async function cargarFallas(retry = 0) {
+  if (retry === 0) {
+    loadingFallas.value = true
+    error.value = null
+  }
   try {
     const params = { page: page.value, size: pageSize }
     if (buscar.value.trim()) params.q = buscar.value.trim()
@@ -512,14 +812,19 @@ async function cargarFallas() {
     const { data } = await api.get('/fallas', { params })
     fallas.value = data.items ?? []
     total.value  = data.total ?? 0
+    loadingFallas.value = false
   } catch (e) {
-    error.value = e.response?.data?.detail || e.message
-  } finally {
+    // Railway cold-start: reintentar hasta 2 veces en 502/503
+    if ((e.response?.status === 502 || e.response?.status === 503) && retry < 2) {
+      await new Promise(r => setTimeout(r, 2000))
+      return cargarFallas(retry + 1)
+    }
+    error.value = e.response?.data?.detail || e.message || 'Error de conexión'
     loadingFallas.value = false
   }
 }
 
-// ── Carga stats y SLA ─────────────────────────────────────────────────
+// ── Carga stats y SLA (no crítico) ────────────────────────────────────
 async function cargarStats() {
   loadingStats.value = true
   try {
@@ -550,7 +855,8 @@ async function cargarProyectos() {
 
 async function recargar() {
   page.value = 1
-  await Promise.all([cargarFallas(), cargarStats()])
+  await cargarFallas()
+  cargarStats()
 }
 
 // ── Navegación ────────────────────────────────────────────────────────
@@ -612,6 +918,26 @@ function fmtFecha(d) {
     day: '2-digit', month: 'short', year: 'numeric',
   })
 }
+function fmtFechaCorta(iso) {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })
+}
+function fmtPeriodo(desde) {
+  if (!desde) return '—'
+  return new Date(desde + 'T00:00:00').toLocaleDateString('es-CO', { month: 'long', year: 'numeric' })
+}
+function formatKwh(kwh) {
+  if (kwh == null || isNaN(kwh)) return '—'
+  if (kwh >= 1000) return (kwh / 1000).toFixed(2) + ' MWh'
+  return kwh.toFixed(1) + ' kWh'
+}
+function utilClass(util) {
+  if (util == null) return ''
+  const pct = util * 100
+  if (pct >= 70) return 'util-good'
+  if (pct >= 40) return 'util-mid'
+  return 'util-low'
+}
 
 // ── Crear falla ───────────────────────────────────────────────────────
 async function onCreate(payload) {
@@ -633,11 +959,15 @@ async function onCreate(payload) {
   }
 }
 
-onMounted(() => {
-  cargarCatalogos()
+// ── onMounted: fallas primero, stats después ──────────────────────────
+onMounted(async () => {
+  // Carga paralela de datos de soporte (no bloquean la tabla)
   cargarProyectos()
+  cargarCatalogos()
+  // Primero las fallas (con retry para Railway cold-start)
+  await cargarFallas()
+  // Luego las stats de forma no crítica
   cargarStats()
-  cargarFallas()
 })
 </script>
 
@@ -717,6 +1047,19 @@ onMounted(() => {
   cursor: pointer;
   font-family: inherit;
 }
+.mon-btn-outline {
+  background: transparent;
+  border: 1.5px solid #e5e0f0;
+  border-radius: 8px;
+  padding: 7px 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #6d5a8e;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all .14s;
+}
+.mon-btn-outline:hover { border-color: #915BD8; color: #6d28d9; background: #f5f0ff; }
 
 /* ── KPIs ────────────────────────────────────────────────────────── */
 .mon-kpis {
@@ -1104,6 +1447,10 @@ onMounted(() => {
   padding: 24px 32px 40px;
   background: #f5f4f8;
 }
+.mon-tab-view--flush {
+  padding: 0;
+  overflow: hidden;
+}
 @media (max-width: 768px) { .mon-tab-view { padding: 16px; } }
 
 .mon-tab-loading {
@@ -1118,6 +1465,37 @@ onMounted(() => {
 .mon-tab-empty {
   text-align: center;
   padding: 80px 20px;
+}
+.mon-tab-error-block {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: #fff5f5;
+  border: 1px solid #fecaca;
+  border-radius: 12px;
+  padding: 16px 20px;
+  font-size: 13px;
+  margin-bottom: 20px;
+}
+
+/* Tab header reutilizable */
+.tab-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  gap: 12px;
+}
+.section-title {
+  font-size: 17px;
+  font-weight: 800;
+  color: #2C2039;
+  margin: 0 0 3px;
+}
+.section-sub {
+  font-size: 12px;
+  color: #a094b8;
+  margin: 0;
 }
 
 /* ── Charts ──────────────────────────────────────────────────────── */
@@ -1271,5 +1649,323 @@ onMounted(() => {
   text-transform: uppercase;
   letter-spacing: .4px;
   color: #a094b8;
+}
+
+/* ══ TAB 3: CLIENTES ════════════════════════════════════════════════ */
+
+/* Barra resumen */
+.cli-summary-bar {
+  display: flex;
+  gap: 0;
+  background: #fff;
+  border: 1px solid #ece8f4;
+  border-radius: 12px;
+  margin-bottom: 20px;
+  overflow: hidden;
+}
+.cli-sum-item {
+  flex: 1;
+  padding: 16px 12px;
+  text-align: center;
+  border-right: 1px solid #ece8f4;
+}
+.cli-sum-item:last-child { border-right: none; }
+.cli-sum-val {
+  font-size: 22px;
+  font-weight: 900;
+  color: #2C2039;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.cli-val--green { color: #16a34a; }
+.cli-val--orange { color: #ea580c; }
+.cli-sum-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: #a094b8;
+}
+
+/* Grid clientes */
+.clientes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 16px;
+}
+
+.cliente-card {
+  background: #fff;
+  border: 1px solid #ece8f4;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(44,32,57,.05);
+}
+.cliente-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 18px;
+  border-bottom: 1px solid #f3f0f8;
+  background: #faf8fc;
+}
+.cliente-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #7c3aed, #915BD8);
+  color: #fff;
+  font-size: 18px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.cliente-info { flex: 1; min-width: 0; }
+.cliente-nombre {
+  font-size: 14px;
+  font-weight: 700;
+  color: #2C2039;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cliente-sub {
+  font-size: 11px;
+  color: #a094b8;
+  margin-top: 2px;
+}
+.cliente-gen-total { text-align: right; flex-shrink: 0; }
+.cliente-gen-val {
+  font-size: 16px;
+  font-weight: 800;
+  color: #7c3aed;
+  line-height: 1;
+}
+.cliente-gen-label {
+  font-size: 10px;
+  color: #a094b8;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+}
+
+/* Proyectos dentro de la card */
+.cliente-proyectos-list { padding: 8px 0; }
+.cp-row {
+  display: grid;
+  grid-template-columns: 12px 1fr auto auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 18px;
+  transition: background .1s;
+}
+.cp-row:hover { background: #faf7ff; }
+.cp-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.cp-dot--farm { background: #915BD8; }
+.cp-dot--mini { background: #f97316; }
+.cp-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #4b3b72;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cp-kw {
+  font-size: 11px;
+  color: #a094b8;
+  white-space: nowrap;
+}
+.cp-kwh {
+  font-size: 12px;
+  font-weight: 700;
+  color: #2C2039;
+  white-space: nowrap;
+}
+.cp-util {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+.util-good { background: #f0fdf4; color: #16a34a; }
+.util-mid  { background: #fefce8; color: #a16207; }
+.util-low  { background: #fef2f2; color: #dc2626; }
+
+/* ══ TAB 4: INFORMES ════════════════════════════════════════════════ */
+
+/* Panel crear */
+.inf-create-panel {
+  background: #fff;
+  border: 1.5px solid #e5e0f0;
+  border-radius: 12px;
+  margin-bottom: 20px;
+  overflow: hidden;
+  transition: border-color .15s;
+}
+.inf-create-panel--open { border-color: #915BD8; }
+
+.inf-create-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  cursor: pointer;
+  user-select: none;
+  transition: background .12s;
+}
+.inf-create-toggle:hover { background: #faf7ff; }
+.inf-create-toggle-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.inf-create-icon { font-size: 18px; }
+.inf-create-toggle-label {
+  font-size: 14px;
+  font-weight: 700;
+  color: #2C2039;
+}
+.inf-create-chevron {
+  font-size: 11px;
+  color: #a094b8;
+  font-weight: 700;
+}
+
+.inf-create-body {
+  padding: 0 20px 20px;
+  border-top: 1px solid #f0eaf8;
+  padding-top: 18px;
+}
+.inf-form-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.inf-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 140px;
+}
+.inf-form-field--wide { flex: 2; min-width: 200px; }
+.inf-form-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: #a094b8;
+}
+.inf-form-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.inf-form-preview {
+  font-size: 13px;
+  color: #6b5a8a;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Lista de informes */
+.inf-list-section { }
+.inf-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+.inf-list-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #2C2039;
+  margin: 0;
+}
+.inf-empty {
+  text-align: center;
+  padding: 60px 20px;
+}
+.inf-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  background: #fff;
+  border: 1px solid #ece8f4;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.inf-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 13px 18px;
+  cursor: pointer;
+  transition: background .1s;
+  border-bottom: 1px solid #f3f0f8;
+}
+.inf-row:last-child { border-bottom: none; }
+.inf-row:hover { background: #faf7ff; }
+.inf-row-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+.inf-tipo-badge {
+  display: inline-block;
+  font-size: 9.5px;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 20px;
+  letter-spacing: .5px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.inf-tipo-fmo         { background: #f0f4ff; color: #3730a3; border: 1px solid #c7d2fe; }
+.inf-tipo-operaciones { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
+.inf-row-info { min-width: 0; }
+.inf-row-nombre {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #2C2039;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.inf-row-periodo {
+  font-size: 11.5px;
+  color: #a094b8;
+  margin-top: 2px;
+  text-transform: capitalize;
+}
+.inf-row-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-shrink: 0;
+}
+.inf-row-fecha {
+  font-size: 11.5px;
+  color: #a094b8;
+}
+.inf-row-arrow {
+  font-size: 14px;
+  font-weight: 700;
+  color: #7c3aed;
 }
 </style>
