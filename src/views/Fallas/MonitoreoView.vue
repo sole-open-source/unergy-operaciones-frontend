@@ -18,6 +18,19 @@
       </div>
     </div>
 
+    <!-- ══ TAB BAR ═══════════════════════════════════════════════════════════ -->
+    <div class="mon-tabs">
+      <button v-for="(tab, i) in TABS" :key="i"
+              class="mon-tab" :class="{ 'mon-tab--active': activeTab === i }"
+              @click="activeTab = i">
+        <span class="mon-tab-icon">{{ tab.icon }}</span>
+        {{ tab.label }}
+      </button>
+    </div>
+
+    <!-- ══ TAB 0: FALLAS ══════════════════════════════════════════════════════ -->
+    <template v-if="activeTab === 0">
+
     <!-- ══ KPI CARDS ══════════════════════════════════════════════════════ -->
     <div class="mon-kpis">
       <div class="kpi" :class="filtroEstadoCodigo === '' && filtroPrioridadCodigo === '' && !filtroAlerta ? 'kpi--active kpi--purple' : ''">
@@ -215,16 +228,225 @@
       <FallaForm :catalogos="catalogos" @save="onCreate" @cancel="showDialog = false" />
     </Dialog>
 
+    </template><!-- /TAB 0 -->
+
+    <!-- ══ TAB 1: GENERACIÓN ════════════════════════════════════════════════ -->
+    <div v-else-if="activeTab === 1" class="mon-tab-view">
+      <Suspense>
+        <GeneracionSolarView />
+        <template #fallback>
+          <div class="mon-tab-loading">
+            <div class="mon-spinner" /><span>Cargando generación…</span>
+          </div>
+        </template>
+      </Suspense>
+    </div>
+
+    <!-- ══ TAB 2: GRÁFICOS ══════════════════════════════════════════════════ -->
+    <div v-else-if="activeTab === 2" class="mon-tab-view">
+      <div v-if="chartsLoading" class="mon-tab-loading">
+        <div class="mon-spinner" /><span>Cargando datos…</span>
+      </div>
+      <div v-else-if="!chartsFallas.length" class="mon-tab-empty">
+        <div class="mon-empty-icon">📊</div>
+        <p class="mon-empty-title">Sin datos de fallas</p>
+        <p class="mon-empty-sub">No hay registros para generar gráficos</p>
+      </div>
+      <div v-else class="charts-grid">
+
+        <!-- SLA Cumplimiento -->
+        <div class="chart-card chart-card--wide">
+          <div class="chart-title">Cumplimiento SLA</div>
+          <div class="sla-gauge-wrap">
+            <div class="sla-gauge-pct"
+                 :style="{ color: (stats?.cumplimiento_sla_pct ?? 0) >= 80 ? '#16a34a' : (stats?.cumplimiento_sla_pct ?? 0) >= 50 ? '#d97706' : '#dc2626' }">
+              {{ stats?.cumplimiento_sla_pct ?? '—' }}<span style="font-size:18px; font-weight:600;">%</span>
+            </div>
+            <div class="sla-gauge-track">
+              <div class="sla-gauge-fill"
+                   :style="{
+                     width: Math.min(stats?.cumplimiento_sla_pct ?? 0, 100) + '%',
+                     background: (stats?.cumplimiento_sla_pct ?? 0) >= 80 ? '#16a34a' : (stats?.cumplimiento_sla_pct ?? 0) >= 50 ? '#d97706' : '#dc2626'
+                   }" />
+            </div>
+            <div class="sla-gauge-stats">
+              <span>Vencidos: <b style="color:#dc2626">{{ sla?.fallas_sla_vencido ?? 0 }}</b></span>
+              <span>En riesgo: <b style="color:#d97706">{{ sla?.fallas_en_riesgo_sla ?? 0 }}</b></span>
+              <span>Prom. resolución: <b>{{ sla?.promedio_tiempo_resolucion_horas ?? '—' }}h</b></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Por estado -->
+        <div class="chart-card">
+          <div class="chart-title">Fallas por estado</div>
+          <div class="bar-chart">
+            <div v-for="g in fallasPorEstado" :key="g.label" class="bar-row">
+              <div class="bar-label">{{ g.label }}</div>
+              <div class="bar-track">
+                <div class="bar-fill"
+                     :style="{ width: (g.count / chartsMax * 100) + '%', background: g.color || '#915BD8' }" />
+              </div>
+              <div class="bar-val">{{ g.count }}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Por prioridad -->
+        <div class="chart-card">
+          <div class="chart-title">Fallas por prioridad</div>
+          <div class="prio-chart">
+            <div v-for="g in fallasPorPrioridad" :key="g.label" class="prio-row">
+              <span class="prio-chip" :class="'prio-' + g.nivel">{{ g.label }}</span>
+              <div class="prio-bar-wrap">
+                <div class="prio-bar-fill" :class="'prio-fill-' + g.nivel"
+                     :style="{ width: (g.count / Math.max(...fallasPorPrioridad.map(x=>x.count), 1) * 100) + '%' }" />
+              </div>
+              <span class="bar-val">{{ g.count }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Por categoría -->
+        <div class="chart-card" v-if="fallasPorCategoria.length">
+          <div class="chart-title">Fallas por categoría</div>
+          <div class="bar-chart">
+            <div v-for="g in fallasPorCategoria" :key="g.label" class="bar-row">
+              <div class="bar-label">{{ g.label }}</div>
+              <div class="bar-track">
+                <div class="bar-fill"
+                     :style="{ width: (g.count / chartsMax * 100) + '%', background: g.color || '#915BD8' }" />
+              </div>
+              <div class="bar-val">{{ g.count }}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Resumen rápido -->
+        <div class="chart-card chart-card--wide chart-summary">
+          <div class="chart-title">Resumen operacional</div>
+          <div class="summary-grid">
+            <div class="summary-item">
+              <div class="summary-val">{{ stats?.total_activas ?? '—' }}</div>
+              <div class="summary-label">Fallas activas</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-val summary-val--orange">{{ stats?.en_revision ?? '—' }}</div>
+              <div class="summary-label">En gestión</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-val summary-val--red">{{ stats?.alerta_7_dias ?? '—' }}</div>
+              <div class="summary-label">Alertas &gt;7 días</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-val summary-val--green">{{ stats?.resueltas_mes ?? '—' }}</div>
+              <div class="summary-label">Resueltas este mes</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-val" style="font-size:20px;">{{ chartsFallas.length }}</div>
+              <div class="summary-label">Total histórico (muestra)</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ══ TAB 3: CLIENTES ══════════════════════════════════════════════════ -->
+    <div v-else-if="activeTab === 3" class="mon-tab-view">
+      <Suspense>
+        <ClientesListView />
+        <template #fallback>
+          <div class="mon-tab-loading">
+            <div class="mon-spinner" /><span>Cargando clientes…</span>
+          </div>
+        </template>
+      </Suspense>
+    </div>
+
+    <!-- ══ TAB 4: INFORMES ══════════════════════════════════════════════════ -->
+    <div v-else-if="activeTab === 4" class="mon-tab-view">
+      <Suspense>
+        <InformesListView />
+        <template #fallback>
+          <div class="mon-tab-loading">
+            <div class="mon-spinner" /><span>Cargando informes…</span>
+          </div>
+        </template>
+      </Suspense>
+    </div>
+
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch, defineAsyncComponent } from 'vue'
 import { useRouter } from 'vue-router'
 import Dialog from 'primevue/dialog'
 import { useToast } from 'primevue/usetoast'
 import FallaForm from './FallaForm.vue'
 import api from '@/api/client'
+
+// ── Tabs ──────────────────────────────────────────────────────────────
+const TABS = [
+  { label: 'Fallas',      icon: '⚡' },
+  { label: 'Generación',  icon: '☀️' },
+  { label: 'Gráficos',    icon: '📊' },
+  { label: 'Clientes',    icon: '🏢' },
+  { label: 'Informes',    icon: '📋' },
+]
+const activeTab = ref(0)
+
+const GeneracionSolarView = defineAsyncComponent(() => import('@/views/GeneracionSolarView.vue'))
+const ClientesListView    = defineAsyncComponent(() => import('@/views/Clientes/ClientesListView.vue'))
+const InformesListView    = defineAsyncComponent(() => import('@/views/Operaciones/InformesListView.vue'))
+
+// ── Gráficos: carga lazy al activar tab 2 ──────────────────────────────
+const chartsFallas   = ref([])
+const chartsLoading  = ref(false)
+
+const fallasPorEstado = computed(() => {
+  const g = {}
+  for (const f of chartsFallas.value) {
+    const k = f.estado?.etiqueta || 'Sin estado'
+    if (!g[k]) g[k] = { label: k, color: f.estado?.color_hex || '#915BD8', count: 0 }
+    g[k].count++
+  }
+  return Object.values(g).sort((a, b) => b.count - a.count)
+})
+const fallasPorPrioridad = computed(() => {
+  const g = {}
+  for (const f of chartsFallas.value) {
+    const k = f.prioridad?.etiqueta || 'Sin prioridad'
+    if (!g[k]) g[k] = { label: k, nivel: f.prioridad?.nivel || 4, count: 0 }
+    g[k].count++
+  }
+  return Object.values(g).sort((a, b) => a.nivel - b.nivel)
+})
+const fallasPorCategoria = computed(() => {
+  const g = {}
+  for (const f of chartsFallas.value) {
+    const k = f.tipo?.categoria?.etiqueta || 'Sin categoría'
+    if (!g[k]) g[k] = { label: k, color: f.tipo?.categoria?.color_hex || '#915BD8', count: 0 }
+    g[k].count++
+  }
+  return Object.values(g).sort((a, b) => b.count - a.count)
+})
+const chartsMax = computed(() =>
+  Math.max(...fallasPorEstado.value.map(g => g.count),
+           ...fallasPorCategoria.value.map(g => g.count), 1)
+)
+
+async function cargarCharts() {
+  if (chartsFallas.value.length || chartsLoading.value) return
+  chartsLoading.value = true
+  try {
+    const { data } = await api.get('/fallas', { params: { size: 500 } })
+    chartsFallas.value = data.items ?? []
+  } catch { /* silent */ } finally { chartsLoading.value = false }
+}
+
+watch(activeTab, (val) => { if (val === 2) cargarCharts() })
 
 const router = useRouter()
 const toast  = useToast()
@@ -838,5 +1060,216 @@ onMounted(() => {
 /* Responsive */
 @media (max-width: 768px) {
   .mon-hero, .mon-filters, .mon-table-area, .mon-sla-band { padding-left: 16px; padding-right: 16px; }
+}
+
+/* ── Tab bar ─────────────────────────────────────────────────────── */
+.mon-tabs {
+  display: flex;
+  gap: 0;
+  background: #1e1530;
+  padding: 0 32px;
+  border-bottom: 1px solid rgba(145,91,216,.22);
+  flex-shrink: 0;
+  overflow-x: auto;
+}
+.mon-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 18px;
+  font-size: 12.5px;
+  font-weight: 600;
+  font-family: inherit;
+  color: rgba(245,240,255,.42);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color .14s, border-color .14s;
+  margin-bottom: -1px;
+}
+.mon-tab:hover:not(.mon-tab--active) { color: rgba(245,240,255,.72); }
+.mon-tab--active {
+  color: #f5f0ff;
+  border-bottom-color: #915BD8;
+}
+.mon-tab-icon { font-size: 14px; }
+@media (max-width: 768px) { .mon-tabs { padding-left: 12px; } .mon-tab { padding: 10px 12px; } }
+
+/* ── Paneles de tab (1-4) ────────────────────────────────────────── */
+.mon-tab-view {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px 32px 40px;
+  background: #f5f4f8;
+}
+@media (max-width: 768px) { .mon-tab-view { padding: 16px; } }
+
+.mon-tab-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 80px 20px;
+  color: #a094b8;
+  font-size: 13px;
+}
+.mon-tab-empty {
+  text-align: center;
+  padding: 80px 20px;
+}
+
+/* ── Charts ──────────────────────────────────────────────────────── */
+.charts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 16px;
+}
+.chart-card {
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #ece8f4;
+  padding: 20px 22px;
+  box-shadow: 0 1px 3px rgba(44,32,57,.04);
+}
+.chart-card--wide {
+  grid-column: 1 / -1;
+}
+.chart-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .55px;
+  color: #a094b8;
+  margin-bottom: 16px;
+}
+
+/* SLA gauge */
+.sla-gauge-wrap { display: flex; flex-direction: column; gap: 12px; }
+.sla-gauge-pct {
+  font-size: 52px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -2px;
+}
+.sla-gauge-track {
+  height: 10px;
+  background: #f0eaf8;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.sla-gauge-fill {
+  height: 100%;
+  border-radius: 6px;
+  transition: width .6s ease;
+}
+.sla-gauge-stats {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  font-size: 12.5px;
+  color: #6b5a8a;
+}
+
+/* Horizontal bar chart */
+.bar-chart { display: flex; flex-direction: column; gap: 10px; }
+.bar-row {
+  display: grid;
+  grid-template-columns: 120px 1fr 32px;
+  align-items: center;
+  gap: 8px;
+}
+.bar-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #4a3b6b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bar-track {
+  height: 8px;
+  background: #f0eaf8;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width .5s ease;
+  min-width: 4px;
+}
+.bar-val {
+  font-size: 12px;
+  font-weight: 700;
+  color: #6d28d9;
+  text-align: right;
+}
+
+/* Priority chart */
+.prio-chart { display: flex; flex-direction: column; gap: 10px; }
+.prio-row {
+  display: grid;
+  grid-template-columns: 90px 1fr 32px;
+  align-items: center;
+  gap: 8px;
+}
+.prio-chip {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 20px;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: .2px;
+}
+.prio-bar-wrap {
+  height: 8px;
+  background: #f0eaf8;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.prio-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width .5s ease;
+  min-width: 4px;
+}
+.prio-fill-1 { background: #dc2626; }
+.prio-fill-2 { background: #ea580c; }
+.prio-fill-3 { background: #d97706; }
+.prio-fill-4 { background: #6b7280; }
+
+/* Summary card */
+.chart-summary { }
+.summary-grid {
+  display: flex;
+  gap: 0;
+  flex-wrap: wrap;
+}
+.summary-item {
+  flex: 1;
+  min-width: 120px;
+  padding: 12px 16px;
+  border-right: 1px solid #f0eaf8;
+}
+.summary-item:last-child { border-right: none; }
+.summary-val {
+  font-size: 32px;
+  font-weight: 900;
+  line-height: 1;
+  color: #2C2039;
+  margin-bottom: 4px;
+}
+.summary-val--orange { color: #ea580c; }
+.summary-val--red    { color: #dc2626; }
+.summary-val--green  { color: #16a34a; }
+.summary-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+  color: #a094b8;
 }
 </style>
