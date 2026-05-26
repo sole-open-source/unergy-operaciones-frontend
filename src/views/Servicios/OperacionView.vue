@@ -40,12 +40,16 @@
           <!-- Info card -->
           <template v-if="contratos.mantenimiento">
             <div class="rounded-xl border bg-white p-5" style="border-color:#f59e0b40">
-              <div class="flex items-start justify-between mb-5 gap-3">
+              <!-- Header -->
+              <div class="flex items-start justify-between mb-4 gap-3">
                 <div class="flex items-center gap-2.5 flex-wrap">
                   <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style="background:#fef3c7">
                     <i class="pi pi-wrench text-sm" style="color:#f59e0b" />
                   </div>
-                  <span class="text-sm font-semibold" style="color:#2C2039">{{ proyectoNombre }}</span>
+                  <div>
+                    <p class="text-xs text-gray-400 leading-none mb-0.5">Contrato de Mantenimiento O&amp;M</p>
+                    <span class="text-sm font-semibold" style="color:#2C2039">{{ proyectoNombre }}</span>
+                  </div>
                 </div>
                 <div class="flex items-center gap-2 flex-shrink-0">
                   <Tag :value="CONTRATO_LABELS[contratos.mantenimiento.estado]"
@@ -58,20 +62,68 @@
                     @change="cargarDesdeExcel" />
                 </div>
               </div>
-              <div class="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-5">
-                <InfoIcon icon="pi pi-user" color="#f59e0b" label="Contratante"
-                  :value="contratos.mantenimiento.contratante_nombre" />
-                <InfoIcon icon="pi pi-briefcase" color="#f59e0b" label="Prestador"
-                  :value="contratos.mantenimiento.prestador_nombre" />
-                <InfoIcon icon="pi pi-calendar" color="#f59e0b" label="Fecha de inicio O&M"
-                  :value="formatFecha(contratos.mantenimiento.fecha_inicio)" />
-                <InfoIcon icon="pi pi-dollar" color="#f59e0b" label="Valor O&M Anual (BASE)"
-                  :value="formatCOP(contratos.mantenimiento.tarifa_base)" />
-                <InfoIcon icon="pi pi-calculator" color="#f59e0b" label="Valor mensual"
-                  :value="formatCOP(contratos.mantenimiento.tarifa_base != null ? contratos.mantenimiento.tarifa_base / 12 : null)" />
-                <InfoLink color="#f59e0b" label="Enlace del contrato en Drive"
-                  :href="contratos.mantenimiento.enlace_drive"
-                  :editable="true" @editar="openMantenimientoDialog('editar')" />
+              <!-- Mini-cards grid -->
+              <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+                <!-- Contratante -->
+                <div class="rounded-lg p-3.5" style="background:#fffbeb;border:1px solid #fde68a">
+                  <p class="text-xs mb-1.5 flex items-center gap-1.5" style="color:#92400e">
+                    <i class="pi pi-user text-xs" style="color:#f59e0b" />Contratante
+                  </p>
+                  <p class="text-sm font-semibold leading-snug" style="color:#1c1917">
+                    {{ contratos.mantenimiento.contratante_nombre || '—' }}
+                  </p>
+                </div>
+                <!-- Prestador -->
+                <div class="rounded-lg p-3.5" style="background:#fffbeb;border:1px solid #fde68a">
+                  <p class="text-xs mb-1.5 flex items-center gap-1.5" style="color:#92400e">
+                    <i class="pi pi-building text-xs" style="color:#f59e0b" />Prestador
+                  </p>
+                  <p class="text-sm font-semibold leading-snug" style="color:#1c1917">
+                    {{ contratos.mantenimiento.prestador_nombre || '—' }}
+                  </p>
+                </div>
+                <!-- Fecha inicio -->
+                <div class="rounded-lg p-3.5" style="background:#fffbeb;border:1px solid #fde68a">
+                  <p class="text-xs mb-1.5 flex items-center gap-1.5" style="color:#92400e">
+                    <i class="pi pi-calendar text-xs" style="color:#f59e0b" />Fecha de inicio O&amp;M
+                  </p>
+                  <p class="text-sm font-semibold" style="color:#1c1917">
+                    {{ formatFecha(contratos.mantenimiento.fecha_inicio) || '—' }}
+                  </p>
+                </div>
+                <!-- Valor anual -->
+                <div class="rounded-lg p-3.5" style="background:#fffbeb;border:1px solid #fde68a">
+                  <p class="text-xs mb-1.5 flex items-center gap-1.5" style="color:#92400e">
+                    <i class="pi pi-dollar text-xs" style="color:#f59e0b" />Valor O&amp;M Anual (BASE)
+                  </p>
+                  <p class="text-base font-bold" style="color:#d97706">
+                    {{ formatCOP(contratos.mantenimiento.tarifa_base) || '—' }}
+                  </p>
+                </div>
+                <!-- Valor mensual -->
+                <div class="rounded-lg p-3.5" style="background:#fffbeb;border:1px solid #fde68a">
+                  <p class="text-xs mb-1.5 flex items-center gap-1.5" style="color:#92400e">
+                    <i class="pi pi-calculator text-xs" style="color:#f59e0b" />Valor mensual
+                  </p>
+                  <p class="text-base font-bold" style="color:#d97706">
+                    {{ formatCOP(contratos.mantenimiento.tarifa_mensual ?? (contratos.mantenimiento.tarifa_base != null ? Math.round(contratos.mantenimiento.tarifa_base / 12) : null)) || '—' }}
+                  </p>
+                </div>
+                <!-- Enlace Drive -->
+                <div class="rounded-lg p-3.5" style="background:#fffbeb;border:1px solid #fde68a">
+                  <p class="text-xs mb-1.5 flex items-center gap-1.5" style="color:#92400e">
+                    <i class="pi pi-file-pdf text-xs" style="color:#f59e0b" />Contrato en Drive
+                  </p>
+                  <a v-if="contratos.mantenimiento.enlace_drive && contratos.mantenimiento.enlace_drive.startsWith('http')"
+                     :href="contratos.mantenimiento.enlace_drive" target="_blank" rel="noopener"
+                     class="text-sm font-semibold flex items-center gap-1.5 hover:underline" style="color:#f59e0b">
+                    <i class="pi pi-external-link text-xs" />Ver contrato
+                  </a>
+                  <button v-else @click="openMantenimientoDialog('editar')"
+                    class="text-sm font-medium flex items-center gap-1.5" style="color:#f59e0b">
+                    <i class="pi pi-plus-circle text-xs" />Agregar enlace
+                  </button>
+                </div>
               </div>
             </div>
           </template>
@@ -689,7 +741,7 @@ function openMantenimientoDialog(modo) {
     dialogMant.form.prestador_nombre   = c.prestador_nombre   || ''
     dialogMant.form.fecha_inicio       = c.fecha_inicio ? new Date(c.fecha_inicio) : null
     dialogMant.form.tarifa_base        = c.tarifa_base ?? null
-    dialogMant.form.tarifa_mensual     = c.tarifa_base != null ? Math.round(c.tarifa_base / 12) : null
+    dialogMant.form.tarifa_mensual     = c.tarifa_mensual ?? (c.tarifa_base != null ? Math.round(c.tarifa_base / 12) : null)
     dialogMant.form.enlace_drive       = c.enlace_drive || ''
     dialogMant.form.estado             = c.estado || 'vigente'
   } else {
@@ -727,6 +779,7 @@ async function saveMantenimiento() {
       prestador_nombre:   dialogMant.form.prestador_nombre.trim(),
       fecha_inicio:       toISO(dialogMant.form.fecha_inicio),
       tarifa_base:        dialogMant.form.tarifa_base,
+      tarifa_mensual:     dialogMant.form.tarifa_mensual ?? null,
       enlace_drive:       dialogMant.form.enlace_drive?.trim() || null,
       estado:             dialogMant.form.estado,
     }
