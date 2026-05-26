@@ -26,10 +26,34 @@
     <Teleport to="body">
       <div v-if="chartTooltip.visible"
         :style="{ position:'fixed', left: chartTooltip.x + 'px', top: chartTooltip.y + 'px', zIndex: 9999 }"
-        class="bg-white shadow-xl rounded-lg py-2 px-3 text-xs border border-gray-100 pointer-events-none">
-        <div class="font-semibold text-gray-800 mb-0.5 max-w-[200px] truncate">{{ chartTooltip.proy }}</div>
-        <div class="font-bold text-sm text-gray-900">{{ fmt(chartTooltip.val) }}</div>
-        <div class="text-gray-400 text-[10px] mt-0.5">{{ chartTooltip.mes }}</div>
+        class="bg-white shadow-xl rounded-lg py-2 px-3 text-xs border border-gray-100 pointer-events-none min-w-[168px]">
+        <div class="font-semibold text-gray-800 mb-1.5">{{ chartTooltip.mes }}</div>
+        <div class="flex flex-col gap-1">
+          <div class="flex items-center justify-between gap-3">
+            <div class="flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-sm shrink-0" style="background:#22c55e"></span>
+              <span class="text-gray-500">Ingreso</span>
+            </div>
+            <span class="font-mono font-semibold text-gray-900">{{ fmtCompact(chartTooltip.bruto) }}</span>
+          </div>
+          <div class="flex items-center justify-between gap-3">
+            <div class="flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-sm shrink-0" style="background:#ef4444"></span>
+              <span class="text-gray-500">Costos</span>
+            </div>
+            <span class="font-mono font-semibold text-gray-900">{{ fmtCompact(chartTooltip.costos) }}</span>
+          </div>
+          <div class="flex items-center justify-between gap-3">
+            <div class="flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-sm shrink-0" style="background:#915BD8"></span>
+              <span class="text-gray-500">Neto</span>
+            </div>
+            <span class="font-mono font-semibold"
+              :style="chartTooltip.neto >= 0 ? 'color:#22c55e' : 'color:#ef4444'">
+              {{ fmtCompact(chartTooltip.neto) }}
+            </span>
+          </div>
+        </div>
       </div>
     </Teleport>
 
@@ -42,7 +66,7 @@
 
       <div v-for="cliente in vista" :key="cliente.cliente_id">
 
-        <!-- ── Nivel 1: Inversionista ── FIX 3: bg-gray-900 ── -->
+        <!-- Nivel 1: Inversionista -->
         <div class="flex items-center gap-2 px-4 py-2.5 cursor-pointer select-none bg-gray-900"
           @click="toggleCliente(cliente.cliente_id)">
           <i :class="expandidosCliente[cliente.cliente_id] ? 'pi pi-chevron-down' : 'pi pi-chevron-right'"
@@ -58,54 +82,51 @@
 
         <template v-if="expandidosCliente[cliente.cliente_id]">
 
-          <!-- ─── Panel resumen financiero ──────────────────────────────── -->
+          <!-- Panel resumen financiero -->
           <div class="bg-white rounded-xl shadow-sm p-4 mx-3 my-2">
 
-            <!-- FIX 3: 4 KPI cards -->
+            <!-- 4 KPI cards -->
             <div class="flex gap-3 mb-5 flex-wrap">
-              <!-- Ingresos totales -->
               <div class="flex-1 min-w-[140px] bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
                 <div class="flex items-start justify-between mb-2">
-                  <span class="text-xs font-medium text-gray-400 uppercase tracking-wide">Ingresos totales</span>
+                  <span class="text-xs font-medium text-gray-400 uppercase tracking-wide">Ingreso Bruto</span>
                   <i class="pi pi-trending-up text-gray-300 text-[11px]" />
                 </div>
                 <div class="text-xl font-bold text-gray-900">
-                  {{ fmtCompact(resumenMap[cliente.cliente_id].ingresosTotales) }}
+                  {{ fmtCompact(resumenMap[cliente.cliente_id].ingresoBruto) }}
                 </div>
               </div>
-              <!-- Promedio mensual -->
               <div class="flex-1 min-w-[140px] bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
                 <div class="flex items-start justify-between mb-2">
-                  <span class="text-xs font-medium text-gray-400 uppercase tracking-wide">Promedio mensual</span>
-                  <i class="pi pi-chart-line text-gray-300 text-[11px]" />
+                  <span class="text-xs font-medium text-gray-400 uppercase tracking-wide">Costos Operativos</span>
+                  <i class="pi pi-minus text-gray-300 text-[11px]" />
                 </div>
                 <div class="text-xl font-bold text-gray-900">
-                  {{ fmtCompact(resumenMap[cliente.cliente_id].promedioMensual) }}
+                  {{ fmtCompact(resumenMap[cliente.cliente_id].costosOperativos) }}
                 </div>
               </div>
-              <!-- Meses activos -->
-              <div class="flex-1 min-w-[110px] bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
+              <div class="flex-1 min-w-[140px] bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
                 <div class="flex items-start justify-between mb-2">
-                  <span class="text-xs font-medium text-gray-400 uppercase tracking-wide">Meses activos</span>
-                  <i class="pi pi-calendar text-gray-300 text-[11px]" />
-                </div>
-                <div class="text-xl font-bold text-gray-900">
-                  {{ resumenMap[cliente.cliente_id].mesesActivos }}
-                </div>
-              </div>
-              <!-- Proyectos -->
-              <div class="flex-1 min-w-[110px] bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
-                <div class="flex items-start justify-between mb-2">
-                  <span class="text-xs font-medium text-gray-400 uppercase tracking-wide">Proyectos</span>
+                  <span class="text-xs font-medium text-gray-400 uppercase tracking-wide">Servicios Unergy</span>
                   <i class="pi pi-bolt text-gray-300 text-[11px]" />
                 </div>
                 <div class="text-xl font-bold text-gray-900">
-                  {{ resumenMap[cliente.cliente_id].proyectosCnt }}
+                  {{ fmtCompact(resumenMap[cliente.cliente_id].serviciosUnergy) }}
+                </div>
+              </div>
+              <div class="flex-1 min-w-[140px] bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
+                <div class="flex items-start justify-between mb-2">
+                  <span class="text-xs font-medium text-gray-400 uppercase tracking-wide">Ingreso Neto</span>
+                  <i class="pi pi-wallet text-gray-300 text-[11px]" />
+                </div>
+                <div class="text-xl font-bold"
+                  :style="resumenMap[cliente.cliente_id].ingresoNeto >= 0 ? 'color:#22c55e' : 'color:#ef4444'">
+                  {{ fmtCompact(resumenMap[cliente.cliente_id].ingresoNeto) }}
                 </div>
               </div>
             </div>
 
-            <!-- FIX 4: Gráfico h=280, FIX 2: scroll horizontal sin límite de proyectos -->
+            <!-- Gráfico: barras agrupadas por mes -->
             <div v-if="resumenMap[cliente.cliente_id].meses.length" class="overflow-x-auto mb-3">
               <svg
                 :width="resumenMap[cliente.cliente_id].svgW"
@@ -113,36 +134,35 @@
                 :viewBox="`0 0 ${resumenMap[cliente.cliente_id].svgW} 280`"
                 style="display:block"
               >
-                <!-- Y-axis gridlines -->
+                <!-- Gridlines horizontales -->
                 <line v-for="f in [0.25, 0.5, 0.75, 1]" :key="f"
                   x1="0" :x2="resumenMap[cliente.cliente_id].svgW"
                   :y1="8 + (1 - f) * 248" :y2="8 + (1 - f) * 248"
                   stroke="#F1F5F9" stroke-width="1" />
-                <!-- Baseline -->
+                <!-- Línea de base -->
                 <line x1="0" :x2="resumenMap[cliente.cliente_id].svgW"
-                  y1="256" y2="256" stroke="#E2E8F0" stroke-width="1.5" />
+                  :y1="resumenMap[cliente.cliente_id].baselineY"
+                  :y2="resumenMap[cliente.cliente_id].baselineY"
+                  stroke="#E2E8F0" stroke-width="1.5" />
 
-                <!-- Barras + labels de mes -->
-                <g v-for="(bar, bi) in resumenMap[cliente.cliente_id].barData" :key="bar.mes">
-                  <template v-for="seg in svgBarSegments(bar, resumenMap[cliente.cliente_id], bi)" :key="seg.proy">
-                    <!-- Segmento superior: esquinas superiores redondeadas -->
-                    <path v-if="seg.isTop"
-                      :d="roundedTopPath(seg.x, seg.y, seg.w, seg.h)"
-                      :fill="CHART_COLORS[seg.colorIdx % CHART_COLORS.length]"
-                      style="cursor:pointer"
-                      @mousemove="(e) => { chartTooltip.visible=true; chartTooltip.x=e.clientX+14; chartTooltip.y=e.clientY-80; chartTooltip.proy=seg.proy; chartTooltip.val=seg.val; chartTooltip.mes=shortMes(bar.mes) }"
-                      @mouseleave="chartTooltip.visible=false"
-                    />
-                    <!-- Segmentos intermedios/base: planos -->
-                    <rect v-else
-                      :x="seg.x" :y="seg.y" :width="seg.w" :height="seg.h"
-                      :fill="CHART_COLORS[seg.colorIdx % CHART_COLORS.length]"
-                      style="cursor:pointer"
-                      @mousemove="(e) => { chartTooltip.visible=true; chartTooltip.x=e.clientX+14; chartTooltip.y=e.clientY-80; chartTooltip.proy=seg.proy; chartTooltip.val=seg.val; chartTooltip.mes=shortMes(bar.mes) }"
-                      @mouseleave="chartTooltip.visible=false"
-                    />
+                <!-- Grupo de 3 barras por mes -->
+                <g v-for="(bar, bi) in resumenMap[cliente.cliente_id].barData" :key="bar.mes"
+                  style="cursor:pointer"
+                  @mousemove="(e) => showGroupTooltip(e, bar)"
+                  @mouseleave="chartTooltip.visible = false">
+
+                  <template v-for="(seg, si) in svgGroupedSegs(bar, resumenMap[cliente.cliente_id], bi)" :key="si">
+                    <!-- Barra positiva: esquinas redondeadas arriba -->
+                    <path v-if="seg.h > 0"
+                      :d="roundedTopPath(seg.x, seg.y, seg.w, seg.h, 2)"
+                      :fill="seg.fill" />
+                    <!-- Barra negativa: esquinas redondeadas abajo -->
+                    <path v-if="seg.hn > 0"
+                      :d="roundedBottomPath(seg.x, resumenMap[cliente.cliente_id].baselineY, seg.w, seg.hn, 2)"
+                      :fill="seg.fill" />
                   </template>
-                  <!-- Label del mes en el eje X -->
+
+                  <!-- Label eje X -->
                   <text
                     :x="svgGroupCenterX(bi, resumenMap[cliente.cliente_id])"
                     y="272"
@@ -155,18 +175,23 @@
               </svg>
             </div>
 
-            <!-- Leyenda -->
-            <div v-if="resumenMap[cliente.cliente_id].proyNames.length > 1"
-              class="flex flex-wrap gap-x-4 gap-y-1 mb-4">
-              <div v-for="(proy, i) in resumenMap[cliente.cliente_id].proyNames" :key="proy"
-                class="flex items-center gap-1.5 text-xs text-gray-500">
-                <div class="w-2.5 h-2.5 rounded-sm shrink-0"
-                  :style="{ background: CHART_COLORS[i % CHART_COLORS.length] }" />
-                <span class="truncate max-w-[160px]" :title="proy">{{ proy }}</span>
+            <!-- Leyenda fija de 3 categorías -->
+            <div class="flex flex-wrap gap-x-4 gap-y-1 mb-4">
+              <div class="flex items-center gap-1.5 text-xs text-gray-500">
+                <div class="w-2.5 h-2.5 rounded-sm shrink-0" style="background:#22c55e" />
+                <span>Ingreso Bruto</span>
+              </div>
+              <div class="flex items-center gap-1.5 text-xs text-gray-500">
+                <div class="w-2.5 h-2.5 rounded-sm shrink-0" style="background:#ef4444" />
+                <span>Costos + Servicios</span>
+              </div>
+              <div class="flex items-center gap-1.5 text-xs text-gray-500">
+                <div class="w-2.5 h-2.5 rounded-sm shrink-0" style="background:#915BD8" />
+                <span>Ingreso Neto</span>
               </div>
             </div>
 
-            <!-- Tabla colapsable -->
+            <!-- Tabla colapsable por proyecto -->
             <div>
               <button class="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 mb-2"
                 @click="toggleTabla(cliente.cliente_id)">
@@ -200,7 +225,6 @@
                         {{ fmtCompact(row.total) }}
                       </td>
                     </tr>
-                    <!-- Fila de totales -->
                     <tr class="border-t-2 border-gray-300">
                       <td class="px-2 py-1.5 font-bold text-gray-700 sticky left-0 bg-gray-50 border-r border-gray-200">TOTAL</td>
                       <td v-for="(val, mi) in resumenMap[cliente.cliente_id].totalRow.meses" :key="mi"
@@ -219,34 +243,34 @@
 
           <div v-for="proy in cliente.proyectos" :key="proy.proyecto_inversionista_id">
 
-            <!-- Nivel 2: Proyecto -->
+            <!-- Nivel 2: Proyecto (sin morado) -->
             <div class="flex items-center gap-2 py-2 px-4 cursor-pointer select-none"
-              style="background:rgba(145,91,216,0.1); border-left:3px solid #915BD8; margin-left:1rem"
+              style="background:#F8F9FA; border-left:3px solid #D1D5DB; margin-left:1rem"
               @click="toggleProy(proy.proyecto_inversionista_id)">
               <i :class="expandidosProy[proy.proyecto_inversionista_id] ? 'pi pi-chevron-down' : 'pi pi-chevron-right'"
-                class="text-[10px]" style="color:#915BD8" />
-              <span class="flex-1 text-sm font-medium" style="color:#2C2039">
+                class="text-[10px] text-gray-400" />
+              <span class="flex-1 text-sm font-medium text-gray-700">
                 {{ proy.proyecto_nombre }}
               </span>
               <span class="text-[11px] px-2 py-0.5 rounded-full font-semibold"
-                style="background:rgba(145,91,216,0.15); color:#915BD8">
+                style="background:#E5E7EB; color:#6B7280">
                 {{ pct(proy.porcentaje_participacion) }}
               </span>
               <span v-if="proy.es_patrimonio_autonomo"
                 class="text-[10px] px-1.5 py-0.5 rounded font-semibold"
-                style="background:#2C2039; color:#FDFAF7">
+                style="background:#374151; color:#F9FAFB">
                 PA
               </span>
             </div>
 
-            <!-- Nivel 3: Liquidaciones (FIX 1: valor proporcional al %) -->
+            <!-- Nivel 3: Liquidaciones -->
             <template v-if="expandidosProy[proy.proyecto_inversionista_id]">
               <div v-for="liq in proy.liquidaciones" :key="liq.liquidacion_id"
                 class="flex items-center gap-4 py-1.5 px-4 border-b text-xs"
                 style="margin-left:2rem; border-color:rgba(44,32,57,0.07); background:#FDFAF7">
                 <span class="w-20 shrink-0 text-gray-600">{{ formatPeriodo(liq.periodo) }}</span>
                 <Tag :value="liq.estado" :severity="estadoSeverity(liq.estado)" class="text-[10px] shrink-0" />
-                <span class="flex-1 text-right font-mono" style="color:#2C2039">
+                <span class="flex-1 text-right font-mono text-gray-800">
                   {{ fmt((liq.ingreso_neto_cop || 0) * (proy.porcentaje_participacion || 1)) }}
                 </span>
                 <button
@@ -359,16 +383,21 @@ function estadoSeverity(e) {
   }[e] || 'secondary'
 }
 
-// ─── Resumen financiero por cliente ──────────────────────────────────────────
+// ─── Tooltip del gráfico ──────────────────────────────────────────────────────
 
-const CHART_COLORS = [
-  '#915BD8', '#22c55e', '#f59e0b', '#3b82f6',
-  '#ef4444', '#ec4899', '#14b8a6', '#f97316',
-  '#8b5cf6', '#06b6d4', '#84cc16', '#a855f7',
-]
+const chartTooltip = ref({ visible: false, x: 0, y: 0, mes: '', bruto: 0, costos: 0, neto: 0 })
 
-// Tooltip reactivo del gráfico
-const chartTooltip = ref({ visible: false, x: 0, y: 0, proy: '', val: 0, mes: '' })
+function showGroupTooltip(e, bar) {
+  chartTooltip.value = {
+    visible: true,
+    x: e.clientX + 14,
+    y: e.clientY - 110,
+    mes:    shortMes(bar.mes),
+    bruto:  bar.bruto,
+    costos: bar.costos,
+    neto:   bar.neto,
+  }
+}
 
 function shortMes(ym) {
   const [y, m] = ym.split('-')
@@ -393,74 +422,83 @@ function toggleTabla(id) {
 }
 
 // ─── resumenMap ───────────────────────────────────────────────────────────────
-// FIX 1: usar `||` (no `??`) para que participation=0 caiga en fallback 1
-// FIX 2: sin límite de proyectos (todos incluidos, sin "Otros")
 const resumenMap = computed(() => {
   const map = {}
   for (const cliente of vista.value) {
-    const proyMap = {}   // { proyNombre: { 'YYYY-MM': valor_proporcional } }
-    const mesSet = new Set()
-    let ingresosTotales = 0
+    const proyMap  = {}  // { proyNombre: { 'YYYY-MM': ingreso_neto_proporcional } } — para tabla
+    const monthKPI = {}  // { 'YYYY-MM': { bruto, costos, facturas } } — para chart y KPIs
+    const mesSet   = new Set()
 
     for (const proy of cliente.proyectos) {
-      // FIX 1: || en lugar de ?? para que participation=0 use 1
       const ptj = proy.porcentaje_participacion || 1
       for (const liq of proy.liquidaciones) {
         const mes = liq.periodo?.substring(0, 7)
         if (!mes) continue
         mesSet.add(mes)
-        const valor = (liq.ingreso_neto_cop || 0) * ptj
+
+        // Acumular KPI financiero por mes (proporcional al %)
+        if (!monthKPI[mes]) monthKPI[mes] = { bruto: 0, costos: 0, facturas: 0 }
+        monthKPI[mes].bruto    += (liq.resumen?.total_ingresos_cop || 0) * ptj
+        monthKPI[mes].costos   += (liq.resumen?.total_costos_cop   || 0) * ptj
+        monthKPI[mes].facturas += (liq.resumen?.total_facturas_cop || 0) * ptj
+
+        // Tabla de detalle: sigue usando ingreso_neto_cop proporcional
+        const valorTabla = (liq.ingreso_neto_cop || 0) * ptj
         if (!proyMap[proy.proyecto_nombre]) proyMap[proy.proyecto_nombre] = {}
         proyMap[proy.proyecto_nombre][mes] =
-          (proyMap[proy.proyecto_nombre][mes] || 0) + valor
-        if (valor > 0) ingresosTotales += valor
+          (proyMap[proy.proyecto_nombre][mes] || 0) + valorTabla
       }
     }
 
-    const meses = [...mesSet].sort()
-    // FIX 2: todos los proyectos, sin agrupación en "Otros"
+    const meses     = [...mesSet].sort()
     const proyNames = Object.keys(proyMap)
+    const svgW      = Math.max(meses.length * 90, 500)
 
-    // Ancho SVG: 80px por mes, mínimo 500 — el wrapper tiene overflow-x-auto
-    const svgW = Math.max(meses.length * 80, 500)
+    // KPIs totales del período
+    let ingresoBruto     = 0
+    let costosOperativos = 0
+    let serviciosUnergy  = 0
+    for (const k of Object.values(monthKPI)) {
+      ingresoBruto     += k.bruto
+      costosOperativos += k.costos
+      serviciosUnergy  += k.facturas
+    }
+    const ingresoNeto = ingresoBruto - costosOperativos - serviciosUnergy
 
-    // Datos para el gráfico
-    let maxValMes = 0
+    // Datos para el gráfico agrupado (3 barras por mes)
     const barData = meses.map(mes => {
-      const segs = proyNames.map(p => ({
-        proy: p,
-        val: Math.max(0, proyMap[p]?.[mes] || 0),
-      }))
-      const total = segs.reduce((a, s) => a + s.val, 0)
-      if (total > maxValMes) maxValMes = total
-      return { mes, segs }
+      const k = monthKPI[mes] || { bruto: 0, costos: 0, facturas: 0 }
+      return {
+        mes,
+        bruto:  k.bruto,
+        costos: k.costos + k.facturas,
+        neto:   k.bruto - k.costos - k.facturas,
+      }
     })
 
-    // Filas de la tabla
+    // Escala del gráfico (neto puede ser negativo)
+    const maxVal     = Math.max(1, ...barData.map(b => Math.max(b.bruto, b.costos, b.neto)))
+    const minVal     = Math.min(0, ...barData.map(b => b.neto))
+    const totalRange = maxVal - minVal
+    const baselineY  = 8 + (maxVal / totalRange) * 248  // y=8..256
+
+    // Filas de la tabla (ingreso_neto por proyecto por mes)
     const tablaRows = proyNames.map(p => ({
       nombre: p,
-      meses: meses.map(m => proyMap[p]?.[m] ?? null),
-      total: meses.reduce((acc, m) => acc + (proyMap[p]?.[m] || 0), 0),
+      meses:  meses.map(m => proyMap[p]?.[m] ?? null),
+      total:  meses.reduce((acc, m) => acc + (proyMap[p]?.[m] || 0), 0),
     }))
 
-    // Fila de totales
     const totalRow = {
       meses: meses.map(m => proyNames.reduce((acc, p) => acc + (proyMap[p]?.[m] || 0), 0)),
-      total: ingresosTotales,
+      total: meses.reduce((s, m) => s + proyNames.reduce((a, p) => a + (proyMap[p]?.[m] || 0), 0), 0),
     }
 
     map[cliente.cliente_id] = {
-      ingresosTotales,
-      promedioMensual: mesSet.size > 0 ? ingresosTotales / mesSet.size : 0,
-      mesesActivos: mesSet.size,
-      proyectosCnt: cliente.proyectos.length,
-      meses,
-      proyNames,
-      barData,
-      maxValMes,
-      svgW,
-      tablaRows,
-      totalRow,
+      ingresoBruto, costosOperativos, serviciosUnergy, ingresoNeto,
+      meses, proyNames, barData,
+      maxVal, minVal, totalRange, baselineY,
+      svgW, tablaRows, totalRow,
     }
   }
   return map
@@ -468,45 +506,44 @@ const resumenMap = computed(() => {
 
 // ─── Helpers del gráfico SVG ──────────────────────────────────────────────────
 
-// FIX 4: CHART_H=248 (alto total 280), esquinas superiores redondeadas en el top seg
-function svgBarSegments(bar, res, bi) {
-  if (res.maxValMes <= 0) return []
-  const nMes = res.meses.length
-  const gW = res.svgW / nMes
-  const bW = Math.min(gW * 0.70, 60)
-  const gX = bi * gW + (gW - bW) / 2
-  const CHART_H = 248  // y:[8..256]
+function svgGroupedSegs(bar, res, bi) {
+  if (res.totalRange <= 0) return []
+  const nMes   = res.meses.length
+  const gW     = res.svgW / nMes
+  const barW   = Math.min(gW * 0.2, 18)
+  const gap    = Math.min(gW * 0.03, 5)
+  const totalW = 3 * barW + 2 * gap
+  const startX = bi * gW + (gW - totalW) / 2
+  const scale  = 248 / res.totalRange
 
-  let cumH = 0
-  const segs = []
-  for (let i = 0; i < bar.segs.length; i++) {
-    const v = bar.segs[i].val
-    if (v <= 0) continue
-    const h = Math.max((v / res.maxValMes) * CHART_H, 1.5)
-    segs.push({
-      val:      v,
-      proy:     bar.segs[i].proy,
-      colorIdx: i,
-      x:        gX,
-      y:        8 + CHART_H - cumH - h,
-      w:        bW,
-      h,
-      isTop:    false,
-    })
-    cumH += h
-  }
-  // Solo el segmento más alto de la barra lleva esquinas redondeadas arriba
-  if (segs.length > 0) segs[segs.length - 1].isTop = true
-  return segs
+  return [
+    { val: bar.bruto,  fill: '#22c55e' },
+    { val: bar.costos, fill: '#ef4444' },
+    { val: bar.neto,   fill: '#915BD8' },
+  ].map((c, i) => {
+    const x    = startX + i * (barW + gap)
+    const absH = Math.max(Math.abs(c.val) * scale, c.val !== 0 ? 1.5 : 0)
+    return {
+      x, w: barW, fill: c.fill,
+      y:  c.val >= 0 ? res.baselineY - absH : res.baselineY,
+      h:  c.val >= 0 ? absH : 0,
+      hn: c.val <  0 ? absH : 0,
+    }
+  })
 }
 
-// Path SVG con solo las esquinas superiores redondeadas (radius=3)
+// Rectángulo con esquinas superiores redondeadas
 function roundedTopPath(x, y, w, h, r = 3) {
   if (h <= r * 2) return `M${x} ${y} H${x + w} V${y + h} H${x} Z`
   return `M${x} ${y + r} Q${x} ${y} ${x + r} ${y} H${x + w - r} Q${x + w} ${y} ${x + w} ${y + r} V${y + h} H${x} Z`
 }
 
-// Centro X del grupo de mes para el label del eje X
+// Rectángulo con esquinas inferiores redondeadas (barras negativas hacia abajo)
+function roundedBottomPath(x, y, w, h, r = 2) {
+  if (h <= r * 2) return `M${x} ${y} H${x + w} V${y + h} H${x} Z`
+  return `M${x} ${y} H${x + w} V${y + h - r} Q${x + w} ${y + h} ${x + w - r} ${y + h} H${x + r} Q${x} ${y + h} ${x} ${y + h - r} Z`
+}
+
 function svgGroupCenterX(bi, res) {
   const gW = res.svgW / res.meses.length
   return bi * gW + gW / 2
