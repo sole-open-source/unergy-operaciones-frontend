@@ -143,7 +143,8 @@
                       <template v-for="srv in SERVICIOS_BADGES" :key="srv.key">
                         <span v-if="row[srv.key]"
                               class="srv-badge"
-                              v-tooltip.top="srv.tooltip">
+                              :class="{ 'tip': srv.tooltip }"
+                              :data-tip="srv.tooltip || undefined">
                           {{ srv.badge }}
                         </span>
                       </template>
@@ -156,9 +157,9 @@
                          class="avatar-stack"
                          :style="{ width: avatarStackWidth(Math.min(row.inversionistas.length, 4)) }">
                       <span v-for="(inv, idx) in row.inversionistas.slice(0, 3)" :key="inv.id"
-                            class="avatar-circle"
+                            class="avatar-circle tip"
                             :style="{ ...avatarColor(inv.cliente_nombre), left: (idx * 20) + 'px', zIndex: 10 - idx }"
-                            v-tooltip.top="inv.cliente_nombre">
+                            :data-tip="inv.cliente_nombre">
                         {{ getInitials(inv.cliente_nombre) }}
                       </span>
                       <span v-if="row.inversionistas.length > 3"
@@ -539,5 +540,49 @@ thead .sticky-col {
   background: #F3F4F6;
   color: #6B7280;
   font-size: 9px;
+}
+
+/* ── Tooltip CSS puro (srv-badge y avatar-circle) ────────────────────────────── */
+.tip {
+  position: relative;
+}
+/* caja oscura */
+.tip::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 7px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  background: #1a1a1a;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.4;
+  padding: 4px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 200;
+}
+/* flecha */
+.tip::before {
+  content: '';
+  position: absolute;
+  bottom: calc(100% + 1px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  border: 5px solid transparent;
+  border-top-color: #1a1a1a;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 200;
+}
+.tip:hover::after,
+.tip:hover::before {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
 }
 </style>
