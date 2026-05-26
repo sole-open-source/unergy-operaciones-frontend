@@ -195,17 +195,19 @@
               <input v-model="genBuscarProyecto" type="text" class="mon-input"
                      placeholder="Buscar y seleccionar proyecto…"
                      @focus="genDropdownOpen = true"
-                     @blur="setTimeout(() => genDropdownOpen = false, 200)" />
+                     @blur="cerrarDropdownGen" />
               <span v-if="genSeleccionados.length" class="gen-sel-count">{{ genSeleccionados.length }}</span>
             </div>
             <div v-if="genDropdownOpen && genProyectosOpciones.length" class="gen-dropdown">
-              <div v-for="p in genProyectosOpciones" :key="p.name"
+              <div v-for="p in genProyectosOpciones" :key="p.nombre_comercial"
                    class="gen-dropdown-item"
-                   :class="{ 'gen-dropdown-item--sel': genSeleccionados.includes(p.name) }"
-                   @mousedown.prevent="toggleGenProyecto(p.name)">
-                <span class="gen-check">{{ genSeleccionados.includes(p.name) ? '✓' : '' }}</span>
-                <span class="gen-dropdown-name">{{ p.name }}</span>
-                <span class="gen-dropdown-mwh">{{ p.mwh.toFixed(1) }} MWh</span>
+                   :class="{ 'gen-dropdown-item--sel': genSeleccionados.includes(p.nombre_comercial) }"
+                   @mousedown.prevent="toggleGenProyecto(p.nombre_comercial)">
+                <span class="gen-check">{{ genSeleccionados.includes(p.nombre_comercial) ? '✓' : '' }}</span>
+                <span class="gen-dropdown-name">{{ p.nombre_comercial }}</span>
+                <span v-if="genMWhProyecto(p.nombre_comercial) != null" class="gen-dropdown-mwh">
+                  {{ genMWhProyecto(p.nombre_comercial).toFixed(1) }} MWh
+                </span>
               </div>
             </div>
           </div>
@@ -954,12 +956,12 @@ const genSeleccionados = ref([])   // nombres de proyectos seleccionados
 const genBuscarProyecto = ref('')
 const genDropdownOpen  = ref(false)
 
+// Opciones del selector usan `proyectos` (disponible desde el inicio, sin esperar API generación)
 const genProyectosOpciones = computed(() => {
   const q = genBuscarProyecto.value.toLowerCase()
-  return genHistorial.value
-    .filter(h => !q || h.name.toLowerCase().includes(q))
-    .sort((a, b) => b.mwh - a.mwh)
-    .slice(0, 30)
+  return proyectos.value
+    .filter(p => !q || (p.nombre_comercial || '').toLowerCase().includes(q))
+    .slice(0, 50)
 })
 
 const genTotalMWh = computed(() =>
@@ -1014,6 +1016,11 @@ function toggleGenProyecto(name) {
   if (idx >= 0) genSeleccionados.value.splice(idx, 1)
   else genSeleccionados.value.push(name)
   genBuscarProyecto.value = ''
+  genDropdownOpen.value = false
+}
+
+function cerrarDropdownGen() {
+  setTimeout(() => { genDropdownOpen.value = false }, 200)
 }
 
 async function cambiarDias(dias) {
@@ -1321,9 +1328,12 @@ function fmtPeriodo(desde) {
 // WATCH + MOUNTED
 // ════════════════════════════════════════════════════════════
 watch(activeTab, (val) => {
-  if (val === 1 && !genHistorial.value.length) cargarGeneracion()
+  if (val === 1) {
+    if (!proyectos.value.length) cargarProyectos()   // necesario para el selector
+    if (!genHistorial.value.length) cargarGeneracion()
+  }
   if (val === 3 && !clientes.value.length) { cargarClientes(); if (!genHistorial.value.length) cargarGeneracion() }
-  if (val === 4) cargarInformes(true)   // siempre recargar al abrir tab
+  if (val === 4) cargarInformes(true)
 })
 
 onMounted(() => {
