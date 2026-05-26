@@ -108,6 +108,10 @@
       <!-- ══ SIMULACIÓN ══ -->
       <TabPanel header="Simulación">
         <div class="p-4 space-y-6">
+          <div v-if="!isEditMode && hasSimulacionData" class="flex justify-end">
+            <Button label="Descargar Excel" icon="pi pi-file-excel" size="small" outlined
+              severity="success" @click="descargarSimulacionExcel" />
+          </div>
           <div v-for="sim in SIMULACIONES" :key="sim.key">
             <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
               {{ sim.label }} <span class="normal-case font-normal">(kWh/mes)</span>
@@ -436,6 +440,7 @@ import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import Divider from 'primevue/divider'
 import { useToast } from 'primevue/usetoast'
+import * as XLSX from 'xlsx'
 import api from '@/api/client'
 import ContratoServicioWizard from '@/views/Contratos/ContratoServicioWizard.vue'
 
@@ -534,6 +539,46 @@ const SIMULACIONES = [
   { key: 'p50', label: 'P50', editArray: editP50, displayArray: p50Display },
   { key: 'p99', label: 'P99', editArray: editP99, displayArray: p99Display },
 ]
+
+const hasSimulacionData = computed(() =>
+  SIMULACIONES.some(s => s.displayArray.value.some(v => v != null))
+)
+
+function sanitizeFilename(name) {
+  return String(name || 'proyecto').replace(/[\\/:*?"<>|]+/g, '_').trim() || 'proyecto'
+}
+
+function descargarSimulacionExcel() {
+  try {
+    if (!proyecto.value) return
+    const header = ['Escenario', ...MESES, 'Total anual (kWh)']
+    const rows = SIMULACIONES.map(sim => {
+      const vals = sim.displayArray.value.map(v => (v == null ? null : Number(v)))
+      const total = vals.reduce((acc, v) => acc + (v ?? 0), 0)
+      return [sim.label, ...vals, total]
+    })
+    const aoa = [
+      [`Simulación de generación — ${proyecto.value.nombre_comercial || ''}`],
+      [`Potencia instalada: ${proyecto.value.potencia_instalada_kwp ?? '—'} kWp`],
+      [`Exportado: ${new Date().toLocaleString('es-CO')}`],
+      [],
+      header,
+      ...rows,
+    ]
+    const ws = XLSX.utils.aoa_to_sheet(aoa)
+    ws['!cols'] = [{ wch: 14 }, ...MESES.map(() => ({ wch: 10 })), { wch: 18 }]
+    if (!ws['!merges']) ws['!merges'] = []
+    ws['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: header.length - 1 } })
+
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Simulación')
+    const filename = `simulacion_${sanitizeFilename(proyecto.value.nombre_comercial)}.xlsx`
+    XLSX.writeFile(wb, filename)
+    toast.add({ severity: 'success', summary: 'Excel descargado', life: 2500 })
+  } catch (e) {
+    toast.add({ severity: 'error', summary: 'No se pudo generar el Excel', detail: e?.message, life: 4000 })
+  }
+}
 
 function parseMonthArray(val) {
   if (!val) return Array(12).fill(null)
