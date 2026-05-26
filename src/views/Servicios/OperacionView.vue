@@ -40,34 +40,90 @@
           <!-- Info card -->
           <template v-if="contratos.mantenimiento">
             <div class="rounded-xl border bg-white p-5" style="border-color:#f59e0b40">
-              <div class="flex items-center justify-between mb-5">
-                <div class="flex items-center gap-2.5">
-                  <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background:#fef3c7">
+              <!-- Header -->
+              <div class="flex items-start justify-between mb-4 gap-3">
+                <div class="flex items-center gap-2.5 flex-wrap">
+                  <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style="background:#fef3c7">
                     <i class="pi pi-wrench text-sm" style="color:#f59e0b" />
                   </div>
-                  <span class="text-sm font-semibold" style="color:#2C2039">Contrato de Mantenimiento</span>
+                  <div>
+                    <p class="text-xs text-gray-400 leading-none mb-0.5">Contrato de Mantenimiento O&amp;M</p>
+                    <span class="text-sm font-semibold" style="color:#2C2039">{{ proyectoNombre }}</span>
+                  </div>
+                </div>
+                <div class="flex items-center gap-2 flex-shrink-0">
                   <Tag :value="CONTRATO_LABELS[contratos.mantenimiento.estado]"
                        :severity="CONTRATO_SEVERITY[contratos.mantenimiento.estado]" class="text-xs" />
+                  <Button icon="pi pi-pencil" label="Editar" size="small" text severity="secondary"
+                    @click="openMantenimientoDialog('editar')" />
+                  <Button icon="pi pi-file-excel" label="Cargar desde Excel" size="small" severity="secondary" outlined
+                    @click="triggerExcelInput" />
+                  <input ref="excelInputRef" type="file" accept=".xlsx,.xls" class="hidden"
+                    @change="cargarDesdeExcel" />
                 </div>
-                <Button icon="pi pi-pencil" label="Editar" size="small" text severity="secondary"
-                  @click="openEditContrato('mantenimiento')" />
-                <Button icon="pi pi-plus" label="Nuevo contrato" size="small" outlined
-                  style="border-color:#f59e0b;color:#f59e0b"
-                  @click="openWizard('mantenimiento')" />
               </div>
-              <div class="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-5">
-                <InfoIcon icon="pi pi-user" color="#f59e0b" label="Contratante"
-                  :value="contratos.mantenimiento.contratante_nombre" />
-                <InfoIcon icon="pi pi-briefcase" color="#f59e0b" label="Prestador"
-                  :value="contratos.mantenimiento.prestador_nombre" />
-                <InfoIcon icon="pi pi-calendar" color="#f59e0b" label="Fecha de inicio O&M"
-                  :value="formatFecha(contratos.mantenimiento.fecha_inicio)" />
-                <InfoIcon icon="pi pi-dollar" color="#f59e0b" label="Valor O&M Anual (BASE)"
-                  :value="formatCOP(contratos.mantenimiento.tarifa_base)" />
-                <InfoIcon icon="pi pi-calculator" color="#f59e0b" label="Valor mensual"
-                  :value="formatCOP(contratos.mantenimiento.tarifa_base != null ? contratos.mantenimiento.tarifa_base / 12 : null)" />
-                <InfoLink color="#f59e0b" label="Enlace del contrato en Drive"
-                  :href="contratos.mantenimiento.enlace_drive" />
+              <!-- Mini-cards grid -->
+              <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+                <!-- Contratante -->
+                <div class="rounded-lg p-3.5" style="background:#fffbeb;border:1px solid #fde68a">
+                  <p class="text-xs mb-1.5 flex items-center gap-1.5" style="color:#92400e">
+                    <i class="pi pi-user text-xs" style="color:#f59e0b" />Contratante
+                  </p>
+                  <p class="text-sm font-semibold leading-snug" style="color:#1c1917">
+                    {{ contratos.mantenimiento.contratante_nombre || '—' }}
+                  </p>
+                </div>
+                <!-- Prestador -->
+                <div class="rounded-lg p-3.5" style="background:#fffbeb;border:1px solid #fde68a">
+                  <p class="text-xs mb-1.5 flex items-center gap-1.5" style="color:#92400e">
+                    <i class="pi pi-building text-xs" style="color:#f59e0b" />Prestador
+                  </p>
+                  <p class="text-sm font-semibold leading-snug" style="color:#1c1917">
+                    {{ contratos.mantenimiento.prestador_nombre || '—' }}
+                  </p>
+                </div>
+                <!-- Fecha inicio -->
+                <div class="rounded-lg p-3.5" style="background:#fffbeb;border:1px solid #fde68a">
+                  <p class="text-xs mb-1.5 flex items-center gap-1.5" style="color:#92400e">
+                    <i class="pi pi-calendar text-xs" style="color:#f59e0b" />Fecha de inicio O&amp;M
+                  </p>
+                  <p class="text-sm font-semibold" style="color:#1c1917">
+                    {{ formatFecha(contratos.mantenimiento.fecha_inicio) || '—' }}
+                  </p>
+                </div>
+                <!-- Valor anual -->
+                <div class="rounded-lg p-3.5" style="background:#fffbeb;border:1px solid #fde68a">
+                  <p class="text-xs mb-1.5 flex items-center gap-1.5" style="color:#92400e">
+                    <i class="pi pi-dollar text-xs" style="color:#f59e0b" />Valor O&amp;M Anual (BASE)
+                  </p>
+                  <p class="text-base font-bold" style="color:#d97706">
+                    {{ formatCOP(contratos.mantenimiento.tarifa_base) || '—' }}
+                  </p>
+                </div>
+                <!-- Valor mensual -->
+                <div class="rounded-lg p-3.5" style="background:#fffbeb;border:1px solid #fde68a">
+                  <p class="text-xs mb-1.5 flex items-center gap-1.5" style="color:#92400e">
+                    <i class="pi pi-calculator text-xs" style="color:#f59e0b" />Valor mensual
+                  </p>
+                  <p class="text-base font-bold" style="color:#d97706">
+                    {{ formatCOP(contratos.mantenimiento.tarifa_mensual ?? (contratos.mantenimiento.tarifa_base != null ? Math.round(contratos.mantenimiento.tarifa_base / 12) : null)) || '—' }}
+                  </p>
+                </div>
+                <!-- Enlace Drive -->
+                <div class="rounded-lg p-3.5" style="background:#fffbeb;border:1px solid #fde68a">
+                  <p class="text-xs mb-1.5 flex items-center gap-1.5" style="color:#92400e">
+                    <i class="pi pi-file-pdf text-xs" style="color:#f59e0b" />Contrato en Drive
+                  </p>
+                  <a v-if="contratos.mantenimiento.enlace_drive && contratos.mantenimiento.enlace_drive.startsWith('http')"
+                     :href="contratos.mantenimiento.enlace_drive" target="_blank" rel="noopener"
+                     class="text-sm font-semibold flex items-center gap-1.5 hover:underline" style="color:#f59e0b">
+                    <i class="pi pi-external-link text-xs" />Ver contrato
+                  </a>
+                  <button v-else @click="openMantenimientoDialog('editar')"
+                    class="text-sm font-medium flex items-center gap-1.5" style="color:#f59e0b">
+                    <i class="pi pi-plus-circle text-xs" />Agregar enlace
+                  </button>
+                </div>
               </div>
             </div>
           </template>
@@ -81,7 +137,7 @@
               <p class="text-xs text-gray-400 mb-4">Registra el contrato para iniciar el seguimiento de pagos</p>
               <Button label="Crear contrato" icon="pi pi-plus" size="small"
                 style="background:#f59e0b;border-color:#f59e0b"
-                @click="openWizard('mantenimiento')" />
+                @click="openMantenimientoDialog('crear')" />
             </div>
           </template>
 
@@ -95,6 +151,16 @@
             :filtros="filtros.mantenimiento"
             @open-pago="openNuevoPago('mantenimiento')"
             @eliminar="(id) => eliminarPago('mantenimiento', id)"
+          />
+
+          <!-- Facturas -->
+          <FacturasCobradas
+            :datos="facturasCobradas"
+            :proyecto-nombre="proyectoNombre"
+          />
+          <FacturasEmitidas
+            :datos="facturasEmitidas"
+            :proyecto-nombre="proyectoNombre"
           />
         </div>
       </TabPanel>
@@ -237,6 +303,81 @@
 
     </TabView>
 
+    <!-- ── Dialog Mantenimiento (crear / editar) ─────────────────────────────── -->
+    <Dialog v-model:visible="dialogMant.visible" modal :style="{ width: '520px' }"
+      :breakpoints="{ '560px': '95vw' }">
+      <template #header>
+        <div class="flex items-center gap-2">
+          <i class="pi pi-wrench text-sm" style="color:#f59e0b" />
+          <span class="font-semibold text-sm" style="color:#2C2039">
+            {{ dialogMant.modo === 'crear' ? 'Crear contrato de mantenimiento' : 'Editar contrato de mantenimiento' }}
+          </span>
+        </div>
+      </template>
+      <div class="space-y-4 pt-1">
+        <!-- Contratante / Prestador -->
+        <div class="grid grid-cols-2 gap-4">
+          <div class="flex flex-col gap-1">
+            <label class="text-xs font-medium text-gray-600">Contratante <span class="text-red-400">*</span></label>
+            <InputText v-model="dialogMant.form.contratante_nombre" class="w-full" placeholder="Nombre o razón social" />
+            <p v-if="dialogMant.errores.contratante_nombre" class="text-xs text-red-400">{{ dialogMant.errores.contratante_nombre }}</p>
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-xs font-medium text-gray-600">Prestador <span class="text-red-400">*</span></label>
+            <InputText v-model="dialogMant.form.prestador_nombre" class="w-full" placeholder="Nombre o razón social" />
+            <p v-if="dialogMant.errores.prestador_nombre" class="text-xs text-red-400">{{ dialogMant.errores.prestador_nombre }}</p>
+          </div>
+        </div>
+        <!-- Fecha / Estado -->
+        <div class="grid grid-cols-2 gap-4">
+          <div class="flex flex-col gap-1">
+            <label class="text-xs font-medium text-gray-600">Fecha de inicio O&amp;M <span class="text-red-400">*</span></label>
+            <DatePicker v-model="dialogMant.form.fecha_inicio" dateFormat="yy-mm-dd"
+              class="w-full" showClear placeholder="aaaa-mm-dd" />
+            <p v-if="dialogMant.errores.fecha_inicio" class="text-xs text-red-400">{{ dialogMant.errores.fecha_inicio }}</p>
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-xs font-medium text-gray-600">Estado <span class="text-red-400">*</span></label>
+            <Select v-model="dialogMant.form.estado" :options="ESTADOS_MANT"
+              optionLabel="label" optionValue="value" class="w-full" />
+            <p v-if="dialogMant.errores.estado" class="text-xs text-red-400">{{ dialogMant.errores.estado }}</p>
+          </div>
+        </div>
+        <!-- Valor anual / Valor mensual -->
+        <div class="grid grid-cols-2 gap-4">
+          <div class="flex flex-col gap-1">
+            <label class="text-xs font-medium text-gray-600">Valor O&amp;M Anual (BASE) <span class="text-red-400">*</span></label>
+            <InputNumber v-model="dialogMant.form.tarifa_base"
+              mode="currency" currency="COP" locale="es-CO" :maxFractionDigits="0"
+              class="w-full" placeholder="$ 0"
+              @update:modelValue="v => { if (v != null) dialogMant.form.tarifa_mensual = Math.round(v / 12) }" />
+            <p v-if="dialogMant.errores.tarifa_base" class="text-xs text-red-400">{{ dialogMant.errores.tarifa_base }}</p>
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-xs font-medium text-gray-600">Valor mensual <span class="text-red-400">*</span></label>
+            <InputNumber v-model="dialogMant.form.tarifa_mensual"
+              mode="currency" currency="COP" locale="es-CO" :maxFractionDigits="0"
+              class="w-full" placeholder="$ 0" />
+            <p class="text-xs text-gray-400">Sugerido: Valor Anual ÷ 12</p>
+          </div>
+        </div>
+        <!-- Enlace Drive -->
+        <div class="flex flex-col gap-1">
+          <label class="text-xs font-medium text-gray-600">Enlace del contrato en Drive</label>
+          <InputText v-model="dialogMant.form.enlace_drive" class="w-full"
+            placeholder="https://drive.google.com/…" />
+          <p v-if="dialogMant.errores.enlace_drive" class="text-xs text-red-400">{{ dialogMant.errores.enlace_drive }}</p>
+        </div>
+      </div>
+      <template #footer>
+        <Button label="Cancelar" severity="secondary" text @click="dialogMant.visible = false" />
+        <Button :label="dialogMant.modo === 'crear' ? 'Crear contrato' : 'Guardar cambios'"
+          icon="pi pi-check" :loading="guardandoMant"
+          style="background:#f59e0b;border-color:#f59e0b"
+          @click="saveMantenimiento" />
+      </template>
+    </Dialog>
+
     <!-- ── Wizard nuevo contrato ──────────────────────────────────────────────── -->
     <ContratoServicioWizard
       v-if="wizardVisible"
@@ -341,6 +482,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import * as XLSX from 'xlsx'
 import TabView from 'primevue/tabview'
 import TabPanel from 'primevue/tabpanel'
 import Tag from 'primevue/tag'
@@ -374,8 +516,14 @@ const ESTADO_PAGO_OPCIONES = [
 const ESTADO_PAGO_LABELS    = { pendiente: 'Pendiente', revisado: 'Revisado', aprobado: 'Aprobado' }
 const ESTADO_PAGO_SEVERITY  = { pendiente: 'danger', revisado: 'warn', aprobado: 'success' }
 
-const CONTRATO_LABELS   = { vigente: 'Vigente', vencido: 'Vencido', terminado: 'Terminado', en_renovacion: 'En renovación' }
-const CONTRATO_SEVERITY = { vigente: 'success', vencido: 'danger', terminado: 'secondary', en_renovacion: 'warn' }
+const CONTRATO_LABELS   = { vigente: 'Vigente', vencido: 'Vencido', terminado: 'Terminado', en_renovacion: 'En renovación', en_revision: 'En revisión' }
+const CONTRATO_SEVERITY = { vigente: 'success', vencido: 'danger', terminado: 'secondary', en_renovacion: 'warn', en_revision: 'warn' }
+
+const ESTADOS_MANT = [
+  { label: 'Vigente',     value: 'vigente' },
+  { label: 'Vencido',     value: 'vencido' },
+  { label: 'En revisión', value: 'en_revision' },
+]
 
 const TABS_TIPOS = ['mantenimiento', 'arriendo', 'internet']
 
@@ -387,6 +535,25 @@ const loading          = ref(true)
 const proyectoNombre   = ref('')
 const guardandoPago    = ref(false)
 const guardandoContrato = ref(false)
+const guardandoMant    = ref(false)
+const excelInputRef    = ref(null)
+const facturasCobradas = ref([])
+const facturasEmitidas = ref([])
+
+const dialogMant = reactive({
+  visible: false,
+  modo: 'crear',
+  form: {
+    contratante_nombre: '',
+    prestador_nombre: '',
+    fecha_inicio: null,
+    tarifa_base: null,
+    tarifa_mensual: null,
+    enlace_drive: '',
+    estado: 'vigente',
+  },
+  errores: {},
+})
 
 const contratos = reactive({ mantenimiento: null, arriendo: null, internet: null })
 const pagos     = reactive({ mantenimiento: [],   arriendo: [],   internet: [] })
@@ -564,6 +731,141 @@ async function onContratoCreado() {
   } catch { /* ignore */ }
 }
 
+// ── Mantenimiento modal (crear / editar) ──────────────────────────────────────
+function openMantenimientoDialog(modo) {
+  dialogMant.modo = modo
+  dialogMant.errores = {}
+  if (modo === 'editar' && contratos.mantenimiento) {
+    const c = contratos.mantenimiento
+    dialogMant.form.contratante_nombre = c.contratante_nombre || ''
+    dialogMant.form.prestador_nombre   = c.prestador_nombre   || ''
+    dialogMant.form.fecha_inicio       = c.fecha_inicio ? new Date(c.fecha_inicio) : null
+    dialogMant.form.tarifa_base        = c.tarifa_base ?? null
+    dialogMant.form.tarifa_mensual     = c.tarifa_mensual ?? (c.tarifa_base != null ? Math.round(c.tarifa_base / 12) : null)
+    dialogMant.form.enlace_drive       = c.enlace_drive || ''
+    dialogMant.form.estado             = c.estado || 'vigente'
+  } else {
+    dialogMant.form.contratante_nombre = ''
+    dialogMant.form.prestador_nombre   = ''
+    dialogMant.form.fecha_inicio       = null
+    dialogMant.form.tarifa_base        = null
+    dialogMant.form.tarifa_mensual     = null
+    dialogMant.form.enlace_drive       = ''
+    dialogMant.form.estado             = 'vigente'
+  }
+  dialogMant.visible = true
+}
+
+function validarFormMant() {
+  const e = {}
+  if (!dialogMant.form.contratante_nombre?.trim()) e.contratante_nombre = 'Campo requerido'
+  if (!dialogMant.form.prestador_nombre?.trim())   e.prestador_nombre   = 'Campo requerido'
+  if (!dialogMant.form.fecha_inicio)                e.fecha_inicio       = 'Campo requerido'
+  if (dialogMant.form.tarifa_base == null)          e.tarifa_base        = 'Campo requerido'
+  if (!dialogMant.form.estado)                      e.estado             = 'Campo requerido'
+  const link = dialogMant.form.enlace_drive?.trim()
+  if (link && !link.startsWith('http')) e.enlace_drive = 'Debe ser una URL válida (debe iniciar con http)'
+  dialogMant.errores = e
+  return Object.keys(e).length === 0
+}
+
+async function saveMantenimiento() {
+  if (!validarFormMant()) return
+  guardandoMant.value = true
+  try {
+    const toISO = d => d instanceof Date ? d.toISOString().slice(0, 10) : (d || null)
+    const payload = {
+      contratante_nombre: dialogMant.form.contratante_nombre.trim(),
+      prestador_nombre:   dialogMant.form.prestador_nombre.trim(),
+      fecha_inicio:       toISO(dialogMant.form.fecha_inicio),
+      tarifa_base:        dialogMant.form.tarifa_base,
+      tarifa_mensual:     dialogMant.form.tarifa_mensual ?? null,
+      enlace_drive:       dialogMant.form.enlace_drive?.trim() || null,
+      estado:             dialogMant.form.estado,
+    }
+    if (dialogMant.modo === 'crear') {
+      const proyId = route.params.id
+      payload.servicio_aplica = 'mantenimiento'
+      payload.proyecto_id     = Number(proyId)
+      await api.post('/contratos-servicio', payload)
+      const { data } = await api.get('/contratos-servicio', { params: { tipo: 'mantenimiento', proyecto_id: proyId } })
+      contratos.mantenimiento = data.length ? data[0] : null
+      await loadPagos('mantenimiento')
+    } else {
+      const { data } = await api.patch(`/contratos-servicio/${contratos.mantenimiento.id}`, payload)
+      contratos.mantenimiento = { ...contratos.mantenimiento, ...data }
+    }
+    dialogMant.visible = false
+    toast.add({ severity: 'success', summary: dialogMant.modo === 'crear' ? 'Contrato creado' : 'Contrato actualizado', life: 2500 })
+  } catch (e) {
+    toast.add({ severity: 'error', summary: 'Error', detail: e.response?.data?.detail ?? e.message, life: 4000 })
+  } finally {
+    guardandoMant.value = false
+  }
+}
+
+// ── Importación desde Excel ───────────────────────────────────────────────────
+function triggerExcelInput() {
+  excelInputRef.value?.click()
+}
+
+async function cargarDesdeExcel(event) {
+  const file = event.target.files?.[0]
+  if (!file) return
+  event.target.value = ''
+  try {
+    const buffer = await file.arrayBuffer()
+    const wb     = XLSX.read(new Uint8Array(buffer), { type: 'array', cellDates: true })
+    const ws     = wb.Sheets[wb.SheetNames[0]]
+    const rows   = XLSX.utils.sheet_to_json(ws, { defval: '' })
+
+    const proyNombre = proyectoNombre.value?.trim().toLowerCase()
+    const fila = rows.find(r => {
+      const val = r['Proyecto'] ?? r['proyecto'] ?? r['PROYECTO'] ?? ''
+      return String(val).trim().toLowerCase() === proyNombre
+    })
+
+    if (!fila) {
+      toast.add({
+        severity: 'error',
+        summary: 'Proyecto no encontrado en el Excel',
+        detail: `No se encontró "${proyectoNombre.value}" en la columna "Proyecto". Verifica el archivo e intenta de nuevo.`,
+        life: 6000,
+      })
+      return
+    }
+
+    const parseNum = v => {
+      if (v == null || v === '') return null
+      const n = typeof v === 'number' ? v : Number(String(v).replace(/[^0-9.-]/g, ''))
+      return isNaN(n) ? null : n
+    }
+
+    const parseFecha = v => {
+      if (!v) return null
+      if (v instanceof Date) return v
+      const d = new Date(v)
+      return isNaN(d.getTime()) ? null : d
+    }
+
+    dialogMant.form.contratante_nombre = String(fila['Contratante'] ?? '').trim()
+    dialogMant.form.prestador_nombre   = String(fila['Prestador'] ?? '').trim()
+    dialogMant.form.fecha_inicio       = parseFecha(fila['Fecha de inicio O&M'])
+    dialogMant.form.tarifa_base        = parseNum(fila['Valor O&M Anual (BASE)'])
+    const mensualExcel                 = parseNum(fila['Valor mensual'])
+    dialogMant.form.tarifa_mensual     = mensualExcel ?? (dialogMant.form.tarifa_base != null ? Math.round(dialogMant.form.tarifa_base / 12) : null)
+    dialogMant.form.enlace_drive       = String(fila['Enlace del contrato en Drive'] ?? '').trim()
+    dialogMant.form.estado             = contratos.mantenimiento?.estado ?? 'vigente'
+    dialogMant.errores                 = {}
+    dialogMant.modo                    = contratos.mantenimiento ? 'editar' : 'crear'
+    dialogMant.visible                 = true
+
+    toast.add({ severity: 'info', summary: 'Datos cargados desde Excel', detail: 'Revisa los datos y confirma para guardar.', life: 4000 })
+  } catch (e) {
+    toast.add({ severity: 'error', summary: 'Error al leer el Excel', detail: e.message, life: 4000 })
+  }
+}
+
 // ── Helpers de formato ────────────────────────────────────────────────────────
 function formatCOP(val) {
   if (val == null) return '—'
@@ -639,9 +941,10 @@ const InfoBadge = {
   `,
 }
 
-// Enlace a Drive con ícono clicable
+// Enlace a Drive con ícono clicable (+ botón "Agregar enlace" si editable y vacío)
 const InfoLink = {
-  props: { color: String, label: String, href: String },
+  props: { color: String, label: String, href: String, editable: Boolean },
+  emits: ['editar'],
   template: `
     <div class="flex items-start gap-2.5">
       <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"
@@ -656,7 +959,16 @@ const InfoLink = {
           <i class="pi pi-external-link text-xs" />
           Ver en Drive
         </a>
-        <span v-else class="text-sm" style="color:#9ca3af">—</span>
+        <template v-else>
+          <button v-if="editable" type="button"
+            class="text-xs font-medium inline-flex items-center gap-1 hover:underline transition-opacity"
+            style="background:none;border:none;cursor:pointer;padding:0;color:#9b89b5"
+            @click="$emit('editar')">
+            <i class="pi pi-plus-circle text-xs" />
+            Agregar enlace
+          </button>
+          <span v-else class="text-sm" style="color:#9ca3af">—</span>
+        </template>
       </div>
     </div>
   `,
@@ -785,7 +1097,220 @@ const PagosTabla = {
   `,
 }
 
+// Acordeón desplegable con animación suave
+const Acordeon = {
+  props: {
+    titulo: String,
+    icono: String,
+    color: { type: String, default: '#f59e0b' },
+    count: { type: Number, default: 0 },
+  },
+  data() {
+    return { abierto: false }
+  },
+  template: `
+    <div class="rounded-xl border bg-white overflow-hidden" style="border-color:#e5e7eb">
+      <button type="button"
+        class="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50/60 transition-colors text-left"
+        @click="abierto = !abierto">
+        <div class="flex items-center gap-2.5">
+          <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+            :style="'background:' + color + '18'">
+            <i :class="icono + ' text-xs'" :style="'color:' + color" />
+          </div>
+          <span class="text-sm font-semibold" style="color:#2C2039">{{ titulo }}</span>
+          <span class="inline-flex items-center justify-center rounded-full text-xs font-medium px-2 py-0.5 leading-none"
+            :style="'background:' + color + '15; color:' + color">{{ count }}</span>
+        </div>
+        <i class="pi pi-chevron-down text-xs text-gray-400 transition-transform duration-200"
+          :style="abierto ? 'transform:rotate(180deg)' : ''" />
+      </button>
+      <transition
+        enter-active-class="transition-opacity duration-200 ease-out"
+        enter-from-class="opacity-0"
+        enter-to-class="opacity-100"
+        leave-active-class="transition-opacity duration-150 ease-in"
+        leave-from-class="opacity-100"
+        leave-to-class="opacity-0">
+        <div v-if="abierto" class="border-t border-gray-100">
+          <slot />
+        </div>
+      </transition>
+    </div>
+  `,
+}
+
+// Acordeón 1: Facturas cobradas
+const FacturasCobradas = {
+  components: { DataTable, Column, Select, Acordeon },
+  props: {
+    datos: { type: Array, default: () => [] },
+    proyectoNombre: String,
+  },
+  data() {
+    return {
+      filtroAño: null,
+      filtroMes: null,
+      AÑOS_STATIC,
+      MESES_OPCIONES_STATIC,
+      MESES_NOMBRES_STATIC,
+    }
+  },
+  computed: {
+    datosFiltrados() {
+      let r = this.datos
+      if (this.filtroAño) r = r.filter(f => f.anio === this.filtroAño)
+      if (this.filtroMes) r = r.filter(f => f.mes === this.filtroMes)
+      return r
+    },
+    hayFiltros() { return this.filtroAño || this.filtroMes },
+  },
+  methods: {
+    limpiarFiltros() { this.filtroAño = null; this.filtroMes = null },
+    formatCOP(val) {
+      if (val == null) return '—'
+      return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(val)
+    },
+  },
+  template: `
+    <Acordeon titulo="Facturas cobradas" icono="pi pi-file-import" color="#f59e0b" :count="datos.length">
+      <div class="flex flex-wrap items-center gap-3 px-5 py-3 bg-gray-50/60 border-b border-gray-100">
+        <div class="flex items-center gap-1.5">
+          <i class="pi pi-filter text-xs text-gray-400" />
+          <span class="text-xs text-gray-400 font-medium">Filtrar por:</span>
+        </div>
+        <Select v-model="filtroAño" :options="AÑOS_STATIC" placeholder="Año"
+          showClear class="text-sm" style="height:32px;min-width:90px" />
+        <Select v-model="filtroMes" :options="MESES_OPCIONES_STATIC"
+          optionLabel="label" optionValue="value" placeholder="Mes"
+          showClear class="text-sm" style="height:32px;min-width:110px" />
+        <button v-if="hayFiltros" type="button"
+          class="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1 transition-colors"
+          @click="limpiarFiltros">
+          <i class="pi pi-times text-xs" /> Limpiar
+        </button>
+        <span v-if="hayFiltros" class="text-xs text-gray-400 ml-auto">
+          {{ datosFiltrados.length }} resultado{{ datosFiltrados.length !== 1 ? 's' : '' }}
+        </span>
+      </div>
+      <DataTable :value="datosFiltrados" stripedRows rowHover class="text-sm"
+        emptyMessage="Sin facturas cobradas registradas.">
+        <Column header="Mes" style="min-width:100px">
+          <template #body="{ data }">
+            <span class="font-medium" style="color:#2C2039">{{ MESES_NOMBRES_STATIC[data.mes] ?? data.mes }}</span>
+          </template>
+        </Column>
+        <Column field="proyecto" header="Proyecto" style="min-width:130px" />
+        <Column field="inversionista" header="Inversionista" style="min-width:130px" />
+        <Column header="Monto" style="min-width:140px">
+          <template #body="{ data }">
+            <span class="font-semibold tabular-nums" style="color:#2C2039">{{ formatCOP(data.monto) }}</span>
+          </template>
+        </Column>
+        <Column field="nroFactura" header="N° Factura" style="min-width:110px" />
+        <Column header="Soporte" style="width:80px" bodyClass="text-center">
+          <template #body="{ data }">
+            <a v-if="data.soporteUrl" :href="data.soporteUrl" target="_blank" rel="noopener noreferrer"
+              class="inline-flex items-center justify-center w-7 h-7 rounded-lg transition-colors hover:bg-amber-50"
+              style="color:#f59e0b" title="Ver soporte">
+              <i class="pi pi-file text-sm" />
+            </a>
+            <span v-else class="text-gray-300 text-sm">—</span>
+          </template>
+        </Column>
+      </DataTable>
+    </Acordeon>
+  `,
+}
+
+// Acordeón 2: Facturas emitidas
+const FacturasEmitidas = {
+  components: { DataTable, Column, Select, Acordeon },
+  props: {
+    datos: { type: Array, default: () => [] },
+    proyectoNombre: String,
+  },
+  data() {
+    return {
+      filtroAño: null,
+      filtroMes: null,
+      AÑOS_STATIC,
+      MESES_OPCIONES_STATIC,
+    }
+  },
+  computed: {
+    datosFiltrados() {
+      let r = this.datos
+      if (this.filtroAño) {
+        r = r.filter(f => {
+          const d = f.fecha ? new Date(f.fecha) : null
+          return d && d.getFullYear() === this.filtroAño
+        })
+      }
+      if (this.filtroMes) {
+        r = r.filter(f => {
+          const d = f.fecha ? new Date(f.fecha) : null
+          return d && d.getMonth() + 1 === this.filtroMes
+        })
+      }
+      return r
+    },
+    hayFiltros() { return this.filtroAño || this.filtroMes },
+  },
+  methods: {
+    limpiarFiltros() { this.filtroAño = null; this.filtroMes = null },
+    formatCOP(val) {
+      if (val == null) return '—'
+      return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(val)
+    },
+  },
+  template: `
+    <Acordeon titulo="Facturas emitidas" icono="pi pi-file-export" color="#f59e0b" :count="datos.length">
+      <div class="flex flex-wrap items-center gap-3 px-5 py-3 bg-gray-50/60 border-b border-gray-100">
+        <div class="flex items-center gap-1.5">
+          <i class="pi pi-filter text-xs text-gray-400" />
+          <span class="text-xs text-gray-400 font-medium">Filtrar por:</span>
+        </div>
+        <Select v-model="filtroAño" :options="AÑOS_STATIC" placeholder="Año"
+          showClear class="text-sm" style="height:32px;min-width:90px" />
+        <Select v-model="filtroMes" :options="MESES_OPCIONES_STATIC"
+          optionLabel="label" optionValue="value" placeholder="Mes"
+          showClear class="text-sm" style="height:32px;min-width:110px" />
+        <button v-if="hayFiltros" type="button"
+          class="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1 transition-colors"
+          @click="limpiarFiltros">
+          <i class="pi pi-times text-xs" /> Limpiar
+        </button>
+        <span v-if="hayFiltros" class="text-xs text-gray-400 ml-auto">
+          {{ datosFiltrados.length }} resultado{{ datosFiltrados.length !== 1 ? 's' : '' }}
+        </span>
+      </div>
+      <DataTable :value="datosFiltrados" stripedRows rowHover class="text-sm"
+        emptyMessage="Sin facturas emitidas registradas.">
+        <Column field="fecha" header="Fecha" style="min-width:110px" />
+        <Column field="proyecto" header="Proyecto" style="min-width:130px" />
+        <Column field="nroFactura" header="N° Factura" style="min-width:110px" />
+        <Column header="Monto" style="min-width:140px">
+          <template #body="{ data }">
+            <span class="font-semibold tabular-nums" style="color:#2C2039">{{ formatCOP(data.monto) }}</span>
+          </template>
+        </Column>
+        <Column header="Soporte" style="width:80px" bodyClass="text-center">
+          <template #body="{ data }">
+            <a v-if="data.soporteUrl" :href="data.soporteUrl" target="_blank" rel="noopener noreferrer"
+              class="inline-flex items-center justify-center w-7 h-7 rounded-lg transition-colors hover:bg-amber-50"
+              style="color:#f59e0b" title="Ver soporte">
+              <i class="pi pi-file text-sm" />
+            </a>
+            <span v-else class="text-gray-300 text-sm">—</span>
+          </template>
+        </Column>
+      </DataTable>
+    </Acordeon>
+  `,
+}
+
 export default {
-  components: { InfoIcon, InfoBadge, InfoLink, PagosTabla },
+  components: { InfoIcon, InfoBadge, InfoLink, PagosTabla, Acordeon, FacturasCobradas, FacturasEmitidas },
 }
 </script>
