@@ -433,12 +433,46 @@ const modal = reactive({
 // ── Helpers: datos estáticos ───────────────────────────────────────────────────
 /**
  * Filtra los registros estáticos de Solenium por el nombre del proyecto activo.
- * Comparación case-insensitive y con trim.
+ *
+ * Estrategia dual:
+ *  1) Coincidencia exacta (case-insensitive) — p.ej. "Minigranja Solar Gandalf"
+ *  2) Si falla, coincidencia por palabras clave — cubre el formato del DB
+ *     "MGS 0004 Valle de Gandalf" que debe mapear a "Minigranja Solar Gandalf".
+ *     Se extraen palabras significativas (≥3 chars, no números, no palabras
+ *     vacías), se busca el proyecto estático con mayor score de coincidencia.
  */
 const staticSolForProject = computed(() => {
-  const nombre = (props.proyectoNombre || '').trim().toLowerCase()
+  const nombre = (props.proyectoNombre || '').trim()
   if (!nombre) return []
-  return FACTURAS_SOL_ESTATICAS.filter(r => r.proyecto.trim().toLowerCase() === nombre)
+
+  const nombreLower = nombre.toLowerCase()
+
+  // 1. Exacta
+  const exactos = FACTURAS_SOL_ESTATICAS.filter(
+    r => r.proyecto.trim().toLowerCase() === nombreLower,
+  )
+  if (exactos.length) return exactos
+
+  // 2. Por palabras clave
+  const STOP = new Set([
+    'mgs', 'de', 'la', 'el', 'los', 'las', 'del', 'solar', 'minigranja', 'y', 'con',
+  ])
+  const keywords = nombreLower
+    .split(/\s+/)
+    .filter(w => w.length >= 3 && !STOP.has(w) && !/^\d+$/.test(w))
+  if (!keywords.length) return []
+
+  const proyectosUnicos = [...new Set(FACTURAS_SOL_ESTATICAS.map(r => r.proyecto))]
+  let mejorProyecto = null
+  let mejorScore = 0
+  for (const p of proyectosUnicos) {
+    const pLower = p.toLowerCase()
+    const score = keywords.filter(kw => pLower.includes(kw)).length
+    if (score > mejorScore) { mejorScore = score; mejorProyecto = p }
+  }
+
+  if (!mejorProyecto || mejorScore === 0) return []
+  return FACTURAS_SOL_ESTATICAS.filter(r => r.proyecto === mejorProyecto)
 })
 
 /**
@@ -489,6 +523,14 @@ async function load() {
 
 onMounted(() => { if (props.contratoId) load() })
 watch(() => props.contratoId, (id) => { if (id) load() })
+
+// Si el nombre del proyecto llega después de la carga inicial y la lista Solenium
+// sigue vacía (sin datos de API ni estáticos), rellenar con datos estáticos.
+watch(() => props.proyectoNombre, () => {
+  if (!loading.value && facturasSol.value.length === 0) {
+    facturasSol.value = staticSolForProject.value
+  }
+})
 
 // ── Modal ──────────────────────────────────────────────────────────────────────
 function abrirModal(tipo) {
