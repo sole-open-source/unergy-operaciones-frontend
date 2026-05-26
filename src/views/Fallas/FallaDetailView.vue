@@ -146,6 +146,7 @@ import Select from 'primevue/select'
 import Textarea from 'primevue/textarea'
 import ProgressSpinner from 'primevue/progressspinner'
 import FallaForm from './FallaForm.vue'
+import InfoField from '@/components/InfoField.vue'
 import api from '@/api/client'
 
 const route = useRoute()

@@ -183,15 +183,9 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import axios from 'axios'
+import api from '@/api/client'
 
 const router = useRouter()
-
-const BACKEND = 'https://backend-production-63d8.up.railway.app'
-function authHeaders() {
-  const token = localStorage.getItem('token')
-  return token ? { Authorization: `Bearer ${token}` } : {}
-}
 
 const todosLoaded  = ref([])
 const loading      = ref(false)
@@ -239,16 +233,9 @@ async function cargar() {
   loading.value = true
   error.value = null
   try {
-    const { data } = await axios.get(`${BACKEND}/api/v1/informes/`, {
-      params: { limit: 200 },
-      headers: authHeaders(),
-    })
+    const { data } = await api.get('/informes/', { params: { limit: 200 } })
     todosLoaded.value = data
   } catch (e) {
-    if (e.response?.status === 401) {
-      localStorage.removeItem('token'); localStorage.removeItem('user')
-      window.location.href = '/login'; return
-    }
     error.value = e.response?.data?.detail || e.message
   } finally {
     loading.value = false
@@ -266,7 +253,7 @@ async function eliminarInforme(inf) {
   const periodo = inf.periodo_display || inf.periodo_desde || ''
   if (!confirm(`¿Eliminar el informe "${nombre} · ${periodo}"?\n\nEsta acción no se puede deshacer.`)) return
   try {
-    await axios.delete(`${BACKEND}/api/v1/informes/${inf.id}`, { headers: authHeaders() })
+    await api.delete(`/informes/${inf.id}`)
     todosLoaded.value = todosLoaded.value.filter(i => i.id !== inf.id)
   } catch (e) {
     alert('⚠️ ' + (e.response?.data?.detail || e.message))

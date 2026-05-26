@@ -95,28 +95,9 @@
 <script setup>
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
-import axios from 'axios'
+import api from '@/api/client'
 
 const route = useRoute()
-
-// Cliente directo al backend — bypasea proxy de Vercel/Vite para evitar 404 de infraestructura
-const BACKEND = 'https://backend-production-63d8.up.railway.app'
-function authHeaders() {
-  const token = localStorage.getItem('token')
-  return {
-    'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  }
-}
-function handle401(e) {
-  if (e.response?.status === 401) {
-    localStorage.removeItem('token')
-    localStorage.removeItem('user')
-    window.location.href = '/login'
-    return true
-  }
-  return false
-}
 
 const informe    = ref(null)
 const loading    = ref(false)
@@ -135,13 +116,10 @@ async function cargar() {
   loading.value = true
   error.value   = null
   try {
-    const { data } = await axios.get(`${BACKEND}/api/v1/informes/${route.params.id}`, {
-      headers: authHeaders(),
-    })
+    const { data } = await api.get(`/informes/${route.params.id}`)
     informe.value   = data
     htmlContent.value = data.html_content || ''
   } catch (e) {
-    if (handle401(e)) return
     error.value = e.response?.data?.detail || e.message
   } finally {
     loading.value = false
@@ -164,7 +142,7 @@ async function saveEdit() {
   saving.value = true
   try {
     const newHtml = contentRef.value.innerHTML
-    const { data } = await axios.post(`${BACKEND}/api/v1/informes/`, {
+    const { data } = await api.post('/informes/', {
       tipo: informe.value.tipo,
       sub_project: informe.value.sub_project,
       periodo_desde: informe.value.periodo_desde,
@@ -172,13 +150,12 @@ async function saveEdit() {
       periodo_display: informe.value.periodo_display,
       proyecto_nombre: informe.value.proyecto_nombre,
       html_content: newHtml,
-    }, { headers: authHeaders() })
+    })
     informe.value   = { ...informe.value, ...data }
     htmlContent.value = newHtml
     editMode.value  = false
     toast('💾 Informe guardado')
   } catch (e) {
-    if (handle401(e)) return
     toast('⚠️ ' + (e.response?.data?.detail || e.message), true)
   } finally {
     saving.value = false
@@ -189,19 +166,14 @@ async function saveEdit() {
 async function changeEstado(nuevoEstado) {
   changingEstado.value = true
   try {
-    const { data } = await axios.patch(
-      `${BACKEND}/api/v1/informes/${informe.value.id}/estado`,
-      { estado: nuevoEstado },
-      { headers: authHeaders() }
+    const { data } = await api.patch(
+      `/informes/${informe.value.id}/estado`,
+      { estado: nuevoEstado }
     )
     informe.value = { ...informe.value, ...data }
     if (nuevoEstado === 'aprobado') {
       try {
-        const { data: envData } = await axios.post(
-          `${BACKEND}/api/v1/informes/${informe.value.id}/enviar`,
-          {},
-          { headers: authHeaders() }
-        )
+        const { data: envData } = await api.post(`/informes/${informe.value.id}/enviar`, {})
         toast(`✅ Aprobado y enviado a ${envData.enviado_a}`)
       } catch (err) {
         const msg = err.response?.data?.detail || ''
@@ -211,7 +183,6 @@ async function changeEstado(nuevoEstado) {
       toast(`👁 Estado: ${nuevoEstado}`)
     }
   } catch (e) {
-    if (handle401(e)) return
     toast('⚠️ ' + (e.response?.data?.detail || e.message), true)
   } finally {
     changingEstado.value = false
