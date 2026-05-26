@@ -1,7 +1,7 @@
 <template>
   <div class="space-y-4">
     <div class="flex items-center justify-between">
-      <h2 class="text-lg font-semibold" style="color:#2C2039">Liquidaciones por Inversionista</h2>
+      <h2 class="text-lg font-semibold text-gray-800">Liquidaciones por Inversionista</h2>
     </div>
 
     <!-- Filtros -->
@@ -438,9 +438,9 @@ const resumenMap = computed(() => {
 
         // Acumular KPI financiero por mes (proporcional al %)
         if (!monthKPI[mes]) monthKPI[mes] = { bruto: 0, costos: 0, facturas: 0 }
-        monthKPI[mes].bruto    += (liq.resumen?.total_ingresos_cop || 0) * ptj
-        monthKPI[mes].costos   += (liq.resumen?.total_costos_cop   || 0) * ptj
-        monthKPI[mes].facturas += (liq.resumen?.total_facturas_cop || 0) * ptj
+        monthKPI[mes].bruto    += (liq.total_ingresos_cop || 0) * ptj
+        monthKPI[mes].costos   += (liq.total_costos_cop   || 0) * ptj
+        monthKPI[mes].facturas += (liq.total_facturas_cop || 0) * ptj
 
         // Tabla de detalle: sigue usando ingreso_neto_cop proporcional
         const valorTabla = (liq.ingreso_neto_cop || 0) * ptj
