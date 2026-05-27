@@ -19,11 +19,7 @@
       </div>
     </div>
 
-  <div :class="['gf-layout', drawerVisible && 'gf-layout--split']">
-
-  <div class="gf-main space-y-4 min-w-0">
-
-    <!-- ══ BUCKETS / KPIs ═══════════════════════════════════════════════ -->
+    <!-- ══ BUCKETS / KPIs (siempre full width) ══════════════════════════ -->
     <div class="gf-buckets grid grid-cols-2 lg:grid-cols-4 gap-3">
       <button v-for="b in BUCKETS" :key="b.key"
         class="bucket-card" :class="{ 'bucket-card--active': bucket === b.key }"
@@ -40,7 +36,7 @@
       </button>
     </div>
 
-    <!-- ══ TOOLBAR ═══════════════════════════════════════════════════════ -->
+    <!-- ══ TOOLBAR (siempre full width) ═════════════════════════════════ -->
     <div class="bg-white rounded-xl shadow-sm p-3 flex flex-wrap items-center gap-2">
       <IconField class="flex-1 min-w-[240px] max-w-md">
         <InputIcon class="pi pi-search" />
@@ -66,6 +62,10 @@
         {{ filtradas.length }} de {{ porBucket.length }}
       </div>
     </div>
+
+  <div :class="['gf-layout', drawerVisible && 'gf-layout--split']">
+
+  <div class="gf-main space-y-4 min-w-0">
 
     <!-- ══ TABLA ═══════════════════════════════════════════════════════════ -->
     <div class="bg-white rounded-xl shadow-sm overflow-hidden">
