@@ -241,8 +241,12 @@
         <!-- Body drawer -->
         <div class="gf-drawer-body">
 
-          <!-- Badges + meta -->
-          <div class="space-y-2">
+          <!-- ── HERO: identificación + descripción + badges + hechos ─── -->
+          <section class="gf-hero">
+            <!-- Descripción prominente (el "qué pasa") -->
+            <p class="gf-hero-desc">{{ drawerFalla.descripcion }}</p>
+
+            <!-- Badges (estado, prioridad, categoría) -->
             <div class="flex flex-wrap gap-1.5">
               <Tag :value="drawerFalla.estado?.etiqueta" :style="estadoPillStyle(drawerFalla.estado?.color_hex)" />
               <span class="prio-pill" :style="prioPillStyle(drawerFalla.prioridad?.codigo)">
@@ -251,120 +255,139 @@
               <Tag v-if="drawerFalla.tipo?.categoria" :value="drawerFalla.tipo.categoria.etiqueta"
                 :style="catTagStyle(drawerFalla.tipo.categoria.color_hex)" />
             </div>
-            <div class="text-xs text-gray-500 flex flex-wrap gap-x-3 gap-y-1">
-              <span v-if="drawerFalla.proyecto" class="inline-flex items-center gap-1">
-                <i class="pi pi-building" /> {{ drawerFalla.proyecto.nombre_comercial }}
-              </span>
-              <span class="inline-flex items-center gap-1">
-                <i class="pi pi-calendar" /> Identificada {{ relativeTime(drawerFalla.fecha_identificacion) }}
-              </span>
-              <span v-if="drawerFalla.registrado_por" class="inline-flex items-center gap-1">
-                <i class="pi pi-user" /> {{ drawerFalla.registrado_por.nombre }}
-              </span>
-            </div>
-          </div>
 
-          <!-- Quick actions con autosave -->
-          <div class="bg-gray-50 rounded-lg p-3 space-y-2.5">
-            <div class="flex items-center gap-2">
-              <i class="pi pi-bolt text-xs" style="color:#915BD8" />
-              <span class="text-xs font-semibold uppercase tracking-wide text-gray-600">Acciones rápidas</span>
-              <span v-if="savingQuick" class="ml-auto text-[10px] text-gray-400 flex items-center gap-1">
-                <i class="pi pi-spin pi-spinner text-[10px]" /> Guardando...
-              </span>
-              <span v-else-if="savedFlash" class="ml-auto text-[10px] text-emerald-600 flex items-center gap-1">
-                <i class="pi pi-check text-[10px]" /> Guardado
-              </span>
-            </div>
-            <div class="grid grid-cols-1 gap-2">
-              <div class="flex items-center gap-2">
-                <label class="qa-label">Estado</label>
-                <Select v-model="quickEdit.estado_id" :options="catalogos.estados"
-                  optionLabel="etiqueta" optionValue="id" class="flex-1"
-                  @change="autosaveQuick()" />
+            <!-- Hechos en grid compacto (todo a un vistazo) -->
+            <dl class="gf-facts">
+              <div class="gf-fact">
+                <dt class="gf-fact-label"><i class="pi pi-building" /> Proyecto</dt>
+                <dd class="gf-fact-value">{{ drawerFalla.proyecto?.nombre_comercial || '—' }}</dd>
               </div>
-              <div class="flex items-center gap-2">
-                <label class="qa-label">Prioridad</label>
-                <Select v-model="quickEdit.prioridad_id" :options="catalogos.prioridades"
-                  optionLabel="etiqueta" optionValue="id" class="flex-1"
-                  @change="autosaveQuick()" />
+              <div class="gf-fact">
+                <dt class="gf-fact-label"><i class="pi pi-user" /> Asignado</dt>
+                <dd class="gf-fact-value">
+                  <div v-if="drawerFalla.asignado_a" class="flex items-center gap-1.5">
+                    <div class="avatar-xs" :style="avatarStyle(drawerFalla.asignado_a)">{{ initials(drawerFalla.asignado_a.nombre) }}</div>
+                    <span>{{ drawerFalla.asignado_a.nombre }}</span>
+                  </div>
+                  <span v-else class="text-gray-500">Sin asignar</span>
+                </dd>
               </div>
-              <div class="flex items-center gap-2">
-                <label class="qa-label">Asignado</label>
-                <Select v-model="quickEdit.asignado_a_id" :options="usuarios"
-                  optionLabel="nombre" optionValue="id" placeholder="Sin asignar" showClear filter
-                  class="flex-1" @change="autosaveQuick()" />
+              <div class="gf-fact">
+                <dt class="gf-fact-label"><i class="pi pi-calendar" /> Identificada</dt>
+                <dd class="gf-fact-value">{{ fmtFecha(drawerFalla.fecha_identificacion) }} <span class="text-gray-500">· {{ relativeTime(drawerFalla.fecha_identificacion) }}</span></dd>
               </div>
-            </div>
+              <div class="gf-fact">
+                <dt class="gf-fact-label"><i class="pi pi-user-edit" /> Registrado por</dt>
+                <dd class="gf-fact-value">{{ drawerFalla.registrado_por?.nombre || '—' }}</dd>
+              </div>
+              <div v-if="drawerFalla.fecha_resolucion" class="gf-fact">
+                <dt class="gf-fact-label"><i class="pi pi-check-circle" /> Resuelta</dt>
+                <dd class="gf-fact-value text-emerald-700 font-semibold">{{ fmtFecha(drawerFalla.fecha_resolucion?.slice?.(0,10) || drawerFalla.fecha_resolucion) }}</dd>
+              </div>
+              <div v-if="drawerFalla.energia_perdida_kwh != null" class="gf-fact">
+                <dt class="gf-fact-label"><i class="pi pi-bolt" /> Energía perdida</dt>
+                <dd class="gf-fact-value text-red-700 font-semibold">{{ Number(drawerFalla.energia_perdida_kwh).toLocaleString('es-CO') }} kWh</dd>
+              </div>
+            </dl>
+          </section>
+
+          <!-- ── EDICIÓN RÁPIDA + SLA (grid 2-col en pantallas anchas) ─── -->
+          <div class="gf-twocol">
+            <!-- Quick actions con autosave -->
+            <section class="gf-section gf-section--filled">
+              <header class="gf-section-head">
+                <i class="pi pi-bolt gf-section-icon" />
+                <h3 class="gf-section-title">Edición rápida</h3>
+                <span v-if="savingQuick" class="gf-save-flag">
+                  <i class="pi pi-spin pi-spinner" /> Guardando…
+                </span>
+                <span v-else-if="savedFlash" class="gf-save-flag gf-save-flag--ok">
+                  <i class="pi pi-check" /> Guardado
+                </span>
+              </header>
+              <div class="space-y-2">
+                <div class="gf-field-row">
+                  <label class="gf-field-label">Estado</label>
+                  <Select v-model="quickEdit.estado_id" :options="catalogos.estados"
+                    optionLabel="etiqueta" optionValue="id" class="flex-1"
+                    @change="autosaveQuick()" />
+                </div>
+                <div class="gf-field-row">
+                  <label class="gf-field-label">Prioridad</label>
+                  <Select v-model="quickEdit.prioridad_id" :options="catalogos.prioridades"
+                    optionLabel="etiqueta" optionValue="id" class="flex-1"
+                    @change="autosaveQuick()" />
+                </div>
+                <div class="gf-field-row">
+                  <label class="gf-field-label">Asignado</label>
+                  <Select v-model="quickEdit.asignado_a_id" :options="usuarios"
+                    optionLabel="nombre" optionValue="id" placeholder="Sin asignar" showClear filter
+                    class="flex-1" @change="autosaveQuick()" />
+                </div>
+              </div>
+            </section>
+
+            <!-- SLA -->
+            <section class="gf-section gf-section--filled">
+              <header class="gf-section-head">
+                <i class="pi pi-clock gf-section-icon" />
+                <h3 class="gf-section-title">SLA</h3>
+                <Tag v-if="drawerFalla.sla_limite_horas" class="ml-auto" :value="slaText(drawerFalla)" :severity="slaSeverity(drawerFalla)" />
+                <span v-else class="ml-auto text-xs text-gray-500">Sin límite</span>
+              </header>
+              <template v-if="drawerFalla.sla_limite_horas">
+                <div class="gf-sla-stat">
+                  <span class="gf-sla-num" :style="{ color: slaTextColor(drawerFalla) }">{{ horasTranscurridas(drawerFalla) }}h</span>
+                  <span class="gf-sla-of">de {{ drawerFalla.sla_limite_horas }}h</span>
+                </div>
+                <div class="bg-gray-200 rounded-full h-2 overflow-hidden mt-2">
+                  <div class="h-full rounded-full transition-all" :style="slaFillStyle(drawerFalla)" />
+                </div>
+              </template>
+              <p v-else class="text-sm text-gray-600 mt-1">Esta falla no tiene SLA configurado.</p>
+            </section>
           </div>
 
-          <!-- SLA -->
-          <div v-if="drawerFalla.sla_limite_horas">
-            <div class="flex items-center gap-2 mb-2">
-              <i class="pi pi-clock text-xs" style="color:#915BD8" />
-              <span class="text-xs font-semibold uppercase tracking-wide text-gray-600">SLA</span>
-              <Tag class="ml-auto" :value="slaText(drawerFalla)" :severity="slaSeverity(drawerFalla)" />
+          <!-- ── ACCIÓN SUGERIDA (alta visibilidad si existe) ──────────── -->
+          <aside v-if="drawerFalla.tipo?.accion_sugerida" class="gf-suggestion">
+            <div class="gf-suggestion-icon"><i class="pi pi-lightbulb" /></div>
+            <div>
+              <p class="gf-suggestion-label">Acción sugerida</p>
+              <p class="gf-suggestion-text">{{ drawerFalla.tipo.accion_sugerida }}</p>
             </div>
-            <div class="bg-gray-100 rounded-full h-2 overflow-hidden">
-              <div class="h-full rounded-full transition-all" :style="slaFillStyle(drawerFalla)" />
-            </div>
-            <div class="flex justify-between text-[11px] text-gray-500 mt-1">
-              <span>{{ horasTranscurridas(drawerFalla) }}h transcurridas</span>
-              <span>Límite: {{ drawerFalla.sla_limite_horas }}h</span>
-            </div>
-          </div>
+          </aside>
 
-          <!-- Descripción -->
-          <div>
-            <div class="flex items-center gap-2 mb-2">
-              <i class="pi pi-align-left text-xs" style="color:#915BD8" />
-              <span class="text-xs font-semibold uppercase tracking-wide text-gray-600">Descripción</span>
-            </div>
-            <p class="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{{ drawerFalla.descripcion }}</p>
-          </div>
-
-          <!-- Análisis (causa raíz / acciones correctivas) -->
-          <div v-if="drawerFalla.causa_raiz || drawerFalla.acciones_correctivas">
-            <div class="flex items-center gap-2 mb-2">
-              <i class="pi pi-search text-xs" style="color:#915BD8" />
-              <span class="text-xs font-semibold uppercase tracking-wide text-gray-600">Análisis</span>
-            </div>
-            <div class="space-y-2">
+          <!-- ── ANÁLISIS ──────────────────────────────────────────────── -->
+          <section v-if="drawerFalla.causa_raiz || drawerFalla.acciones_correctivas" class="gf-section">
+            <header class="gf-section-head">
+              <i class="pi pi-search gf-section-icon" />
+              <h3 class="gf-section-title">Análisis</h3>
+            </header>
+            <div class="space-y-3">
               <div v-if="drawerFalla.causa_raiz">
-                <p class="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">Causa raíz</p>
-                <p class="text-sm text-gray-700 whitespace-pre-line">{{ drawerFalla.causa_raiz }}</p>
+                <p class="gf-subhead">Causa raíz</p>
+                <p class="gf-body-text">{{ drawerFalla.causa_raiz }}</p>
               </div>
               <div v-if="drawerFalla.acciones_correctivas">
-                <p class="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">Acciones correctivas</p>
-                <p class="text-sm text-gray-700 whitespace-pre-line">{{ drawerFalla.acciones_correctivas }}</p>
+                <p class="gf-subhead">Acciones correctivas</p>
+                <p class="gf-body-text">{{ drawerFalla.acciones_correctivas }}</p>
               </div>
             </div>
-          </div>
+          </section>
 
-          <!-- Acción sugerida -->
-          <div v-if="drawerFalla.tipo?.accion_sugerida"
-            class="rounded-lg p-3" style="background: linear-gradient(135deg, #faf7ff 0%, #f3edff 100%); border:1px solid #e5d9ff">
-            <div class="flex items-center gap-2 mb-1.5">
-              <i class="pi pi-lightbulb text-xs" style="color:#915BD8" />
-              <span class="text-xs font-semibold uppercase tracking-wide" style="color:#4a3b6b">Acción sugerida</span>
-            </div>
-            <p class="text-sm text-gray-700">{{ drawerFalla.tipo.accion_sugerida }}</p>
-          </div>
-
-          <!-- Seguimientos -->
-          <div>
-            <div class="flex items-center gap-2 mb-2">
-              <i class="pi pi-comments text-xs" style="color:#915BD8" />
-              <span class="text-xs font-semibold uppercase tracking-wide text-gray-600">
-                Seguimientos ({{ drawerFalla.seguimientos?.length || 0 }})
-              </span>
-            </div>
+          <!-- ── SEGUIMIENTOS ──────────────────────────────────────────── -->
+          <section class="gf-section">
+            <header class="gf-section-head">
+              <i class="pi pi-comments gf-section-icon" />
+              <h3 class="gf-section-title">Seguimientos</h3>
+              <span class="gf-section-count">{{ drawerFalla.seguimientos?.length || 0 }}</span>
+            </header>
 
             <!-- Add note -->
-            <div class="bg-gray-50 rounded-lg p-2.5 space-y-2 mb-3">
+            <div class="gf-add-note">
               <Textarea v-model="nuevaNota.nota" rows="2" autoResize
-                placeholder="Agregar nota o actualización..." class="w-full text-sm" />
-              <div class="flex items-center gap-2">
+                placeholder="Agregar nota o actualización…" class="w-full" />
+              <div class="flex items-center gap-2 mt-2">
                 <Select v-model="nuevaNota.estado_id" :options="catalogos.estados"
                   optionLabel="etiqueta" optionValue="id" placeholder="Cambiar estado (opcional)"
                   showClear class="flex-1" />
@@ -375,27 +398,27 @@
             </div>
 
             <!-- Timeline -->
-            <div v-if="sortedSeguimientos.length" class="space-y-2">
+            <div v-if="sortedSeguimientos.length" class="space-y-3 mt-3">
               <div v-for="seg in sortedSeguimientos" :key="seg.id" class="flex gap-2.5">
-                <div class="avatar-sm flex-shrink-0" :style="avatarStyle(seg.usuario)">
+                <div class="avatar-md flex-shrink-0" :style="avatarStyle(seg.usuario)">
                   {{ initials(seg.usuario?.nombre) }}
                 </div>
                 <div class="flex-1 min-w-0">
-                  <div class="flex items-center gap-2 mb-0.5">
-                    <span class="text-xs font-semibold text-gray-800">{{ seg.usuario?.nombre || 'Sistema' }}</span>
-                    <span class="text-[10px] text-gray-400">{{ relativeTime(seg.created_at, true) }}</span>
+                  <div class="flex items-center gap-2 mb-0.5 flex-wrap">
+                    <span class="gf-body-text font-semibold">{{ seg.usuario?.nombre || 'Sistema' }}</span>
+                    <span class="text-xs text-gray-500">{{ relativeTime(seg.created_at, true) }}</span>
                   </div>
-                  <p v-if="seg.nota" class="text-sm text-gray-700 whitespace-pre-line">{{ seg.nota }}</p>
-                  <div v-if="seg.estado_nuevo" class="mt-1">
-                    <Tag :value="seg.estado_nuevo?.etiqueta" :style="estadoPillStyle(seg.estado_nuevo?.color_hex)" class="text-[10px]" />
+                  <p v-if="seg.nota" class="gf-body-text whitespace-pre-line">{{ seg.nota }}</p>
+                  <div v-if="seg.estado_nuevo" class="mt-1.5">
+                    <Tag :value="seg.estado_nuevo?.etiqueta" :style="estadoPillStyle(seg.estado_nuevo?.color_hex)" />
                   </div>
                 </div>
               </div>
             </div>
-            <p v-else class="text-xs text-gray-400">Aún no hay seguimientos.</p>
-          </div>
+            <p v-else class="text-sm text-gray-500 mt-3">Aún no hay seguimientos registrados.</p>
+          </section>
 
-          <!-- Acciones principales (al final del scroll del panel) -->
+          <!-- ── ACCIONES PRINCIPALES (final del scroll) ───────────────── -->
           <div class="gf-actions-inline">
             <Button label="Editar completa" icon="pi pi-pencil" outlined class="flex-1"
               @click="editarDesdeDrawer" />
@@ -1336,18 +1359,229 @@ watch(bucket, (newBucket) => {
   flex: 1;
   /* SIN overflow propio: el contenido del panel scrollea con la página */
 }
+/* ── Sistema tipográfico del panel detalle ─────────────────────────────
+   Sólo 3 niveles para evitar caos:
+   - title (h3): text-sm font-bold (14px / semibold)
+   - body:      text-sm (14px / 400)
+   - meta:      text-xs gray-500 (12px / 500) — siempre AA legible
+*/
+.gf-drawer-body :deep(.p-tag) {
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 3px 8px;
+}
+
+.gf-section {
+  background: #fff;
+  border: 1px solid #ece8f4;
+  border-radius: 10px;
+  padding: 14px;
+}
+.gf-section--filled {
+  background: #faf9fc;
+  border-color: #ece8f4;
+}
+.gf-section-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.gf-section-icon {
+  color: #915BD8;
+  font-size: 13px;
+}
+.gf-section-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #2C2039;
+  margin: 0;
+}
+.gf-section-count {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 700;
+  color: #915BD8;
+  background: rgba(145, 91, 216, 0.1);
+  padding: 1px 8px;
+  border-radius: 999px;
+  min-width: 22px;
+  text-align: center;
+}
+.gf-save-flag {
+  margin-left: auto;
+  font-size: 11.5px;
+  color: #6b5a8a;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.gf-save-flag--ok { color: #047857; font-weight: 600; }
+
+.gf-subhead {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #6b5a8a;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin: 0 0 4px;
+}
+.gf-body-text {
+  font-size: 14px;
+  line-height: 1.55;
+  color: #2C2039;
+  margin: 0;
+}
+
+/* Hero — info de identificación al abrir */
+.gf-hero {
+  background: linear-gradient(180deg, #faf7ff 0%, #fff 100%);
+  border: 1px solid #e9ddff;
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.gf-hero-desc {
+  font-size: 15px;
+  line-height: 1.5;
+  color: #1f1530;
+  font-weight: 500;
+  margin: 0;
+  white-space: pre-line;
+}
+.gf-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 16px;
+  margin: 0;
+  padding-top: 10px;
+  border-top: 1px solid #e9ddff;
+}
+@media (max-width: 480px) {
+  .gf-facts { grid-template-columns: 1fr; }
+}
+.gf-fact { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.gf-fact-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #6b5a8a;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.gf-fact-label i { font-size: 11px; }
+.gf-fact-value {
+  font-size: 14px;
+  color: #2C2039;
+  font-weight: 500;
+  margin: 0;
+  word-break: break-word;
+}
+
+/* Grid 2-col para Edición rápida + SLA en pantallas anchas */
+.gf-twocol {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1fr;
+}
+@media (min-width: 640px) {
+  .gf-twocol { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+}
+
+/* Field row dentro de "Edición rápida" */
+.gf-field-row { display: flex; align-items: center; gap: 8px; }
+.gf-field-label {
+  width: 70px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #4a3b6b;
+  flex-shrink: 0;
+}
+
+/* SLA stat */
+.gf-sla-stat {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 4px;
+}
+.gf-sla-num { font-size: 28px; font-weight: 800; line-height: 1; }
+.gf-sla-of { font-size: 13px; color: #6b5a8a; font-weight: 500; }
+
+/* Avatar tamaños */
+.avatar-xs {
+  width: 18px; height: 18px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 9px; font-weight: 700;
+  flex-shrink: 0;
+}
+.avatar-md {
+  width: 32px; height: 32px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 12px; font-weight: 700;
+  flex-shrink: 0;
+}
+
+/* Sugerencia destacada */
+.gf-suggestion {
+  display: flex;
+  gap: 12px;
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border: 1px solid #fcd34d;
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+.gf-suggestion-icon {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  background: rgba(217, 119, 6, 0.18);
+  color: #92400e;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.gf-suggestion-icon i { font-size: 14px; }
+.gf-suggestion-label {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #92400e;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin: 0 0 3px;
+}
+.gf-suggestion-text {
+  font-size: 14px;
+  color: #1f1530;
+  margin: 0;
+  line-height: 1.45;
+}
+
+/* Add note */
+.gf-add-note {
+  background: #faf9fc;
+  border: 1px solid #ece8f4;
+  border-radius: 8px;
+  padding: 10px;
+}
+.gf-add-note :deep(textarea) { font-size: 14px; }
+
 /* Acciones inline al final del scroll del panel (NO sticky) */
 .gf-actions-inline {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
-  padding-top: 12px;
-  margin-top: 4px;
-  border-top: 1px solid #ece8f4;
+  padding-top: 4px;
 }
 .gf-actions-inline :deep(.p-button) {
   flex: 1 1 140px;
   min-width: 0;
+  padding-top: 9px;
+  padding-bottom: 9px;
+  font-size: 13.5px;
+  font-weight: 600;
 }
 
 /* Tabla con mismos bordes + sombra que el panel para que combinen visualmente */

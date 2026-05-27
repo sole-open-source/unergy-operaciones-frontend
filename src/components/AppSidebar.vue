@@ -236,6 +236,7 @@ const ALL_GROUPS = [
       { to: '/generacion-solar', label: 'Generación Solar', icon: 'pi pi-sun', roles: ['admin', 'operaciones', 'monitoreo'] },
       { to: '/informes', label: 'Informes', icon: 'pi pi-file-check', roles: ['admin', 'operaciones', 'monitoreo'] },
       { to: '/operaciones/gestion-fallas', label: 'Gestión de Fallas', icon: 'pi pi-wrench', roles: ['admin', 'operaciones', 'monitoreo'] },
+      { to: '/operaciones/generacion', label: 'Generación', icon: 'pi pi-chart-line', roles: ['admin', 'operaciones', 'monitoreo'] },
       { to: '/fallas', label: 'Monitoreo Fallas', icon: 'pi pi-exclamation-triangle', roles: ['admin', 'operaciones', 'monitoreo'] },
       { to: '/alertas/monitoreo', label: 'Alarmas MGS', icon: 'pi pi-bell', roles: ['admin', 'operaciones', 'monitoreo'] },
       { to: '/mem/fronteras',   label: 'Fronteras',        icon: 'pi pi-globe', roles: ['admin', 'operaciones', 'monitoreo'] },
