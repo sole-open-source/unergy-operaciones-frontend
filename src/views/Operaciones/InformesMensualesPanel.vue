@@ -90,7 +90,7 @@
 
         <!-- Acción principal -->
         <div class="im-field im-field-actions">
-          <Button label="Generar informe" icon="pi pi-cog" :loading="generando"
+          <Button label="Generar" icon="pi pi-cog" size="small" :loading="generando"
                   :disabled="!puedeGenerar" @click="generar" class="im-btn-primary" />
         </div>
       </div>
@@ -135,15 +135,19 @@
           <span class="im-result-sub">· {{ rangeLabel }}</span>
         </div>
         <div class="im-result-actions">
-          <Button label="Descartar" icon="pi pi-times" outlined severity="secondary" size="small"
-                  :disabled="guardando" @click="descartar" />
-          <Button label="Imprimir / PDF" icon="pi pi-print" outlined size="small"
-                  severity="warn" @click="imprimir" />
-          <Button :label="guardando ? 'Guardando…' : (informeIdGuardado ? 'Actualizar borrador' : 'Guardar como borrador')"
+          <Button icon="pi pi-times" outlined severity="secondary" size="small"
+                  :disabled="guardando" @click="descartar"
+                  v-tooltip.bottom="'Descartar y volver al wizard'" />
+          <Button label="PDF" icon="pi pi-print" outlined size="small"
+                  severity="warn" @click="imprimir"
+                  v-tooltip.bottom="'Imprimir o exportar a PDF'" />
+          <Button :label="guardando ? 'Guardando…' : (informeIdGuardado ? 'Actualizar' : 'Guardar')"
                   icon="pi pi-save" :loading="guardando" size="small"
-                  class="im-btn-primary" @click="guardar" />
-          <Button v-if="informeIdGuardado" label="Abrir editor" icon="pi pi-arrow-right" outlined size="small"
-                  @click="abrirEditor" />
+                  class="im-btn-primary" @click="guardar"
+                  v-tooltip.bottom="'Guardar como borrador para revisión/aprobación'" />
+          <Button v-if="informeIdGuardado" icon="pi pi-arrow-right" outlined size="small"
+                  @click="abrirEditor"
+                  v-tooltip.bottom="'Abrir en el editor (flujo de aprobación)'" />
         </div>
       </section>
 
@@ -1269,29 +1273,29 @@ watch(tipo, (t) => {
 .fade-enter-active, .fade-leave-active { transition: opacity .2s ease; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
 
-/* Toolbar */
+/* Toolbar compacto */
 .im-toolbar {
   background: #fff;
-  border-radius: 12px;
-  padding: 16px 20px 18px;
-  margin: 24px 32px 16px;
-  box-shadow: 0 1px 3px rgba(0,0,0,.06);
+  border-radius: 10px;
+  padding: 10px 14px 12px;
+  margin: 12px 16px 10px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.05);
   border: 1px solid #ECE7F2;
 }
 .im-row {
-  display: flex; flex-wrap: wrap; align-items: flex-end; gap: 14px;
+  display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px;
 }
-.im-row-top { align-items: center; margin-bottom: 14px; gap: 18px; }
+.im-row-top { align-items: center; margin-bottom: 10px; gap: 14px; }
 
 .im-segmented {
-  display: inline-flex; background: #F4F1FA; border-radius: 8px; padding: 3px; border: 1px solid #E5E2EC;
+  display: inline-flex; background: #F4F1FA; border-radius: 7px; padding: 2px; border: 1px solid #E5E2EC;
 }
-.im-segmented-lg .im-seg-btn { padding: 9px 14px; font-size: 13px; }
+.im-segmented-lg .im-seg-btn { padding: 6px 11px; font-size: 12px; }
 .im-seg-btn {
   border: none; background: transparent; color: #6B5A8A;
-  padding: 7px 12px; border-radius: 6px; font-size: 12px; font-weight: 700;
+  padding: 5px 10px; border-radius: 5px; font-size: 11px; font-weight: 700;
   cursor: pointer; transition: all .15s; font-family: inherit;
-  display: inline-flex; align-items: center; gap: 6px;
+  display: inline-flex; align-items: center; gap: 5px;
 }
 .im-seg-btn:hover { color: #2C2039; }
 .im-seg-btn--active {
@@ -1301,25 +1305,27 @@ watch(tipo, (t) => {
 .im-seg-btn--active:hover { color: #fff; }
 
 .im-tip {
-  font-size: 12px; color: #6B5A8A;
-  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11px; color: #6B5A8A;
+  display: inline-flex; align-items: center; gap: 5px;
 }
-.im-tip i { color: #915BD8; }
+.im-tip i { color: #915BD8; font-size: 11px; }
 
-.im-field { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 220px; }
-.im-field-narrow { flex: 0 0 auto; min-width: 140px; }
+.im-field { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 200px; }
+.im-field-narrow { flex: 0 0 auto; min-width: 120px; }
 .im-field-actions { flex: 0 0 auto; }
 .im-label {
-  font-size: 11px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: .5px; color: #9CA3AF;
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .4px; color: #9CA3AF;
 }
 .im-select :deep(.p-select) { width: 100%; }
+.im-select :deep(.p-select-label) { padding: 5px 10px; font-size: 12px; }
 .im-input {
-  border: 1.5px solid #E5E2EC; border-radius: 8px; padding: 7px 12px;
-  font-size: 13px; color: #2C2039; outline: none; font-family: inherit;
+  border: 1.5px solid #E5E2EC; border-radius: 6px; padding: 5px 10px;
+  font-size: 12px; color: #2C2039; outline: none; font-family: inherit;
   background: #fff;
   transition: border-color .15s;
   color-scheme: light;
+  height: 30px;
 }
 .im-input:focus { border-color: #915BD8; }
 :deep(.im-btn-primary) {
@@ -1332,15 +1338,15 @@ watch(tipo, (t) => {
   box-shadow: 0 0 0 2px rgba(145,91,216,.25) !important;
 }
 
-/* Deadline banner */
+/* Deadline banner (compacto) */
 .im-deadline {
   display: flex; align-items: center; justify-content: space-between;
-  gap: 12px; flex-wrap: wrap; padding: 10px 14px; border-radius: 10px;
-  margin: 0 0 14px; border: 1px solid;
-  font-size: 13px;
+  gap: 10px; flex-wrap: wrap; padding: 6px 12px; border-radius: 8px;
+  margin: 0 0 10px; border: 1px solid;
+  font-size: 12px;
 }
-.im-deadline-left { display: inline-flex; align-items: center; gap: 8px; color: #4B3A6E; }
-.im-deadline-right { font-weight: 800; font-size: 13px; }
+.im-deadline-left { display: inline-flex; align-items: center; gap: 6px; color: #4B3A6E; }
+.im-deadline-right { font-weight: 800; font-size: 12px; }
 .im-deadline--green  { background: #F0FDF4; border-color: #BBF7D0; }
 .im-deadline--green  .im-deadline-right { color: #16A34A; }
 .im-deadline--yellow { background: #FEFCE8; border-color: #FDE68A; }
@@ -1348,46 +1354,47 @@ watch(tipo, (t) => {
 .im-deadline--red    { background: #FEF2F2; border-color: #FECACA; }
 .im-deadline--red    .im-deadline-right { color: #DC2626; }
 
-/* Estados (loading/error/empty) */
+/* Estados (loading/error/empty) — más compactos */
 .im-empty, .im-error {
-  margin: 24px 32px;
-  background: #fff; border: 1px solid #ECE7F2; border-radius: 12px;
-  padding: 56px 32px; text-align: center;
+  margin: 16px;
+  background: #fff; border: 1px solid #ECE7F2; border-radius: 10px;
+  padding: 40px 24px; text-align: center;
   box-shadow: 0 1px 3px rgba(0,0,0,.04);
-  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
 }
-.im-error { flex-direction: row; text-align: left; padding: 18px 22px; align-items: center; }
-.im-empty-title { font-size: 16px; font-weight: 800; color: #2C2039; }
-.im-empty-sub { font-size: 13px; color: #6B5A8A; max-width: 460px; }
+.im-error { flex-direction: row; text-align: left; padding: 14px 18px; align-items: center; }
+.im-empty-title { font-size: 14px; font-weight: 800; color: #2C2039; }
+.im-empty-sub { font-size: 12px; color: #6B5A8A; max-width: 460px; }
 
-/* Result bar */
+/* Result bar (sticky-friendly y compacto) */
 .im-result-bar {
   display: flex; align-items: center; justify-content: space-between;
-  gap: 12px; flex-wrap: wrap;
-  margin: 16px 32px 0;
-  padding: 12px 18px;
-  background: #fff; border-radius: 12px;
+  gap: 10px; flex-wrap: wrap;
+  margin: 10px 16px 0;
+  padding: 7px 14px;
+  background: #fff; border-radius: 10px;
   border: 1px solid #ECE7F2;
   box-shadow: 0 1px 3px rgba(0,0,0,.04);
+  position: sticky; top: 0; z-index: 8;
 }
-.im-result-meta { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.im-result-meta { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .im-result-pill {
-  font-size: 10px; font-weight: 800; padding: 4px 10px; border-radius: 20px;
-  letter-spacing: .5px; text-transform: uppercase;
+  font-size: 9px; font-weight: 800; padding: 3px 8px; border-radius: 20px;
+  letter-spacing: .4px; text-transform: uppercase;
 }
 .im-pill-proyecto   { background: #F3F0FF; color: #6D28D9; border: 1px solid #E9D5FF; }
 .im-pill-portafolio { background: #FEF3C7; color: #92400E; border: 1px solid #FDE68A; }
 .im-pill-fmo        { background: #DBEAFE; color: #1D4ED8; border: 1px solid #BFDBFE; }
-.im-result-title { font-weight: 700; color: #1A1025; font-size: 14px; }
-.im-result-sub { color: #6B5A8A; font-size: 12px; }
-.im-result-actions { display: inline-flex; gap: 8px; flex-wrap: wrap; }
+.im-result-title { font-weight: 700; color: #1A1025; font-size: 13px; }
+.im-result-sub { color: #6B5A8A; font-size: 11px; }
+.im-result-actions { display: inline-flex; gap: 6px; flex-wrap: wrap; }
 
 /* Report frame */
 .im-report-frame {
-  margin: 16px 32px 60px;
+  margin: 10px 16px 60px;
   background: #ECE9F2;
-  border-radius: 12px;
-  padding: 22px;
+  border-radius: 10px;
+  padding: 18px;
   border: 1px solid #DAD3EA;
 }
 .im-report {

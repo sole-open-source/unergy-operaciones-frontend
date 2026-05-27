@@ -1,22 +1,18 @@
 <template>
   <div class="imv-page">
 
-    <!-- ══ Hero Header ══════════════════════════════════════════════ -->
-    <div class="imv-hero">
-      <div class="imv-hero-left">
-        <div class="imv-hero-row">
-          <div class="imv-hero-ico">
-            <i class="pi pi-file-edit" />
-          </div>
-          <div>
-            <h1 class="imv-hero-title">Informes mensuales</h1>
-            <p class="imv-hero-sub">Generación por proyecto, portafolio y FMO · equipo Operaciones Unergy</p>
-          </div>
-        </div>
+    <!-- ══ Topbar compacto (estilo Gestión de Fallas) ══════════════ -->
+    <div class="imv-topbar">
+      <div class="imv-topbar-title">
+        <i class="pi pi-file-edit text-sm" style="color:#915BD8" />
+        <h2 class="text-base font-bold text-gray-800 whitespace-nowrap">Informes Mensuales</h2>
+        <span class="hidden md:inline text-xs text-gray-500">· Generación por proyecto, portafolio y FMO</span>
       </div>
-      <div class="imv-hero-actions">
-        <RouterLink to="/informes" class="imv-link-btn" v-tooltip.bottom="'Ver informes guardados (borradores, revisados, aprobados)'">
-          <i class="pi pi-folder-open" /> Informes guardados
+      <div class="imv-topbar-actions">
+        <RouterLink to="/informes" class="imv-link-btn"
+                    v-tooltip.bottom="'Ver informes guardados (borradores, revisados, aprobados)'">
+          <i class="pi pi-folder-open" />
+          <span class="hidden sm:inline">Guardados</span>
         </RouterLink>
       </div>
     </div>
@@ -38,55 +34,45 @@ import InformesMensualesPanel from './InformesMensualesPanel.vue'
   font-family: 'Sora', system-ui, sans-serif;
 }
 
-/* Hero */
-.imv-hero {
-  background: linear-gradient(135deg, #2C2039 0%, #3d2b52 60%, #4a2d6e 100%);
-  padding: 28px 32px 24px;
+/* Topbar compacto */
+.imv-topbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+  gap: 12px;
   flex-wrap: wrap;
-  border-bottom: 1px solid rgba(145,91,216,.2);
+  padding: 6px 14px;
+  background: #fff;
+  border-bottom: 1px solid #ECE7F2;
+  box-shadow: 0 1px 3px rgba(28, 18, 50, 0.04);
+  min-height: 42px;
 }
-.imv-hero-row {
-  display: flex; align-items: center; gap: 14px;
+.imv-topbar-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
 }
-.imv-hero-ico {
-  width: 44px; height: 44px;
-  background: rgba(145,91,216,.18);
-  border: 1px solid rgba(145,91,216,.3);
-  border-radius: 12px;
-  display: flex; align-items: center; justify-content: center;
-  color: #DDD2F0; font-size: 20px;
-}
-.imv-hero-title {
-  font-size: 24px;
-  font-weight: 900;
-  color: #FDFAF7;
-  margin: 0 0 4px;
-  letter-spacing: -0.3px;
-}
-.imv-hero-sub {
-  font-size: 13px;
-  color: rgba(253,250,247,.55);
-  margin: 0;
-}
-.imv-hero-actions {
-  display: inline-flex; align-items: center; gap: 8px;
+.imv-topbar-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  flex-shrink: 0;
 }
 .imv-link-btn {
-  display: inline-flex; align-items: center; gap: 6px;
-  background: rgba(255,255,255,.12);
-  border: 1px solid rgba(255,255,255,.25);
-  border-radius: 8px;
-  padding: 8px 14px;
-  color: #FDFAF7;
-  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #F4F1FA;
+  border: 1px solid #E5E2EC;
+  border-radius: 6px;
+  padding: 5px 10px;
+  color: #6D28D9;
+  font-size: 12px;
   font-weight: 700;
   text-decoration: none;
-  transition: background .15s;
+  transition: all .15s;
 }
-.imv-link-btn:hover { background: rgba(255,255,255,.2); }
-.imv-link-btn i { font-size: 13px; }
+.imv-link-btn:hover { background: #E9DEFC; border-color: #C7A8F0; }
+.imv-link-btn i { font-size: 12px; }
 </style>
