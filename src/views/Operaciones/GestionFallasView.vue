@@ -1325,8 +1325,15 @@ watch(bucket, (newBucket) => {
     display: grid;
     grid-template-columns: minmax(230px, 290px) minmax(0, 1fr);
     gap: 16px;
-    align-items: start;
+    /* stretch (no 'start'): la columna izquierda (.gf-main) debe ocupar TODA
+       la altura de la fila (= alto del panel). Si solo midiera su contenido, el
+       sticky de la lista compacta no tendría recorrido y se iría con el scroll.
+       Con stretch, la lista compacta queda fija durante todo el scroll del panel. */
+    align-items: stretch;
   }
+  /* La columna izquierda estirada es el containing block del sticky; la lista
+     compacta se ancla arriba y el espacio sobrante queda vacío (sin afectar nada). */
+  .gf-layout--split .gf-main { align-self: stretch; }
 }
 @media (min-width: 1440px) {
   .gf-layout--split {

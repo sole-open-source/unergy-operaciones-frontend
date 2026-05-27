@@ -61,11 +61,19 @@
 
         <!-- Project multi-select -->
         <div class="gen-project-picker">
-          <MultiSelect v-model="proyectosSel" :options="proyectos" optionLabel="nombre_comercial"
+          <MultiSelect v-model="proyectosSel" :options="proyectosOpts" optionLabel="nombre_comercial"
             optionValue="id" :filter="true" :showToggleAll="false"
             display="chip" placeholder="Selecciona proyectos…"
             :maxSelectedLabels="3" :selectedItemsLabel="`{0} proyectos seleccionados`"
-            class="w-full" size="small" @change="onProyectosChange" />
+            class="w-full" size="small" @change="onProyectosChange">
+            <template #option="{ option }">
+              <div class="flex items-center justify-between gap-2 w-full">
+                <span :class="{ 'text-gray-400': !option._tieneDatos }">{{ option.nombre_comercial }}</span>
+                <span v-if="option._tieneDatos" class="text-[10px] text-emerald-600 whitespace-nowrap">hasta {{ option._hasta }}</span>
+                <span v-else class="text-[10px] text-gray-300 whitespace-nowrap">sin datos</span>
+              </div>
+            </template>
+          </MultiSelect>
         </div>
 
         <!-- Consultar (dispara la query del intervalo seleccionado) -->
@@ -74,6 +82,19 @@
           :disabled="!proyectosSel.length || !!rangoError" :loading="loading"
           @click="cargar"
           v-tooltip.bottom="!proyectosSel.length ? 'Selecciona al menos un proyecto' : (rangoError ? 'Corrige el rango de fechas' : 'Consultar generación')" />
+      </div>
+
+      <!-- Disponibilidad de datos: guía la selección y delata si la base está vacía -->
+      <div v-if="resumenCargado && !resumenError" class="gen-datahint">
+        <template v-if="proyectosConDatos">
+          <i class="pi pi-database" />
+          <span>{{ proyectosConDatos }} proyecto{{ proyectosConDatos !== 1 ? 's' : '' }} con generación · datos hasta <strong>{{ dataMaxFecha }}</strong></span>
+          <button class="gen-datahint-btn" @click="seleccionarConDatos">Seleccionar con datos</button>
+        </template>
+        <template v-else>
+          <i class="pi pi-exclamation-triangle text-amber-500" />
+          <span class="text-amber-700">No hay datos de generación cargados en la base. Revisa el sync de Solenium (no es un problema de esta vista).</span>
+        </template>
       </div>
 
     </div><!-- /sticky-header -->
@@ -308,6 +329,37 @@ const chartContainerWidth = ref(900)
 // pendiente resalta el botón Consultar cuando hay cambios sin aplicar.
 const hasQueried = ref(false)
 const pendiente = ref(false)
+
+// Resumen de disponibilidad: qué proyectos tienen generación y hasta qué fecha.
+// Sirve para (1) marcar proyectos sin datos, (2) ajustar el rango por defecto a
+// donde realmente hay datos (si el sync de Solenium va atrasado), y (3) avisar
+// claramente si la base no tiene generación cargada.
+const genResumen = ref({})        // { [proyectoId]: { dias, total, fechaInicio, fechaFin } }
+const resumenCargado = ref(false)
+const resumenError = ref(false)
+
+const proyectosConDatos = computed(() => Object.keys(genResumen.value).length)
+
+const dataMaxFecha = computed(() => {
+  let max = null
+  for (const r of Object.values(genResumen.value)) {
+    if (r.fechaFin && (!max || r.fechaFin > max)) max = r.fechaFin
+  }
+  return max // 'YYYY-MM-DD' | null
+})
+
+// Opciones del selector: proyectos CON datos primero, luego alfabético.
+const proyectosOpts = computed(() =>
+  [...proyectos.value]
+    .map(p => {
+      const r = genResumen.value[p.id]
+      return { ...p, _tieneDatos: !!r, _hasta: r?.fechaFin || null }
+    })
+    .sort((a, b) => {
+      if (a._tieneDatos !== b._tieneDatos) return a._tieneDatos ? -1 : 1
+      return (a.nombre_comercial || '').localeCompare(b.nombre_comercial || '')
+    })
+)
 
 // ── Atajos ────────────────────────────────────────────────────────────
 const atajosFecha = computed(() => {
@@ -713,10 +765,61 @@ async function cargarProyectos() {
   }
 }
 
+function parseISO(s) {
+  if (!s) return null
+  const [y, m, d] = String(s).slice(0, 10).split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
+
+// Consulta qué proyectos tienen generación (totales + rango de fechas) y, si el
+// dato más reciente es anterior a hoy, mueve el rango por defecto hasta ahí para
+// que la primera consulta no caiga en un rango vacío.
+async function cargarResumenGeneracion() {
+  try {
+    const { data } = await api.get('/generacion/resumen/por-proyecto')
+    const map = {}
+    for (const r of (Array.isArray(data) ? data : [])) {
+      if (!r.dias_con_dato) continue
+      map[r.proyecto_id] = {
+        dias: r.dias_con_dato,
+        total: Number(r.total_kwh_real || 0),
+        fechaInicio: r.fecha_inicio ? String(r.fecha_inicio).slice(0, 10) : null,
+        fechaFin: r.fecha_fin ? String(r.fecha_fin).slice(0, 10) : null,
+      }
+    }
+    genResumen.value = map
+    const maxF = dataMaxFecha.value
+    if (maxF) {
+      const maxDate = parseISO(maxF)
+      if (maxDate && maxDate < hoy) {
+        fechaHasta.value = maxDate
+        fechaDesde.value = new Date(maxDate.getTime() - 29 * 86400000)
+      }
+    }
+  } catch (e) {
+    // no crítico: la vista sigue funcionando sin el resumen
+    resumenError.value = true
+  } finally {
+    resumenCargado.value = true
+  }
+}
+
+// Selecciona los proyectos con más generación (top 10) para ver datos al toque.
+function seleccionarConDatos() {
+  const ids = Object.entries(genResumen.value)
+    .sort((a, b) => (b[1].total || 0) - (a[1].total || 0))
+    .slice(0, 10)
+    .map(([id]) => Number(id))
+  if (!ids.length) return
+  proyectosSel.value = ids
+  pendiente.value = true
+}
+
 // ── ResizeObserver para chart responsive ─────────────────────────────
 let resizeObserver
 onMounted(async () => {
   await cargarProyectos()
+  cargarResumenGeneracion()
   await nextTick()
   if (chartWrapRef.value) {
     const upd = () => { chartContainerWidth.value = chartWrapRef.value?.clientWidth || 900 }
@@ -850,6 +953,30 @@ watch(chartWrapRef, (el) => {
 /* Project picker */
 .gen-project-picker { flex: 1; min-width: 240px; }
 .gen-project-picker :deep(.p-multiselect) { width: 100%; }
+
+/* Línea de disponibilidad de datos */
+.gen-datahint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 4px 12px;
+  font-size: 11.5px;
+  color: #6b5a8a;
+}
+.gen-datahint > i { font-size: 11px; }
+.gen-datahint-btn {
+  border: 1px solid #e9ddff;
+  background: #faf5ff;
+  color: #7c3aed;
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+.gen-datahint-btn:hover { background: #f1e8ff; }
 
 /* Botón Consultar */
 .gen-consultar { flex-shrink: 0; }
