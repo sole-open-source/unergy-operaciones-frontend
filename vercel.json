@@ -13,7 +13,11 @@
       "destination": "https://backend-production-63d8.up.railway.app/monitoreo"
     },
     {
-      "source": "/((?!api/|monitoreo).*)",
+      "source": "/static/:path*",
+      "destination": "https://backend-production-63d8.up.railway.app/static/:path*"
+    },
+    {
+      "source": "/((?!api/|monitoreo|static/).*)",
       "destination": "/index.html"
     }
   ],

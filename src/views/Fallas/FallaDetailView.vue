@@ -1,362 +1,305 @@
 <template>
 
-  <!-- ══ CARGANDO ══════════════════════════════════════════════════════════ -->
-  <div v-if="loading" class="fd-center">
-    <div class="fd-spinner" />
-    <span class="fd-loading-text">Cargando falla…</span>
+  <!-- ══ CARGANDO ════════════════════════════════════════════════════════ -->
+  <div v-if="loading" class="flex flex-col items-center justify-center py-20 gap-3">
+    <ProgressSpinner style="width:40px;height:40px" />
+    <span class="text-sm text-gray-500">Cargando falla…</span>
   </div>
 
-  <!-- ══ NO ENCONTRADA ═════════════════════════════════════════════════════ -->
-  <div v-else-if="notFound" class="fd-center">
-    <div class="fd-empty-icon">⚡</div>
-    <p class="fd-empty-title">Falla no encontrada</p>
-    <p class="fd-empty-sub">El registro solicitado no existe o fue eliminado.</p>
-    <button class="fd-btn fd-btn-primary" style="margin-top:16px" @click="$router.push('/fallas')">
-      ← Volver al monitoreo
-    </button>
+  <!-- ══ NO ENCONTRADA ═══════════════════════════════════════════════════ -->
+  <div v-else-if="notFound" class="flex flex-col items-center justify-center py-20 gap-3 text-gray-500">
+    <i class="pi pi-exclamation-circle text-4xl text-red-400" />
+    <p class="text-sm font-semibold text-gray-700">Falla no encontrada</p>
+    <p class="text-xs">El registro solicitado no existe o fue eliminado.</p>
+    <Button label="Volver al monitoreo" icon="pi pi-arrow-left" outlined size="small" @click="$router.push('/fallas')" />
   </div>
 
-  <!-- ══ VISTA PRINCIPAL ═══════════════════════════════════════════════════ -->
-  <div v-else-if="falla" class="fd-page">
+  <!-- ══ VISTA PRINCIPAL ═════════════════════════════════════════════════ -->
+  <div v-else-if="falla" class="space-y-4">
 
-    <!-- ── Hero ───────────────────────────────────────────────────────────── -->
-    <div class="fd-hero">
-      <div class="fd-hero-top">
-        <button class="fd-back" @click="$router.push('/fallas')">
-          ← Monitoreo de Fallas
-        </button>
-        <div class="fd-hero-actions">
-          <button v-if="!editMode" class="fd-btn fd-btn-ghost" @click="editMode = true">
-            ✎&nbsp; Editar
-          </button>
-          <button v-else class="fd-btn fd-btn-ghost" @click="editMode = false">
-            ✕&nbsp; Cancelar edición
-          </button>
-          <button class="fd-btn fd-btn-danger-ghost" @click="confirmDelete">
-            🗑
-          </button>
+    <!-- ── Header ────────────────────────────────────────────────────── -->
+    <div class="flex items-start justify-between flex-wrap gap-3">
+      <div class="flex items-start gap-3">
+        <Button icon="pi pi-arrow-left" text rounded @click="$router.push('/fallas')" class="-ml-2 mt-1" />
+        <div>
+          <div class="flex items-center gap-2 mb-1.5">
+            <Tag :value="falla.estado?.etiqueta || '—'" :style="pillStyle(falla.estado?.color_hex)" />
+            <Tag :value="falla.prioridad?.etiqueta || '—'" :severity="prioSeverity(falla.prioridad?.codigo)" />
+            <Tag v-if="falla.tipo?.categoria" :value="falla.tipo.categoria.etiqueta"
+              :style="catTagStyle(falla.tipo.categoria.color_hex)" />
+          </div>
+          <h2 class="text-xl font-bold text-gray-800 flex items-center gap-2 flex-wrap">
+            <code class="text-base font-mono text-purple-700 bg-purple-50 px-2 py-0.5 rounded">{{ falla.codigo_interno }}</code>
+            <span class="text-gray-400 text-sm">·</span>
+            <span class="text-base font-medium text-gray-700">{{ falla.tipo?.etiqueta || '—' }}</span>
+          </h2>
+          <p class="text-sm text-gray-600 mt-1 max-w-2xl">{{ falla.descripcion }}</p>
+          <div class="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-xs text-gray-500">
+            <span v-if="falla.proyecto?.nombre_comercial" class="inline-flex items-center gap-1">
+              <i class="pi pi-building" /> {{ falla.proyecto.nombre_comercial }}
+            </span>
+            <span class="inline-flex items-center gap-1">
+              <i class="pi pi-calendar" /> Identificada el {{ fmtDate(falla.fecha_identificacion) }}
+            </span>
+            <span v-if="falla.registrado_por?.nombre" class="inline-flex items-center gap-1">
+              <i class="pi pi-user" /> Registrada por {{ falla.registrado_por.nombre }}
+            </span>
+          </div>
         </div>
       </div>
-
-      <div class="fd-hero-body">
-        <div class="fd-hero-pills">
-          <span class="fd-estado-pill" :style="pillStyle(falla.estado?.color_hex)">
-            {{ falla.estado?.etiqueta || '—' }}
-          </span>
-          <span class="fd-prio-pill" :class="'prio-' + (falla.prioridad?.nivel || 4)">
-            {{ falla.prioridad?.etiqueta || '—' }}
-          </span>
-          <span v-if="falla.tipo?.categoria" class="fd-cat-pill"
-                :style="catPillStyle(falla.tipo.categoria.color_hex)">
-            {{ falla.tipo.categoria.etiqueta }}
-          </span>
-        </div>
-
-        <div class="fd-hero-title-row">
-          <code class="fd-code">{{ falla.codigo_interno }}</code>
-          <span class="fd-dot">·</span>
-          <span class="fd-tipo-text">{{ falla.tipo?.etiqueta || '—' }}</span>
-        </div>
-
-        <p class="fd-desc">{{ falla.descripcion }}</p>
-
-        <div class="fd-hero-meta-row">
-          <span v-if="falla.proyecto?.nombre_comercial">
-            🏗 {{ falla.proyecto.nombre_comercial }}
-          </span>
-          <span>📅 Identificada el {{ fmtDate(falla.fecha_identificacion) }}</span>
-          <span v-if="falla.registrado_por?.nombre">
-            👤 Registrada por {{ falla.registrado_por.nombre }}
-          </span>
-        </div>
+      <div class="flex gap-2">
+        <Button v-if="!editMode" label="Editar" icon="pi pi-pencil" outlined size="small"
+          @click="editMode = true" />
+        <Button v-else label="Cancelar edición" icon="pi pi-times" outlined size="small"
+          severity="secondary" @click="editMode = false" />
+        <Button icon="pi pi-trash" outlined size="small" severity="danger" @click="confirmDelete"
+          v-tooltip.top="'Eliminar falla'" />
       </div>
     </div>
 
-    <!-- ── Modo edición ────────────────────────────────────────────────────── -->
-    <div v-if="editMode" class="fd-layout-single">
-      <div class="fd-card">
-        <div class="fd-section-head">
-          <span class="fd-section-icon">✎</span>
-          <span>Editar falla completa</span>
-        </div>
-        <FallaForm :initial="falla" :catalogos="catalogos" @save="onUpdate" @cancel="editMode = false" />
+    <!-- ── Modo edición ──────────────────────────────────────────────── -->
+    <div v-if="editMode" class="bg-white rounded-xl shadow-sm p-5">
+      <div class="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100">
+        <i class="pi pi-pencil text-sm" style="color:#915BD8" />
+        <h3 class="font-semibold text-sm text-gray-700">Editar falla completa</h3>
       </div>
+      <FallaForm :initial="falla" :catalogos="catalogos" @save="onUpdate" @cancel="editMode = false" />
     </div>
 
-    <!-- ── Vista normal ────────────────────────────────────────────────────── -->
-    <div v-else class="fd-layout">
+    <!-- ── Vista normal ──────────────────────────────────────────────── -->
+    <div v-else class="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
       <!-- COLUMNA PRINCIPAL -->
-      <div class="fd-main">
+      <div class="lg:col-span-2 space-y-4">
 
         <!-- Información general -->
-        <div class="fd-card">
-          <div class="fd-section-head">
-            <span class="fd-section-icon">📋</span>
-            <span>Información general</span>
+        <div class="bg-white rounded-xl shadow-sm p-5">
+          <div class="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100">
+            <i class="pi pi-info-circle text-sm" style="color:#915BD8" />
+            <h3 class="font-semibold text-sm text-gray-700">Información general</h3>
           </div>
-          <div class="fd-info-grid">
-            <div class="fd-field">
-              <div class="fd-label">Proyecto</div>
-              <div class="fd-value fd-bold">{{ falla.proyecto?.nombre_comercial || '—' }}</div>
+          <div class="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+            <InfoField label="Proyecto" :value="falla.proyecto?.nombre_comercial" highlight />
+            <InfoField label="Tipo de falla" :value="falla.tipo?.etiqueta" />
+            <InfoField label="Registrado por" :value="falla.registrado_por?.nombre" />
+            <InfoField label="Asignado a" :value="falla.asignado_a?.nombre || 'Sin asignar'" />
+            <InfoField label="Fecha ocurrencia" :value="fmtDatetime(falla.fecha_ocurrencia)" />
+            <InfoField label="Fecha identificación" :value="fmtDate(falla.fecha_identificacion)" />
+            <div v-if="falla.fecha_resolucion">
+              <p class="text-xs text-gray-400 uppercase tracking-wide">Fecha resolución</p>
+              <p class="font-semibold mt-0.5 text-emerald-600">{{ fmtDatetime(falla.fecha_resolucion) }}</p>
             </div>
-            <div class="fd-field">
-              <div class="fd-label">Tipo de falla</div>
-              <div class="fd-value">{{ falla.tipo?.etiqueta || '—' }}</div>
-            </div>
-            <div class="fd-field">
-              <div class="fd-label">Registrado por</div>
-              <div class="fd-value">{{ falla.registrado_por?.nombre || '—' }}</div>
-            </div>
-            <div class="fd-field">
-              <div class="fd-label">Asignado a</div>
-              <div class="fd-value">{{ falla.asignado_a?.nombre || 'Sin asignar' }}</div>
-            </div>
-            <div class="fd-field">
-              <div class="fd-label">Fecha ocurrencia</div>
-              <div class="fd-value">{{ fmtDatetime(falla.fecha_ocurrencia) }}</div>
-            </div>
-            <div class="fd-field">
-              <div class="fd-label">Fecha identificación</div>
-              <div class="fd-value">{{ fmtDate(falla.fecha_identificacion) }}</div>
-            </div>
-            <div v-if="falla.fecha_resolucion" class="fd-field">
-              <div class="fd-label">Fecha resolución</div>
-              <div class="fd-value" style="color:#16a34a; font-weight:600;">
-                {{ fmtDatetime(falla.fecha_resolucion) }}
-              </div>
-            </div>
-            <div v-if="falla.resolucion" class="fd-field">
-              <div class="fd-label">Tipo resolución</div>
-              <div class="fd-value">{{ falla.resolucion?.etiqueta }}</div>
-            </div>
+            <InfoField v-if="falla.resolucion" label="Tipo resolución" :value="falla.resolucion?.etiqueta" />
           </div>
         </div>
 
         <!-- SLA -->
-        <div class="fd-card fd-sla-card">
-          <div class="fd-section-head">
-            <span class="fd-section-icon">⏱</span>
-            <span>SLA</span>
-            <span class="fd-sla-badge" :class="slaBadgeClass">{{ slaTexto }}</span>
+        <div class="bg-white rounded-xl shadow-sm p-5">
+          <div class="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100">
+            <i class="pi pi-clock text-sm" style="color:#915BD8" />
+            <h3 class="font-semibold text-sm text-gray-700">SLA</h3>
+            <Tag :value="slaTexto" :severity="slaSeverity" class="ml-auto" />
           </div>
-          <div v-if="falla.sla_limite_horas" class="fd-sla-body">
-            <div class="fd-sla-row">
-              <span class="fd-label">Límite</span>
-              <span class="fd-value">{{ falla.sla_limite_horas }}h</span>
-              <span class="fd-label" style="margin-left:auto;">Transcurrido</span>
-              <span class="fd-value" :style="{ color: slaColor }">{{ horasTranscurridas }}h</span>
+          <div v-if="falla.sla_limite_horas">
+            <div class="flex items-center gap-3 text-xs mb-2">
+              <span class="text-gray-500">Límite</span>
+              <span class="font-semibold text-gray-800">{{ falla.sla_limite_horas }}h</span>
+              <span class="text-gray-500 ml-auto">Transcurrido</span>
+              <span class="font-semibold" :style="{ color: slaColor }">{{ horasTranscurridas }}h</span>
             </div>
-            <div class="fd-sla-track">
-              <div class="fd-sla-fill" :style="slaFillStyle" />
+            <div class="bg-gray-100 rounded-full h-2 overflow-hidden">
+              <div class="h-full rounded-full transition-all" :style="slaFillStyle" />
             </div>
           </div>
-          <p v-else class="fd-no-sla">Sin límite SLA configurado</p>
+          <p v-else class="text-xs text-gray-400">Sin límite SLA configurado</p>
         </div>
 
-        <!-- Causa raíz y acciones correctivas -->
-        <div v-if="falla.causa_raiz || falla.acciones_correctivas" class="fd-card">
-          <div class="fd-section-head">
-            <span class="fd-section-icon">🔍</span>
-            <span>Análisis</span>
+        <!-- Análisis -->
+        <div v-if="falla.causa_raiz || falla.acciones_correctivas" class="bg-white rounded-xl shadow-sm p-5">
+          <div class="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100">
+            <i class="pi pi-search text-sm" style="color:#915BD8" />
+            <h3 class="font-semibold text-sm text-gray-700">Análisis</h3>
           </div>
-          <div class="fd-analysis-grid">
-            <div v-if="falla.causa_raiz" class="fd-analysis-block">
-              <div class="fd-analysis-label">Causa raíz</div>
-              <p class="fd-analysis-text">{{ falla.causa_raiz }}</p>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div v-if="falla.causa_raiz">
+              <p class="text-xs text-gray-400 uppercase tracking-wide mb-1">Causa raíz</p>
+              <p class="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{{ falla.causa_raiz }}</p>
             </div>
-            <div v-if="falla.acciones_correctivas" class="fd-analysis-block">
-              <div class="fd-analysis-label">Acciones correctivas</div>
-              <p class="fd-analysis-text">{{ falla.acciones_correctivas }}</p>
+            <div v-if="falla.acciones_correctivas">
+              <p class="text-xs text-gray-400 uppercase tracking-wide mb-1">Acciones correctivas</p>
+              <p class="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{{ falla.acciones_correctivas }}</p>
             </div>
           </div>
         </div>
 
-        <!-- Adjuntos / Fotos -->
-        <div class="fd-card">
-          <div class="fd-section-head">
-            <span class="fd-section-icon">📎</span>
-            <span>Adjuntos ({{ (falla.attachments ?? falla.fotos ?? []).length }})</span>
-            <label class="fd-upload-btn" :class="{ 'fd-upload-btn--loading': uploadingFoto }">
-              <span v-if="!uploadingFoto">+ Subir</span>
-              <span v-else class="fd-mini-spinner" />
-              <input type="file" accept="image/*,.pdf,.xlsx,.docx" multiple
-                     class="fd-hidden-input" @change="uploadFotos" :disabled="uploadingFoto" />
+        <!-- Adjuntos -->
+        <div class="bg-white rounded-xl shadow-sm p-5">
+          <div class="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100">
+            <i class="pi pi-paperclip text-sm" style="color:#915BD8" />
+            <h3 class="font-semibold text-sm text-gray-700">Adjuntos ({{ adjuntos.length }})</h3>
+            <label class="ml-auto inline-flex items-center gap-1.5 text-xs font-semibold cursor-pointer px-3 py-1.5 rounded-md border transition-colors"
+              :class="uploadingFoto ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-wait'
+                                    : 'border-purple-200 text-purple-700 hover:bg-purple-50'">
+              <i v-if="uploadingFoto" class="pi pi-spin pi-spinner text-xs" />
+              <i v-else class="pi pi-plus text-xs" />
+              {{ uploadingFoto ? 'Subiendo...' : 'Subir' }}
+              <input type="file" accept="image/*,.pdf" multiple class="hidden"
+                @change="uploadFotos" :disabled="uploadingFoto" />
             </label>
           </div>
 
-          <div v-if="adjuntos.length" class="fd-fotos-grid">
-            <div v-for="a in adjuntos" :key="a.id" class="fd-foto-card">
-              <img v-if="isImage(a.url || a.archivo_url)" :src="a.url || a.archivo_url"
-                   :alt="a.nombre_archivo || a.nombre" class="fd-foto-img" />
-              <div v-else class="fd-foto-doc">
-                <span class="fd-foto-doc-icon">📄</span>
-                <span class="fd-foto-doc-name">{{ a.nombre_archivo || a.nombre || 'Archivo' }}</span>
+          <div v-if="adjuntos.length" class="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div v-for="(url, idx) in adjuntos" :key="idx"
+              class="relative group rounded-lg overflow-hidden border border-gray-100 bg-gray-50 aspect-square">
+              <img v-if="isImage(url)" :src="resolveUrl(url)" :alt="filename(url)"
+                class="w-full h-full object-cover" />
+              <div v-else class="w-full h-full flex flex-col items-center justify-center gap-2 p-3 text-gray-500">
+                <i class="pi pi-file text-3xl" />
+                <span class="text-[10px] text-center truncate w-full">{{ filename(url) }}</span>
               </div>
-              <div class="fd-foto-overlay">
-                <a :href="a.url || a.archivo_url" target="_blank" class="fd-foto-action" title="Ver">👁</a>
-                <button class="fd-foto-action fd-foto-del" @click="deleteFoto(a)" title="Eliminar">🗑</button>
+              <div class="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
+                <a :href="resolveUrl(url)" target="_blank" rel="noopener"
+                  class="w-8 h-8 rounded-full bg-white text-gray-700 flex items-center justify-center hover:bg-purple-100 hover:text-purple-700 transition-colors"
+                  v-tooltip.top="'Ver'">
+                  <i class="pi pi-eye text-xs" />
+                </a>
+                <button class="w-8 h-8 rounded-full bg-white text-red-600 flex items-center justify-center hover:bg-red-50 transition-colors"
+                  v-tooltip.top="'Eliminar'" @click="deleteFoto(url)">
+                  <i class="pi pi-trash text-xs" />
+                </button>
               </div>
             </div>
           </div>
-          <p v-else class="fd-no-content">Sin adjuntos. Sube imágenes o documentos relevantes.</p>
+          <p v-else class="text-xs text-gray-400">Sin adjuntos. Sube imágenes o documentos relevantes.</p>
         </div>
 
         <!-- Seguimientos -->
-        <div class="fd-card">
-          <div class="fd-section-head">
-            <span class="fd-section-icon">💬</span>
-            <span>Historial de seguimiento ({{ falla.seguimientos?.length || 0 }})</span>
+        <div class="bg-white rounded-xl shadow-sm p-5">
+          <div class="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100">
+            <i class="pi pi-comments text-sm" style="color:#915BD8" />
+            <h3 class="font-semibold text-sm text-gray-700">Historial de seguimiento ({{ falla.seguimientos?.length || 0 }})</h3>
           </div>
 
           <!-- Añadir nota -->
-          <div class="fd-seg-add">
-            <div class="fd-seg-add-row">
-              <div class="fd-field-col">
-                <label class="fd-label">Cambiar estado <span style="color:#c5b9db;">(opcional)</span></label>
-                <select v-model="nuevaNota.estado_id" class="fd-select">
-                  <option value="">Mantener estado actual</option>
-                  <option v-for="e in catalogos.estados" :key="e.id" :value="e.id">
-                    {{ e.etiqueta }}
-                  </option>
-                </select>
-              </div>
+          <div class="bg-gray-50 rounded-lg p-3 mb-4 space-y-3">
+            <div class="flex flex-col gap-1">
+              <label class="field-label">Cambiar estado (opcional)</label>
+              <Select v-model="nuevaNota.estado_id" :options="catalogos.estados" optionLabel="etiqueta"
+                optionValue="id" placeholder="Mantener estado actual" showClear class="w-full md:w-72" />
             </div>
-            <textarea v-model="nuevaNota.nota" class="fd-textarea"
-                      rows="2" placeholder="Escribe una actualización, novedad o nota técnica…" />
-            <div class="fd-seg-add-footer">
-              <button class="fd-btn fd-btn-primary"
-                      :disabled="!nuevaNota.nota.trim() && !nuevaNota.estado_id || addingSeg"
-                      @click="addSeguimiento">
-                <span v-if="addingSeg" class="fd-mini-spinner" />
-                <span v-else>↗ Agregar nota</span>
-              </button>
+            <Textarea v-model="nuevaNota.nota" rows="2" autoResize
+              placeholder="Escribe una actualización, novedad o nota técnica…" class="w-full text-sm" />
+            <div class="flex justify-end">
+              <Button label="Agregar nota" icon="pi pi-send" size="small"
+                :disabled="!nuevaNota.nota.trim() && !nuevaNota.estado_id"
+                :loading="addingSeg" @click="addSeguimiento" />
             </div>
           </div>
 
           <!-- Timeline -->
-          <div v-if="sortedSeguimientos.length" class="fd-timeline">
-            <div v-for="seg in sortedSeguimientos" :key="seg.id" class="fd-timeline-item">
-              <div class="fd-timeline-dot">
+          <div v-if="sortedSeguimientos.length" class="space-y-3">
+            <div v-for="seg in sortedSeguimientos" :key="seg.id" class="flex gap-3">
+              <div class="w-9 h-9 rounded-full bg-purple-600 text-white flex items-center justify-center text-xs font-bold flex-shrink-0">
                 {{ (seg.usuario?.nombre || seg.usuario_nombre || 'S')[0].toUpperCase() }}
               </div>
-              <div class="fd-timeline-body">
-                <div class="fd-timeline-header">
-                  <span class="fd-timeline-user">
-                    {{ seg.usuario?.nombre || seg.usuario_nombre || 'Sistema' }}
-                  </span>
-                  <span class="fd-timeline-time">{{ fmtDatetime(seg.created_at) }}</span>
+              <div class="flex-1 bg-gray-50 rounded-lg px-3 py-2">
+                <div class="flex items-center justify-between gap-2 mb-1">
+                  <span class="text-sm font-semibold text-gray-800">{{ seg.usuario?.nombre || seg.usuario_nombre || 'Sistema' }}</span>
+                  <span class="text-xs text-gray-400">{{ fmtDatetime(seg.created_at) }}</span>
                 </div>
-                <p v-if="seg.nota" class="fd-timeline-nota">{{ seg.nota }}</p>
-                <div v-if="seg.estado_nuevo" class="fd-timeline-estado">
-                  <span>→</span>
-                  <span class="fd-estado-pill fd-estado-pill--sm"
-                        :style="pillStyle(seg.estado_nuevo?.color_hex)">
-                    {{ seg.estado_nuevo?.etiqueta || seg.estado_nuevo }}
-                  </span>
+                <p v-if="seg.nota" class="text-sm text-gray-700 whitespace-pre-line">{{ seg.nota }}</p>
+                <div v-if="seg.estado_nuevo" class="mt-1.5 flex items-center gap-1 text-xs">
+                  <i class="pi pi-arrow-right text-[10px] text-gray-400" />
+                  <Tag :value="seg.estado_nuevo?.etiqueta || ''" :style="pillStyle(seg.estado_nuevo?.color_hex)" class="text-[10px]" />
                 </div>
               </div>
             </div>
           </div>
-          <p v-else class="fd-no-content" style="margin-top:8px;">Aún no hay notas de seguimiento.</p>
+          <p v-else class="text-xs text-gray-400">Aún no hay notas de seguimiento.</p>
         </div>
 
-      </div><!-- /fd-main -->
+      </div>
 
-      <!-- COLUMNA DERECHA (sidebar) -->
-      <div class="fd-sidebar">
+      <!-- COLUMNA SIDEBAR -->
+      <div class="space-y-4">
 
         <!-- Acción sugerida -->
-        <div v-if="falla.tipo?.accion_sugerida" class="fd-card fd-card-accent">
-          <div class="fd-section-head">
-            <span class="fd-section-icon">💡</span>
-            <span>Acción sugerida</span>
+        <div v-if="falla.tipo?.accion_sugerida" class="rounded-xl p-5 shadow-sm"
+          style="background: linear-gradient(135deg, #faf7ff 0%, #f3edff 100%); border: 1px solid #e5d9ff;">
+          <div class="flex items-center gap-2 mb-3">
+            <i class="pi pi-lightbulb text-sm" style="color:#915BD8" />
+            <h3 class="font-semibold text-sm" style="color:#4a3b6b">Acción sugerida</h3>
           </div>
-          <p class="fd-accion-text">{{ falla.tipo.accion_sugerida }}</p>
+          <p class="text-sm text-gray-700 leading-relaxed">{{ falla.tipo.accion_sugerida }}</p>
         </div>
 
         <!-- Actualización rápida -->
-        <div class="fd-card">
-          <div class="fd-section-head">
-            <span class="fd-section-icon">⚡</span>
-            <span>Actualización rápida</span>
+        <div class="bg-white rounded-xl shadow-sm p-5">
+          <div class="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100">
+            <i class="pi pi-bolt text-sm" style="color:#915BD8" />
+            <h3 class="font-semibold text-sm text-gray-700">Actualización rápida</h3>
           </div>
-          <div class="fd-quick-form">
-            <div class="fd-field-col">
-              <label class="fd-label">Estado</label>
-              <select v-model="quickEdit.estado_id" class="fd-select">
-                <option v-for="e in catalogos.estados" :key="e.id" :value="e.id">
-                  {{ e.etiqueta }}
-                </option>
-              </select>
+          <div class="space-y-3">
+            <div class="flex flex-col gap-1">
+              <label class="field-label">Estado</label>
+              <Select v-model="quickEdit.estado_id" :options="catalogos.estados" optionLabel="etiqueta"
+                optionValue="id" class="w-full" />
             </div>
-            <div class="fd-field-col">
-              <label class="fd-label">Prioridad</label>
-              <select v-model="quickEdit.prioridad_id" class="fd-select">
-                <option v-for="p in catalogos.prioridades" :key="p.id" :value="p.id">
-                  {{ p.etiqueta }}
-                </option>
-              </select>
+            <div class="flex flex-col gap-1">
+              <label class="field-label">Prioridad</label>
+              <Select v-model="quickEdit.prioridad_id" :options="catalogos.prioridades" optionLabel="etiqueta"
+                optionValue="id" class="w-full" />
             </div>
-            <div class="fd-field-col">
-              <label class="fd-label">Asignado a</label>
-              <select v-model="quickEdit.asignado_a_id" class="fd-select">
-                <option value="">Sin asignar</option>
-                <option v-for="u in usuarios" :key="u.id" :value="u.id">{{ u.nombre }}</option>
-              </select>
+            <div class="flex flex-col gap-1">
+              <label class="field-label">Asignado a</label>
+              <Select v-model="quickEdit.asignado_a_id" :options="usuarios" optionLabel="nombre"
+                optionValue="id" placeholder="Sin asignar" showClear class="w-full" />
             </div>
-            <div class="fd-field-col">
-              <label class="fd-label">Energía perdida (kWh)</label>
-              <input v-model.number="quickEdit.energia_perdida_kwh" type="number"
-                     class="fd-input" placeholder="Ej: 250.5" min="0" step="0.1" />
+            <div class="flex flex-col gap-1">
+              <label class="field-label">Energía perdida (kWh)</label>
+              <InputNumber v-model="quickEdit.energia_perdida_kwh" :minFractionDigits="0" :maxFractionDigits="2"
+                :min="0" class="w-full" />
             </div>
-            <div class="fd-field-col">
-              <label class="fd-label">Causa raíz</label>
-              <textarea v-model="quickEdit.causa_raiz" class="fd-textarea fd-textarea--sm"
-                        rows="2" placeholder="Causa raíz identificada…" />
+            <div class="flex flex-col gap-1">
+              <label class="field-label">Causa raíz</label>
+              <Textarea v-model="quickEdit.causa_raiz" rows="2" autoResize
+                placeholder="Causa raíz identificada…" class="w-full text-sm" />
             </div>
-            <button class="fd-btn fd-btn-primary fd-btn-full"
-                    :disabled="savingQuick" @click="saveQuickEdit">
-              <span v-if="savingQuick" class="fd-mini-spinner" />
-              <span v-else>Guardar cambios</span>
-            </button>
+            <Button label="Guardar cambios" icon="pi pi-check" :loading="savingQuick"
+              @click="saveQuickEdit" class="w-full" />
           </div>
         </div>
 
-        <!-- Metadatos extra -->
-        <div class="fd-card fd-meta-card">
-          <div class="fd-section-head">
-            <span class="fd-section-icon">🗂</span>
-            <span>Detalles técnicos</span>
+        <!-- Detalles técnicos -->
+        <div class="bg-white rounded-xl shadow-sm p-5">
+          <div class="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100">
+            <i class="pi pi-cog text-sm" style="color:#915BD8" />
+            <h3 class="font-semibold text-sm text-gray-700">Detalles técnicos</h3>
           </div>
-          <div class="fd-meta-list">
-            <div class="fd-meta-row">
-              <span class="fd-label">ID interno</span>
-              <code class="fd-mono">{{ falla.id }}</code>
+          <div class="space-y-2 text-xs">
+            <div class="flex items-center justify-between">
+              <span class="text-gray-500">ID interno</span>
+              <code class="font-mono text-gray-700">{{ falla.id }}</code>
             </div>
-            <div class="fd-meta-row">
-              <span class="fd-label">Código</span>
-              <code class="fd-mono">{{ falla.codigo_interno }}</code>
+            <div class="flex items-center justify-between">
+              <span class="text-gray-500">Código</span>
+              <code class="font-mono text-gray-700">{{ falla.codigo_interno }}</code>
             </div>
-            <div v-if="falla.energia_perdida_kwh != null" class="fd-meta-row">
-              <span class="fd-label">Energía perdida</span>
-              <span class="fd-value fd-value-danger">
-                {{ falla.energia_perdida_kwh.toLocaleString('es-CO') }} kWh
-              </span>
+            <div v-if="falla.energia_perdida_kwh != null" class="flex items-center justify-between">
+              <span class="text-gray-500">Energía perdida</span>
+              <span class="font-semibold text-red-600">{{ falla.energia_perdida_kwh.toLocaleString('es-CO') }} kWh</span>
             </div>
-            <div v-if="falla.sla_cumplido !== null && falla.sla_cumplido !== undefined" class="fd-meta-row">
-              <span class="fd-label">SLA</span>
-              <span :class="falla.sla_cumplido ? 'fd-badge-ok' : 'fd-badge-fail'">
-                {{ falla.sla_cumplido ? '✓ Cumplido' : '✗ Incumplido' }}
-              </span>
+            <div v-if="falla.sla_cumplido != null" class="flex items-center justify-between">
+              <span class="text-gray-500">SLA</span>
+              <Tag :value="falla.sla_cumplido ? 'Cumplido' : 'Incumplido'"
+                :severity="falla.sla_cumplido ? 'success' : 'danger'" />
             </div>
           </div>
         </div>
 
-      </div><!-- /fd-sidebar -->
-
-    </div><!-- /fd-layout -->
-  </div><!-- /fd-page -->
+      </div>
+    </div>
+  </div>
 
 </template>
 
@@ -365,41 +308,55 @@ import { ref, computed, reactive, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import { useConfirm } from 'primevue/useconfirm'
+import Button from 'primevue/button'
+import Tag from 'primevue/tag'
+import Select from 'primevue/select'
+import Textarea from 'primevue/textarea'
+import InputNumber from 'primevue/inputnumber'
+import ProgressSpinner from 'primevue/progressspinner'
 import FallaForm from './FallaForm.vue'
 import api from '@/api/client'
 
-const route   = useRoute()
-const router  = useRouter()
-const toast   = useToast()
-const confirm = useConfirm()
+const route = useRoute()
+const router = useRouter()
+const toast = useToast()
+const confirmService = useConfirm()
 
-// ── Estado ───────────────────────────────────────────────────────────────
-const falla     = ref(null)
-const loading   = ref(true)
-const notFound  = ref(false)
-const editMode  = ref(false)
+// ── Estado ──────────────────────────────────────────────────────────────
+const falla = ref(null)
+const loading = ref(true)
+const notFound = ref(false)
+const editMode = ref(false)
 const addingSeg = ref(false)
-const savingQuick  = ref(false)
+const savingQuick = ref(false)
 const uploadingFoto = ref(false)
 
 const catalogos = ref({ estados: [], prioridades: [], tipos: [], resoluciones: [] })
-const usuarios  = ref([])
+const usuarios = ref([])
 
 const nuevaNota = reactive({ nota: '', estado_id: '' })
 const quickEdit = reactive({
-  estado_id:          null,
-  prioridad_id:       null,
-  asignado_a_id:      '',
+  estado_id: null,
+  prioridad_id: null,
+  asignado_a_id: '',
   energia_perdida_kwh: null,
-  causa_raiz:         '',
+  causa_raiz: '',
 })
 
-// ── Computed ─────────────────────────────────────────────────────────────
+// ── Computed ────────────────────────────────────────────────────────────
 const sortedSeguimientos = computed(() =>
   [...(falla.value?.seguimientos ?? [])].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
 )
 
-const adjuntos = computed(() => falla.value?.attachments ?? falla.value?.fotos ?? [])
+// Backend retorna `fotos_lista: list[str]` (URLs). Soportar también legados.
+const adjuntos = computed(() => {
+  const v = falla.value
+  if (!v) return []
+  if (Array.isArray(v.fotos_lista)) return v.fotos_lista
+  if (Array.isArray(v.attachments)) return v.attachments.map(a => a.url || a.archivo_url || a).filter(Boolean)
+  if (Array.isArray(v.fotos)) return v.fotos.map(a => a.url || a.archivo_url || a).filter(Boolean)
+  return []
+})
 
 const horasTranscurridas = computed(() => {
   if (!falla.value?.fecha_identificacion) return 0
@@ -418,23 +375,23 @@ const slaColor = computed(() => {
   const p = slaPct.value
   if (p == null) return '#a094b8'
   if (p >= 100) return '#dc2626'
-  if (p >= 70)  return '#d97706'
+  if (p >= 70) return '#d97706'
   return '#16a34a'
 })
 
-const slaBadgeClass = computed(() => {
-  if (falla.value?.sla_cumplido === true)  return 'fd-sla-ok'
-  if (falla.value?.sla_cumplido === false) return 'fd-sla-fail'
+const slaSeverity = computed(() => {
+  if (falla.value?.sla_cumplido === true) return 'success'
+  if (falla.value?.sla_cumplido === false) return 'danger'
   const p = slaPct.value
-  if (p == null) return ''
-  if (p >= 100) return 'fd-sla-fail'
-  if (p >= 70)  return 'fd-sla-warn'
-  return 'fd-sla-ok'
+  if (p == null) return 'secondary'
+  if (p >= 100) return 'danger'
+  if (p >= 70) return 'warn'
+  return 'success'
 })
 
 const slaTexto = computed(() => {
-  if (falla.value?.sla_cumplido === true)  return '✓ Cumplido'
-  if (falla.value?.sla_cumplido === false) return '✗ Excedido'
+  if (falla.value?.sla_cumplido === true) return 'Cumplido'
+  if (falla.value?.sla_cumplido === false) return 'Excedido'
   const p = slaPct.value
   if (p == null) return 'Sin SLA'
   if (p >= 100) return `Excedido ${p}%`
@@ -446,45 +403,51 @@ const slaFillStyle = computed(() => {
   return { width: `${p}%`, background: slaColor.value }
 })
 
-// ── Helpers visuales ─────────────────────────────────────────────────────
+// ── Helpers ─────────────────────────────────────────────────────────────
 function pillStyle(hex) {
   const c = hex || '#915BD8'
   return { background: c + '1a', color: c, border: `1px solid ${c}33` }
 }
-
-function catPillStyle(hex) {
+function catTagStyle(hex) {
   const c = hex || '#915BD8'
-  return { background: c + '18', color: c }
+  return { background: c + '18', color: c, border: `1px solid ${c}33` }
 }
-
+function prioSeverity(codigo) {
+  return { critica: 'danger', alta: 'warn', media: 'info', baja: 'secondary' }[codigo] || 'secondary'
+}
 function fmtDate(d) {
   if (!d) return '—'
   return new Date(d + 'T00:00:00').toLocaleDateString('es-CO',
     { day: '2-digit', month: 'short', year: 'numeric' })
 }
-
 function fmtDatetime(d) {
   if (!d) return '—'
   return new Date(d).toLocaleString('es-CO',
     { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
-
-function isImage(url) {
-  return /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(url || '')
+function isImage(url) { return /\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/i.test(url || '') }
+function resolveUrl(url) {
+  if (!url) return ''
+  if (url.startsWith('http://') || url.startsWith('https://')) return url
+  // Backend retorna `/static/uploads/fallas/...`. En producción Vercel proxía /static/* a Railway.
+  return url
+}
+function filename(url) {
+  if (!url) return 'archivo'
+  return decodeURIComponent(url.split('/').pop() || 'archivo')
 }
 
-// ── Carga ─────────────────────────────────────────────────────────────────
+// ── Carga ───────────────────────────────────────────────────────────────
 async function load() {
   loading.value = true
   try {
     const { data } = await api.get(`/fallas/${route.params.id}`)
     falla.value = data
-    // Sincronizar quickEdit
-    quickEdit.estado_id          = data.estado?.id      ?? null
-    quickEdit.prioridad_id       = data.prioridad?.id   ?? null
-    quickEdit.asignado_a_id      = data.asignado_a?.id  ?? ''
+    quickEdit.estado_id = data.estado?.id ?? null
+    quickEdit.prioridad_id = data.prioridad?.id ?? null
+    quickEdit.asignado_a_id = data.asignado_a?.id ?? ''
     quickEdit.energia_perdida_kwh = data.energia_perdida_kwh ?? null
-    quickEdit.causa_raiz         = data.causa_raiz      ?? ''
+    quickEdit.causa_raiz = data.causa_raiz ?? ''
   } catch (err) {
     if (err?.response?.status === 404) notFound.value = true
   } finally {
@@ -506,7 +469,7 @@ async function loadUsuarios() {
   } catch { /* /usuarios puede no existir */ }
 }
 
-// ── Acciones ──────────────────────────────────────────────────────────────
+// ── Acciones ────────────────────────────────────────────────────────────
 async function onUpdate(payload) {
   try {
     await api.patch(`/fallas/${falla.value.id}`, payload)
@@ -523,10 +486,10 @@ async function saveQuickEdit() {
   savingQuick.value = true
   try {
     const payload = {}
-    if (quickEdit.estado_id)          payload.estado_id          = quickEdit.estado_id
-    if (quickEdit.prioridad_id)       payload.prioridad_id       = quickEdit.prioridad_id
-    if (quickEdit.asignado_a_id)      payload.asignado_a_id      = quickEdit.asignado_a_id
-    if (quickEdit.causa_raiz?.trim()) payload.causa_raiz         = quickEdit.causa_raiz.trim()
+    if (quickEdit.estado_id) payload.estado_id = quickEdit.estado_id
+    if (quickEdit.prioridad_id) payload.prioridad_id = quickEdit.prioridad_id
+    if (quickEdit.asignado_a_id) payload.asignado_a_id = quickEdit.asignado_a_id
+    if (quickEdit.causa_raiz?.trim()) payload.causa_raiz = quickEdit.causa_raiz.trim()
     if (quickEdit.energia_perdida_kwh != null) payload.energia_perdida_kwh = quickEdit.energia_perdida_kwh
     await api.patch(`/fallas/${falla.value.id}`, payload)
     toast.add({ severity: 'success', summary: 'Cambios guardados', life: 2500 })
@@ -544,10 +507,10 @@ async function addSeguimiento() {
   addingSeg.value = true
   try {
     const payload = {}
-    if (nuevaNota.nota.trim())  payload.nota           = nuevaNota.nota.trim()
-    if (nuevaNota.estado_id)    payload.estado_nuevo_id = nuevaNota.estado_id
+    if (nuevaNota.nota.trim()) payload.nota = nuevaNota.nota.trim()
+    if (nuevaNota.estado_id) payload.estado_nuevo_id = nuevaNota.estado_id
     await api.post(`/fallas/${falla.value.id}/seguimientos`, payload)
-    nuevaNota.nota      = ''
+    nuevaNota.nota = ''
     nuevaNota.estado_id = ''
     toast.add({ severity: 'success', summary: 'Seguimiento agregado', life: 2500 })
     await load()
@@ -563,43 +526,60 @@ async function uploadFotos(event) {
   const files = Array.from(event.target.files)
   if (!files.length) return
   uploadingFoto.value = true
+  let okCount = 0
   try {
     for (const file of files) {
       const form = new FormData()
-      form.append('file', file)
-      form.append('etapa', 'proceso')
+      // El backend espera el campo `archivo` (no `file`).
+      form.append('archivo', file)
       try {
         await api.post(`/fallas/${falla.value.id}/attachments`, form,
           { headers: { 'Content-Type': 'multipart/form-data' } })
-      } catch {
-        toast.add({ severity: 'warn', summary: `No se pudo subir ${file.name}`, life: 3000 })
+        okCount++
+      } catch (err) {
+        const msg = err?.response?.data?.detail ?? `No se pudo subir ${file.name}`
+        toast.add({ severity: 'warn', summary: 'Archivo rechazado', detail: msg, life: 4000 })
       }
     }
-    await load()
-    toast.add({ severity: 'success', summary: `${files.length} archivo(s) subido(s)`, life: 2500 })
+    if (okCount) {
+      await load()
+      toast.add({ severity: 'success', summary: `${okCount} archivo(s) subido(s)`, life: 2500 })
+    }
   } finally {
     uploadingFoto.value = false
     event.target.value = ''
   }
 }
 
-async function deleteFoto(adjunto) {
-  if (!confirm('¿Eliminar este adjunto?')) return
-  try {
-    await api.delete(`/fallas/${falla.value.id}/attachments/${adjunto.id}`)
-    await load()
-  } catch {
-    toast.add({ severity: 'error', summary: 'No se pudo eliminar', life: 3000 })
-  }
+function deleteFoto(url) {
+  confirmService.require({
+    message: '¿Eliminar este adjunto? Esta acción no se puede deshacer.',
+    header: 'Eliminar adjunto',
+    icon: 'pi pi-exclamation-triangle',
+    rejectProps: { label: 'Cancelar', severity: 'secondary' },
+    acceptProps: { label: 'Eliminar', severity: 'danger' },
+    accept: async () => {
+      try {
+        // No hay endpoint DELETE en backend. Actualizamos fotos_urls vía PATCH excluyendo la URL.
+        const nuevaLista = adjuntos.value.filter(u => u !== url)
+        await api.patch(`/fallas/${falla.value.id}`, { fotos_urls: nuevaLista })
+        await load()
+        toast.add({ severity: 'success', summary: 'Adjunto eliminado', life: 2500 })
+      } catch (err) {
+        const msg = err?.response?.data?.detail ?? 'No se pudo eliminar'
+        toast.add({ severity: 'error', summary: 'Error', detail: msg, life: 3000 })
+      }
+    },
+  })
 }
 
 function confirmDelete() {
-  confirm.require({
+  confirmService.require({
     message: `¿Eliminar la falla ${falla.value.codigo_interno}? Esta acción no se puede deshacer.`,
     header: 'Confirmar eliminación',
     icon: 'pi pi-exclamation-triangle',
-    rejectProps:  { label: 'Cancelar',  severity: 'secondary' },
-    acceptProps:  { label: 'Eliminar',  severity: 'danger' },
+    rejectProps: { label: 'Cancelar', severity: 'secondary' },
+    acceptProps: { label: 'Eliminar', severity: 'danger' },
     accept: async () => {
       try {
         await api.delete(`/fallas/${falla.value.id}`)
@@ -619,550 +599,24 @@ onMounted(() => {
 })
 </script>
 
+<script>
+const InfoField = {
+  props: { label: String, value: [String, Number, Boolean], highlight: Boolean },
+  template: `<div>
+    <p class="text-xs text-gray-400 uppercase tracking-wide">{{ label }}</p>
+    <p class="mt-0.5" :class="highlight ? 'font-bold text-gray-800' : 'font-medium text-gray-700'">{{ value || '—' }}</p>
+  </div>`,
+}
+export default { components: { InfoField } }
+</script>
+
 <style scoped>
-/* ── Base ──────────────────────────────────────────────────────────────── */
-.fd-page {
-  min-height: 100%;
-  background: #f5f4f8;
-  font-family: 'Sora', system-ui, sans-serif;
-  display: flex;
-  flex-direction: column;
-}
-
-/* ── Centro (loading / not found) ─────────────────────────────────────── */
-.fd-center {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 60vh;
-  gap: 12px;
-  font-family: 'Sora', system-ui, sans-serif;
-  text-align: center;
-  padding: 40px 20px;
-}
-.fd-spinner {
-  width: 36px; height: 36px;
-  border: 3px solid #ece8f4;
-  border-top-color: #915BD8;
-  border-radius: 50%;
-  animation: fd-spin .75s linear infinite;
-}
-@keyframes fd-spin { to { transform: rotate(360deg); } }
-.fd-loading-text { font-size: 13px; color: #a094b8; }
-.fd-empty-icon   { font-size: 40px; opacity: .2; }
-.fd-empty-title  { font-size: 16px; font-weight: 700; color: #4a3b6b; margin: 0; }
-.fd-empty-sub    { font-size: 13px; color: #a094b8; margin: 0; }
-
-/* ── Hero ──────────────────────────────────────────────────────────────── */
-.fd-hero {
-  background: linear-gradient(135deg, #1e1530 0%, #2C2039 55%, #3a2653 100%);
-  padding: 20px 32px 24px;
-  flex-shrink: 0;
-  border-bottom: 1px solid rgba(145,91,216,.18);
-}
-.fd-hero-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16px;
-  gap: 12px;
-}
-.fd-back {
-  background: none;
-  border: none;
-  color: rgba(245,240,255,.5);
-  font-size: 12px;
-  font-family: inherit;
-  cursor: pointer;
-  padding: 0;
-  transition: color .15s;
-}
-.fd-back:hover { color: rgba(245,240,255,.9); }
-.fd-hero-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-
-.fd-hero-body { display: flex; flex-direction: column; gap: 10px; }
-
-.fd-hero-pills {
-  display: flex; gap: 6px; flex-wrap: wrap;
-}
-.fd-estado-pill {
-  display: inline-flex;
-  align-items: center;
-  padding: 3px 10px;
-  border-radius: 20px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: .3px;
-}
-.fd-estado-pill--sm { font-size: 10.5px; padding: 2px 8px; }
-.fd-prio-pill {
-  display: inline-flex;
-  align-items: center;
-  padding: 3px 10px;
-  border-radius: 20px;
-  font-size: 11px;
-  font-weight: 700;
-}
-.fd-cat-pill {
-  display: inline-flex;
-  align-items: center;
-  padding: 3px 10px;
-  border-radius: 20px;
-  font-size: 11px;
-  font-weight: 600;
-}
-/* Prioridad colors */
-.prio-1 { background: #fef2f2; color: #dc2626; }
-.prio-2 { background: #fff7ed; color: #c2410c; }
-.prio-3 { background: #eff6ff; color: #1d4ed8; }
-.prio-4 { background: #f9fafb; color: #6b7280; }
-
-.fd-hero-title-row {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.fd-code {
-  font-size: 17px;
-  font-weight: 900;
-  color: #c4a8ff;
-  font-family: 'Courier New', monospace;
-  letter-spacing: .5px;
-}
-.fd-dot { color: rgba(245,240,255,.25); font-size: 15px; }
-.fd-tipo-text {
-  font-size: 14px;
-  font-weight: 600;
-  color: rgba(245,240,255,.65);
-}
-.fd-desc {
-  font-size: 14px;
-  line-height: 1.55;
-  color: rgba(245,240,255,.88);
-  margin: 0;
-  max-width: 680px;
-}
-.fd-hero-meta-row {
-  display: flex;
-  gap: 16px;
-  flex-wrap: wrap;
-  font-size: 11.5px;
-  color: rgba(245,240,255,.4);
-}
-
-/* ── Botones ───────────────────────────────────────────────────────────── */
-.fd-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  border-radius: 8px;
-  padding: 7px 14px;
-  font-size: 12.5px;
-  font-weight: 600;
-  font-family: inherit;
-  cursor: pointer;
-  transition: all .14s;
-  border: none;
-  white-space: nowrap;
-}
-.fd-btn:disabled { opacity: .45; cursor: not-allowed; }
-.fd-btn-primary {
-  background: #7c3aed;
-  color: #fff;
-  border: 1px solid #6d28d9 !important;
-}
-.fd-btn-primary:hover:not(:disabled) { background: #6d28d9; }
-.fd-btn-ghost {
-  background: rgba(255,255,255,.09);
-  color: rgba(245,240,255,.85);
-  border: 1px solid rgba(255,255,255,.18) !important;
-}
-.fd-btn-ghost:hover { background: rgba(255,255,255,.15); }
-.fd-btn-danger-ghost {
-  background: rgba(239,68,68,.1);
-  color: #fca5a5;
-  border: 1px solid rgba(239,68,68,.2) !important;
-}
-.fd-btn-danger-ghost:hover { background: rgba(239,68,68,.2); }
-.fd-btn-full { width: 100%; justify-content: center; }
-
-/* ── Layout ────────────────────────────────────────────────────────────── */
-.fd-layout {
-  display: grid;
-  grid-template-columns: 1fr 320px;
-  gap: 16px;
-  padding: 20px 32px 40px;
-  flex: 1;
-  min-height: 0;
-}
-.fd-layout-single {
-  padding: 20px 32px 40px;
-}
-@media (max-width: 1024px) {
-  .fd-layout { grid-template-columns: 1fr; }
-  .fd-sidebar { order: -1; }
-}
-@media (max-width: 640px) {
-  .fd-hero, .fd-layout, .fd-layout-single { padding-left: 16px; padding-right: 16px; }
-}
-
-.fd-main    { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
-.fd-sidebar { display: flex; flex-direction: column; gap: 14px; }
-
-/* ── Cards ─────────────────────────────────────────────────────────────── */
-.fd-card {
-  background: #fff;
-  border-radius: 12px;
-  border: 1px solid #ece8f4;
-  padding: 18px 20px;
-  box-shadow: 0 1px 3px rgba(44,32,57,.04);
-}
-.fd-card-accent {
-  border-left: 3px solid #915BD8;
-  background: #fdf9ff;
-}
-
-.fd-section-head {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 12px;
-  font-weight: 700;
-  color: #4a3b6b;
-  text-transform: uppercase;
-  letter-spacing: .5px;
-  margin-bottom: 14px;
-}
-.fd-section-icon { font-size: 14px; }
-
-/* ── Info grid ─────────────────────────────────────────────────────────── */
-.fd-info-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 14px 20px;
-}
-.fd-field  { display: flex; flex-direction: column; gap: 2px; }
-.fd-label  {
-  font-size: 10.5px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: .5px;
-  color: #a094b8;
-}
-.fd-value  { font-size: 13px; color: #2C2039; }
-.fd-bold   { font-weight: 700; }
-.fd-value-danger { font-weight: 700; color: #dc2626; }
-
-/* ── SLA ───────────────────────────────────────────────────────────────── */
-.fd-sla-card { }
-.fd-sla-badge {
-  margin-left: auto;
-  font-size: 11px;
-  font-weight: 700;
-  padding: 2px 9px;
-  border-radius: 12px;
-  text-transform: none;
-  letter-spacing: 0;
-}
-.fd-sla-ok   { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
-.fd-sla-fail { background: #fff1f2; color: #dc2626; border: 1px solid #fecaca; }
-.fd-sla-warn { background: #fffbeb; color: #d97706; border: 1px solid #fde68a; }
-
-.fd-sla-body { display: flex; flex-direction: column; gap: 8px; }
-.fd-sla-row  {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-}
-.fd-sla-track {
-  height: 6px;
-  background: #f0eaf8;
-  border-radius: 4px;
-  overflow: hidden;
-}
-.fd-sla-fill {
-  height: 100%;
-  border-radius: 4px;
-  transition: width .5s ease;
-}
-.fd-no-sla { font-size: 12.5px; color: #a094b8; }
-
-/* ── Análisis ──────────────────────────────────────────────────────────── */
-.fd-analysis-grid  { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-@media (max-width: 640px) { .fd-analysis-grid { grid-template-columns: 1fr; } }
-.fd-analysis-block { display: flex; flex-direction: column; gap: 5px; }
-.fd-analysis-label {
-  font-size: 10.5px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: .5px;
-  color: #7c3aed;
-}
-.fd-analysis-text { font-size: 13px; color: #2C2039; line-height: 1.55; margin: 0; }
-
-/* ── Fotos ─────────────────────────────────────────────────────────────── */
-.fd-upload-btn {
-  margin-left: auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  background: #f0eaf8;
-  color: #7c3aed;
-  border: 1px solid #ddd6fe;
-  border-radius: 7px;
-  padding: 4px 11px;
-  font-size: 11.5px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: background .13s;
-  font-family: inherit;
-}
-.fd-upload-btn:hover { background: #e9dffc; }
-.fd-upload-btn--loading { opacity: .6; cursor: wait; }
-.fd-hidden-input { display: none; }
-
-.fd-fotos-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
-  gap: 8px;
-  margin-top: 4px;
-}
-.fd-foto-card {
-  position: relative;
-  border-radius: 8px;
-  overflow: hidden;
-  border: 1px solid #ece8f4;
-  aspect-ratio: 1;
-  background: #f8f6fc;
-}
-.fd-foto-img {
-  width: 100%; height: 100%;
-  object-fit: cover;
+.field-label {
   display: block;
-}
-.fd-foto-doc {
-  width: 100%; height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  padding: 8px;
-}
-.fd-foto-doc-icon { font-size: 24px; }
-.fd-foto-doc-name {
-  font-size: 9px;
-  color: #9b89b5;
-  text-align: center;
-  word-break: break-all;
-  line-clamp: 2;
-  overflow: hidden;
-}
-.fd-foto-overlay {
-  position: absolute;
-  inset: 0;
-  background: rgba(0,0,0,.55);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  opacity: 0;
-  transition: opacity .15s;
-}
-.fd-foto-card:hover .fd-foto-overlay { opacity: 1; }
-.fd-foto-action {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px; height: 28px;
-  background: rgba(255,255,255,.9);
-  border-radius: 6px;
-  font-size: 13px;
-  border: none;
-  cursor: pointer;
-  text-decoration: none;
-  transition: background .12s;
-}
-.fd-foto-action:hover { background: #fff; }
-.fd-foto-del  { background: rgba(239,68,68,.85); }
-.fd-foto-del:hover { background: #ef4444; }
-
-/* ── Seguimientos ──────────────────────────────────────────────────────── */
-.fd-seg-add {
-  background: #faf8fd;
-  border: 1px solid #ece8f4;
-  border-radius: 10px;
-  padding: 14px;
-  margin-bottom: 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.fd-seg-add-row  { display: flex; gap: 10px; flex-wrap: wrap; }
-.fd-seg-add-footer { display: flex; justify-content: flex-end; }
-.fd-field-col  { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 140px; }
-
-.fd-timeline {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  position: relative;
-  padding-left: 28px;
-}
-.fd-timeline::before {
-  content: '';
-  position: absolute;
-  left: 9px;
-  top: 8px;
-  bottom: 8px;
-  width: 1px;
-  background: #ece8f4;
-}
-.fd-timeline-item {
-  position: relative;
-  display: flex;
-  gap: 0;
-  margin-bottom: 14px;
-}
-.fd-timeline-item:last-child { margin-bottom: 0; }
-.fd-timeline-dot {
-  position: absolute;
-  left: -28px;
-  top: 2px;
-  width: 20px; height: 20px;
-  border-radius: 50%;
-  background: #7c3aed;
-  color: #fff;
-  font-size: 9px;
-  font-weight: 900;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  z-index: 1;
-}
-.fd-timeline-body {
-  background: #faf8fd;
-  border: 1px solid #ece8f4;
-  border-radius: 9px;
-  padding: 10px 13px;
-  flex: 1;
-  min-width: 0;
-}
-.fd-timeline-header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-bottom: 5px;
-}
-.fd-timeline-user {
-  font-size: 12px;
-  font-weight: 700;
-  color: #2C2039;
-}
-.fd-timeline-time {
-  font-size: 10.5px;
-  color: #a094b8;
-}
-.fd-timeline-nota {
-  font-size: 12.5px;
-  line-height: 1.5;
-  color: #4a3b6b;
-  margin: 0;
-}
-.fd-timeline-estado {
-  display: flex;
-  align-items: center;
-  gap: 6px;
   font-size: 11px;
-  color: #7c3aed;
-  margin-top: 6px;
-}
-.fd-no-content {
-  font-size: 12.5px;
-  color: #a094b8;
-  text-align: center;
-  padding: 16px 0 4px;
-  margin: 0;
-}
-
-/* ── Quick form (sidebar) ──────────────────────────────────────────────── */
-.fd-quick-form { display: flex; flex-direction: column; gap: 12px; }
-
-.fd-select, .fd-input {
-  background: #faf9fc;
-  border: 1.5px solid #e5e0f0;
-  border-radius: 7px;
-  padding: 7px 10px;
-  color: #2C2039;
-  font-size: 12.5px;
-  font-family: inherit;
-  outline: none;
-  transition: border-color .14s;
-  width: 100%;
-}
-.fd-select:focus, .fd-input:focus { border-color: #915BD8; }
-.fd-select { cursor: pointer; }
-
-.fd-textarea {
-  background: #faf9fc;
-  border: 1.5px solid #e5e0f0;
-  border-radius: 7px;
-  padding: 7px 10px;
-  color: #2C2039;
-  font-size: 12.5px;
-  font-family: inherit;
-  outline: none;
-  transition: border-color .14s;
-  width: 100%;
-  resize: vertical;
-}
-.fd-textarea:focus { border-color: #915BD8; }
-.fd-textarea--sm { min-height: 56px; }
-
-/* ── Meta card ─────────────────────────────────────────────────────────── */
-.fd-meta-card { }
-.fd-meta-list { display: flex; flex-direction: column; gap: 10px; }
-.fd-meta-row  {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-  font-size: 12px;
-}
-.fd-mono {
-  font-family: 'Courier New', monospace;
-  font-size: 11px;
-  font-weight: 700;
-  color: #7c3aed;
-  background: #f5f0ff;
-  padding: 1px 6px;
-  border-radius: 4px;
-}
-.fd-badge-ok   { font-size: 11px; font-weight: 700; color: #16a34a; }
-.fd-badge-fail { font-size: 11px; font-weight: 700; color: #dc2626; }
-
-/* ── Acción sugerida ───────────────────────────────────────────────────── */
-.fd-accion-text {
-  font-size: 12.5px;
-  line-height: 1.55;
-  color: #4a3b6b;
-  margin: 0;
-}
-
-/* ── Mini spinner (inline) ─────────────────────────────────────────────── */
-.fd-mini-spinner {
-  display: inline-block;
-  width: 13px; height: 13px;
-  border: 2px solid rgba(255,255,255,.3);
-  border-top-color: #fff;
-  border-radius: 50%;
-  animation: fd-spin .6s linear infinite;
-  vertical-align: middle;
+  font-weight: 600;
+  color: #6b5a8a;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
 }
 </style>

@@ -6,7 +6,7 @@
     <AppSidebar />
     <div class="flex flex-col flex-1 overflow-hidden">
       <AppTopbar />
-      <main :class="isMonitoreo ? 'flex-1 overflow-hidden p-0' : isSolar ? 'flex-1 overflow-hidden p-0' : 'flex-1 overflow-y-auto p-6'">
+      <main :class="isSolar ? 'flex-1 overflow-hidden p-0' : 'flex-1 overflow-y-auto p-6'">
         <RouterView />
       </main>
     </div>
@@ -28,7 +28,6 @@ const route = useRoute()
 const toast = useToast()
 const routeReady = computed(() => !!route.name)
 const isLoginPage = computed(() => ['Login', 'ForgotPassword', 'ResetPassword'].includes(route.name))
-const isMonitoreo = computed(() => route.name === 'Fallas')
 const isSolar     = computed(() => route.name === 'Solar')
 
 onMounted(() => {
