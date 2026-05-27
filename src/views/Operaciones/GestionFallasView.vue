@@ -68,7 +68,7 @@
   <div class="gf-main space-y-4 min-w-0">
 
     <!-- ══ TABLA ═══════════════════════════════════════════════════════════ -->
-    <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+    <div class="gf-table-wrap">
       <div v-if="error" class="p-6 flex items-center gap-3 text-red-600">
         <i class="pi pi-exclamation-circle text-xl" />
         <div class="flex-1">
@@ -155,18 +155,6 @@
           </template>
         </Column>
 
-        <Column header="SLA" style="width:100px">
-          <template #body="{ data }">
-            <div v-if="data.sla_limite_horas" class="sla-mini">
-              <div class="sla-mini-bar">
-                <div class="sla-mini-fill" :style="slaFillStyle(data)" />
-              </div>
-              <span class="sla-mini-text" :style="{ color: slaTextColor(data) }">{{ slaText(data) }}</span>
-            </div>
-            <span v-else class="text-xs text-gray-300">—</span>
-          </template>
-        </Column>
-
         <Column header="Fecha" style="width:100px" field="fecha_identificacion" sortable>
           <template #body="{ data }">
             <div class="text-xs">
@@ -207,7 +195,7 @@
               <code class="font-mono text-sm text-purple-700 bg-purple-50 px-2 py-0.5 rounded">{{ drawerFalla.codigo_interno }}</code>
               <span class="text-xs text-gray-400">·</span>
               <span class="text-sm font-medium text-gray-700 truncate">{{ drawerFalla.tipo?.etiqueta }}</span>
-              <span v-if="navIndex >= 0" class="text-[10px] text-gray-400 ml-auto whitespace-nowrap">
+              <span v-if="navIndex >= 0" class="text-[10px] text-gray-400 ml-auto whitespace-nowrap hidden sm:inline-block">
                 {{ navIndex + 1 }} / {{ filtradas.length }}
               </span>
             </div>
@@ -1103,23 +1091,21 @@ watch(drawerVisible, (val) => {
 }
 
 /* ── Push layout (lista + panel lateral) ──────────────────────────────── */
-.gf-layout {
-  /* Sin split: la lista ocupa todo el ancho */
-  display: block;
-}
+/* Alturas: AppTopbar=56px, padding p-6=24px*2 = 48px. Total a descontar = 104px (~6.5rem) */
+.gf-layout { display: block; }
 .gf-main { min-width: 0; }
 
 /* En lg+, cuando hay panel abierto, layout grid de dos columnas */
 @media (min-width: 1024px) {
   .gf-layout--split {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(480px, 50%);
+    grid-template-columns: minmax(0, 1fr) minmax(440px, 50%);
     gap: 16px;
     align-items: start;
   }
 }
 
-/* Aside: en móvil = overlay full-screen; en desktop = panel en flujo */
+/* Aside: en <lg = overlay; en lg+ = panel en flujo (sticky) */
 .gf-aside {
   position: fixed;
   inset: 0;
@@ -1136,7 +1122,7 @@ watch(drawerVisible, (val) => {
 .gf-aside-panel {
   position: relative;
   width: 100%;
-  max-width: 540px;
+  max-width: 560px;
   height: 100%;
   background: #fff;
   display: flex;
@@ -1151,39 +1137,77 @@ watch(drawerVisible, (val) => {
     top: 0;
     z-index: 5;
     height: auto;
-    max-height: calc(100vh - 3rem);
+    max-height: calc(100vh - 6.5rem);
     display: block;
   }
   .gf-aside-backdrop { display: none; }
   .gf-aside-panel {
     max-width: none;
-    height: calc(100vh - 3rem);
+    height: calc(100vh - 6.5rem);
     border-radius: 12px;
     border: 1px solid #ece8f4;
-    box-shadow: 0 4px 12px rgba(28, 18, 50, 0.06);
+    box-shadow: 0 4px 14px rgba(28, 18, 50, 0.08);
   }
 }
 
 /* Header / body / footer del panel */
 .gf-drawer-header {
-  display: flex; align-items: center; gap: 6px;
-  padding: 10px 14px;
+  display: flex; align-items: center; gap: 4px;
+  padding: 10px 12px;
   border-bottom: 1px solid #ece8f4;
-  background: #fff; z-index: 10;
+  background: #fff;
+  flex-shrink: 0;
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+.gf-drawer-header > :deep(.p-button) {
   flex-shrink: 0;
 }
 .gf-drawer-body {
-  padding: 18px 18px 18px;
-  display: flex; flex-direction: column; gap: 18px;
+  padding: 16px 18px;
+  display: flex; flex-direction: column; gap: 16px;
   overflow-y: auto;
   flex: 1;
+  min-height: 0;
 }
 .gf-drawer-footer {
   background: #fff;
-  padding: 12px 14px;
+  padding: 10px 12px;
   border-top: 1px solid #ece8f4;
   display: flex; gap: 8px;
   flex-shrink: 0;
+  flex-wrap: wrap;
+}
+.gf-drawer-footer :deep(.p-button) {
+  flex: 1 1 140px;
+  min-width: 0;
+}
+
+/* Tabla con mismos bordes + sombra que el panel para que combinen visualmente */
+.gf-table-wrap {
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #ece8f4;
+  box-shadow: 0 4px 14px rgba(28, 18, 50, 0.08);
+  overflow: hidden;
+}
+@media (min-width: 1024px) {
+  .gf-layout--split .gf-table-wrap {
+    /* La tabla ocupa toda la altura disponible junto al panel */
+    max-height: calc(100vh - 6.5rem);
+    display: flex;
+    flex-direction: column;
+  }
+  .gf-layout--split .gf-table-wrap :deep(.p-datatable) {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .gf-layout--split .gf-table-wrap :deep(.p-datatable-wrapper) {
+    flex: 1;
+    overflow: auto;
+  }
 }
 
 /* ── DataTable density tweaks ─────────────────────────────────────────── */
