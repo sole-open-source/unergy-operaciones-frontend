@@ -1,9 +1,7 @@
 <template>
-  <div :class="['gf-layout', drawerVisible && 'gf-layout--split']">
+  <div class="space-y-4">
 
-  <div class="gf-main space-y-4 min-w-0">
-
-    <!-- ══ HEADER ════════════════════════════════════════════════════════ -->
+    <!-- ══ HEADER (siempre full width) ═══════════════════════════════════ -->
     <div class="flex items-start justify-between flex-wrap gap-3">
       <div class="flex items-center gap-3">
         <div class="w-9 h-9 rounded-full flex items-center justify-center" style="background: rgba(145,91,216,0.12)">
@@ -20,6 +18,10 @@
         <Button label="Nueva falla" icon="pi pi-plus" size="small" @click="abrirCrear" />
       </div>
     </div>
+
+  <div :class="['gf-layout', drawerVisible && 'gf-layout--split']">
+
+  <div class="gf-main space-y-4 min-w-0">
 
     <!-- ══ BUCKETS / KPIs ═══════════════════════════════════════════════ -->
     <div class="gf-buckets grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -392,6 +394,8 @@
       </div><!-- /gf-aside-panel -->
     </aside>
 
+  </div><!-- /gf-layout -->
+
     <!-- ══ DIALOG CREAR / EDITAR ══════════════════════════════════════════ -->
     <Dialog v-model:visible="formDialogVisible" modal class="w-full max-w-2xl"
       :header="editingFalla ? `Editar falla ${editingFalla.codigo_interno}` : 'Nueva falla'"
@@ -400,7 +404,7 @@
         @save="onSaveForm" @cancel="formDialogVisible = false" />
     </Dialog>
 
-  </div>
+  </div><!-- /outer space-y-4 -->
 </template>
 
 <script setup>
