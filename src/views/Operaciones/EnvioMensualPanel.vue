@@ -686,11 +686,11 @@ async function cargar() {
 async function cargarProyectos() {
   try {
     const { data } = await api.get('/monitoreo/_legacy', { params: { action: 'getProjects' } })
-    // La API devuelve array de strings o de objetos {sub_project, nombre_comercial, ...}
-    if (Array.isArray(data)) {
-      todosProyectos.value = data.map(p => (typeof p === 'string' ? p : (p.sub_project || p.nombre_comercial || p.name || '')))
-        .filter(Boolean)
-    }
+    // La API devuelve { ok: true, projects: [...] } o un array directo
+    let list = Array.isArray(data) ? data : (data?.projects || [])
+    todosProyectos.value = list
+      .map(p => (typeof p === 'string' ? p : (p.sub_project || p.nombre_comercial || p.name || '')))
+      .filter(Boolean)
   } catch { /* no crítico */ }
 }
 
