@@ -511,9 +511,12 @@ const permisoEnviar = computed(() =>
 const today  = new Date()
 const mesMax = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`
 
-// Restaurar el último mes visitado desde localStorage (ej. si el usuario dejó Abril abierto)
+// Default inteligente: si no hay mes guardado, abre el mes ANTERIOR
+// (en Mayo abre Abril, en Junio abre Mayo, etc. — siempre el mes a revisar)
+const _prevDate = new Date(today.getFullYear(), today.getMonth() - 1, 1)
+const mesPrevio = `${_prevDate.getFullYear()}-${String(_prevDate.getMonth() + 1).padStart(2, '0')}`
 const _savedMes = localStorage.getItem(LS_MES_KEY)
-const mesSel = ref((_savedMes && _savedMes <= mesMax) ? _savedMes : mesMax)
+const mesSel = ref((_savedMes && _savedMes <= mesMax) ? _savedMes : mesPrevio)
 
 const informes   = ref([])
 const loading    = ref(false)
