@@ -67,8 +67,39 @@
 
   <div class="gf-main space-y-4 min-w-0">
 
-    <!-- ══ TABLA ═══════════════════════════════════════════════════════════ -->
-    <div class="gf-table-wrap">
+    <!-- ══ COMPACT LIST (sólo lg+ con panel abierto) ════════════════════ -->
+    <div v-if="drawerVisible" class="gf-compact hidden lg:flex">
+      <div class="gf-compact-header">
+        <span class="text-[11px] font-bold uppercase tracking-wide text-gray-500">
+          {{ filtradas.length }} falla{{ filtradas.length !== 1 ? 's' : '' }}
+        </span>
+      </div>
+      <div v-if="!filtradas.length" class="gf-compact-empty">
+        <i class="pi pi-inbox text-2xl mb-2" />
+        <p class="text-xs">Sin resultados</p>
+      </div>
+      <div v-else class="gf-compact-list">
+        <button v-for="f in filtradas" :key="f.id"
+          class="gf-compact-row"
+          :class="{ 'gf-compact-row--active': drawerFalla?.id === f.id }"
+          @click="abrirDrawer(f)">
+          <span class="gf-compact-stripe" :style="{ background: prioColor(f.prioridad?.codigo) }" />
+          <div class="gf-compact-content">
+            <div class="gf-compact-line1">
+              <code class="gf-compact-code">{{ f.codigo_interno }}</code>
+              <span v-if="f.estado?.codigo"
+                class="gf-compact-dot"
+                :style="{ background: f.estado?.color_hex || '#915BD8' }"
+                v-tooltip.right="f.estado?.etiqueta" />
+            </div>
+            <div class="gf-compact-line2">{{ f.tipo?.etiqueta || f.descripcion || 'Sin descripción' }}</div>
+          </div>
+        </button>
+      </div>
+    </div>
+
+    <!-- ══ TABLA (oculta cuando hay panel en lg+) ═══════════════════════ -->
+    <div :class="['gf-table-wrap', drawerVisible && 'lg:hidden']">
       <div v-if="error" class="p-6 flex items-center gap-3 text-red-600">
         <i class="pi pi-exclamation-circle text-xl" />
         <div class="flex-1">
@@ -1095,13 +1126,18 @@ watch(drawerVisible, (val) => {
 .gf-layout { display: block; }
 .gf-main { min-width: 0; }
 
-/* En lg+, cuando hay panel abierto, layout grid de dos columnas */
+/* En lg+, cuando hay panel abierto, layout grid: lista compacta + panel ancho */
 @media (min-width: 1024px) {
   .gf-layout--split {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(440px, 50%);
+    grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
     gap: 16px;
     align-items: start;
+  }
+}
+@media (min-width: 1440px) {
+  .gf-layout--split {
+    grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
   }
 }
 
@@ -1251,4 +1287,107 @@ watch(drawerVisible, (val) => {
   -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
 }
+
+/* ── Compact list (panel abierto en lg+) ───────────────────────────────── */
+.gf-compact {
+  flex-direction: column;
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #ece8f4;
+  box-shadow: 0 4px 14px rgba(28, 18, 50, 0.08);
+  overflow: hidden;
+  max-height: calc(100vh - 6.5rem);
+}
+.gf-compact-header {
+  padding: 10px 14px;
+  border-bottom: 1px solid #ece8f4;
+  background: #faf9fc;
+  flex-shrink: 0;
+}
+.gf-compact-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #9ca3af;
+  padding: 24px;
+}
+.gf-compact-list {
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+.gf-compact-row {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  padding: 10px 14px 10px 10px;
+  border: none;
+  background: #fff;
+  border-bottom: 1px solid #f3f1f8;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  transition: background 0.12s;
+}
+.gf-compact-row:hover { background: #faf9fc; }
+.gf-compact-row--active {
+  background: #faf5ff;
+}
+.gf-compact-row--active::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: #915BD8;
+}
+.gf-compact-stripe {
+  width: 3px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.gf-compact-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.gf-compact-line1 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.gf-compact-code {
+  font-family: 'Courier New', monospace;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #6b5a8a;
+  background: #f3f1f8;
+  padding: 1px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.2px;
+}
+.gf-compact-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+.gf-compact-line2 {
+  font-size: 13px;
+  font-weight: 500;
+  color: #2C2039;
+  line-height: 1.3;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  word-break: break-word;
+}
+.gf-compact-row--active .gf-compact-line2 { color: #4a3b6b; font-weight: 600; }
 </style>
