@@ -1066,23 +1066,23 @@ watch(bucket, (newBucket) => {
 .gf-page {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 0;
 }
 
-/* Header sticky con title + buckets + filtros — siempre visible */
+/* Header sticky con title + buckets + filtros — pieza visual unificada */
 .gf-sticky-header {
   position: sticky;
   top: 0;
   z-index: 20;
-  background: #f3f4f6;  /* mismo bg que main (bg-gray-100) para que no se vea contenido detrás */
-  padding-top: 4px;     /* ligero respiro al pegarse al top */
-  padding-bottom: 8px;
+  background: #f3f4f6;
+  padding-top: 4px;
+  padding-bottom: 12px;       /* gris hasta el inicio del contenido — sin "gap" desnudo */
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 0;                      /* topbar + toolbar pegados, sin franja gris entre ellos */
 }
 
-/* ── Top bar compacto (title + buckets + actions en una fila) ────────── */
+/* ── Top bar (parte superior del card unificado) ───────────────────── */
 .gf-topbar {
   display: flex;
   align-items: center;
@@ -1090,8 +1090,9 @@ watch(bucket, (newBucket) => {
   flex-wrap: wrap;
   padding: 6px 10px;
   background: #fff;
-  border-radius: 10px;
+  border-radius: 10px 10px 0 0;  /* sólo bordes superiores redondeados */
   border: 1px solid #ece8f4;
+  border-bottom: none;
   box-shadow: 0 1px 3px rgba(28, 18, 50, 0.04);
   min-height: 42px;
 }
@@ -1150,7 +1151,7 @@ watch(bucket, (newBucket) => {
   font-size: 12px;
 }
 
-/* ── Toolbar delgado ──────────────────────────────────────────────────── */
+/* ── Toolbar (parte inferior del card unificado, divisor sutil) ────── */
 .gf-toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -1158,8 +1159,9 @@ watch(bucket, (newBucket) => {
   gap: 6px;
   padding: 6px 10px;
   background: #fff;
-  border-radius: 10px;
+  border-radius: 0 0 10px 10px;
   border: 1px solid #ece8f4;
+  border-top: 1px solid #ece8f4;  /* divisor interno entre filas */
   box-shadow: 0 1px 3px rgba(28, 18, 50, 0.04);
 }
 .gf-toolbar :deep(.p-inputtext),
@@ -1663,11 +1665,13 @@ watch(bucket, (newBucket) => {
   overflow: hidden;
 }
 @media (min-width: 1024px) {
-  /* La lista compacta se mantiene visible mientras la página scrollea.
-     top = altura aprox del sticky-header (topbar ~42 + gap 8 + toolbar ~36 + gap 8 ≈ 94px). */
+  /* La lista compacta se ancla JUSTO DEBAJO del sticky-header.
+     Altura sticky-header: 4px top + topbar 42 + toolbar 42 + 12px bottom ≈ 100px = 6.25rem.
+     Top de la compacta = esa altura → así no queda franja visible entre ambos
+     donde el panel detalle se cuele al scrollear. */
   .gf-compact {
     position: sticky;
-    top: 6rem;
+    top: 6.25rem;
     max-height: calc(100vh - 7.5rem);
     z-index: 1;
   }
