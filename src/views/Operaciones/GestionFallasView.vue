@@ -1,66 +1,58 @@
 <template>
-  <div class="space-y-4">
+  <div class="space-y-2">
 
-    <!-- ══ HEADER (siempre full width) ═══════════════════════════════════ -->
-    <div class="flex items-start justify-between flex-wrap gap-3">
-      <div class="flex items-center gap-3">
-        <div class="w-9 h-9 rounded-full flex items-center justify-center" style="background: rgba(145,91,216,0.12)">
-          <i class="pi pi-bolt text-base" style="color:#915BD8" />
-        </div>
-        <div>
-          <h2 class="text-xl font-bold text-gray-800">Gestión de Fallas</h2>
-          <p class="text-xs text-gray-500">Operación diaria · registro, asignación y resolución de incidencias</p>
-        </div>
+    <!-- ══ TITLE + BUCKETS + ACTIONS (una sola fila compacta) ═══════════ -->
+    <div class="gf-topbar">
+      <div class="gf-topbar-title">
+        <i class="pi pi-bolt text-sm" style="color:#915BD8" />
+        <h2 class="text-base font-bold text-gray-800 whitespace-nowrap">Gestión de Fallas</h2>
       </div>
-      <div class="flex items-center gap-2">
-        <Button label="Actualizar" icon="pi pi-refresh" outlined size="small"
-          :loading="loading" @click="cargar" />
-        <Button label="Nueva falla" icon="pi pi-plus" size="small" @click="abrirCrear" />
+
+      <!-- Bucket pills inline -->
+      <div class="gf-bucket-pills">
+        <button v-for="b in BUCKETS" :key="b.key"
+          class="bucket-pill"
+          :class="{ 'bucket-pill--active': bucket === b.key }"
+          :style="bucketPillStyle(b.color, bucket === b.key)"
+          @click="bucket = b.key">
+          <span class="bucket-pill-dot" :style="{ background: b.color }" />
+          <span class="bucket-pill-label">{{ b.label }}</span>
+          <span class="bucket-pill-count" :style="{ color: b.color }">{{ counts[b.key] }}</span>
+        </button>
+      </div>
+
+      <div class="gf-topbar-actions">
+        <Button icon="pi pi-refresh" outlined size="small" :loading="loading" @click="cargar"
+          v-tooltip.bottom="'Actualizar'" />
+        <Button label="Nueva" icon="pi pi-plus" size="small" @click="abrirCrear" />
       </div>
     </div>
 
-    <!-- ══ BUCKETS / KPIs (siempre full width) ══════════════════════════ -->
-    <div class="gf-buckets grid grid-cols-2 lg:grid-cols-4 gap-3">
-      <button v-for="b in BUCKETS" :key="b.key"
-        class="bucket-card" :class="{ 'bucket-card--active': bucket === b.key }"
-        :style="bucketActiveStyle(b.color, bucket === b.key)"
-        @click="bucket = b.key">
-        <div class="bucket-icon" :style="{ background: b.color + '20', color: b.color }">
-          <i :class="b.icon" />
-        </div>
-        <div class="flex-1 text-left">
-          <div class="bucket-count" :style="{ color: b.color }">{{ counts[b.key] }}</div>
-          <div class="bucket-label">{{ b.label }}</div>
-        </div>
-        <div class="bucket-bar" :style="{ background: b.color }" />
-      </button>
-    </div>
-
-    <!-- ══ TOOLBAR (siempre full width) ═════════════════════════════════ -->
-    <div class="bg-white rounded-xl shadow-sm p-3 flex flex-wrap items-center gap-2">
-      <IconField class="flex-1 min-w-[240px] max-w-md">
-        <InputIcon class="pi pi-search" />
+    <!-- ══ TOOLBAR (fila delgada) ═══════════════════════════════════════ -->
+    <div class="gf-toolbar">
+      <IconField class="flex-1 min-w-[200px] max-w-sm">
+        <InputIcon class="pi pi-search text-xs" />
         <InputText ref="searchInputRef" v-model="search"
           placeholder="Buscar por código, descripción, proyecto, tipo..."
-          class="w-full" />
+          class="w-full" size="small" />
       </IconField>
       <Select v-model="filtroProyecto" :options="proyectos" optionLabel="nombre_comercial"
-        optionValue="id" placeholder="Proyecto" showClear filter class="w-44" />
+        optionValue="id" placeholder="Proyecto" showClear filter class="w-36" size="small" />
       <Select v-model="filtroPrioridad" :options="catalogos.prioridades"
-        optionLabel="etiqueta" optionValue="codigo" placeholder="Prioridad" showClear class="w-36" />
+        optionLabel="etiqueta" optionValue="codigo" placeholder="Prioridad" showClear class="w-32" size="small" />
       <Select v-model="filtroAsignado" :options="opcionesAsignado"
-        optionLabel="label" optionValue="value" placeholder="Responsable" showClear filter class="w-44" />
+        optionLabel="label" optionValue="value" placeholder="Responsable" showClear filter class="w-36" size="small" />
       <Select v-model="filtroEstado" :options="catalogos.estados"
-        optionLabel="etiqueta" optionValue="codigo" placeholder="Estado" showClear class="w-36" />
+        optionLabel="etiqueta" optionValue="codigo" placeholder="Estado" showClear class="w-32" size="small" />
       <DatePicker v-model="filtroFechaDesde" placeholder="Desde" dateFormat="yy-mm-dd"
-        showButtonBar class="w-32" />
+        showButtonBar class="w-28" size="small" />
       <DatePicker v-model="filtroFechaHasta" placeholder="Hasta" dateFormat="yy-mm-dd"
-        showButtonBar class="w-32" />
-      <Button v-if="hayFiltros" label="Limpiar" icon="pi pi-times" text size="small"
-        severity="secondary" @click="limpiarFiltros" />
-      <div class="ml-auto text-xs text-gray-500" v-if="!loading">
-        {{ filtradas.length }} de {{ porBucket.length }}
-      </div>
+        showButtonBar class="w-28" size="small" />
+      <Button v-if="hayFiltros" icon="pi pi-times" text size="small" severity="secondary"
+        @click="limpiarFiltros" v-tooltip.bottom="'Limpiar filtros'" />
+      <span class="ml-auto text-[11px] text-gray-500 whitespace-nowrap" v-if="!loading">
+        {{ filtradas.length }} / {{ porBucket.length }}
+      </span>
     </div>
 
   <div :class="['gf-layout', drawerVisible && 'gf-layout--split']">
@@ -875,6 +867,11 @@ function bucketActiveStyle(color, active) {
   return { boxShadow: `inset 0 0 0 2px ${color}` }
 }
 
+function bucketPillStyle(color, active) {
+  if (!active) return {}
+  return { color }
+}
+
 function rowClass(data) {
   return drawerFalla.value?.id === data.id ? 'gf-row-active' : ''
 }
@@ -1020,7 +1017,100 @@ watch(drawerVisible, (val) => {
 </script>
 
 <style scoped>
-/* ── Bucket cards ──────────────────────────────────────────────────────── */
+/* ── Top bar compacto (title + buckets + actions en una fila) ────────── */
+.gf-topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 6px 10px;
+  background: #fff;
+  border-radius: 10px;
+  border: 1px solid #ece8f4;
+  box-shadow: 0 1px 3px rgba(28, 18, 50, 0.04);
+  min-height: 42px;
+}
+.gf-topbar-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.gf-topbar-actions {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* Bucket pills inline */
+.gf-bucket-pills {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  flex: 1;
+  justify-content: center;
+  min-width: 0;
+}
+.bucket-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px 5px 8px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b5a8a;
+  transition: all 0.12s;
+  white-space: nowrap;
+}
+.bucket-pill:hover { background: #faf7ff; }
+.bucket-pill--active {
+  background: #faf5ff;
+  border-color: rgba(145, 91, 216, 0.25);
+}
+.bucket-pill-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.bucket-pill-label { color: inherit; }
+.bucket-pill-count {
+  font-weight: 700;
+  font-size: 12px;
+}
+
+/* ── Toolbar delgado ──────────────────────────────────────────────────── */
+.gf-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: #fff;
+  border-radius: 10px;
+  border: 1px solid #ece8f4;
+  box-shadow: 0 1px 3px rgba(28, 18, 50, 0.04);
+}
+.gf-toolbar :deep(.p-inputtext),
+.gf-toolbar :deep(.p-select),
+.gf-toolbar :deep(.p-datepicker-input) {
+  font-size: 12px !important;
+  padding-top: 5px !important;
+  padding-bottom: 5px !important;
+}
+.gf-toolbar :deep(.p-select-label) {
+  font-size: 12px !important;
+  padding-top: 5px !important;
+  padding-bottom: 5px !important;
+}
+
+/* ── Bucket cards (vista no usada actualmente — backup) ──────────────── */
 .bucket-card {
   position: relative;
   display: flex;
