@@ -1,5 +1,7 @@
 <template>
-  <div class="space-y-4">
+  <div :class="['gf-layout', drawerVisible && 'gf-layout--split']">
+
+  <div class="gf-main space-y-4 min-w-0">
 
     <!-- ══ HEADER ════════════════════════════════════════════════════════ -->
     <div class="flex items-start justify-between flex-wrap gap-3">
@@ -20,7 +22,7 @@
     </div>
 
     <!-- ══ BUCKETS / KPIs ═══════════════════════════════════════════════ -->
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    <div class="gf-buckets grid grid-cols-2 lg:grid-cols-4 gap-3">
       <button v-for="b in BUCKETS" :key="b.key"
         class="bucket-card" :class="{ 'bucket-card--active': bucket === b.key }"
         :style="bucketActiveStyle(b.color, bucket === b.key)"
@@ -76,7 +78,8 @@
       <DataTable v-else :value="filtradas" :loading="loading" rowHover stripedRows
         class="gf-table text-sm" :rows="25" paginator
         :rowsPerPageOptions="[15, 25, 50, 100]" :alwaysShowPaginator="false"
-        @row-click="(e) => abrirDrawer(e.data)" selectionMode="single">
+        @row-click="(e) => abrirDrawer(e.data)" selectionMode="single"
+        :rowClass="rowClass" scrollable>
         <template #empty>
           <div class="flex flex-col items-center py-14 gap-2 text-gray-400">
             <i :class="bucketActual.icon + ' text-4xl'" :style="{ color: bucketActual.color }" />
@@ -187,20 +190,30 @@
       </DataTable>
     </div>
 
-    <!-- ══ DRAWER DETALLE ════════════════════════════════════════════════ -->
-    <Drawer v-model:visible="drawerVisible" position="right"
-      :pt="{ root: { class: 'gf-drawer' } }" :showCloseIcon="false">
-      <template v-if="drawerFalla">
-        <!-- Header drawer -->
+  </div><!-- /gf-main -->
+
+    <!-- ══ PANEL DETALLE ════════════════════════════════════════════════ -->
+    <aside v-if="drawerVisible && drawerFalla" class="gf-aside" @keydown.left.stop="navegar(-1)" @keydown.right.stop="navegar(1)">
+      <!-- Backdrop solo en móvil -->
+      <div class="gf-aside-backdrop" @click="drawerVisible = false" />
+      <div class="gf-aside-panel">
+        <!-- Header panel -->
         <div class="gf-drawer-header">
-          <Button icon="pi pi-times" text rounded size="small" @click="drawerVisible = false" />
+          <Button icon="pi pi-times" text rounded size="small" @click="drawerVisible = false" v-tooltip.bottom="'Cerrar (Esc)'" />
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2 flex-wrap">
               <code class="font-mono text-sm text-purple-700 bg-purple-50 px-2 py-0.5 rounded">{{ drawerFalla.codigo_interno }}</code>
               <span class="text-xs text-gray-400">·</span>
               <span class="text-sm font-medium text-gray-700 truncate">{{ drawerFalla.tipo?.etiqueta }}</span>
+              <span v-if="navIndex >= 0" class="text-[10px] text-gray-400 ml-auto whitespace-nowrap">
+                {{ navIndex + 1 }} / {{ filtradas.length }}
+              </span>
             </div>
           </div>
+          <Button icon="pi pi-chevron-left" text rounded size="small" severity="secondary"
+            :disabled="navIndex <= 0" @click="navegar(-1)" v-tooltip.bottom="'Anterior (←)'" />
+          <Button icon="pi pi-chevron-right" text rounded size="small" severity="secondary"
+            :disabled="navIndex < 0 || navIndex >= filtradas.length - 1" @click="navegar(1)" v-tooltip.bottom="'Siguiente (→)'" />
           <Button icon="pi pi-external-link" text rounded size="small" severity="secondary"
             @click="$router.push(`/fallas/${drawerFalla.id}`)" v-tooltip.bottom="'Abrir página completa'" />
           <Button icon="pi pi-trash" text rounded size="small" severity="danger"
@@ -376,8 +389,8 @@
           <Button v-else label="Reabrir" icon="pi pi-replay" severity="warn" outlined
             class="flex-1" @click="reabrirFalla" />
         </div>
-      </template>
-    </Drawer>
+      </div><!-- /gf-aside-panel -->
+    </aside>
 
     <!-- ══ DIALOG CREAR / EDITAR ══════════════════════════════════════════ -->
     <Dialog v-model:visible="formDialogVisible" modal class="w-full max-w-2xl"
@@ -404,7 +417,6 @@ import InputText from 'primevue/inputtext'
 import IconField from 'primevue/iconfield'
 import InputIcon from 'primevue/inputicon'
 import DatePicker from 'primevue/datepicker'
-import Drawer from 'primevue/drawer'
 import Dialog from 'primevue/dialog'
 import Textarea from 'primevue/textarea'
 import FallaForm from '@/views/Fallas/FallaForm.vue'
@@ -554,6 +566,21 @@ const emptySubtitulo = computed(() => {
 const sortedSeguimientos = computed(() =>
   [...(drawerFalla.value?.seguimientos ?? [])].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
 )
+
+// Índice de la falla actual del panel en la lista filtrada (para navegación)
+const navIndex = computed(() => {
+  if (!drawerFalla.value) return -1
+  return filtradas.value.findIndex(f => f.id === drawerFalla.value.id)
+})
+
+function navegar(delta) {
+  if (!filtradas.value.length) return
+  const cur = navIndex.value
+  if (cur < 0) return
+  const next = Math.max(0, Math.min(filtradas.value.length - 1, cur + delta))
+  if (next === cur) return
+  abrirDrawer(filtradas.value[next])
+}
 
 // ── Carga ────────────────────────────────────────────────────────────────
 async function cargar() {
@@ -825,6 +852,10 @@ function bucketActiveStyle(color, active) {
   return { boxShadow: `inset 0 0 0 2px ${color}` }
 }
 
+function rowClass(data) {
+  return drawerFalla.value?.id === data.id ? 'gf-row-active' : ''
+}
+
 function initials(nombre) {
   if (!nombre) return '?'
   const parts = nombre.trim().split(/\s+/)
@@ -938,6 +969,9 @@ function onKeydown(e) {
     abrirCrear()
   } else if (e.key === 'Escape' && drawerVisible.value) {
     drawerVisible.value = false
+  } else if (drawerVisible.value && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+    e.preventDefault()
+    navegar(e.key === 'ArrowLeft' ? -1 : 1)
   }
 }
 
@@ -1064,32 +1098,92 @@ watch(drawerVisible, (val) => {
   flex-shrink: 0;
 }
 
-/* ── Drawer ───────────────────────────────────────────────────────────── */
-:deep(.gf-drawer) {
-  width: 100% !important;
-  max-width: 640px !important;
+/* ── Push layout (lista + panel lateral) ──────────────────────────────── */
+.gf-layout {
+  /* Sin split: la lista ocupa todo el ancho */
+  display: block;
 }
+.gf-main { min-width: 0; }
+
+/* En lg+, cuando hay panel abierto, layout grid de dos columnas */
+@media (min-width: 1024px) {
+  .gf-layout--split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(480px, 50%);
+    gap: 16px;
+    align-items: start;
+  }
+}
+
+/* Aside: en móvil = overlay full-screen; en desktop = panel en flujo */
+.gf-aside {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  justify-content: flex-end;
+}
+.gf-aside-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(28, 18, 50, 0.35);
+  backdrop-filter: blur(2px);
+}
+.gf-aside-panel {
+  position: relative;
+  width: 100%;
+  max-width: 540px;
+  height: 100%;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  box-shadow: -8px 0 24px rgba(28, 18, 50, 0.12);
+  overflow: hidden;
+}
+
+@media (min-width: 1024px) {
+  .gf-aside {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    height: auto;
+    max-height: calc(100vh - 3rem);
+    display: block;
+  }
+  .gf-aside-backdrop { display: none; }
+  .gf-aside-panel {
+    max-width: none;
+    height: calc(100vh - 3rem);
+    border-radius: 12px;
+    border: 1px solid #ece8f4;
+    box-shadow: 0 4px 12px rgba(28, 18, 50, 0.06);
+  }
+}
+
+/* Header / body / footer del panel */
 .gf-drawer-header {
-  display: flex; align-items: center; gap: 8px;
-  padding: 12px 16px;
+  display: flex; align-items: center; gap: 6px;
+  padding: 10px 14px;
   border-bottom: 1px solid #ece8f4;
-  position: sticky; top: 0;
   background: #fff; z-index: 10;
+  flex-shrink: 0;
 }
 .gf-drawer-body {
-  padding: 18px 18px 80px;
+  padding: 18px 18px 18px;
   display: flex; flex-direction: column; gap: 18px;
+  overflow-y: auto;
+  flex: 1;
 }
 .gf-drawer-footer {
-  position: sticky; bottom: 0;
   background: #fff;
-  padding: 12px 16px;
+  padding: 12px 14px;
   border-top: 1px solid #ece8f4;
   display: flex; gap: 8px;
+  flex-shrink: 0;
 }
 
 /* ── DataTable density tweaks ─────────────────────────────────────────── */
-:deep(.gf-table .p-datatable-tbody > tr) { cursor: pointer; }
+:deep(.gf-table .p-datatable-tbody > tr) { cursor: pointer; transition: background 0.12s; }
 :deep(.gf-table .p-datatable-tbody > tr > td) {
   padding: 10px 12px;
   vertical-align: middle;
@@ -1102,6 +1196,24 @@ watch(drawerVisible, (val) => {
   letter-spacing: 0.3px;
   color: #6b5a8a;
   padding: 10px 12px;
+}
+:deep(.gf-table .p-datatable-tbody > tr.gf-row-active) {
+  background: #faf5ff !important;
+  box-shadow: inset 3px 0 0 #915BD8;
+}
+:deep(.gf-table .p-datatable-tbody > tr.gf-row-active > td) {
+  border-color: #e9ddff;
+}
+:deep(.gf-table .p-datatable-wrapper) {
+  overflow-x: auto;
+}
+
+/* En split-mode comprimimos buckets y headers para ahorrar espacio */
+@media (min-width: 1024px) {
+  .gf-layout--split .gf-main { /* hint para hijos */ }
+  .gf-layout--split .gf-buckets {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 /* Line clamp utility */
