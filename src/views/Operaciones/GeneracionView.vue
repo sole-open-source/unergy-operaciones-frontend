@@ -65,8 +65,15 @@
             optionValue="id" :filter="true" :showToggleAll="false"
             display="chip" placeholder="Selecciona proyectos…"
             :maxSelectedLabels="3" :selectedItemsLabel="`{0} proyectos seleccionados`"
-            class="w-full" size="small" @change="cargarSiPosible" />
+            class="w-full" size="small" @change="onProyectosChange" />
         </div>
+
+        <!-- Consultar (dispara la query del intervalo seleccionado) -->
+        <Button label="Consultar" icon="pi pi-search" size="small"
+          class="gen-consultar" :class="{ 'gen-consultar--pendiente': pendiente && proyectosSel.length && !rangoError }"
+          :disabled="!proyectosSel.length || !!rangoError" :loading="loading"
+          @click="cargar"
+          v-tooltip.bottom="!proyectosSel.length ? 'Selecciona al menos un proyecto' : (rangoError ? 'Corrige el rango de fechas' : 'Consultar generación')" />
       </div>
 
     </div><!-- /sticky-header -->
@@ -75,7 +82,7 @@
     <div v-if="!proyectosSel.length" class="gen-empty">
       <i class="pi pi-info-circle text-3xl mb-3" style="color:#915BD8" />
       <p class="text-base font-semibold text-gray-700">Selecciona uno o más proyectos para comenzar</p>
-      <p class="text-sm text-gray-500 mt-1">Usa el selector arriba o aplica un atajo de fecha primero.</p>
+      <p class="text-sm text-gray-500 mt-1">Elige proyectos y un rango, luego presiona <strong>Consultar</strong>.</p>
     </div>
 
     <!-- ══ LOADING ════════════════════════════════════════════════════ -->
@@ -88,17 +95,27 @@
     <div v-else-if="error" class="gen-error">
       <i class="pi pi-exclamation-circle text-2xl text-red-500" />
       <div class="flex-1">
-        <p class="font-semibold text-red-700">Error al cargar</p>
+        <p class="font-semibold text-red-700">No se pudo consultar la generación</p>
         <p class="text-sm text-gray-600 mt-0.5">{{ error }}</p>
       </div>
       <Button label="Reintentar" icon="pi pi-refresh" outlined size="small" @click="cargar" />
+    </div>
+
+    <!-- ══ READY TO QUERY (proyectos elegidos, aún sin consultar) ═════ -->
+    <div v-else-if="!hasQueried" class="gen-empty">
+      <i class="pi pi-search text-3xl mb-3" style="color:#915BD8" />
+      <p class="text-base font-semibold text-gray-700">Listo para consultar</p>
+      <p class="text-sm text-gray-500 mt-1">Ajusta el rango y la granularidad, luego presiona Consultar.</p>
+      <Button label="Consultar" icon="pi pi-search" size="small" class="mt-3"
+        :disabled="!!rangoError" :loading="loading" @click="cargar" />
     </div>
 
     <!-- ══ NO DATA ═══════════════════════════════════════════════════ -->
     <div v-else-if="!datasets.length || datasets.every(d => !d.points.length)" class="gen-empty">
       <i class="pi pi-database text-3xl mb-3 text-gray-300" />
       <p class="text-base font-semibold text-gray-700">Sin datos para el rango seleccionado</p>
-      <p class="text-sm text-gray-500 mt-1">Prueba con un rango distinto o verifica que el proyecto tenga generación registrada.</p>
+      <p class="text-sm text-gray-500 mt-1">Los proyectos seleccionados no tienen generación registrada en este intervalo. Prueba con un rango más amplio o fechas anteriores.</p>
+      <Button label="Probar último año" icon="pi pi-calendar" outlined size="small" class="mt-3" @click="aplicarUltimoAnio" />
     </div>
 
     <!-- ══ MAIN CONTENT ══════════════════════════════════════════════ -->
@@ -287,6 +304,11 @@ const tipoGrafico = ref('line')
 const chartWrapRef = ref(null)
 const chartContainerWidth = ref(900)
 
+// Consulta manual: hasQueried distingue "aún no consultado" de "sin datos";
+// pendiente resalta el botón Consultar cuando hay cambios sin aplicar.
+const hasQueried = ref(false)
+const pendiente = ref(false)
+
 // ── Atajos ────────────────────────────────────────────────────────────
 const atajosFecha = computed(() => {
   if (granularidad.value === 'mensual') {
@@ -329,7 +351,31 @@ function aplicarRangoRapido(q) {
     d.setDate(1)
     fechaDesde.value = d
   }
-  cargarSiPosible()
+  marcarPendiente()
+}
+
+// Cambia a granularidad diaria + último año y consulta directamente
+// (atajo desde el estado "sin datos" para encontrar datos históricos).
+function aplicarUltimoAnio() {
+  granularidad.value = 'diaria'
+  fechaHasta.value = new Date(hoy)
+  fechaDesde.value = diasAtras(364)
+  cargar()
+}
+
+// Marca que hay filtros sin aplicar (resalta el botón Consultar).
+function marcarPendiente() {
+  pendiente.value = true
+}
+
+// Cambio en la selección de proyectos: si se vacía, limpia resultados.
+function onProyectosChange() {
+  pendiente.value = true
+  if (!proyectosSel.value.length) {
+    datasets.value = []
+    hasQueried.value = false
+    error.value = null
+  }
 }
 
 // ── Validación del rango ─────────────────────────────────────────────
@@ -358,11 +404,11 @@ function cambiarGranularidad(g) {
     fechaHasta.value = new Date(hoy)
     fechaDesde.value = diasAtras(max - 1)
   }
-  cargarSiPosible()
+  marcarPendiente()
 }
 
 function onCambioFechas() {
-  if (!rangoError.value) cargarSiPosible()
+  marcarPendiente()
 }
 
 // ── Período label helper ─────────────────────────────────────────────
@@ -370,20 +416,12 @@ const unidadPeriodo = computed(() => ({ mensual: 'mes', diaria: 'día', horaria:
 const unidadPeriodoPlural = computed(() => ({ mensual: 'meses', diaria: 'días', horaria: 'horas' }[granularidad.value]))
 
 // ── Carga ────────────────────────────────────────────────────────────
-async function cargarSiPosible() {
-  await nextTick()
-  if (rangoError.value) return
-  if (!proyectosSel.value.length) {
-    datasets.value = []
-    return
-  }
-  await cargar()
-}
-
 async function cargar() {
   if (!proyectosSel.value.length || rangoError.value) return
   loading.value = true
   error.value = null
+  pendiente.value = false
+  hasQueried.value = true
   try {
     const fInicio = isoDate(fechaDesde.value)
     const fFin = isoDate(fechaHasta.value)
@@ -402,22 +440,47 @@ async function cargar() {
     )
 
     const ds = []
+    const errores = []
     results.forEach((r, idx) => {
-      if (r.status !== 'fulfilled') return
-      const pid = r.value.pid
+      const pid = proyectosSel.value[idx]
       const proyecto = proyectos.value.find(p => p.id === pid)
-      const itemsRaw = r.value.items
-      const points = agruparSegunGranularidad(itemsRaw)
+      const nombre = proyecto?.nombre_comercial || `Proyecto ${pid}`
+      if (r.status !== 'fulfilled') {
+        const reason = r.reason
+        const msg = reason?.response?.data?.detail || reason?.message || 'error de conexión'
+        errores.push(`${nombre}: ${msg}`)
+        return
+      }
+      const points = agruparSegunGranularidad(r.value.items)
       const total = points.reduce((s, p) => s + (p.kwh || 0), 0)
       ds.push({
         proyectoId: pid,
-        nombre: proyecto?.nombre_comercial || `Proyecto ${pid}`,
+        nombre,
         color: PALETTE[idx % PALETTE.length],
         points,
         total,
         hidden: false,
       })
     })
+
+    // Si TODAS las consultas fallaron, es un fallo real de la API: mostrarlo
+    // (antes se tragaba el error y parecía simplemente "sin datos").
+    if (!ds.length && errores.length) {
+      error.value = errores.length === 1
+        ? errores[0]
+        : `No se pudo consultar ningún proyecto. ${errores[0]}`
+      datasets.value = []
+      return
+    }
+    // Fallos parciales: mostrar los que sí cargaron + avisar de los que no.
+    if (errores.length) {
+      toast.add({
+        severity: 'warn',
+        summary: 'Algunos proyectos no cargaron',
+        detail: errores.join(' · '),
+        life: 6000,
+      })
+    }
 
     // Sort by total desc for legend
     ds.sort((a, b) => b.total - a.total)
@@ -687,6 +750,18 @@ watch(chartWrapRef, (el) => {
   flex-direction: column;
   gap: 8px;
 }
+/* Tapa la franja superior (padding 24px del <main>) por la que el contenido
+   se asomaría al hacer scroll. Mismo patrón que Gestión de Fallas. */
+.gen-sticky-header::before {
+  content: "";
+  position: absolute;
+  left: -24px;
+  right: -24px;
+  bottom: 100%;
+  height: 28px;
+  background: #f3f4f6;
+  pointer-events: none;
+}
 
 .gen-titlebar {
   display: flex;
@@ -775,6 +850,18 @@ watch(chartWrapRef, (el) => {
 /* Project picker */
 .gen-project-picker { flex: 1; min-width: 240px; }
 .gen-project-picker :deep(.p-multiselect) { width: 100%; }
+
+/* Botón Consultar */
+.gen-consultar { flex-shrink: 0; }
+/* Resalta cuando hay filtros sin aplicar (pendiente de consultar) */
+.gen-consultar--pendiente :deep(.p-button),
+.gen-consultar--pendiente.p-button {
+  animation: gen-pulse 1.6s ease-in-out infinite;
+}
+@keyframes gen-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(145, 91, 216, 0.45); }
+  50%      { box-shadow: 0 0 0 4px rgba(145, 91, 216, 0.18); }
+}
 
 /* Empty / loading / error states */
 .gen-empty, .gen-loading, .gen-error {

@@ -1,8 +1,8 @@
 <template>
-  <div class="gf-page">
+  <div class="gf-page" ref="pageRef">
 
     <!-- ══ STICKY HEADER: title + buckets + filters siempre visibles ════ -->
-    <div class="gf-sticky-header">
+    <div class="gf-sticky-header" ref="stickyHeaderRef">
 
     <!-- ══ TITLE + BUCKETS + ACTIONS (una sola fila compacta) ═══════════ -->
     <div class="gf-topbar">
@@ -505,6 +505,10 @@ const filtroFechaDesde = ref(null)
 const filtroFechaHasta = ref(null)
 
 const searchInputRef = ref(null)
+
+// Refs para medir la altura real del header sticky y anclar la lista compacta
+const pageRef = ref(null)
+const stickyHeaderRef = ref(null)
 
 // ── Drawer / detalle ─────────────────────────────────────────────────────
 const drawerVisible = ref(false)
@@ -1023,17 +1027,35 @@ function onKeydown(e) {
   }
 }
 
+// Mide la altura real del header sticky y la expone como --gf-header-h en
+// la página. Así la lista compacta se ancla justo debajo del header (colisiona
+// con él, no se deja tapar) sin depender de un valor mágico que se desfasa
+// cuando los pills/filtros hacen wrap en pantallas medianas.
+let _headerRO = null
+function measureHeader() {
+  if (!stickyHeaderRef.value || !pageRef.value) return
+  pageRef.value.style.setProperty('--gf-header-h', `${stickyHeaderRef.value.offsetHeight}px`)
+}
+
 onMounted(() => {
   cargar()
   cargarCatalogos()
   cargarProyectos()
   cargarUsuarios()
   window.addEventListener('keydown', onKeydown)
+  nextTick(() => {
+    measureHeader()
+    if (window.ResizeObserver && stickyHeaderRef.value) {
+      _headerRO = new ResizeObserver(measureHeader)
+      _headerRO.observe(stickyHeaderRef.value)
+    }
+  })
 })
 
 import { onBeforeUnmount } from 'vue'
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeydown)
+  _headerRO?.disconnect()
 })
 
 // Limpiar drawer al cerrar
@@ -1080,6 +1102,20 @@ watch(bucket, (newBucket) => {
   display: flex;
   flex-direction: column;
   gap: 0;                      /* topbar + toolbar pegados, sin franja gris entre ellos */
+}
+/* El contenedor de scroll (<main>) tiene padding 24px. Un sticky top:0 queda
+   anclado 24px por debajo del borde visible, dejando una franja superior por la
+   que el contenido (lista compacta / panel detalle) se asomaba al hacer scroll.
+   Este "cap" full-bleed tapa esa franja (arriba y en los bordes laterales). */
+.gf-sticky-header::before {
+  content: "";
+  position: absolute;
+  left: -24px;
+  right: -24px;
+  bottom: 100%;
+  height: 28px;
+  background: #f3f4f6;
+  pointer-events: none;
 }
 
 /* ── Top bar (parte superior del card unificado) ───────────────────── */
@@ -1597,7 +1633,7 @@ watch(bucket, (newBucket) => {
 @media (min-width: 1024px) {
   .gf-layout--split .gf-table-wrap {
     /* La tabla ocupa toda la altura disponible junto al panel */
-    max-height: calc(100vh - 6.5rem);
+    max-height: calc(100vh - var(--gf-header-h, 6.5rem) - 1rem);
     display: flex;
     flex-direction: column;
   }
@@ -1665,14 +1701,14 @@ watch(bucket, (newBucket) => {
   overflow: hidden;
 }
 @media (min-width: 1024px) {
-  /* La lista compacta se ancla JUSTO DEBAJO del sticky-header.
-     Altura sticky-header: 4px top + topbar 42 + toolbar 42 + 12px bottom ≈ 100px = 6.25rem.
-     Top de la compacta = esa altura → así no queda franja visible entre ambos
-     donde el panel detalle se cuele al scrollear. */
+  /* La lista compacta se ancla JUSTO DEBAJO del sticky-header usando su altura
+     real medida (--gf-header-h). Así "choca" con el header y no se deja tapar,
+     sin depender de un valor fijo que se desfasa cuando los filtros hacen wrap.
+     Fallback 6.25rem para el primer frame antes de medir. */
   .gf-compact {
     position: sticky;
-    top: 6.25rem;
-    max-height: calc(100vh - 7.5rem);
+    top: var(--gf-header-h, 6.25rem);
+    max-height: calc(100vh - var(--gf-header-h, 6.25rem) - 1.25rem);
     z-index: 1;
   }
 }
