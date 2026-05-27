@@ -1014,6 +1014,23 @@ watch(drawerVisible, (val) => {
     setTimeout(() => { drawerFalla.value = null }, 200)
   }
 })
+
+// Si el usuario cambia de bucket y la falla abierta NO pertenece al nuevo bucket,
+// cerrar el panel para evitar inconsistencias (ej: viendo una activa y cambias a resueltas).
+// NOTA: sólo se aplica al cambio de bucket, no a filtros de búsqueda/proyecto/etc.
+// para no interrumpir al usuario mientras refina la lista.
+watch(bucket, (newBucket) => {
+  if (!drawerVisible.value || !drawerFalla.value) return
+  if (newBucket === 'todas') return
+  const bucketDeLaFallaAbierta = bucketDeFalla(drawerFalla.value)
+  if (bucketDeLaFallaAbierta !== newBucket) {
+    drawerVisible.value = false
+  }
+})
+
+// Si la falla seleccionada cambia de bucket por edición (ej: marcar resuelta) y el
+// usuario está viendo Activas, el panel sigue abierto mostrando los datos finales —
+// se considera intencional ya que el usuario acaba de actuar sobre esa falla.
 </script>
 
 <style scoped>
