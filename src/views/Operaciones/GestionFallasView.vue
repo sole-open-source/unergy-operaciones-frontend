@@ -390,17 +390,17 @@
             <p v-else class="text-xs text-gray-400">Aún no hay seguimientos.</p>
           </div>
 
-        </div>
+          <!-- Acciones principales (al final del scroll del panel) -->
+          <div class="gf-actions-inline">
+            <Button label="Editar completa" icon="pi pi-pencil" outlined class="flex-1"
+              @click="editarDesdeDrawer" />
+            <Button v-if="!drawerFalla.estado?.es_estado_final" label="Marcar resuelta"
+              icon="pi pi-check" severity="success" class="flex-1"
+              :loading="resolvingFalla" @click="quickResolve(drawerFalla)" />
+            <Button v-else label="Reabrir" icon="pi pi-replay" severity="warn" outlined
+              class="flex-1" @click="reabrirFalla" />
+          </div>
 
-        <!-- Footer drawer: acción principal -->
-        <div class="gf-drawer-footer">
-          <Button label="Editar completa" icon="pi pi-pencil" outlined class="flex-1"
-            @click="editarDesdeDrawer" />
-          <Button v-if="!drawerFalla.estado?.es_estado_final" label="Marcar resuelta"
-            icon="pi pi-check" severity="success" class="flex-1"
-            :loading="resolvingFalla" @click="quickResolve(drawerFalla)" />
-          <Button v-else label="Reabrir" icon="pi pi-replay" severity="warn" outlined
-            class="flex-1" @click="reabrirFalla" />
         </div>
       </div><!-- /gf-aside-panel -->
     </aside>
@@ -1237,14 +1237,14 @@ watch(bucket, (newBucket) => {
 @media (min-width: 1024px) {
   .gf-layout--split {
     display: grid;
-    grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+    grid-template-columns: minmax(230px, 290px) minmax(0, 1fr);
     gap: 16px;
     align-items: start;
   }
 }
 @media (min-width: 1440px) {
   .gf-layout--split {
-    grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+    grid-template-columns: minmax(250px, 325px) minmax(0, 1fr);
   }
 }
 
@@ -1313,15 +1313,16 @@ watch(bucket, (newBucket) => {
   flex: 1;
   min-height: 0;
 }
-.gf-drawer-footer {
-  background: #fff;
-  padding: 10px 12px;
-  border-top: 1px solid #ece8f4;
-  display: flex; gap: 8px;
-  flex-shrink: 0;
+/* Acciones inline al final del scroll del panel (NO sticky) */
+.gf-actions-inline {
+  display: flex;
+  gap: 8px;
   flex-wrap: wrap;
+  padding-top: 12px;
+  margin-top: 4px;
+  border-top: 1px solid #ece8f4;
 }
-.gf-drawer-footer :deep(.p-button) {
+.gf-actions-inline :deep(.p-button) {
   flex: 1 1 140px;
   min-width: 0;
 }
