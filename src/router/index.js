@@ -22,6 +22,7 @@ const routes = [
   // ── Operaciones ──────────────────────────────────────────────────
   { path: '/informes',     name: 'Informes',     component: () => import('@/views/Operaciones/InformesListView.vue'),  meta: { roles: ['admin', 'operaciones', 'monitoreo'] } },
   { path: '/informes/:id', name: 'InformeDetalle', component: () => import('@/views/Operaciones/InformeDetailView.vue'), meta: { roles: ['admin', 'operaciones', 'monitoreo'] } },
+  { path: '/operaciones/gestion-fallas', name: 'GestionFallas', component: () => import('@/views/Operaciones/GestionFallasView.vue'), meta: { roles: ['admin', 'operaciones', 'monitoreo'] } },
   { path: '/fallas',       name: 'Fallas',       component: () => import('@/views/Fallas/MonitoreoView.vue'),   meta: { roles: ['admin', 'operaciones', 'monitoreo'] } },
   { path: '/fallas/lista', redirect: '/fallas' },
   { path: '/fallas/:id',   name: 'FallaDetalle', component: () => import('@/views/Fallas/FallaDetailView.vue'), meta: { roles: ['admin', 'operaciones', 'monitoreo'] } },
