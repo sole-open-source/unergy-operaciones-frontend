@@ -11,6 +11,12 @@
         </div>
 
         <div class="em-header-right">
+          <!-- Búsqueda por proyecto -->
+          <div class="em-search-wrap">
+            <i class="pi pi-search em-search-icon" />
+            <input v-model="busqueda" type="text" placeholder="Buscar proyecto…" class="em-search-input" />
+            <button v-if="busqueda" class="em-search-clear" @click="busqueda = ''" title="Limpiar">✕</button>
+          </div>
           <!-- Mes selector -->
           <div class="em-month-picker">
             <button class="em-month-nav" @click="cambiarMes(-1)" title="Mes anterior">‹</button>
@@ -157,6 +163,23 @@
             </tr>
           </tbody>
         </table>
+        <!-- ── Sección "Faltantes": proyectos sin informe en el mes ──── -->
+        <div v-if="!loading && faltantes.length > 0" class="em-faltantes-wrap">
+          <button class="em-faltantes-toggle" @click="showFaltantes = !showFaltantes">
+            <span class="em-faltantes-badge">{{ faltantes.length }}</span>
+            <span>Proyecto{{ faltantes.length !== 1 ? 's' : '' }} sin informe en {{ mesLabel }}</span>
+            <i :class="showFaltantes ? 'pi pi-chevron-up' : 'pi pi-chevron-down'" style="margin-left:auto;font-size:11px;color:#6B5A8A" />
+          </button>
+          <transition name="fade">
+            <div v-if="showFaltantes" class="em-faltantes-list">
+              <div v-for="p in faltantes" :key="p" class="em-faltante-row">
+                <span class="em-faltante-dot" />
+                <span class="em-faltante-nombre">{{ p }}</span>
+                <span class="em-faltante-hint">Sin informe operacional</span>
+              </div>
+            </div>
+          </transition>
+        </div>
       </div>
       <!-- /em-table-wrap -->
 
@@ -470,9 +493,10 @@ import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
 
-const EMAIL_VERIFICADOR = 'juan.jose@unergy.io'
-const EMAIL_VERIFICADOR_ALT = 'juanjose@unergy.io'   // email actual del usuario en memoria
-const EMAIL_REMITENTE   = 'laura.h@unergy.io'
+const EMAIL_VERIFICADOR     = 'juan.jose@unergy.io'
+const EMAIL_VERIFICADOR_ALT = 'juanjose@unergy.io'
+const EMAIL_REMITENTE       = 'laura.h@unergy.io'
+const LS_MES_KEY            = 'em_pipeline_mes'   // localStorage key
 
 const userEmail = computed(() => (auth.user?.email || '').toLowerCase())
 const userRol   = computed(() => auth.user?.rol || '')
@@ -484,40 +508,49 @@ const permisoEnviar = computed(() =>
 )
 
 // ── Estado ─────────────────────────────────────────────────────
-const today = new Date()
+const today  = new Date()
 const mesMax = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`
-const mesSel = ref(mesMax)
-const informes = ref([])
-const loading = ref(false)
-const filtro = ref('')  // '' | 'pendiente' | 'comentado' | 'resuelto' | 'verificado' | 'enviado'
+
+// Restaurar el último mes visitado desde localStorage (ej. si el usuario dejó Abril abierto)
+const _savedMes = localStorage.getItem(LS_MES_KEY)
+const mesSel = ref((_savedMes && _savedMes <= mesMax) ? _savedMes : mesMax)
+
+const informes   = ref([])
+const loading    = ref(false)
+const filtro     = ref('')   // '' | 'pendiente' | 'comentado' | 'resuelto' | 'verificado' | 'enviado'
+const busqueda   = ref('')   // texto libre para filtrar por nombre de proyecto
+
+// "Faltantes": proyectos que NO tienen informe operacional en el mes seleccionado
+const todosProyectos  = ref([])   // lista de nombres/keys de proyectos en operación
+const showFaltantes   = ref(false)
 
 // Drawer
-const drawerInf = ref(null)
-const drawerTab = ref('preview')
-const detalleHtml = ref('')
+const drawerInf     = ref(null)
+const drawerTab     = ref('preview')
+const detalleHtml   = ref('')
 const loadingDetalle = ref(false)
 
 // Editor inline
-const editando = ref(false)
+const editando        = ref(false)
 const guardandoEdicion = ref(false)
-const previewRef = ref(null)
+const previewRef      = ref(null)
 
 // Comentarios
-const nuevoComentario = ref('')
-const agregandoComentario = ref(false)
-const resolviendoId = ref(null)
-const resolviendoTexto = ref('')
+const nuevoComentario      = ref('')
+const agregandoComentario  = ref(false)
+const resolviendoId        = ref(null)
+const resolviendoTexto     = ref('')
 const actuandoComentarioId = ref(null)
 
 // Verificación
 const verificando = ref(false)
 
 // Envío masivo
-const confirmEnvio = ref(false)
-const enviandoBatch = ref(false)
-const progBatch = ref({ hechos: 0, total: 0, actual: '' })
+const confirmEnvio   = ref(false)
+const enviandoBatch  = ref(false)
+const progBatch      = ref({ hechos: 0, total: 0, actual: '' })
 const resultadoBatch = ref(null)
-const enviandoIds = ref(new Set())
+const enviandoIds    = ref(new Set())
 
 // Toast
 const toastMsg = ref('')
@@ -531,19 +564,45 @@ function toast(msg, err = false) {
 
 // ── Computed ───────────────────────────────────────────────────
 function pipelineEstado(inf) {
-  if (inf.correo_enviado) return 'enviado'
+  if (inf.correo_enviado)      return 'enviado'
   if (inf.estado === 'aprobado') return 'verificado'
   const total = (inf.comentarios || []).length
-  const pend = (inf.comentarios || []).filter(c => !c.resuelto).length
-  if (pend > 0) return 'comentado'
-  if (total > 0) return 'resuelto'   // hubo comentarios pero todos subsanados
+  const pend  = (inf.comentarios || []).filter(c => !c.resuelto).length
+  if (pend  > 0) return 'comentado'
+  if (total > 0) return 'resuelto'
   if (inf.estado === 'revisado') return 'resuelto'
   return 'pendiente'
 }
 
+const mesLabel = computed(() => {
+  if (!mesSel.value) return ''
+  const [y, m] = mesSel.value.split('-')
+  const n = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+             'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'][+m]
+  return `${n} ${y}`
+})
+
+// Proyectos que tienen al menos un informe (tipo op) en el mes seleccionado
+const proyectosConInforme = computed(() =>
+  new Set(informes.value.filter(i => i.tipo === 'op').map(i => i.sub_project))
+)
+
+// "Faltantes": están en operación pero no generaron informe en este mes
+const faltantes = computed(() =>
+  todosProyectos.value.filter(p => !proyectosConInforme.value.has(p))
+)
+
 const filtrados = computed(() => {
-  if (!filtro.value) return informes.value
-  return informes.value.filter(i => pipelineEstado(i) === filtro.value)
+  let list = informes.value
+  if (filtro.value) list = list.filter(i => pipelineEstado(i) === filtro.value)
+  if (busqueda.value.trim()) {
+    const q = busqueda.value.trim().toLowerCase()
+    list = list.filter(i =>
+      (i.proyecto_nombre || '').toLowerCase().includes(q) ||
+      (i.sub_project || '').toLowerCase().includes(q)
+    )
+  }
+  return list
 })
 
 const resumen = computed(() => {
@@ -557,11 +616,10 @@ const puedeEnviarBatch = computed(() =>
 )
 
 // ── Helpers ────────────────────────────────────────────────────
-function comentariosTotales(inf) { return (inf.comentarios || []).length }
-function comentariosPendientes(inf) { return (inf.comentarios || []).filter(c => !c.resuelto).length }
+function comentariosTotales(inf)   { return (inf.comentarios || []).length }
+function comentariosPendientes(inf){ return (inf.comentarios || []).filter(c => !c.resuelto).length }
 function comentariosTooltip(inf) {
-  const t = comentariosTotales(inf)
-  const p = comentariosPendientes(inf)
+  const t = comentariosTotales(inf), p = comentariosPendientes(inf)
   if (t === 0) return 'Sin comentarios'
   if (p === 0) return `${t} comentario(s) — todos subsanados`
   return `${p} de ${t} comentarios sin subsanar`
@@ -574,13 +632,8 @@ function tipoLabel(t) {
   return { op: 'Operacional', fmo: 'FMO', port: 'Portafolio' }[t] || (t || '—').toUpperCase()
 }
 function estadoLabel(e) {
-  return {
-    pendiente: 'Pendiente',
-    comentado: 'Con comentarios',
-    resuelto: 'Comentarios resueltos',
-    verificado: 'Verificado',
-    enviado: 'Enviado',
-  }[e] || e
+  return { pendiente: 'Pendiente', comentado: 'Con comentarios', resuelto: 'Comentarios resueltos',
+           verificado: 'Verificado', enviado: 'Enviado' }[e] || e
 }
 function formatFecha(iso) {
   if (!iso) return '—'
@@ -593,33 +646,51 @@ function formatFechaCorta(iso) {
 function formatPeriodo(iso) {
   if (!iso) return '—'
   const [y, m] = iso.split('-')
-  const mes = ['', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'][+m] || m
+  const mes = ['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][+m] || m
   return `${mes} ${y}`
 }
 function avatarColor(email) {
-  const colors = ['#915BD8', '#F97316', '#16A34A', '#2563EB', '#DC2626', '#D97706', '#9333EA', '#0891B2']
+  const colors = ['#915BD8','#F97316','#16A34A','#2563EB','#DC2626','#D97706','#9333EA','#0891B2']
   let h = 0
   for (const c of (email || '')) h = ((h << 5) - h) + c.charCodeAt(0) | 0
   return colors[Math.abs(h) % colors.length]
 }
 
-// ── Cargar ─────────────────────────────────────────────────────
+// ── Cargar informes ─────────────────────────────────────────────
 async function cargar() {
   if (!mesSel.value) return
   loading.value = true
+  // Persistir mes seleccionado
+  localStorage.setItem(LS_MES_KEY, mesSel.value)
   try {
     const [y, m] = mesSel.value.split('-').map(Number)
-    const desde = `${y}-${String(m).padStart(2, '0')}-01`
+    const desde   = `${y}-${String(m).padStart(2,'0')}-01`
     const lastDay = new Date(y, m, 0).getDate()
-    const hasta = `${y}-${String(m).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
-    const { data } = await api.get('/informes/', { params: { limit: 200 } })
-    informes.value = (data || []).filter(i => i.periodo_desde >= desde && i.periodo_desde <= hasta)
+    const hasta   = `${y}-${String(m).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`
+    // ✅ Filtro de fecha en el backend — no más client-side filtering con riesgo de perder registros
+    const { data } = await api.get('/informes/', {
+      params: { periodo_desde_gte: desde, periodo_desde_lte: hasta, limit: 500 }
+    })
+    informes.value = data || []
   } catch (e) {
     toast('⚠️ ' + (e.response?.data?.detail || e.message), true)
   } finally {
     loading.value = false
   }
 }
+
+// ── Cargar lista de proyectos en operación (para detectar "faltantes") ──
+async function cargarProyectos() {
+  try {
+    const { data } = await api.get('/monitoreo/_legacy', { params: { action: 'getProjects' } })
+    // La API devuelve array de strings o de objetos {sub_project, nombre_comercial, ...}
+    if (Array.isArray(data)) {
+      todosProyectos.value = data.map(p => (typeof p === 'string' ? p : (p.sub_project || p.nombre_comercial || p.name || '')))
+        .filter(Boolean)
+    }
+  } catch { /* no crítico */ }
+}
+
 function cambiarMes(delta) {
   if (!mesSel.value) return
   const [y, m] = mesSel.value.split('-').map(Number)
@@ -628,8 +699,8 @@ function cambiarMes(delta) {
   if (nuevo > mesMax) return
   mesSel.value = nuevo
 }
-watch(mesSel, () => cargar())
-onMounted(cargar)
+watch(mesSel, () => { filtro.value = ''; busqueda.value = ''; cargar() })
+onMounted(() => { cargar(); cargarProyectos() })
 
 // ── Drawer ─────────────────────────────────────────────────────
 async function abrirDrawer(inf, tab = 'preview') {
@@ -1397,6 +1468,71 @@ async function ejecutarEnvioBatch() {
 }
 .em-toast-ok { background: #DCFCE7; color: #166534; border: 1px solid #BBF7D0; }
 .em-toast-err { background: #FEE2E2; color: #991B1B; border: 1px solid #FECACA; }
+
+/* ── Búsqueda ─────────────────────────────────────────────────── */
+.em-search-wrap {
+  position: relative;
+  display: inline-flex; align-items: center;
+}
+.em-search-icon {
+  position: absolute; left: 8px; color: #9CA3AF; font-size: 12px; pointer-events: none;
+}
+.em-search-input {
+  background: #F4F1FA; border: 1px solid #E5E2EC; border-radius: 7px;
+  padding: 4px 28px 4px 26px;
+  font-family: inherit; font-size: 12px; color: #2C2039;
+  outline: none; width: 180px;
+  transition: border-color .15s, width .2s;
+}
+.em-search-input:focus { border-color: #915BD8; width: 220px; }
+.em-search-input::placeholder { color: #A89EC0; }
+.em-search-clear {
+  position: absolute; right: 6px;
+  background: none; border: none; cursor: pointer;
+  color: #9CA3AF; font-size: 10px; padding: 0; line-height: 1;
+}
+.em-search-clear:hover { color: #6D28D9; }
+
+/* ── Faltantes ────────────────────────────────────────────────── */
+.em-faltantes-wrap {
+  margin: 0 12px 10px;
+  border: 1px solid #FDE68A;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #FFFBEB;
+}
+.em-faltantes-toggle {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; padding: 9px 14px;
+  background: transparent; border: none;
+  cursor: pointer; font-family: inherit; font-size: 12px; font-weight: 700;
+  color: #92400E;
+  text-align: left;
+}
+.em-faltantes-toggle:hover { background: #FEF3C7; }
+.em-faltantes-badge {
+  background: #D97706; color: #fff;
+  font-size: 10px; font-weight: 800;
+  padding: 1px 7px; border-radius: 8px;
+  min-width: 18px; text-align: center;
+}
+.em-faltantes-list {
+  display: flex; flex-direction: column;
+  padding: 4px 14px 10px;
+  gap: 4px;
+}
+.em-faltante-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  background: rgba(254,243,199,.5);
+}
+.em-faltante-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: #D97706; flex-shrink: 0;
+}
+.em-faltante-nombre { font-size: 12px; font-weight: 700; color: #78350F; flex: 1; }
+.em-faltante-hint   { font-size: 10px; color: #92400E; font-style: italic; }
 
 /* ── Transiciones ─────────────────────────────────────────────── */
 .slide-right-enter-active, .slide-right-leave-active { transition: all .25s ease; }

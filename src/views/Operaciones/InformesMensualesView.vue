@@ -64,13 +64,15 @@ watch(tab, (val) => setTab(val))
 // Cuenta informes pendientes/comentados del mes actual para mostrar badge en el tab Pipeline
 async function cargarBadge() {
   try {
-    const now = new Date()
+    const now   = new Date()
     const desde = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
-    const last = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+    const last  = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
     const hasta = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(last).padStart(2, '0')}`
-    const { data } = await api.get('/informes/', { params: { limit: 200 } })
-    const mes = (data || []).filter(i => i.periodo_desde >= desde && i.periodo_desde <= hasta)
-    const pendientes = mes.filter(i => i.estado !== 'aprobado' || !i.correo_enviado).length
+    // ✅ Filtro en backend para no depender del orden/límite
+    const { data } = await api.get('/informes/', {
+      params: { periodo_desde_gte: desde, periodo_desde_lte: hasta, limit: 500 }
+    })
+    const pendientes = (data || []).filter(i => i.estado !== 'aprobado' || !i.correo_enviado).length
     badgePipeline.value = pendientes || null
   } catch { /* no crítico */ }
 }
