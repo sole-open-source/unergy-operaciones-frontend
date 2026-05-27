@@ -6,7 +6,7 @@
       <div class="imv-topbar-title">
         <i class="pi pi-file-edit text-sm" style="color:#915BD8" />
         <h2 class="text-base font-bold text-gray-800 whitespace-nowrap">Informes Mensuales</h2>
-        <span class="hidden md:inline text-xs text-gray-500">· Generación por proyecto, portafolio y FMO</span>
+        <span class="hidden md:inline text-xs text-gray-500">· Generación, verificación y envío</span>
       </div>
       <div class="imv-topbar-actions">
         <RouterLink to="/informes" class="imv-link-btn"
@@ -14,17 +14,30 @@
           <i class="pi pi-folder-open" />
           <span class="hidden sm:inline">Guardados</span>
         </RouterLink>
+        <button class="imv-link-btn imv-link-btn--primary"
+                @click="envioMensualOpen = true"
+                v-tooltip.bottom="'Pipeline mensual: revisar, comentar, verificar y enviar al cliente'">
+          <i class="pi pi-send" />
+          <span class="hidden sm:inline">Envío mensual</span>
+        </button>
       </div>
     </div>
 
     <!-- Wizard -->
     <InformesMensualesPanel />
 
+    <!-- Panel de envío mensual (full-overlay) -->
+    <EnvioMensualPanel v-if="envioMensualOpen" @cerrar="envioMensualOpen = false" />
+
   </div>
 </template>
 
 <script setup>
+import { ref } from 'vue'
 import InformesMensualesPanel from './InformesMensualesPanel.vue'
+import EnvioMensualPanel from './EnvioMensualPanel.vue'
+
+const envioMensualOpen = ref(false)
 </script>
 
 <style scoped>
@@ -75,4 +88,14 @@ import InformesMensualesPanel from './InformesMensualesPanel.vue'
 }
 .imv-link-btn:hover { background: #E9DEFC; border-color: #C7A8F0; }
 .imv-link-btn i { font-size: 12px; }
+
+.imv-link-btn--primary {
+  background: #915BD8;
+  border-color: #915BD8;
+  color: #FDFAF7;
+}
+.imv-link-btn--primary:hover {
+  background: #7C3AED;
+  border-color: #7C3AED;
+}
 </style>
