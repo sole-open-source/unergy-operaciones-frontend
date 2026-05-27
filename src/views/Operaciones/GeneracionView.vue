@@ -193,7 +193,8 @@
 
         <!-- SVG chart -->
         <div class="gen-chart-wrap" ref="chartWrapRef">
-          <svg :viewBox="`0 0 ${chartW} ${chartH}`" preserveAspectRatio="none" class="gen-chart-svg">
+          <svg ref="chartSvgRef" :viewBox="`0 0 ${chartW} ${chartH}`" preserveAspectRatio="none" class="gen-chart-svg"
+            @mousemove="onChartMove" @mouseleave="onChartLeave">
             <!-- Y grid lines + labels -->
             <g class="gen-grid">
               <template v-for="(y, i) in yTicks" :key="'y' + i">
@@ -231,7 +232,29 @@
                   rx="1.5" />
               </g>
             </template>
+
+            <!-- Hover: línea guía vertical + puntos resaltados -->
+            <g v-if="hover" class="gen-hover" pointer-events="none">
+              <line :x1="hover.gx" :x2="hover.gx" :y1="paddingT" :y2="chartH - paddingB" class="gen-hover-line" />
+              <circle v-for="s in hoverSeries" :key="'h' + s.proyectoId"
+                :cx="hover.gx" :cy="yToPx(s.kwh)" r="4" :fill="s.color" stroke="#fff" stroke-width="1.5" />
+            </g>
           </svg>
+
+          <!-- Tooltip: valor de X (período) y de Y (kWh) bajo el cursor -->
+          <div v-if="hover" class="gen-tooltip" :class="{ 'gen-tooltip--flip': hover.flip }"
+            :style="{ left: hover.tipLeft + 'px', top: hover.tipTop + 'px' }">
+            <div class="gen-tooltip-x">{{ hover.label }}</div>
+            <div v-for="s in hoverSeries" :key="'t' + s.proyectoId" class="gen-tooltip-row">
+              <span class="gen-tooltip-dot" :style="{ background: s.color }" />
+              <span class="gen-tooltip-name">{{ s.nombre }}</span>
+              <span class="gen-tooltip-val">{{ s.kwh.toLocaleString('es-CO', { maximumFractionDigits: 1 }) }} kWh</span>
+            </div>
+            <div v-if="hoverSeries.length > 1" class="gen-tooltip-row gen-tooltip-total">
+              <span class="gen-tooltip-name">Total</span>
+              <span class="gen-tooltip-val">{{ hoverTotal.toLocaleString('es-CO', { maximumFractionDigits: 1 }) }} kWh</span>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -315,7 +338,11 @@ const fechaHasta = ref(new Date())
 const datasets = ref([])
 const tipoGrafico = ref('line')
 const chartWrapRef = ref(null)
+const chartSvgRef = ref(null)
 const chartContainerWidth = ref(900)
+
+// Hover sobre la gráfica: período (X) + valor kWh (Y) de cada serie bajo el cursor.
+const hover = ref(null)  // { idx, gx, tipLeft, tipTop, flip, label } | null
 
 // Consulta manual: hasQueried distingue "aún no consultado" de "sin datos";
 // pendiente resalta el botón Consultar cuando hay cambios sin aplicar.
@@ -662,6 +689,35 @@ function fmtYTick(v) {
   if (v >= 1_000) return (v / 1_000).toFixed(1) + 'k'
   return v.toFixed(0)
 }
+
+// ── Hover (tooltip de valores X/Y) ───────────────────────────────────
+// Series visibles con su valor en el período bajo el cursor.
+const hoverSeries = computed(() => {
+  if (!hover.value) return []
+  const i = hover.value.idx
+  return datasets.value
+    .filter(d => !d.hidden)
+    .map(d => ({ proyectoId: d.proyectoId, color: d.color, nombre: d.nombre, kwh: d.points[i]?.kwh ?? 0 }))
+})
+const hoverTotal = computed(() => hoverSeries.value.reduce((s, d) => s + d.kwh, 0))
+
+function onChartMove(e) {
+  const n = periodos.value.length
+  if (!n || !chartSvgRef.value) { hover.value = null; return }
+  const rect = chartSvgRef.value.getBoundingClientRect()
+  if (!rect.width) return
+  // mapea pixel del cursor → coordenada X del viewBox (preserveAspectRatio=none ⇒ lineal)
+  const userX = (e.clientX - rect.left) / rect.width * chartW.value
+  const span = chartW.value - paddingL - paddingR
+  let idx = n <= 1 ? 0 : Math.round(((userX - paddingL) / span) * (n - 1))
+  idx = Math.max(0, Math.min(n - 1, idx))
+  const wrapRect = chartWrapRef.value?.getBoundingClientRect()
+  const tipLeft = wrapRect ? e.clientX - wrapRect.left : 0
+  const tipTop = wrapRect ? e.clientY - wrapRect.top : 0
+  const flip = wrapRect ? tipLeft > wrapRect.width * 0.6 : false
+  hover.value = { idx, gx: xToPx(idx), tipLeft, tipTop, flip, label: periodos.value[idx]?.label || '' }
+}
+function onChartLeave() { hover.value = null }
 
 // ── Tabla ────────────────────────────────────────────────────────────
 const tablaFilas = computed(() => {
@@ -1032,12 +1088,58 @@ watch(chartWrapRef, (el) => {
 .gen-chart-wrap {
   width: 100%;
   padding: 12px 16px 4px;
+  position: relative;   /* ancla del tooltip de hover */
 }
 .gen-chart-svg {
   width: 100%;
   height: 280px;
   display: block;
 }
+
+/* Hover: línea guía + tooltip de valores X/Y */
+.gen-hover-line {
+  stroke: #915BD8;
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+  opacity: 0.75;
+}
+.gen-tooltip {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+  min-width: 150px;
+  max-width: 240px;
+  background: #fff;
+  border: 1px solid #e9ddff;
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(28, 18, 50, 0.16);
+  padding: 8px 10px;
+  font-size: 11.5px;
+  transform: translate(12px, -50%);
+}
+.gen-tooltip--flip { transform: translate(calc(-100% - 12px), -50%); }
+.gen-tooltip-x {
+  font-weight: 700;
+  color: #2C2039;
+  margin-bottom: 5px;
+  white-space: nowrap;
+}
+.gen-tooltip-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 0;
+}
+.gen-tooltip-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.gen-tooltip-name {
+  color: #6b5a8a;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gen-tooltip-val { font-weight: 700; color: #2C2039; font-variant-numeric: tabular-nums; }
+.gen-tooltip-total { border-top: 1px solid #f0ebf7; margin-top: 4px; padding-top: 4px; }
 .gen-chart-svg .gen-grid line {
   stroke: #ece8f4;
   stroke-width: 1;
