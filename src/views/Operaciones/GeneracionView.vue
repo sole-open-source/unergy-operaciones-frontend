@@ -23,40 +23,67 @@
 
       <!-- Filter row -->
       <div class="gen-filterbar">
-        <!-- Granularity selector -->
+        <!-- 1) Granularidad -->
         <div class="gen-segmented">
           <button v-for="g in GRANULARIDADES" :key="g.key"
             class="gen-seg-btn"
-            :class="{ 'gen-seg-btn--active': granularidad === g.key, 'gen-seg-btn--disabled': g.disabled }"
-            :disabled="g.disabled"
-            :title="g.tooltip || ''"
-            @click="cambiarGranularidad(g.key)">
+            :class="{ 'gen-seg-btn--active': granularidad === g.key }"
+            @click="onGranularidadChange(g.key)">
             <i :class="g.icon" />
             <span>{{ g.label }}</span>
           </button>
         </div>
 
-        <!-- Date range -->
-        <div class="flex items-center gap-1.5">
-          <DatePicker v-model="fechaDesde" placeholder="Desde" dateFormat="dd/mm/yy"
-            :showIcon="true" size="small" class="w-36" :maxDate="hoy"
-            @date-select="onCambioFechas" />
-          <span class="text-xs text-gray-400">→</span>
-          <DatePicker v-model="fechaHasta" placeholder="Hasta" dateFormat="dd/mm/yy"
-            :showIcon="true" size="small" class="w-36" :maxDate="hoy"
-            @date-select="onCambioFechas" />
-        </div>
-
-        <!-- Quick range chips -->
-        <div class="gen-chips">
-          <button v-for="q in atajosFecha" :key="q.label" class="gen-chip" @click="aplicarRangoRapido(q)">
-            {{ q.label }}
+        <!-- 2) Modo (cambia según granularidad: presets + intervalo) -->
+        <div class="gen-segmented gen-segmented--modo">
+          <button v-for="m in modosActuales" :key="m.key"
+            class="gen-seg-btn"
+            :class="{ 'gen-seg-btn--active': modo === m.key }"
+            @click="onModoChange(m.key)">
+            {{ m.label }}
           </button>
         </div>
 
-        <!-- Validation message -->
-        <span v-if="rangoError" class="gen-err">
+        <!-- 3) Selector contextual según granularidad + modo -->
+        <!-- Mensual · Año específico -->
+        <Select v-if="granularidad === 'mensual' && modo === 'anio'"
+          v-model="anioSel" :options="aniosDisponibles" optionLabel="label" optionValue="value"
+          class="w-28" size="small" @update:modelValue="aplicarModo" />
+        <!-- Mensual · Intervalo de meses (un solo picker de rango) -->
+        <DatePicker v-else-if="granularidad === 'mensual' && modo === 'intervalo'"
+          v-model="rango" selectionMode="range" view="month" dateFormat="mm/yy" :manualInput="false"
+          :showIcon="true" size="small" class="w-56" :maxDate="hoy"
+          placeholder="Mes inicial → final" @update:modelValue="aplicarModo" />
+        <!-- Diaria · Mes específico -->
+        <DatePicker v-else-if="granularidad === 'diaria' && modo === 'mes'"
+          v-model="mesSel" view="month" dateFormat="MM yy" :manualInput="false"
+          :showIcon="true" size="small" class="w-44" :maxDate="hoy"
+          placeholder="Elige un mes" @update:modelValue="aplicarModo" />
+        <!-- Diaria · Intervalo de días (UN solo picker de rango) -->
+        <DatePicker v-else-if="granularidad === 'diaria' && modo === 'intervalo'"
+          v-model="rango" selectionMode="range" :numberOfMonths="2" dateFormat="dd/mm/yy" :manualInput="false"
+          :showIcon="true" size="small" class="w-64" :maxDate="hoy"
+          placeholder="Día inicial → final" @update:modelValue="aplicarModo" />
+        <!-- Horaria · Día específico -->
+        <DatePicker v-else-if="granularidad === 'horaria' && modo === 'dia'"
+          v-model="diaSel" dateFormat="dd/mm/yy" :manualInput="false"
+          :showIcon="true" size="small" class="w-44" :maxDate="hoy"
+          placeholder="Elige un día" @update:modelValue="aplicarModo" />
+        <!-- Horaria · Intervalo de días (UN solo picker de rango) -->
+        <DatePicker v-else-if="granularidad === 'horaria' && modo === 'intervalo'"
+          v-model="rango" selectionMode="range" :numberOfMonths="2" dateFormat="dd/mm/yy" :manualInput="false"
+          :showIcon="true" size="small" class="w-64" :maxDate="hoy"
+          placeholder="Día inicial → final" @update:modelValue="aplicarModo" />
+
+        <!-- Etiqueta del rango resuelto -->
+        <span class="gen-range-label"><i class="pi pi-calendar-clock" /> {{ rangoLabel }}</span>
+
+        <!-- Avisos -->
+        <span v-if="rangoError && rangoError !== 'Selecciona un rango'" class="gen-err">
           <i class="pi pi-exclamation-circle" /> {{ rangoError }}
+        </span>
+        <span v-else-if="avisoRango" class="gen-aviso">
+          <i class="pi pi-info-circle" /> {{ avisoRango }}
         </span>
 
         <!-- Project multi-select (valor = sub_project = ID de API Unergy) -->
@@ -128,7 +155,7 @@
       <i class="pi pi-database text-3xl mb-3 text-gray-300" />
       <p class="text-base font-semibold text-gray-700">Sin datos para el rango seleccionado</p>
       <p class="text-sm text-gray-500 mt-1">Los proyectos seleccionados no tienen generación registrada en este intervalo. Prueba con un rango más amplio o fechas anteriores.</p>
-      <Button label="Probar último año" icon="pi pi-calendar" outlined size="small" class="mt-3" @click="aplicarUltimoAnio" />
+      <Button label="Ver el año en curso (mensual)" icon="pi pi-calendar" outlined size="small" class="mt-3" @click="verEsteAnioMensual" />
     </div>
 
     <!-- ══ MAIN CONTENT ══════════════════════════════════════════════ -->
@@ -303,6 +330,7 @@ import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
 import DatePicker from 'primevue/datepicker'
 import MultiSelect from 'primevue/multiselect'
+import Select from 'primevue/select'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import ProgressSpinner from 'primevue/progressspinner'
@@ -316,12 +344,32 @@ const MESES_ES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','N
 const PALETTE = ['#915BD8', '#2563eb', '#10b981', '#D4A017', '#dc2626', '#0891b2', '#7c3aed', '#db2777', '#65a30d', '#0d9488']
 
 const GRANULARIDADES = [
-  { key: 'mensual', label: 'Mensual', icon: 'pi pi-calendar', maxDias: 365 * 5 },
-  { key: 'diaria',  label: 'Diaria',  icon: 'pi pi-list',     maxDias: 365 },
-  { key: 'horaria', label: 'Horaria', icon: 'pi pi-clock',    maxDias: 7,
-    disabled: false,
-    tooltip: 'Vista horaria: máximo 1 semana (lecturas reales de la API de Unergy).' },
+  { key: 'mensual', label: 'Mensual', icon: 'pi pi-calendar' },
+  { key: 'diaria',  label: 'Diaria',  icon: 'pi pi-list' },
+  { key: 'horaria', label: 'Horaria', icon: 'pi pi-clock' },
 ]
+
+// Modos de selección por granularidad: presets rápidos + intervalo libre.
+// La unidad natural de cada granularidad: año (mensual), mes (diaria), día (horaria).
+const MODOS = {
+  mensual: [
+    { key: 'actual',    label: 'Este año' },
+    { key: 'pasado',    label: 'Año pasado' },
+    { key: 'anio',      label: 'Año…' },
+    { key: 'intervalo', label: 'Intervalo' },
+  ],
+  diaria: [
+    { key: 'actual',    label: 'Este mes' },
+    { key: 'mes',       label: 'Mes…' },
+    { key: 'intervalo', label: 'Intervalo' },
+  ],
+  horaria: [
+    { key: 'ayer',      label: 'Ayer' },
+    { key: 'dia',       label: 'Día…' },
+    { key: 'intervalo', label: 'Intervalo' },
+  ],
+}
+const MODO_DEFAULT = { mensual: 'actual', diaria: 'actual', horaria: 'ayer' }
 
 const hoy = new Date(); hoy.setHours(0, 0, 0, 0)
 
@@ -332,8 +380,14 @@ const proyectos = ref([])
 const proyectosSel = ref([])
 
 const granularidad = ref('diaria')
-const fechaDesde = ref(diasAtras(30))
+const modo = ref('actual')
+const fechaDesde = ref(new Date())
 const fechaHasta = ref(new Date())
+// Selectores específicos por modo:
+const anioSel = ref(new Date().getFullYear())  // mensual · "Año…"
+const mesSel = ref(new Date())                  // diaria  · "Mes…"  (cualquier día del mes)
+const diaSel = ref(new Date())                  // horaria · "Día…"
+const rango = ref(null)                         // modo intervalo: UN solo picker de rango [desde, hasta]
 
 const datasets = ref([])
 const tipoGrafico = ref('line')
@@ -356,64 +410,97 @@ const nombrePorSub = computed(() => {
   return m
 })
 
-// ── Atajos ────────────────────────────────────────────────────────────
-const atajosFecha = computed(() => {
-  if (granularidad.value === 'mensual') {
-    return [
-      { label: '6m',  meses: 6 },
-      { label: '1a',  meses: 12 },
-      { label: '2a',  meses: 24 },
-    ]
-  }
-  if (granularidad.value === 'diaria') {
-    return [
-      { label: '7d',  dias: 7 },
-      { label: '30d', dias: 30 },
-      { label: '90d', dias: 90 },
-      { label: '6m',  dias: 180 },
-      { label: '1a',  dias: 365 },
-    ]
-  }
-  return [
-    { label: 'Hoy',  dias: 1 },
-    { label: '3d',   dias: 3 },
-    { label: '7d',   dias: 7 },
-  ]
+// ── Modo de selección + cálculo de fechas ─────────────────────────────
+const modosActuales = computed(() => MODOS[granularidad.value] || [])
+
+const aniosDisponibles = computed(() => {
+  const y = new Date().getFullYear()
+  const arr = []
+  for (let a = y; a >= 2019; a--) arr.push({ label: String(a), value: a })
+  return arr
 })
 
-function diasAtras(n) {
-  const d = new Date()
-  d.setHours(0, 0, 0, 0)
-  d.setDate(d.getDate() - n)
-  return d
+function finDeAnioOHoy(y) {
+  const t = new Date(); t.setHours(0, 0, 0, 0)
+  const last = new Date(y, 11, 31)
+  return last > t ? t : last
+}
+function finDeMesOHoy(y, m) { // m 0-based
+  const t = new Date(); t.setHours(0, 0, 0, 0)
+  const last = new Date(y, m + 1, 0)
+  return last > t ? t : last
 }
 
-function aplicarRangoRapido(q) {
-  fechaHasta.value = new Date(hoy)
-  if (q.dias != null) {
-    fechaDesde.value = diasAtras(q.dias - 1)
-  } else if (q.meses != null) {
-    const d = new Date(hoy)
-    d.setMonth(d.getMonth() - q.meses + 1)
-    d.setDate(1)
-    fechaDesde.value = d
+// Rango del picker único (modo intervalo) para día/hora → [desde, hasta] normalizado.
+function rangoDiasSel() {
+  const r = rango.value || []
+  const a = r[0] ? new Date(r[0]) : new Date(fechaDesde.value)
+  const b = r[1] ? new Date(r[1]) : new Date(r[0] || fechaHasta.value)
+  a.setHours(0, 0, 0, 0); b.setHours(0, 0, 0, 0)
+  return b < a ? [b, a] : [a, b]
+}
+// Rango del picker único (modo intervalo mensual) → límites de mes.
+function rangoMesesSel() {
+  const r = rango.value || []
+  const a0 = r[0] ? new Date(r[0]) : new Date(fechaDesde.value)
+  const b0 = r[1] ? new Date(r[1]) : new Date(r[0] || fechaHasta.value)
+  let a = new Date(a0.getFullYear(), a0.getMonth(), 1)
+  let b = finDeMesOHoy(b0.getFullYear(), b0.getMonth())
+  return b < a ? [new Date(b0.getFullYear(), b0.getMonth(), 1), finDeMesOHoy(a0.getFullYear(), a0.getMonth())] : [a, b]
+}
+
+// Calcula fechaDesde/fechaHasta a partir de {granularidad, modo, selectores}.
+function recomputarFechas() {
+  const t = new Date(); t.setHours(0, 0, 0, 0)
+  const y = t.getFullYear()
+  let d = null, h = null
+  if (granularidad.value === 'mensual') {
+    if (modo.value === 'actual') { d = new Date(y, 0, 1); h = finDeAnioOHoy(y) }
+    else if (modo.value === 'pasado') { d = new Date(y - 1, 0, 1); h = new Date(y - 1, 11, 31) }
+    else if (modo.value === 'anio') { const yy = anioSel.value || y; d = new Date(yy, 0, 1); h = finDeAnioOHoy(yy) }
+    else { [d, h] = rangoMesesSel() }
+  } else if (granularidad.value === 'diaria') {
+    if (modo.value === 'actual') { d = new Date(y, t.getMonth(), 1); h = new Date(t) }
+    else if (modo.value === 'mes') { const m = mesSel.value || t; d = new Date(m.getFullYear(), m.getMonth(), 1); h = finDeMesOHoy(m.getFullYear(), m.getMonth()) }
+    else { [d, h] = rangoDiasSel() }
+  } else { // horaria
+    if (modo.value === 'ayer') { const ay = new Date(t); ay.setDate(ay.getDate() - 1); d = ay; h = new Date(ay) }
+    else if (modo.value === 'dia') { const dd = new Date(diaSel.value || t); dd.setHours(0, 0, 0, 0); d = dd; h = new Date(dd) }
+    else { [d, h] = rangoDiasSel() }
   }
+  if (d) fechaDesde.value = d
+  if (h) fechaHasta.value = h
+}
+
+function aplicarModo() { recomputarFechas(); marcarPendiente() }
+
+function onGranularidadChange(g) {
+  if (g === granularidad.value) return
+  granularidad.value = g
+  modo.value = MODO_DEFAULT[g]
+  recomputarFechas()
   marcarPendiente()
 }
 
-// Cambia a granularidad diaria + último año y consulta directamente
-// (atajo desde el estado "sin datos" para encontrar datos históricos).
-function aplicarUltimoAnio() {
-  granularidad.value = 'diaria'
-  fechaHasta.value = new Date(hoy)
-  fechaDesde.value = diasAtras(364)
+function onModoChange(m) {
+  if (m === modo.value) return
+  modo.value = m
+  // Al entrar a "intervalo", precarga el picker de rango con el rango vigente.
+  if (m === 'intervalo') rango.value = [new Date(fechaDesde.value), new Date(fechaHasta.value)]
+  recomputarFechas()
+  marcarPendiente()
+}
+
+// Atajo desde el estado "sin datos": vista mensual del año en curso.
+function verEsteAnioMensual() {
+  granularidad.value = 'mensual'
+  modo.value = 'actual'
+  recomputarFechas()
   cargar()
 }
 
 // Marca que hay filtros sin aplicar (resalta el botón Consultar).
-function marcarPendiente() {
-  pendiente.value = true
-}
+function marcarPendiente() { pendiente.value = true }
 
 // Cambio en la selección de proyectos: si se vacía, limpia resultados.
 function onProyectosChange() {
@@ -425,38 +512,33 @@ function onProyectosChange() {
   }
 }
 
-// ── Validación del rango ─────────────────────────────────────────────
+// ── Validación (sin límites de tamaño: sólo coherencia) ───────────────
 const rangoDias = computed(() => {
   if (!fechaDesde.value || !fechaHasta.value) return 0
-  const diff = (fechaHasta.value.getTime() - fechaDesde.value.getTime()) / 86400000
-  return Math.max(0, Math.ceil(diff) + 1)
+  return Math.max(0, Math.ceil((fechaHasta.value - fechaDesde.value) / 86400000) + 1)
 })
-
 const rangoError = computed(() => {
-  if (!fechaDesde.value || !fechaHasta.value) return null
-  if (fechaHasta.value < fechaDesde.value) return 'La fecha final debe ser posterior a la inicial'
-  const g = GRANULARIDADES.find(g => g.key === granularidad.value)
-  if (g && rangoDias.value > g.maxDias) {
-    return `${g.label}: máximo ${g.maxDias === 365 ? '1 año' : g.maxDias === 7 ? '1 semana' : g.maxDias + ' días'} (actual: ${rangoDias.value} días)`
-  }
+  if (!fechaDesde.value || !fechaHasta.value) return 'Selecciona un rango'
+  if (fechaHasta.value < fechaDesde.value) return 'La fecha final debe ser igual o posterior a la inicial'
   return null
 })
+// Aviso NO bloqueante (rango horario muy amplio puede truncarse en la API).
+const avisoRango = computed(() =>
+  granularidad.value === 'horaria' && rangoDias.value > 31
+    ? 'Rango horario amplio: la API puede truncar lecturas muy extensas.'
+    : null
+)
 
-function cambiarGranularidad(g) {
-  if (g === granularidad.value) return
-  granularidad.value = g
-  // Ajusta el rango al máximo permitido si es necesario
-  const max = GRANULARIDADES.find(gg => gg.key === g).maxDias
-  if (rangoDias.value > max) {
-    fechaHasta.value = new Date(hoy)
-    fechaDesde.value = diasAtras(max - 1)
-  }
-  marcarPendiente()
-}
-
-function onCambioFechas() {
-  marcarPendiente()
-}
+// Etiqueta legible del rango resuelto (feedback claro de qué se va a consultar).
+const rangoLabel = computed(() => {
+  const d = fechaDesde.value, h = fechaHasta.value
+  if (!d || !h) return ''
+  if (granularidad.value === 'mensual')
+    return `${MESES_ES[d.getMonth()]} ${d.getFullYear()} → ${MESES_ES[h.getMonth()]} ${h.getFullYear()}`
+  const f = x => `${String(x.getDate()).padStart(2, '0')} ${MESES_ES[x.getMonth()].toLowerCase()} ${x.getFullYear()}`
+  if (d.getTime() === h.getTime()) return f(d)
+  return `${f(d)} → ${f(h)}`
+})
 
 // ── Período label helper ─────────────────────────────────────────────
 const unidadPeriodo = computed(() => ({ mensual: 'mes', diaria: 'día', horaria: 'hora' }[granularidad.value]))
@@ -800,6 +882,7 @@ async function cargarProyectos() {
 // ── ResizeObserver para chart responsive ─────────────────────────────
 let resizeObserver
 onMounted(async () => {
+  recomputarFechas()   // fija el rango inicial según granularidad/modo por defecto
   await cargarProyectos()
   await nextTick()
   if (chartWrapRef.value) {
@@ -902,24 +985,35 @@ watch(chartWrapRef, (el) => {
 }
 .gen-seg-btn--disabled { opacity: 0.5; cursor: not-allowed; }
 
-/* Quick range chips */
-.gen-chips {
+/* Segmento de "modo" — tono distinto para diferenciarlo de la granularidad */
+.gen-segmented--modo { background: #eef4ff; }
+.gen-segmented--modo .gen-seg-btn--active { color: #2563eb; }
+
+/* Etiqueta del rango resuelto */
+.gen-range-label {
   display: inline-flex;
-  gap: 3px;
-}
-.gen-chip {
-  padding: 4px 10px;
-  background: #f3f1f8;
-  border: 1px solid transparent;
-  border-radius: 999px;
+  align-items: center;
+  gap: 5px;
   font-size: 11.5px;
   font-weight: 600;
-  color: #6b5a8a;
-  cursor: pointer;
-  transition: all 0.12s;
-  font-family: inherit;
+  color: #4a3b6b;
+  background: #faf5ff;
+  border: 1px solid #e9ddff;
+  border-radius: 999px;
+  padding: 3px 10px;
+  white-space: nowrap;
 }
-.gen-chip:hover { background: #ece4ff; color: #4a3b6b; }
+.gen-range-label i { font-size: 11px; color: #915BD8; }
+
+/* Aviso no bloqueante */
+.gen-aviso {
+  font-size: 11.5px;
+  color: #b45309;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
 
 /* Validation error */
 .gen-err {
