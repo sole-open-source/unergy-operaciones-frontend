@@ -59,18 +59,17 @@
           <i class="pi pi-exclamation-circle" /> {{ rangoError }}
         </span>
 
-        <!-- Project multi-select -->
+        <!-- Project multi-select (valor = sub_project = ID de API Unergy) -->
         <div class="gen-project-picker">
-          <MultiSelect v-model="proyectosSel" :options="proyectosOpts" optionLabel="nombre_comercial"
-            optionValue="id" :filter="true" :showToggleAll="false"
+          <MultiSelect v-model="proyectosSel" :options="proyectos" optionLabel="nombre_comercial"
+            optionValue="sub_project" :filter="true" :showToggleAll="false"
             display="chip" placeholder="Selecciona proyectos…"
             :maxSelectedLabels="3" :selectedItemsLabel="`{0} proyectos seleccionados`"
             class="w-full" size="small" @change="onProyectosChange">
             <template #option="{ option }">
               <div class="flex items-center justify-between gap-2 w-full">
-                <span :class="{ 'text-gray-400': !option._tieneDatos }">{{ option.nombre_comercial }}</span>
-                <span v-if="option._tieneDatos" class="text-[10px] text-emerald-600 whitespace-nowrap">hasta {{ option._hasta }}</span>
-                <span v-else class="text-[10px] text-gray-300 whitespace-nowrap">sin datos</span>
+                <span>{{ option.nombre_comercial }}</span>
+                <span class="text-[10px] text-gray-400 whitespace-nowrap">{{ option.municipio }}</span>
               </div>
             </template>
           </MultiSelect>
@@ -84,17 +83,10 @@
           v-tooltip.bottom="!proyectosSel.length ? 'Selecciona al menos un proyecto' : (rangoError ? 'Corrige el rango de fechas' : 'Consultar generación')" />
       </div>
 
-      <!-- Disponibilidad de datos: guía la selección y delata si la base está vacía -->
-      <div v-if="resumenCargado && !resumenError" class="gen-datahint">
-        <template v-if="proyectosConDatos">
-          <i class="pi pi-database" />
-          <span>{{ proyectosConDatos }} proyecto{{ proyectosConDatos !== 1 ? 's' : '' }} con generación · datos hasta <strong>{{ dataMaxFecha }}</strong></span>
-          <button class="gen-datahint-btn" @click="seleccionarConDatos">Seleccionar con datos</button>
-        </template>
-        <template v-else>
-          <i class="pi pi-exclamation-triangle text-amber-500" />
-          <span class="text-amber-700">No hay datos de generación cargados en la base. Revisa el sync de Solenium (no es un problema de esta vista).</span>
-        </template>
+      <!-- Fuente de datos -->
+      <div v-if="proyectos.length" class="gen-datahint">
+        <i class="pi pi-bolt" />
+        <span>{{ proyectos.length }} proyectos disponibles · generación en vivo desde la API de Unergy</span>
       </div>
 
     </div><!-- /sticky-header -->
@@ -305,7 +297,7 @@ const GRANULARIDADES = [
   { key: 'diaria',  label: 'Diaria',  icon: 'pi pi-list',     maxDias: 365 },
   { key: 'horaria', label: 'Horaria', icon: 'pi pi-clock',    maxDias: 7,
     disabled: false,
-    tooltip: 'Vista horaria: máximo 1 semana. Por ahora utiliza datos diarios distribuidos.' },
+    tooltip: 'Vista horaria: máximo 1 semana (lecturas reales de la API de Unergy).' },
 ]
 
 const hoy = new Date(); hoy.setHours(0, 0, 0, 0)
@@ -330,36 +322,12 @@ const chartContainerWidth = ref(900)
 const hasQueried = ref(false)
 const pendiente = ref(false)
 
-// Resumen de disponibilidad: qué proyectos tienen generación y hasta qué fecha.
-// Sirve para (1) marcar proyectos sin datos, (2) ajustar el rango por defecto a
-// donde realmente hay datos (si el sync de Solenium va atrasado), y (3) avisar
-// claramente si la base no tiene generación cargada.
-const genResumen = ref({})        // { [proyectoId]: { dias, total, fechaInicio, fechaFin } }
-const resumenCargado = ref(false)
-const resumenError = ref(false)
-
-const proyectosConDatos = computed(() => Object.keys(genResumen.value).length)
-
-const dataMaxFecha = computed(() => {
-  let max = null
-  for (const r of Object.values(genResumen.value)) {
-    if (r.fechaFin && (!max || r.fechaFin > max)) max = r.fechaFin
-  }
-  return max // 'YYYY-MM-DD' | null
+// Mapa sub_project → nombre comercial (para etiquetar cada serie).
+const nombrePorSub = computed(() => {
+  const m = {}
+  for (const p of proyectos.value) if (p.sub_project) m[p.sub_project] = p.nombre_comercial
+  return m
 })
-
-// Opciones del selector: proyectos CON datos primero, luego alfabético.
-const proyectosOpts = computed(() =>
-  [...proyectos.value]
-    .map(p => {
-      const r = genResumen.value[p.id]
-      return { ...p, _tieneDatos: !!r, _hasta: r?.fechaFin || null }
-    })
-    .sort((a, b) => {
-      if (a._tieneDatos !== b._tieneDatos) return a._tieneDatos ? -1 : 1
-      return (a.nombre_comercial || '').localeCompare(b.nombre_comercial || '')
-    })
-)
 
 // ── Atajos ────────────────────────────────────────────────────────────
 const atajosFecha = computed(() => {
@@ -467,7 +435,9 @@ function onCambioFechas() {
 const unidadPeriodo = computed(() => ({ mensual: 'mes', diaria: 'día', horaria: 'hora' }[granularidad.value]))
 const unidadPeriodoPlural = computed(() => ({ mensual: 'meses', diaria: 'días', horaria: 'horas' }[granularidad.value]))
 
-// ── Carga ────────────────────────────────────────────────────────────
+// ── Carga (datos EN VIVO de la API de Unergy vía /monitoreo/_legacy) ──────
+// La generación NO vive en la tabla local; se consulta a api.unergy.io con el
+// sub_project de cada proyecto (misma fuente que usa el resto de la plataforma).
 async function cargar() {
   if (!proyectosSel.value.length || rangoError.value) return
   loading.value = true
@@ -478,63 +448,55 @@ async function cargar() {
     const fInicio = isoDate(fechaDesde.value)
     const fFin = isoDate(fechaHasta.value)
 
-    // Fetch raw daily generation per project from /api/v1/generacion
+    // Una llamada por proyecto: getGeneration trae lecturas en vivo de Unergy.
+    // Endpoint real: /api/v1/monitoreo/_legacy (baseURL del cliente ya es /api/v1).
     const results = await Promise.allSettled(
-      proyectosSel.value.map(pid =>
-        api.get('/generacion', { params: {
-          proyecto_id: pid,
-          fecha_inicio: fInicio,
-          fecha_fin: fFin,
-          size: 1000,
-          page: 1,
-        }}).then(r => ({ pid, items: r.data.items ?? [] }))
+      proyectosSel.value.map(sub =>
+        api.get('/monitoreo/_legacy', {
+          params: { action: 'getGeneration', sub_project: sub, date_from: fInicio, date_to: fFin },
+        }).then(r => ({ sub, body: r.data }))
       )
     )
 
-    const ds = []
+    const parsed = []
     const errores = []
     results.forEach((r, idx) => {
-      const pid = proyectosSel.value[idx]
-      const proyecto = proyectos.value.find(p => p.id === pid)
-      const nombre = proyecto?.nombre_comercial || `Proyecto ${pid}`
+      const sub = proyectosSel.value[idx]
+      const nombre = nombrePorSub.value[sub] || sub
       if (r.status !== 'fulfilled') {
         const reason = r.reason
         const msg = reason?.response?.data?.detail || reason?.message || 'error de conexión'
         errores.push(`${nombre}: ${msg}`)
         return
       }
-      const points = agruparSegunGranularidad(r.value.items)
-      const total = points.reduce((s, p) => s + (p.kwh || 0), 0)
-      ds.push({
-        proyectoId: pid,
-        nombre,
-        color: PALETTE[idx % PALETTE.length],
-        points,
-        total,
-        hidden: false,
-      })
+      const body = r.value.body
+      if (body && body.ok === false) {
+        errores.push(`${nombre}: ${body.error || 'la API de Unergy no devolvió datos'}`)
+        return
+      }
+      const raw = Array.isArray(body?.data) ? body.data : []
+      parsed.push({ sub, nombre, map: sumarPorGranularidad(raw) })
     })
 
-    // Si TODAS las consultas fallaron, es un fallo real de la API: mostrarlo
-    // (antes se tragaba el error y parecía simplemente "sin datos").
-    if (!ds.length && errores.length) {
+    // Si TODAS fallaron, es un fallo real: mostrarlo (no "sin datos").
+    if (!parsed.length && errores.length) {
       error.value = errores.length === 1
         ? errores[0]
         : `No se pudo consultar ningún proyecto. ${errores[0]}`
       datasets.value = []
       return
     }
-    // Fallos parciales: mostrar los que sí cargaron + avisar de los que no.
     if (errores.length) {
-      toast.add({
-        severity: 'warn',
-        summary: 'Algunos proyectos no cargaron',
-        detail: errores.join(' · '),
-        life: 6000,
-      })
+      toast.add({ severity: 'warn', summary: 'Algunos proyectos no cargaron', detail: errores.join(' · '), life: 6000 })
     }
 
-    // Sort by total desc for legend
+    // Eje común continuo → todas las series quedan alineadas en chart y tabla.
+    const keys = construirEjeKeys()
+    const ds = parsed.map((p, idx) => {
+      const points = keys.map(k => ({ key: k, kwh: p.map.get(k) ?? 0, label: labelDeClave(k) }))
+      const total = points.reduce((s, pt) => s + pt.kwh, 0)
+      return { proyectoId: p.sub, nombre: p.nombre, color: PALETTE[idx % PALETTE.length], points, total, hidden: false }
+    })
     ds.sort((a, b) => b.total - a.total)
     datasets.value = ds
   } catch (e) {
@@ -544,49 +506,54 @@ async function cargar() {
   }
 }
 
-// ── Agrupación por granularidad ──────────────────────────────────────
-function agruparSegunGranularidad(items) {
-  // items: [{ fecha: 'YYYY-MM-DD', kwh_real, kwh_p90, ... }]
-  if (!items.length) return []
-  if (granularidad.value === 'diaria') {
-    // Ordenar y rellenar días faltantes con 0
-    return rellenarDias(items)
-  }
-  if (granularidad.value === 'mensual') {
-    const map = new Map()
-    items.forEach(it => {
-      if (!it.fecha || it.kwh_real == null) return
-      const k = it.fecha.slice(0, 7)
-      map.set(k, (map.get(k) || 0) + Number(it.kwh_real))
-    })
-    return [...map.entries()].sort().map(([k, v]) => ({ key: k, kwh: v, label: mesLabel(k) }))
-  }
-  // horaria: distribuye el total diario en 24 horas con curva solar aproximada (placeholder)
-  // — en una próxima iteración se conectará con Solenium para datos horarios reales.
-  const result = []
-  const curva = [0, 0, 0, 0, 0, 0.01, 0.03, 0.06, 0.09, 0.11, 0.12, 0.12, 0.12, 0.11, 0.09, 0.07, 0.04, 0.02, 0.01, 0, 0, 0, 0, 0]
-  items.forEach(it => {
-    if (!it.fecha || it.kwh_real == null) return
-    const totalDia = Number(it.kwh_real)
-    for (let h = 0; h < 24; h++) {
-      const k = `${it.fecha} ${String(h).padStart(2, '0')}:00`
-      result.push({ key: k, kwh: totalDia * curva[h], label: `${it.fecha.slice(5)} ${String(h).padStart(2, '0')}h` })
+// ── Agregación por granularidad ───────────────────────────────────────
+// raw: [{ time: 'YYYY-MM-DD HH:MM', date: 'YYYY-MM-DD', kwh: number }] (deltas por intervalo)
+function sumarPorGranularidad(raw) {
+  const map = new Map()
+  for (const it of raw) {
+    if (it == null || it.kwh == null) continue
+    let k = null
+    if (granularidad.value === 'diaria') k = it.date
+    else if (granularidad.value === 'mensual') k = (it.date || '').slice(0, 7)
+    else {
+      // horaria: agrupa por hora real usando el timestamp de la lectura
+      const t = it.time || ''
+      k = t.length >= 13 ? `${t.slice(0, 10)} ${t.slice(11, 13)}:00` : (it.date ? `${it.date} 00:00` : null)
     }
-  })
-  return result
+    if (!k) continue
+    map.set(k, (map.get(k) || 0) + Number(it.kwh))
+  }
+  return map
 }
 
-function rellenarDias(items) {
-  if (!fechaDesde.value || !fechaHasta.value) return []
-  const map = new Map(items.map(i => [i.fecha, Number(i.kwh_real || 0)]))
-  const out = []
-  const cur = new Date(fechaDesde.value)
-  while (cur <= fechaHasta.value) {
-    const k = isoDate(cur)
-    out.push({ key: k, kwh: map.get(k) ?? 0, label: diaLabel(k) })
-    cur.setDate(cur.getDate() + 1)
+// Eje continuo de períodos en el rango seleccionado (alinea todas las series).
+function construirEjeKeys() {
+  const keys = []
+  if (!fechaDesde.value || !fechaHasta.value) return keys
+  const start = new Date(fechaDesde.value); start.setHours(0, 0, 0, 0)
+  const end = new Date(fechaHasta.value); end.setHours(0, 0, 0, 0)
+  if (granularidad.value === 'diaria') {
+    const cur = new Date(start)
+    while (cur <= end) { keys.push(isoDate(cur)); cur.setDate(cur.getDate() + 1) }
+  } else if (granularidad.value === 'mensual') {
+    const cur = new Date(start.getFullYear(), start.getMonth(), 1)
+    const last = new Date(end.getFullYear(), end.getMonth(), 1)
+    while (cur <= last) { keys.push(isoDate(cur).slice(0, 7)); cur.setMonth(cur.getMonth() + 1) }
+  } else {
+    const cur = new Date(start)
+    const endH = new Date(end); endH.setHours(23, 0, 0, 0)
+    while (cur <= endH) {
+      keys.push(`${isoDate(cur)} ${String(cur.getHours()).padStart(2, '0')}:00`)
+      cur.setHours(cur.getHours() + 1)
+    }
   }
-  return out
+  return keys
+}
+
+function labelDeClave(k) {
+  if (granularidad.value === 'mensual') return mesLabel(k)
+  if (granularidad.value === 'horaria') return `${k.slice(8, 10)}/${k.slice(5, 7)} ${k.slice(11)}`
+  return diaLabel(k)
 }
 
 function mesLabel(yyyymm) {
@@ -756,70 +723,28 @@ function exportarExcel() {
 }
 
 // ── Carga inicial ────────────────────────────────────────────────────
+// Proyectos consultables = los que tienen sub_project (API ID Unergy).
+// getProjects ya filtra a proyectos en operación con ID de API y lo entrega.
 async function cargarProyectos() {
   try {
-    const { data } = await api.get('/proyectos', { params: { size: 500 } })
-    proyectos.value = (data.items ?? []).sort((a, b) => (a.nombre_comercial || '').localeCompare(b.nombre_comercial || ''))
+    const { data } = await api.get('/monitoreo/_legacy', { params: { action: 'getProjects' } })
+    const seen = new Set()
+    proyectos.value = (data?.projects ?? [])
+      .filter(p => {
+        if (!p.sub_project || seen.has(p.sub_project)) return false
+        seen.add(p.sub_project)
+        return true
+      })
+      .sort((a, b) => (a.nombre_comercial || '').localeCompare(b.nombre_comercial || ''))
   } catch (e) {
     error.value = 'No se pudieron cargar los proyectos'
   }
-}
-
-function parseISO(s) {
-  if (!s) return null
-  const [y, m, d] = String(s).slice(0, 10).split('-').map(Number)
-  return new Date(y, m - 1, d)
-}
-
-// Consulta qué proyectos tienen generación (totales + rango de fechas) y, si el
-// dato más reciente es anterior a hoy, mueve el rango por defecto hasta ahí para
-// que la primera consulta no caiga en un rango vacío.
-async function cargarResumenGeneracion() {
-  try {
-    const { data } = await api.get('/generacion/resumen/por-proyecto')
-    const map = {}
-    for (const r of (Array.isArray(data) ? data : [])) {
-      if (!r.dias_con_dato) continue
-      map[r.proyecto_id] = {
-        dias: r.dias_con_dato,
-        total: Number(r.total_kwh_real || 0),
-        fechaInicio: r.fecha_inicio ? String(r.fecha_inicio).slice(0, 10) : null,
-        fechaFin: r.fecha_fin ? String(r.fecha_fin).slice(0, 10) : null,
-      }
-    }
-    genResumen.value = map
-    const maxF = dataMaxFecha.value
-    if (maxF) {
-      const maxDate = parseISO(maxF)
-      if (maxDate && maxDate < hoy) {
-        fechaHasta.value = maxDate
-        fechaDesde.value = new Date(maxDate.getTime() - 29 * 86400000)
-      }
-    }
-  } catch (e) {
-    // no crítico: la vista sigue funcionando sin el resumen
-    resumenError.value = true
-  } finally {
-    resumenCargado.value = true
-  }
-}
-
-// Selecciona los proyectos con más generación (top 10) para ver datos al toque.
-function seleccionarConDatos() {
-  const ids = Object.entries(genResumen.value)
-    .sort((a, b) => (b[1].total || 0) - (a[1].total || 0))
-    .slice(0, 10)
-    .map(([id]) => Number(id))
-  if (!ids.length) return
-  proyectosSel.value = ids
-  pendiente.value = true
 }
 
 // ── ResizeObserver para chart responsive ─────────────────────────────
 let resizeObserver
 onMounted(async () => {
   await cargarProyectos()
-  cargarResumenGeneracion()
   await nextTick()
   if (chartWrapRef.value) {
     const upd = () => { chartContainerWidth.value = chartWrapRef.value?.clientWidth || 900 }
