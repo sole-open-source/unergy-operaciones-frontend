@@ -91,7 +91,7 @@
     </div>
 
     <!-- ══ TABLA (oculta cuando hay panel en lg+) ═══════════════════════ -->
-    <div :class="['gf-table-wrap', drawerVisible && 'lg:hidden']">
+    <div :class="['gf-table-wrap', drawerVisible && 'lg:!hidden']">
       <div v-if="error" class="p-6 flex items-center gap-3 text-red-600">
         <i class="pi pi-exclamation-circle text-xl" />
         <div class="flex-1">
