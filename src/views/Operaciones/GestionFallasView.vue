@@ -1,5 +1,8 @@
 <template>
-  <div class="space-y-2">
+  <div class="gf-page">
+
+    <!-- ══ STICKY HEADER: title + buckets + filters siempre visibles ════ -->
+    <div class="gf-sticky-header">
 
     <!-- ══ TITLE + BUCKETS + ACTIONS (una sola fila compacta) ═══════════ -->
     <div class="gf-topbar">
@@ -54,6 +57,8 @@
         {{ filtradas.length }} / {{ porBucket.length }}
       </span>
     </div>
+
+    </div><!-- /gf-sticky-header -->
 
   <div :class="['gf-layout', drawerVisible && 'gf-layout--split']">
 
@@ -1034,6 +1039,26 @@ watch(bucket, (newBucket) => {
 </script>
 
 <style scoped>
+/* ── Página: layout con scroll híbrido ──────────────────────────────── */
+.gf-page {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Header sticky con title + buckets + filtros — siempre visible */
+.gf-sticky-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: #f3f4f6;  /* mismo bg que main (bg-gray-100) para que no se vea contenido detrás */
+  padding-top: 4px;     /* ligero respiro al pegarse al top */
+  padding-bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 /* ── Top bar compacto (title + buckets + actions en una fila) ────────── */
 .gf-topbar {
   display: flex;
@@ -1275,18 +1300,17 @@ watch(bucket, (newBucket) => {
 }
 
 @media (min-width: 1024px) {
+  /* El panel detalle ya NO es sticky: fluye con el scroll de la página */
   .gf-aside {
-    position: sticky;
-    top: 0;
-    z-index: 5;
-    height: auto;
-    max-height: calc(100vh - 6.5rem);
+    position: static;
+    z-index: auto;
     display: block;
+    max-height: none;
   }
   .gf-aside-backdrop { display: none; }
   .gf-aside-panel {
     max-width: none;
-    height: calc(100vh - 6.5rem);
+    height: auto;            /* contenido define la altura */
     border-radius: 12px;
     border: 1px solid #ece8f4;
     box-shadow: 0 4px 14px rgba(28, 18, 50, 0.08);
@@ -1309,9 +1333,8 @@ watch(bucket, (newBucket) => {
 .gf-drawer-body {
   padding: 16px 18px;
   display: flex; flex-direction: column; gap: 16px;
-  overflow-y: auto;
   flex: 1;
-  min-height: 0;
+  /* SIN overflow propio: el contenido del panel scrollea con la página */
 }
 /* Acciones inline al final del scroll del panel (NO sticky) */
 .gf-actions-inline {
@@ -1404,7 +1427,16 @@ watch(bucket, (newBucket) => {
   border: 1px solid #ece8f4;
   box-shadow: 0 4px 14px rgba(28, 18, 50, 0.08);
   overflow: hidden;
-  max-height: calc(100vh - 6.5rem);
+}
+@media (min-width: 1024px) {
+  /* La lista compacta se mantiene visible mientras la página scrollea.
+     top = altura aprox del sticky-header (topbar ~42 + gap 8 + toolbar ~36 + gap 8 ≈ 94px). */
+  .gf-compact {
+    position: sticky;
+    top: 6rem;
+    max-height: calc(100vh - 7.5rem);
+    z-index: 1;
+  }
 }
 .gf-compact-header {
   padding: 10px 14px;
