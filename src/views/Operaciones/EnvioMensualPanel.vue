@@ -1,18 +1,13 @@
 <template>
-  <!-- Overlay completo: ocupa el viewport por encima del wizard -->
-  <div class="em-overlay" @click.self="cerrar">
-    <div class="em-panel" :class="{ 'em-panel--with-drawer': drawerInf }">
+  <!-- Panel inline (no overlay) — vive dentro de /operaciones/informes-mensuales -->
+  <div class="em-panel" :class="{ 'em-panel--with-drawer': drawerInf }">
 
-      <!-- ══ HEADER ═══════════════════════════════════════════════ -->
+      <!-- ══ HEADER del pipeline (sub-toolbar) ══════════════════════ -->
       <header class="em-header">
         <div class="em-header-left">
-          <div class="em-header-ico"><i class="pi pi-send" /></div>
-          <div>
-            <h2 class="em-header-title">Envío mensual de informes</h2>
-            <p class="em-header-sub">
-              Pipeline de verificación · Edición → Revisión → Comentarios → Aprobación → Envío
-            </p>
-          </div>
+          <p class="em-header-sub">
+            Pipeline · <b>Edición</b> → <b>Revisión</b> → <b>Comentarios</b> → <b>Aprobación</b> → <b>Envío</b>
+          </p>
         </div>
 
         <div class="em-header-right">
@@ -24,7 +19,6 @@
           </div>
           <Button icon="pi pi-refresh" outlined size="small" :loading="loading" @click="cargar"
                   v-tooltip.bottom="'Actualizar lista'" />
-          <button class="em-close" @click="cerrar" v-tooltip.bottom="'Cerrar'">✕</button>
         </div>
       </header>
 
@@ -65,6 +59,9 @@
         <Button label="Enviar todos al cliente" icon="pi pi-send" size="small"
                 :loading="enviandoBatch" @click="abrirConfirmEnvio" class="em-btn-send" />
       </div>
+
+      <!-- ══ Contenido (tabla + drawer side-by-side) ════════════ -->
+      <div class="em-content">
 
       <!-- ══ Tabla principal ═════════════════════════════════════ -->
       <div class="em-table-wrap">
@@ -161,6 +158,7 @@
           </tbody>
         </table>
       </div>
+      <!-- /em-table-wrap -->
 
       <!-- ══ DRAWER LATERAL: detalle / verificación / comentarios ═══════ -->
       <transition name="slide-right">
@@ -203,7 +201,7 @@
           </div>
 
           <div class="em-drawer-body">
-            <!-- PREVIEW -->
+            <!-- PREVIEW + EDICIÓN INLINE -->
             <div v-if="drawerTab === 'preview'" class="em-preview-wrap">
               <div v-if="loadingDetalle" class="em-state">
                 <ProgressSpinner style="width:28px;height:28px" />
@@ -213,15 +211,45 @@
                 <i class="pi pi-file" />
                 <p>Sin contenido del informe</p>
               </div>
-              <div v-else class="em-preview-frame">
-                <div class="em-preview" v-html="detalleHtml" />
-              </div>
-              <div class="em-drawer-quick-actions" v-if="detalleHtml">
-                <Button label="Abrir editor completo" icon="pi pi-pencil" outlined size="small"
-                        @click="editar(drawerInf)" />
-                <Button label="Imprimir / PDF" icon="pi pi-print" outlined size="small" severity="warn"
-                        @click="imprimirDetalle" />
-              </div>
+              <template v-else>
+                <!-- Toolbar de edición inline -->
+                <div class="em-edit-toolbar">
+                  <div v-if="!editando" class="em-edit-status">
+                    <i class="pi pi-eye" />
+                    <span>Vista previa — clic en <b>Editar</b> para modificar inline</span>
+                  </div>
+                  <div v-else class="em-edit-status em-edit-status--on">
+                    <i class="pi pi-pencil" />
+                    <span>Edición activa — haz clic en cualquier texto del informe para modificarlo</span>
+                  </div>
+                  <div class="em-edit-actions">
+                    <Button v-if="!editando && drawerInf?.estado !== 'aprobado'"
+                            label="Editar" icon="pi pi-pencil" outlined size="small"
+                            @click="entrarEdicion" />
+                    <span v-if="!editando && drawerInf?.estado === 'aprobado'" class="em-edit-locked">
+                      🔒 Aprobado · reábrelo desde la tab Verificar para editar
+                    </span>
+                    <template v-if="editando">
+                      <Button label="Descartar" icon="pi pi-times" outlined size="small" severity="secondary"
+                              :disabled="guardandoEdicion" @click="cancelarEdicion" />
+                      <Button :label="guardandoEdicion ? 'Guardando…' : 'Guardar versión'"
+                              icon="pi pi-save" size="small"
+                              :loading="guardandoEdicion" @click="guardarEdicion"
+                              class="em-btn-save-inline" />
+                    </template>
+                    <Button v-if="!editando" label="PDF" icon="pi pi-print" outlined size="small" severity="warn"
+                            @click="imprimirDetalle" v-tooltip.bottom="'Imprimir o exportar a PDF'" />
+                  </div>
+                </div>
+
+                <div class="em-preview-frame" :class="{ 'em-preview-frame--editing': editando }">
+                  <div ref="previewRef"
+                       class="em-preview"
+                       :class="{ 'em-preview--editing': editando }"
+                       :contenteditable="editando ? 'true' : 'false'"
+                       v-html="detalleHtml" />
+                </div>
+              </template>
             </div>
 
             <!-- COMENTARIOS -->
@@ -362,6 +390,9 @@
         </aside>
       </transition>
 
+      </div>
+      <!-- /em-content -->
+
       <!-- ══ Modal confirmación envío masivo ═════════════════════════ -->
       <transition name="fade">
         <div v-if="confirmEnvio" class="em-modal-bd" @click.self="cerrarConfirmEnvio">
@@ -427,20 +458,16 @@
         </div>
       </transition>
 
-    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import Button from 'primevue/button'
 import ProgressSpinner from 'primevue/progressspinner'
 import api from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
 
-const emit = defineEmits(['cerrar'])
-const router = useRouter()
 const auth = useAuthStore()
 
 const EMAIL_VERIFICADOR = 'juan.jose@unergy.io'
@@ -469,6 +496,11 @@ const drawerInf = ref(null)
 const drawerTab = ref('preview')
 const detalleHtml = ref('')
 const loadingDetalle = ref(false)
+
+// Editor inline
+const editando = ref(false)
+const guardandoEdicion = ref(false)
+const previewRef = ref(null)
 
 // Comentarios
 const nuevoComentario = ref('')
@@ -623,9 +655,44 @@ function cerrarDrawer() {
   detalleHtml.value = ''
   resolviendoId.value = null
   nuevoComentario.value = ''
+  editando.value = false
 }
-function cerrar() { emit('cerrar') }
-function editar(inf) { router.push(`/informes/${inf.id}`) }
+function entrarEdicion() {
+  editando.value = true
+  nextTick(() => previewRef.value?.focus?.())
+}
+function cancelarEdicion() {
+  editando.value = false
+  detalleHtml.value = drawerInf.value?.html_content || detalleHtml.value
+}
+async function guardarEdicion() {
+  if (!drawerInf.value || !previewRef.value) return
+  guardandoEdicion.value = true
+  try {
+    const newHtml = previewRef.value.innerHTML
+    const payload = {
+      tipo: drawerInf.value.tipo,
+      sub_project: drawerInf.value.sub_project,
+      periodo_desde: drawerInf.value.periodo_desde,
+      periodo_hasta: drawerInf.value.periodo_hasta,
+      periodo_display: drawerInf.value.periodo_display,
+      proyecto_nombre: drawerInf.value.proyecto_nombre,
+      html_content: newHtml,
+    }
+    const { data } = await api.post('/informes/', payload)
+    const idx = informes.value.findIndex(i => i.id === drawerInf.value.id)
+    if (idx >= 0) Object.assign(informes.value[idx], data)
+    drawerInf.value = informes.value[idx] || data
+    detalleHtml.value = newHtml
+    editando.value = false
+    toast('💾 Cambios guardados')
+  } catch (e) {
+    const detail = e.response?.data?.detail
+    toast('⚠️ ' + (Array.isArray(detail) ? detail[0]?.msg : (detail || e.message)), true)
+  } finally {
+    guardandoEdicion.value = false
+  }
+}
 function imprimirDetalle() {
   if (!detalleHtml.value) return
   const w = window.open('', '_blank')
@@ -809,75 +876,61 @@ async function ejecutarEnvioBatch() {
 </script>
 
 <style scoped>
-/* ── Overlay ──────────────────────────────────────────────────── */
-.em-overlay {
-  position: fixed; inset: 0;
-  background: rgba(28, 18, 50, .55);
-  z-index: 50;
-  display: flex; align-items: stretch; justify-content: stretch;
-  backdrop-filter: blur(2px);
-  font-family: 'Sora', system-ui, sans-serif;
-}
+/* ── Panel inline ─────────────────────────────────────────────── */
 .em-panel {
-  background: #f8f7fa;
+  background: transparent;
   width: 100%;
-  margin: 0;
   display: flex; flex-direction: column;
   position: relative;
-  overflow: hidden;
+  font-family: 'Sora', system-ui, sans-serif;
 }
 
-/* ── Header ───────────────────────────────────────────────────── */
+/* ── Header (sub-toolbar local del pipeline) ─────────────────── */
 .em-header {
   display: flex; align-items: center; justify-content: space-between; gap: 16px;
-  background: linear-gradient(135deg, #2C2039 0%, #3d2b52 60%, #4a2d6e 100%);
-  padding: 12px 18px;
+  background: #fff;
+  padding: 8px 16px;
   flex-wrap: wrap;
+  border-bottom: 1px solid #ECE7F2;
+  box-shadow: 0 1px 3px rgba(28,18,50,.04);
 }
 .em-header-left { display: inline-flex; align-items: center; gap: 12px; min-width: 0; }
-.em-header-ico {
-  width: 36px; height: 36px;
-  background: rgba(145,91,216,.22);
-  border: 1px solid rgba(145,91,216,.3);
-  border-radius: 10px;
-  display: flex; align-items: center; justify-content: center;
-  color: #DDD2F0; font-size: 16px;
-  flex-shrink: 0;
+.em-header-sub {
+  font-size: 11px; color: #6B5A8A; margin: 0;
 }
-.em-header-title { font-size: 16px; font-weight: 800; color: #FDFAF7; margin: 0; letter-spacing: -.2px; }
-.em-header-sub { font-size: 11px; color: rgba(253,250,247,.55); margin: 2px 0 0; }
+.em-header-sub b { color: #6D28D9; font-weight: 700; }
 
 .em-header-right { display: inline-flex; align-items: center; gap: 8px; }
 .em-month-picker {
   display: inline-flex; align-items: center;
-  background: rgba(255,255,255,.08);
-  border: 1px solid rgba(255,255,255,.2);
-  border-radius: 8px;
+  background: #F4F1FA;
+  border: 1px solid #E5E2EC;
+  border-radius: 7px;
   overflow: hidden;
 }
 .em-month-nav {
-  background: transparent; border: none; color: #FDFAF7;
-  width: 28px; height: 30px; cursor: pointer; font-size: 16px; font-weight: 700;
+  background: transparent; border: none; color: #6D28D9;
+  width: 26px; height: 28px; cursor: pointer; font-size: 14px; font-weight: 700;
   transition: background .15s;
 }
-.em-month-nav:hover:not(:disabled) { background: rgba(255,255,255,.12); }
+.em-month-nav:hover:not(:disabled) { background: #E9DEFC; }
 .em-month-nav:disabled { opacity: .35; cursor: not-allowed; }
 .em-month-input {
-  background: transparent; border: none; color: #FDFAF7;
-  font-family: inherit; font-size: 13px; font-weight: 700;
-  padding: 4px 6px; outline: none;
-  color-scheme: dark;
+  background: transparent; border: none; color: #2C2039;
+  font-family: inherit; font-size: 12px; font-weight: 700;
+  padding: 3px 4px; outline: none;
+  color-scheme: light;
 }
 .em-close {
-  background: rgba(255,255,255,.08);
-  border: 1px solid rgba(255,255,255,.2);
-  color: #FDFAF7; cursor: pointer; padding: 0; width: 30px; height: 30px;
-  border-radius: 8px;
-  font-size: 14px;
+  background: #fff;
+  border: 1px solid #E5E2EC;
+  color: #6B5A8A; cursor: pointer; padding: 0; width: 28px; height: 28px;
+  border-radius: 7px;
+  font-size: 12px;
   display: flex; align-items: center; justify-content: center;
-  transition: background .15s;
+  transition: all .15s;
 }
-.em-close:hover { background: rgba(255,255,255,.18); }
+.em-close:hover { background: #F4F1FA; color: #2C2039; }
 
 /* ── KPIs ─────────────────────────────────────────────────────── */
 .em-kpis {
@@ -929,10 +982,18 @@ async function ejecutarEnvioBatch() {
 }
 .em-btn-send :deep(.p-button:hover), :deep(.em-btn-send:hover) { background: #15803D !important; }
 
+/* ── Contenido (tabla + drawer flex side-by-side) ──────────────── */
+.em-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+  min-height: calc(100vh - 280px);
+}
+
 /* ── Tabla ────────────────────────────────────────────────────── */
 .em-table-wrap {
-  flex: 1; overflow: auto;
-  padding: 10px 12px 60px;
+  flex: 1; min-width: 0;
+  padding: 10px 12px 30px;
 }
 .em-state {
   display: flex; flex-direction: column; align-items: center; gap: 10px;
@@ -1025,19 +1086,27 @@ async function ejecutarEnvioBatch() {
 
 /* ── Drawer lateral ─────────────────────────────────────────── */
 .em-drawer {
-  position: absolute;
-  top: 0; right: 0; bottom: 0;
+  position: sticky;
+  top: 0;
   width: 560px; max-width: 100%;
   background: #fff;
   border-left: 1px solid #ECE7F2;
   display: flex; flex-direction: column;
-  box-shadow: -10px 0 30px rgba(28,18,50,.15);
-  z-index: 4;
+  box-shadow: -8px 0 24px rgba(28,18,50,.08);
+  flex-shrink: 0;
+  align-self: flex-start;
+  max-height: calc(100vh - 100px);
 }
-.em-panel--with-drawer .em-table-wrap { padding-right: 580px; }
-@media (max-width: 1000px) {
-  .em-drawer { width: 100%; }
-  .em-panel--with-drawer .em-table-wrap { padding-right: 12px; }
+@media (max-width: 1100px) {
+  /* En pantallas estrechas, el drawer pasa a flotar sobre la tabla */
+  .em-drawer {
+    position: fixed;
+    top: 0; right: 0; bottom: 0;
+    width: min(100%, 540px);
+    max-height: none;
+    height: 100vh;
+    z-index: 30;
+  }
 }
 .em-drawer-head {
   display: flex; align-items: flex-start; justify-content: space-between;
@@ -1084,17 +1153,59 @@ async function ejecutarEnvioBatch() {
   padding: 14px 18px;
 }
 
-/* Preview */
-.em-preview-wrap { display: flex; flex-direction: column; gap: 10px; }
+/* Preview + Edición inline */
+.em-preview-wrap { display: flex; flex-direction: column; gap: 8px; }
+
+.em-edit-toolbar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; flex-wrap: wrap;
+  background: #FAF8FE; border: 1px solid #ECE7F2; border-radius: 8px;
+  padding: 7px 12px;
+  position: sticky; top: 0; z-index: 2;
+}
+.em-edit-status {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11px; color: #6B5A8A;
+}
+.em-edit-status i { color: #915BD8; }
+.em-edit-status--on {
+  background: #FEF9C3; border: 1px solid #FDE68A; border-radius: 99px;
+  padding: 3px 10px; color: #854D0E;
+}
+.em-edit-status--on i { color: #D97706; }
+.em-edit-actions { display: inline-flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.em-edit-locked { font-size: 10px; color: #92400E; font-style: italic; }
+:deep(.em-btn-save-inline) {
+  background: #16A34A !important; border-color: #16A34A !important;
+}
+:deep(.em-btn-save-inline:hover) { background: #15803D !important; border-color: #15803D !important; }
+
 .em-preview-frame {
   background: #ECE9F2; border-radius: 10px; padding: 12px;
   border: 1px solid #DAD3EA;
-  overflow: auto; max-height: 65vh;
+  overflow: auto;
+  flex: 1; min-height: 300px;
+  max-height: calc(100vh - 280px);
+  transition: border-color .2s, box-shadow .2s;
+}
+.em-preview-frame--editing {
+  border-color: #F6FF72;
+  box-shadow: 0 0 0 3px rgba(246,255,114,.4);
 }
 .em-preview {
   max-width: 100%;
   zoom: 0.78;            /* shrink to fit panel sin perder layout */
   transform-origin: top left;
+  outline: none;
+}
+.em-preview--editing {
+  cursor: text;
+  outline: none;
+}
+.em-preview--editing :deep([contenteditable="true"]):focus,
+.em-preview--editing:focus {
+  outline: 2px dashed #915BD8;
+  outline-offset: 4px;
 }
 .em-drawer-quick-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 
