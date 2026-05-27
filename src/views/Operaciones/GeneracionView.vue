@@ -260,6 +260,18 @@
               </g>
             </template>
 
+            <!-- Fallas con impacto en generación: subrayado rojo del día/período -->
+            <g v-if="periodosFlagged.length" class="gen-faults" pointer-events="none">
+              <template v-for="i in periodosFlagged" :key="'fl' + i">
+                <line :x1="xToPx(i)" :x2="xToPx(i)" :y1="paddingT" :y2="chartH - paddingB"
+                  class="gen-fault-vline" />
+                <line :x1="xToPx(i) - marcadorHalfW" :x2="xToPx(i) + marcadorHalfW"
+                  :y1="chartH - paddingB + 2.5" :y2="chartH - paddingB + 2.5"
+                  class="gen-fault-underline" />
+                <circle :cx="xToPx(i)" :cy="paddingT + 2" r="2.6" class="gen-fault-dot" />
+              </template>
+            </g>
+
             <!-- Hover: línea guía vertical + puntos resaltados -->
             <g v-if="hover" class="gen-hover" pointer-events="none">
               <line :x1="hover.gx" :x2="hover.gx" :y1="paddingT" :y2="chartH - paddingB" class="gen-hover-line" />
@@ -281,39 +293,76 @@
               <span class="gen-tooltip-name">Total</span>
               <span class="gen-tooltip-val">{{ hoverTotal.toLocaleString('es-CO', { maximumFractionDigits: 1 }) }} kWh</span>
             </div>
+            <div v-if="hoverFalla" class="gen-tooltip-fault">
+              <i class="pi pi-exclamation-triangle" />
+              {{ hoverFalla.count }} falla{{ hoverFalla.count !== 1 ? 's' : '' }} de generación · {{ hoverFalla.kwh.toLocaleString('es-CO', { maximumFractionDigits: 0 }) }} kWh perdidos
+            </div>
           </div>
         </div>
       </section>
 
-      <!-- Data table -->
+      <!-- Fallas reportadas en el período (cruce con generación) -->
       <section class="gen-card">
         <header class="gen-card-head">
-          <i class="pi pi-table text-sm" style="color:#915BD8" />
-          <h3 class="gen-card-title">Detalle por {{ unidadPeriodo }}</h3>
-          <span class="ml-auto text-xs text-gray-500">{{ periodos.length }} {{ unidadPeriodoPlural }} · {{ datasets.length }} proyectos</span>
+          <i class="pi pi-exclamation-triangle text-sm" style="color:#dc2626" />
+          <h3 class="gen-card-title">Fallas reportadas en el período</h3>
+          <div class="ml-auto flex items-center gap-1.5 flex-wrap">
+            <span class="gen-fchip">{{ fallasDelPeriodo.length }} en total</span>
+            <span v-if="fallasGenCount" class="gen-fchip gen-fchip--red">{{ fallasGenCount }} afectan generación</span>
+            <span v-if="kwhPerdidoTotal > 0" class="gen-fchip gen-fchip--red">
+              {{ kwhPerdidoTotal.toLocaleString('es-CO', { maximumFractionDigits: 0 }) }} kWh perdidos
+            </span>
+          </div>
         </header>
-        <div class="overflow-x-auto">
-          <DataTable :value="tablaFilas" stripedRows class="text-sm gen-table"
-            :rows="20" paginator :rowsPerPageOptions="[10, 20, 50, 100]" :alwaysShowPaginator="periodos.length > 20">
-            <Column field="periodo" :header="unidadPeriodo" frozen style="min-width:120px">
+
+        <div v-if="fallasCargando && !allFallas.length" class="gen-fallas-empty">
+          <ProgressSpinner style="width:28px;height:28px" />
+          <p>Cargando fallas…</p>
+        </div>
+        <div v-else-if="!fallasDelPeriodo.length" class="gen-fallas-empty">
+          <i class="pi pi-check-circle text-2xl" style="color:#16a34a" />
+          <p>Sin fallas reportadas en este intervalo para los proyectos seleccionados.</p>
+        </div>
+        <div v-else class="overflow-x-auto">
+          <DataTable :value="fallasDelPeriodo" stripedRows rowHover class="text-sm gen-table"
+            :rows="10" paginator :rowsPerPageOptions="[10, 20, 50]" :alwaysShowPaginator="fallasDelPeriodo.length > 10"
+            :rowClass="fallaRowClass" selectionMode="single"
+            @row-click="(e) => router.push('/fallas/' + e.data.id)">
+            <Column header="" style="width:6px;padding:0" :pt="{ headerCell: { style: 'padding:0; border:none' } }">
               <template #body="{ data }">
-                <span class="font-medium text-gray-800">{{ data.periodo }}</span>
+                <div class="gen-falla-stripe" :class="{ 'gen-falla-stripe--gen': involucraGeneracion(data) }" />
               </template>
             </Column>
-            <Column v-for="ds in datasets" :key="ds.proyectoId" :field="ds.proyectoId.toString()"
-              :header="ds.nombre" style="min-width:120px">
+            <Column header="Fecha" field="fecha_identificacion" sortable style="width:96px">
               <template #body="{ data }">
-                <span v-if="data[ds.proyectoId] != null" class="font-mono">
-                  {{ data[ds.proyectoId].toLocaleString('es-CO', { maximumFractionDigits: 2 }) }}
+                <span class="font-medium text-gray-800">{{ fmtFechaCorta(data.fecha_identificacion) }}</span>
+              </template>
+            </Column>
+            <Column header="Proyecto" style="min-width:130px">
+              <template #body="{ data }"><span class="text-gray-700">{{ data.proyecto?.nombre_comercial || '—' }}</span></template>
+            </Column>
+            <Column header="Falla" style="min-width:240px">
+              <template #body="{ data }">
+                <div class="font-medium text-gray-800">{{ data.tipo?.etiqueta || 'Sin tipo' }}</div>
+                <div class="text-xs text-gray-500 gen-falla-desc">{{ data.descripcion }}</div>
+              </template>
+            </Column>
+            <Column header="Prioridad" style="width:96px">
+              <template #body="{ data }">
+                <span class="gen-prio-pill" :style="prioPillStyle(data.prioridad?.codigo)">{{ data.prioridad?.etiqueta || '—' }}</span>
+              </template>
+            </Column>
+            <Column header="Estado" style="width:120px">
+              <template #body="{ data }">
+                <Tag :value="data.estado?.etiqueta || '—'" :style="estadoPillStyle(data.estado?.color_hex)" />
+              </template>
+            </Column>
+            <Column header="Energía perdida" style="width:140px">
+              <template #body="{ data }">
+                <span v-if="involucraGeneracion(data)" class="gen-energy-badge">
+                  <i class="pi pi-bolt" /> {{ energiaPerdida(data).toLocaleString('es-CO', { maximumFractionDigits: 0 }) }} kWh
                 </span>
                 <span v-else class="text-gray-300">—</span>
-              </template>
-            </Column>
-            <Column header="Total" style="min-width:120px">
-              <template #body="{ data }">
-                <span class="font-mono font-bold text-purple-700">
-                  {{ data.total.toLocaleString('es-CO', { maximumFractionDigits: 2 }) }}
-                </span>
               </template>
             </Column>
           </DataTable>
@@ -333,11 +382,14 @@ import MultiSelect from 'primevue/multiselect'
 import Select from 'primevue/select'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
+import Tag from 'primevue/tag'
 import ProgressSpinner from 'primevue/progressspinner'
 import * as XLSX from 'xlsx'
+import { useRouter } from 'vue-router'
 import api from '@/api/client'
 
 const toast = useToast()
+const router = useRouter()
 
 // ── Constantes ────────────────────────────────────────────────────────
 const MESES_ES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
@@ -409,6 +461,15 @@ const nombrePorSub = computed(() => {
   for (const p of proyectos.value) if (p.sub_project) m[p.sub_project] = p.nombre_comercial
   return m
 })
+
+// ── Fallas del período (correlación generación ↔ incidencias) ─────────
+const allFallas = ref([])
+const fallasCargando = ref(false)
+// Snapshot del rango/proyectos consultados, para que el panel de fallas coincida
+// con lo que MUESTRA la gráfica (no con filtros aún sin aplicar).
+const qDesde = ref(null)
+const qHasta = ref(null)
+const qNombres = ref([])  // nombres_comerciales consultados
 
 // ── Modo de selección + cálculo de fechas ─────────────────────────────
 const modosActuales = computed(() => MODOS[granularidad.value] || [])
@@ -553,6 +614,10 @@ async function cargar() {
   error.value = null
   pendiente.value = false
   hasQueried.value = true
+  // Snapshot del query → el panel de fallas se alinea con lo que muestra la gráfica.
+  qDesde.value = new Date(fechaDesde.value)
+  qHasta.value = new Date(fechaHasta.value)
+  qNombres.value = proyectosSel.value.map(sub => nombrePorSub.value[sub]).filter(Boolean)
   try {
     const fInicio = isoDate(fechaDesde.value)
     const fFin = isoDate(fechaHasta.value)
@@ -801,6 +866,99 @@ function onChartMove(e) {
 }
 function onChartLeave() { hover.value = null }
 
+// ── Fallas del período + correlación con la gráfica ───────────────────
+function energiaPerdida(f) {
+  const v = f?.energia_perdida_kwh
+  return v == null ? 0 : Number(v) || 0
+}
+function involucraGeneracion(f) {
+  return energiaPerdida(f) > 0
+}
+
+// Fallas de los proyectos consultados dentro del rango consultado (snapshot).
+const fallasDelPeriodo = computed(() => {
+  if (!qDesde.value || !qHasta.value || !qNombres.value.length) return []
+  const nombres = new Set(qNombres.value)
+  const desde = isoDate(qDesde.value)
+  const hasta = isoDate(qHasta.value)
+  return allFallas.value
+    .filter(f => {
+      const fi = (f.fecha_identificacion || '').slice(0, 10)
+      if (!fi || fi < desde || fi > hasta) return false
+      return nombres.has(f.proyecto?.nombre_comercial)
+    })
+    .sort((a, b) => (b.fecha_identificacion || '').localeCompare(a.fecha_identificacion || ''))
+})
+
+const fallasGenCount = computed(() => fallasDelPeriodo.value.filter(involucraGeneracion).length)
+const kwhPerdidoTotal = computed(() => fallasDelPeriodo.value.reduce((s, f) => s + energiaPerdida(f), 0))
+
+// Días con fallas que impactan generación → para subrayar en rojo.
+const faultsByDay = computed(() => {
+  const m = {}  // 'YYYY-MM-DD' → { count, kwh }
+  for (const f of fallasDelPeriodo.value) {
+    if (!involucraGeneracion(f)) continue
+    const d = (f.fecha_identificacion || '').slice(0, 10)
+    if (!d) continue
+    if (!m[d]) m[d] = { count: 0, kwh: 0 }
+    m[d].count++; m[d].kwh += energiaPerdida(f)
+  }
+  return m
+})
+const flaggedMonths = computed(() => {
+  const s = {}
+  for (const d in faultsByDay.value) {
+    const mk = d.slice(0, 7)
+    if (!s[mk]) s[mk] = { count: 0, kwh: 0 }
+    s[mk].count += faultsByDay.value[d].count
+    s[mk].kwh += faultsByDay.value[d].kwh
+  }
+  return s
+})
+
+// Info de fallas-generación para la clave de un período del eje (según granularidad).
+function infoFallaPeriodo(key) {
+  if (!key) return null
+  if (granularidad.value === 'mensual') return flaggedMonths.value[key] || null
+  if (granularidad.value === 'horaria') return faultsByDay.value[key.slice(0, 10)] || null
+  return faultsByDay.value[key] || null  // diaria
+}
+
+// Índices de períodos marcados (para los subrayados rojos).
+const periodosFlagged = computed(() =>
+  periodos.value.map((p, i) => (infoFallaPeriodo(p.key) ? i : -1)).filter(i => i >= 0)
+)
+// Medio ancho del marcador rojo en coordenadas SVG.
+const marcadorHalfW = computed(() => {
+  const n = periodos.value.length
+  if (n <= 1) return 6
+  const span = chartW.value - paddingL - paddingR
+  return Math.max(3, Math.min(12, (span / (n - 1)) * 0.4))
+})
+// Info de falla del período bajo el cursor (para el tooltip).
+const hoverFalla = computed(() => {
+  if (!hover.value) return null
+  return infoFallaPeriodo(periodos.value[hover.value.idx]?.key)
+})
+
+// Helpers visuales de la tabla de fallas.
+const PRIO_COLORS = { critica: '#dc2626', alta: '#ea580c', media: '#d97706', baja: '#6b7280' }
+function prioPillStyle(codigo) {
+  const c = PRIO_COLORS[codigo] || '#9ca3af'
+  return { background: c + '18', color: c, border: `1px solid ${c}40` }
+}
+function estadoPillStyle(hex) {
+  const c = hex || '#915BD8'
+  return { background: c + '1a', color: c, border: `1px solid ${c}40` }
+}
+function fmtFechaCorta(d) {
+  if (!d) return '—'
+  return new Date(String(d).slice(0, 10) + 'T00:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })
+}
+function fallaRowClass(data) {
+  return involucraGeneracion(data) ? 'gen-falla-row--gen' : ''
+}
+
 // ── Tabla ────────────────────────────────────────────────────────────
 const tablaFilas = computed(() => {
   return periodos.value.map((p, i) => {
@@ -879,11 +1037,36 @@ async function cargarProyectos() {
   }
 }
 
+// Carga todas las fallas una vez (se filtran en cliente por proyecto + rango).
+async function cargarFallas() {
+  fallasCargando.value = true
+  try {
+    const { data: primera } = await api.get('/fallas', { params: { page: 1, size: 200 } })
+    const total = primera.total ?? 0
+    const items = [...(primera.items ?? [])]
+    if (total > 200) {
+      const totalPages = Math.ceil(total / 200)
+      const rest = await Promise.allSettled(
+        Array.from({ length: totalPages - 1 }, (_, i) =>
+          api.get('/fallas', { params: { page: i + 2, size: 200 } })
+        )
+      )
+      for (const r of rest) if (r.status === 'fulfilled') items.push(...(r.value.data.items ?? []))
+    }
+    allFallas.value = items
+  } catch (e) {
+    /* no crítico: la gráfica funciona sin el cruce de fallas */
+  } finally {
+    fallasCargando.value = false
+  }
+}
+
 // ── ResizeObserver para chart responsive ─────────────────────────────
 let resizeObserver
 onMounted(async () => {
   recomputarFechas()   // fija el rango inicial según granularidad/modo por defecto
   await cargarProyectos()
+  cargarFallas()
   await nextTick()
   if (chartWrapRef.value) {
     const upd = () => { chartContainerWidth.value = chartWrapRef.value?.clientWidth || 900 }
@@ -1234,6 +1417,23 @@ watch(chartWrapRef, (el) => {
 }
 .gen-tooltip-val { font-weight: 700; color: #2C2039; font-variant-numeric: tabular-nums; }
 .gen-tooltip-total { border-top: 1px solid #f0ebf7; margin-top: 4px; padding-top: 4px; }
+.gen-tooltip-fault {
+  border-top: 1px solid #fde2e2;
+  margin-top: 5px;
+  padding-top: 5px;
+  color: #dc2626;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.gen-tooltip-fault i { font-size: 11px; }
+
+/* Marcadores de falla en la gráfica (subrayado rojo del día/período) */
+.gen-fault-underline { stroke: #dc2626; stroke-width: 3; stroke-linecap: round; }
+.gen-fault-vline { stroke: #dc2626; stroke-width: 1; stroke-dasharray: 2 3; opacity: 0.35; }
+.gen-fault-dot { fill: #dc2626; }
+
 .gen-chart-svg .gen-grid line {
   stroke: #ece8f4;
   stroke-width: 1;
@@ -1264,4 +1464,64 @@ watch(chartWrapRef, (el) => {
   padding: 8px 12px;
   vertical-align: middle;
 }
+.gen-table :deep(.p-datatable-tbody > tr) { cursor: pointer; }
+
+/* ── Panel de fallas del período ─────────────────────────────────────── */
+.gen-fchip {
+  font-size: 11px;
+  font-weight: 700;
+  color: #6b5a8a;
+  background: #f3f1f8;
+  border: 1px solid #ece8f4;
+  border-radius: 999px;
+  padding: 2px 9px;
+  white-space: nowrap;
+}
+.gen-fchip--red { color: #b91c1c; background: #fef2f2; border-color: #fecaca; }
+
+.gen-fallas-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 32px 20px;
+  color: #6b7280;
+  font-size: 13px;
+  text-align: center;
+}
+
+.gen-falla-stripe { width: 4px; height: 30px; border-radius: 2px; background: #d1d5db; margin: 0 auto; }
+.gen-falla-stripe--gen { background: #dc2626; }
+.gen-falla-row--gen :deep(td) { background: #fff7f7; }
+:deep(.gen-falla-row--gen:hover td) { background: #fdeaea !important; }
+
+.gen-falla-desc {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  max-width: 360px;
+}
+.gen-prio-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.2px;
+}
+.gen-energy-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #b91c1c;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  padding: 2px 8px;
+}
+.gen-energy-badge i { font-size: 10px; }
 </style>
