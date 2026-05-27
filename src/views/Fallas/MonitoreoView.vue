@@ -883,7 +883,7 @@
                   <InputIcon class="pi pi-search" />
                   <InputText v-model="genBuscarProyecto" placeholder="Buscar y seleccionar proyecto..."
                     class="w-full" @focus="genDropdownOpen = true"
-                    @blur="setTimeout(() => genDropdownOpen = false, 200)" />
+                    @blur="cerrarDropdownGen" />
                 </IconField>
                 <span v-if="genSeleccionados.length"
                   class="absolute right-2 top-1/2 -translate-y-1/2 bg-purple-600 text-white text-[10px] font-bold rounded-full px-2 py-0.5">
@@ -892,14 +892,16 @@
               </div>
               <div v-if="genDropdownOpen && genProyectosOpciones.length"
                 class="absolute top-full left-0 right-0 mt-1 bg-white rounded-lg shadow-lg border border-gray-100 max-h-72 overflow-auto z-20">
-                <div v-for="p in genProyectosOpciones" :key="p.name"
+                <div v-for="p in genProyectosOpciones" :key="p.nombre_comercial"
                   class="flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 cursor-pointer"
-                  :class="{ 'bg-purple-50': genSeleccionados.includes(p.name) }"
-                  @mousedown.prevent="toggleGenProyecto(p.name)">
-                  <i v-if="genSeleccionados.includes(p.name)" class="pi pi-check text-xs" style="color:#915BD8" />
+                  :class="{ 'bg-purple-50': genSeleccionados.includes(p.nombre_comercial) }"
+                  @mousedown.prevent="toggleGenProyecto(p.nombre_comercial)">
+                  <i v-if="genSeleccionados.includes(p.nombre_comercial)" class="pi pi-check text-xs" style="color:#915BD8" />
                   <span v-else class="w-3" />
-                  <span class="flex-1 truncate">{{ p.name }}</span>
-                  <span class="text-xs text-gray-400">{{ p.mwh.toFixed(1) }} MWh</span>
+                  <span class="flex-1 truncate">{{ p.nombre_comercial }}</span>
+                  <span v-if="genMWhProyecto(p.nombre_comercial) != null" class="text-xs text-gray-400">
+                    {{ genMWhProyecto(p.nombre_comercial).toFixed(1) }} MWh
+                  </span>
                 </div>
               </div>
             </div>
@@ -1699,6 +1701,11 @@ function toggleGenProyecto(name) {
 function cerrarDropdownGen() {
   setTimeout(() => { genDropdownOpen.value = false }, 200)
 }
+
+function cerrarDropdownGen() {
+  setTimeout(() => { genDropdownOpen.value = false }, 200)
+}
+
 async function cambiarDias(dias) {
   genDias.value = dias
   await cargarGeneracion()
