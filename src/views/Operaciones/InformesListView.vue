@@ -7,12 +7,33 @@
         <h1 class="inf-hero-title">Informes</h1>
         <p class="inf-hero-sub">Informes operacionales y FMO · equipo Unergy</p>
       </div>
-      <button class="inf-refresh-btn" :disabled="loading" @click="cargar" title="Actualizar">
+      <button v-if="activeTab === 'guardados'" class="inf-refresh-btn" :disabled="loading" @click="cargar" title="Actualizar">
         <span :class="loading ? 'spin-icon' : ''">↻</span>
         Actualizar
       </button>
     </div>
 
+    <!-- ══ Tab nav ═════════════════════════════════════════════════ -->
+    <div class="inf-tabs">
+      <button class="inf-tab" :class="{ 'inf-tab--active': activeTab === 'guardados' }"
+              @click="setTab('guardados')">
+        <i class="pi pi-folder-open" />
+        <span>Informes guardados</span>
+        <span class="inf-tab-count">{{ todosLoaded.length }}</span>
+      </button>
+      <button class="inf-tab" :class="{ 'inf-tab--active': activeTab === 'mensuales' }"
+              @click="setTab('mensuales')">
+        <i class="pi pi-file-edit" />
+        <span>Informes mensuales</span>
+        <span class="inf-tab-badge">Generar</span>
+      </button>
+    </div>
+
+    <!-- ══ TAB: Informes mensuales (wizard de generación) ══════════════ -->
+    <InformesMensualesPanel v-if="activeTab === 'mensuales'" />
+
+    <!-- ══ TAB: Informes guardados (lista) ═════════════════════════════ -->
+    <template v-else>
     <!-- ══ KPIs ═════════════════════════════════════════════════════ -->
     <div class="inf-kpis">
       <button
@@ -145,7 +166,7 @@
               <div class="td-sub" v-if="inf.proyecto_nombre && inf.sub_project !== inf.proyecto_nombre">{{ inf.sub_project }}</div>
             </td>
             <td>
-              <span class="tipo-tag">{{ inf.tipo === 'fmo' ? 'FMO' : 'Oper.' }}</span>
+              <span class="tipo-tag">{{ tipoLabel(inf.tipo) }}</span>
             </td>
             <td class="td-periodo">
               {{ inf.periodo_display || formatPeriodo(inf.periodo_desde) }}
@@ -176,23 +197,38 @@
         </tbody>
       </table>
     </div>
+    </template>
 
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import api from '@/api/client'
+import InformesMensualesPanel from './InformesMensualesPanel.vue'
 
 const router = useRouter()
+const route  = useRoute()
 
+const activeTab    = ref(route.query.tab === 'mensuales' ? 'mensuales' : 'guardados')
 const todosLoaded  = ref([])
 const loading      = ref(false)
 const error        = ref(null)
 const filtroEstado = ref('')
 const filtroAnio   = ref('')
 const filtroMes    = ref('')
+
+function setTab(tab) {
+  activeTab.value = tab
+  const q = { ...route.query }
+  if (tab === 'mensuales') q.tab = 'mensuales'
+  else delete q.tab
+  router.replace({ query: q })
+}
+watch(() => route.query.tab, (t) => {
+  activeTab.value = t === 'mensuales' ? 'mensuales' : 'guardados'
+})
 
 const meses = [
   { v: '01', label: 'Enero' },   { v: '02', label: 'Febrero' },
@@ -263,6 +299,9 @@ async function eliminarInforme(inf) {
 function estadoLabel(e) {
   return { borrador: 'Borrador', revisado: 'Revisado', aprobado: 'Aprobado' }[e] || e
 }
+function tipoLabel(t) {
+  return { op: 'Operacional', fmo: 'FMO', port: 'Portafolio' }[t] || (t || '—').toUpperCase()
+}
 function formatFecha(iso) {
   return new Date(iso).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })
 }
@@ -307,6 +346,63 @@ onMounted(cargar)
   font-size: 13px;
   color: rgba(253,250,247,.55);
   margin: 0;
+}
+
+/* ── Tabs ───────────────────────────────────────────────────────── */
+.inf-tabs {
+  display: flex;
+  gap: 0;
+  background: #fff;
+  border-bottom: 1px solid #e5e2ec;
+  padding: 0 32px;
+}
+.inf-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  background: transparent;
+  padding: 14px 18px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #6b5a8a;
+  cursor: pointer;
+  font-family: inherit;
+  position: relative;
+  transition: color .15s;
+  border-bottom: 3px solid transparent;
+}
+.inf-tab i { font-size: 14px; }
+.inf-tab:hover { color: #2C2039; background: #f8f7fa; }
+.inf-tab--active {
+  color: #6d28d9;
+  border-bottom-color: #915BD8;
+}
+.inf-tab-count {
+  font-size: 10px;
+  background: #f3f0ff;
+  color: #7c3aed;
+  padding: 2px 7px;
+  border-radius: 10px;
+  font-weight: 800;
+}
+.inf-tab--active .inf-tab-count {
+  background: #915BD8;
+  color: #fff;
+}
+.inf-tab-badge {
+  font-size: 9px;
+  background: #FEF9C3;
+  color: #854D0E;
+  padding: 2px 7px;
+  border-radius: 10px;
+  font-weight: 800;
+  letter-spacing: .4px;
+  text-transform: uppercase;
+}
+.inf-tab--active .inf-tab-badge {
+  background: #F6FF72;
+  color: #4B3A0E;
 }
 
 /* ── KPIs ───────────────────────────────────────────────────────── */
