@@ -166,6 +166,7 @@ import Select from 'primevue/select'
 import Button from 'primevue/button'
 import ProgressSpinner from 'primevue/progressspinner'
 import api from '@/api/client'
+import { buildReportHtmlDoc } from '@/utils/rptStyles'
 
 const router = useRouter()
 
@@ -290,9 +291,27 @@ function descartar() {
 }
 
 function imprimir() {
-  document.body.classList.add('im-printing')
-  window.print()
-  setTimeout(() => document.body.classList.remove('im-printing'), 300)
+  if (!reportRef.value) return
+  const html = reportRef.value.innerHTML
+  if (!html) return
+  const w = window.open('', '_blank', 'width=920,height=700')
+  if (!w) {
+    // fallback: impresión de la página completa si los popups están bloqueados
+    document.body.classList.add('im-printing')
+    window.print()
+    setTimeout(() => document.body.classList.remove('im-printing'), 300)
+    return
+  }
+  const doc = buildReportHtmlDoc(html, {
+    title:  resultTitle.value || 'Informe Operacional',
+    bgGray: false,
+  })
+  w.document.open()
+  w.document.write(doc)
+  w.document.close()
+  w.focus()
+  // Esperar a que cargue la fuente Sora antes de imprimir
+  setTimeout(() => w.print(), 700)
 }
 
 function abrirEditor() {
