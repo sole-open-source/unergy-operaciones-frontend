@@ -495,7 +495,7 @@ const catalogos = ref({ estados: [], prioridades: [], tipos: [], resoluciones: [
 const loading = ref(false)
 const error = ref(null)
 
-const bucket = ref('activas')
+const bucket = ref('todas')
 const search = ref('')
 const filtroProyecto = ref(null)
 const filtroPrioridad = ref(null)
