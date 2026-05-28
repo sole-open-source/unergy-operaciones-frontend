@@ -91,7 +91,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 
@@ -305,14 +305,6 @@ onBeforeUnmount(() => {
   if (map) map.remove()
   markers.forEach(m => m.remove())
 })
-
-watch(() => props.fallas, () => {
-  if (map && map.loaded()) {
-    markers.forEach(m => m.remove()); markers = []
-    // Re-renderizar marcadores con datos actualizados
-    cargarMapa()
-  }
-}, { deep: false })
 </script>
 
 <style scoped>

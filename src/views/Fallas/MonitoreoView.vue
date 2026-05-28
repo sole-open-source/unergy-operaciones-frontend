@@ -641,7 +641,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount, watch, nextTick, defineAsyncComponent } from 'vue'
 import { useRouter } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import { useConfirm } from 'primevue/useconfirm'
@@ -658,7 +658,7 @@ import Dialog from 'primevue/dialog'
 import Textarea from 'primevue/textarea'
 import FallaForm from './FallaForm.vue'
 import FallaArchivos from './FallaArchivos.vue'
-import FallasMapView from './FallasMapView.vue'
+const FallasMapView = defineAsyncComponent(() => import('./FallasMapView.vue'))
 import { Doughnut, Bar, Line } from 'vue-chartjs'
 import {
   Chart as ChartJS, ArcElement, Tooltip, Legend,
