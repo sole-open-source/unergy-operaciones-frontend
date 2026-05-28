@@ -634,14 +634,14 @@ async function cargar() {
   loading.value = true
   error.value = null
   try {
-    const { data: primera } = await api.get('/fallas', { params: { page: 1, size: 200 } })
+    const { data: primera } = await api.get('/fallas', { params: { page: 1, size: 500 } })
     const total = primera.total ?? 0
     const items = [...(primera.items ?? [])]
-    if (total > 200) {
-      const totalPages = Math.ceil(total / 200)
+    if (total > 500) {
+      const totalPages = Math.ceil(total / 500)
       const rest = await Promise.allSettled(
         Array.from({ length: totalPages - 1 }, (_, i) =>
-          api.get('/fallas', { params: { page: i + 2, size: 200 } })
+          api.get('/fallas', { params: { page: i + 2, size: 500 } })
         )
       )
       for (const r of rest) {
