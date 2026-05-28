@@ -528,7 +528,7 @@
     </template><!-- /TAB 0 -->
 
     <!-- ══ TAB 1 — GRÁFICOS ══════════════════════════════════════════════ -->
-    <div v-else-if="activeTab === 1" class="mon-tab-view">
+    <div v-if="activeTab === 1" class="mon-tab-view">
       <div v-if="loading" class="mon-tab-loading">
         <div class="mon-spinner" /><span>Cargando datos…</span>
       </div>
@@ -2166,8 +2166,6 @@ watch(bucket, (newBucket) => {
 
 /* ══ TAB 1 — GRÁFICOS ════════════════════════════════════════════════════ */
 .mon-tab-view {
-  flex: 1;
-  overflow-y: auto;
   padding: 24px 24px 40px;
   background: #f5f4f8;
 }
