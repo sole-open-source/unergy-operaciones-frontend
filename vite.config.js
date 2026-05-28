@@ -30,6 +30,11 @@ export default defineConfig(({ mode }) => {
           target: env.VITE_API_URL || 'http://localhost:8000',
           changeOrigin: true,
         },
+        '/or-api': {
+          target: env.OR_API_URL || 'http://localhost:3002/api',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/or-api/, ''),
+        },
       },
     },
   }

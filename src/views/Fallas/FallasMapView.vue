@@ -95,7 +95,7 @@ import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 
-const OR_BASE = 'http://localhost:3002/api'
+const OR_BASE = '/or-api'
 
 const props = defineProps({
   fallas: { type: Array, default: () => [] },
@@ -152,7 +152,7 @@ async function cargarOperadores() {
       await cargarMapa()
     }
   } catch {
-    errorMapa.value = 'No se pudo conectar al backend OR (puerto 3002). Verifica que esté corriendo.'
+    errorMapa.value = 'No se pudo conectar al backend OR. Verifica que esté corriendo en localhost:3002.'
   }
 }
 
