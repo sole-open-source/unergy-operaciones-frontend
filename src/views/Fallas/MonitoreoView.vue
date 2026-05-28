@@ -3,13 +3,17 @@
 
     <!-- ══ TAB BAR (fuera del sticky) ═══════════════════════════════════ -->
     <div class="mon-tab-bar">
-      <button v-for="(tab, i) in TABS" :key="i"
-        class="mon-tab"
-        :class="{ 'mon-tab--active': activeTab === i }"
-        @click="activeTab = i">
-        <i :class="tab.icon" style="font-size:13px" />
-        {{ tab.label }}
-      </button>
+      <i class="pi pi-bolt text-sm" style="color:#915BD8" />
+      <span class="text-base font-bold text-gray-800 whitespace-nowrap mr-2">Monitoreo de Fallas</span>
+      <div class="mon-tab-group">
+        <button v-for="(tab, i) in TABS" :key="i"
+          class="mon-tab"
+          :class="{ 'mon-tab--active': activeTab === i }"
+          @click="activeTab = i">
+          <i :class="tab.icon" style="font-size:12px" />
+          {{ tab.label }}
+        </button>
+      </div>
     </div>
 
     <!-- ══ TAB 0 — FALLAS ════════════════════════════════════════════════ -->
@@ -20,11 +24,6 @@
 
         <!-- ── Topbar ── -->
         <div class="gf-topbar">
-          <div class="gf-topbar-title">
-            <i class="pi pi-bolt text-sm" style="color:#915BD8" />
-            <h2 class="text-base font-bold text-gray-800 whitespace-nowrap">Monitoreo de Fallas</h2>
-          </div>
-
           <!-- Bucket pills -->
           <div class="gf-bucket-pills">
             <button v-for="b in BUCKETS" :key="b.key"
@@ -178,22 +177,6 @@
                 </template>
               </Column>
 
-              <!-- Asignado -->
-              <Column header="Asignado" style="width:160px">
-                <template #body="{ data }">
-                  <div v-if="data.asignado_a" class="flex items-center gap-2">
-                    <div class="avatar-sm" :style="avatarStyle(data.asignado_a)">
-                      {{ initials(data.asignado_a.nombre) }}
-                    </div>
-                    <span class="text-xs text-gray-700 truncate flex-1">{{ data.asignado_a.nombre }}</span>
-                  </div>
-                  <div v-else class="flex items-center gap-2 text-gray-400">
-                    <div class="avatar-sm avatar-sm--empty"><i class="pi pi-user text-[10px]" /></div>
-                    <span class="text-xs">Sin asignar</span>
-                  </div>
-                </template>
-              </Column>
-
               <!-- Prioridad -->
               <Column header="Prioridad" style="width:100px">
                 <template #body="{ data }">
@@ -317,16 +300,6 @@
                     <dd class="gf-fact-value">{{ drawerFalla.proyecto?.nombre_comercial || '—' }}</dd>
                   </div>
                   <div class="gf-fact">
-                    <dt class="gf-fact-label"><i class="pi pi-user" /> Asignado</dt>
-                    <dd class="gf-fact-value">
-                      <div v-if="drawerFalla.asignado_a" class="flex items-center gap-1.5">
-                        <div class="avatar-xs" :style="avatarStyle(drawerFalla.asignado_a)">{{ initials(drawerFalla.asignado_a.nombre) }}</div>
-                        <span>{{ drawerFalla.asignado_a.nombre }}</span>
-                      </div>
-                      <span v-else class="text-gray-500">Sin asignar</span>
-                    </dd>
-                  </div>
-                  <div class="gf-fact">
                     <dt class="gf-fact-label"><i class="pi pi-calendar" /> Identificada</dt>
                     <dd class="gf-fact-value">
                       {{ fmtFecha(drawerFalla.fecha_identificacion) }}
@@ -342,6 +315,10 @@
                     <dd class="gf-fact-value text-emerald-700 font-semibold">
                       {{ fmtFecha(drawerFalla.fecha_resolucion?.slice?.(0,10) || drawerFalla.fecha_resolucion) }}
                     </dd>
+                  </div>
+                  <div v-if="drawerFalla.tipo_solucion" class="gf-fact">
+                    <dt class="gf-fact-label"><i class="pi pi-wrench" /> Tipo de solución</dt>
+                    <dd class="gf-fact-value font-medium text-emerald-700">{{ drawerFalla.tipo_solucion }}</dd>
                   </div>
                   <div v-if="drawerFalla.energia_perdida_kwh != null" class="gf-fact">
                     <dt class="gf-fact-label"><i class="pi pi-bolt" /> Energía perdida</dt>
@@ -398,12 +375,6 @@
                       <Select v-model="quickEdit.prioridad_id" :options="catalogos.prioridades"
                         optionLabel="etiqueta" optionValue="id" class="flex-1"
                         @change="autosaveQuick()" />
-                    </div>
-                    <div class="gf-field-row">
-                      <label class="gf-field-label">Asignado</label>
-                      <Select v-model="quickEdit.asignado_a_id" :options="usuarios"
-                        optionLabel="nombre" optionValue="id" placeholder="Sin asignar" showClear filter
-                        class="flex-1" @change="autosaveQuick()" />
                     </div>
                   </div>
                 </section>
@@ -663,6 +634,9 @@
       </div>
     </div><!-- /TAB 1 -->
 
+    <!-- ══ TAB 2 — MAPA ══════════════════════════════════════════════════ -->
+    <FallasMapView v-if="activeTab === 2" :fallas="allFallas" />
+
   </div><!-- /gf-page -->
 </template>
 
@@ -684,6 +658,7 @@ import Dialog from 'primevue/dialog'
 import Textarea from 'primevue/textarea'
 import FallaForm from './FallaForm.vue'
 import FallaArchivos from './FallaArchivos.vue'
+import FallasMapView from './FallasMapView.vue'
 import { Doughnut, Bar, Line } from 'vue-chartjs'
 import {
   Chart as ChartJS, ArcElement, Tooltip, Legend,
@@ -701,6 +676,7 @@ const confirmService = useConfirm()
 const TABS = [
   { label: 'Fallas',   icon: 'pi pi-bolt' },
   { label: 'Gráficos', icon: 'pi pi-chart-bar' },
+  { label: 'Mapa',     icon: 'pi pi-map' },
 ]
 const activeTab = ref(0)
 
@@ -724,7 +700,6 @@ const AVATAR_PALETTE = ['#915BD8', '#2563eb', '#16a34a', '#d97706', '#dc2626', '
 // ── Estado base ───────────────────────────────────────────────────────────
 const allFallas  = ref([])
 const proyectos  = ref([])
-const usuarios   = ref([])
 const catalogos  = ref({ estados: [], prioridades: [], tipos: [], resoluciones: [] })
 const loading    = ref(false)
 const error      = ref(null)
@@ -746,7 +721,7 @@ const stickyHeaderRef = ref(null)
 // ── Drawer / detalle ──────────────────────────────────────────────────────
 const drawerVisible  = ref(false)
 const drawerFalla    = ref(null)
-const quickEdit      = reactive({ estado_id: null, prioridad_id: null, asignado_a_id: null })
+const quickEdit      = reactive({ estado_id: null, prioridad_id: null })
 const savingQuick    = ref(false)
 const savedFlash     = ref(false)
 const resolvingFalla = ref(false)
@@ -924,13 +899,6 @@ async function cargarProyectos() {
   } catch { /* no crítico */ }
 }
 
-async function cargarUsuarios() {
-  try {
-    const { data } = await api.get('/usuarios', { params: { size: 200 } })
-    usuarios.value = data.items ?? []
-  } catch { /* /usuarios puede no existir */ }
-}
-
 // ── Acciones ──────────────────────────────────────────────────────────────
 function limpiarFiltros() {
   search.value           = ''
@@ -954,7 +922,6 @@ function abrirDrawer(falla) {
   drawerFalla.value       = falla
   quickEdit.estado_id     = falla.estado?.id ?? null
   quickEdit.prioridad_id  = falla.prioridad?.id ?? null
-  quickEdit.asignado_a_id = falla.asignado_a?.id ?? null
   nuevaNota.nota          = ''
   nuevaNota.estado_id     = null
   drawerVisible.value     = true
@@ -1018,9 +985,6 @@ async function guardarQuickEdit() {
   const payload = {}
   if (quickEdit.estado_id !== drawerFalla.value.estado?.id) payload.estado_id = quickEdit.estado_id
   if (quickEdit.prioridad_id !== drawerFalla.value.prioridad?.id) payload.prioridad_id = quickEdit.prioridad_id
-  if ((quickEdit.asignado_a_id ?? null) !== (drawerFalla.value.asignado_a?.id ?? null)) {
-    payload.asignado_a_id = quickEdit.asignado_a_id
-  }
   if (!Object.keys(payload).length) return
 
   savingQuick.value = true
@@ -1035,7 +999,6 @@ async function guardarQuickEdit() {
     toast.add({ severity: 'error', summary: 'No se pudo guardar', detail: err?.response?.data?.detail, life: 3000 })
     quickEdit.estado_id     = drawerFalla.value.estado?.id ?? null
     quickEdit.prioridad_id  = drawerFalla.value.prioridad?.id ?? null
-    quickEdit.asignado_a_id = drawerFalla.value.asignado_a?.id ?? null
   } finally {
     savingQuick.value = false
   }
@@ -1516,7 +1479,6 @@ onMounted(() => {
   cargar()
   cargarCatalogos()
   cargarProyectos()
-  cargarUsuarios()
   window.addEventListener('keydown', onKeydown)
   nextTick(() => {
     measureHeader()
@@ -1565,39 +1527,59 @@ watch(bucket, (newBucket) => {
 /* ══ TAB BAR ══════════════════════════════════════════════════════════════ */
 .mon-tab-bar {
   display: flex;
-  border-bottom: 1px solid #e5e7eb;
-  background: #f3f4f6;
-  padding: 0 16px;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  background: #fff;
+  border-bottom: 1px solid #ECE7F2;
+  box-shadow: 0 1px 3px rgba(28, 18, 50, 0.04);
   flex-shrink: 0;
   position: sticky;
   top: 0;
   z-index: 25;
 }
 .mon-tab {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 10px 16px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #6b7280;
-  background: none;
+  gap: 5px;
+  background: transparent;
   border: none;
-  border-bottom: 2px solid transparent;
-  cursor: pointer;
+  padding: 5px 12px;
   font-family: inherit;
-  transition: color 0.14s, border-color 0.14s;
+  font-size: 12px;
+  font-weight: 700;
+  color: #6B5A8A;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all .15s;
   white-space: nowrap;
-  margin-bottom: -1px;
 }
-.mon-tab:hover:not(.mon-tab--active) { color: #4b5563; }
-.mon-tab--active { color: #7c3aed; border-bottom-color: #7c3aed; }
+.mon-tab i { font-size: 12px; }
+.mon-tab:hover:not(.mon-tab--active) { color: #2C2039; background: rgba(145,91,216,.08); }
+.mon-tab--active {
+  background: #915BD8;
+  color: #FDFAF7;
+  box-shadow: 0 1px 4px rgba(145,91,216,.3);
+}
+.mon-tab--active:hover { color: #FDFAF7; }
+.mon-tab-group {
+  display: inline-flex;
+  background: #F4F1FA;
+  border: 1px solid #E5E2EC;
+  border-radius: 8px;
+  padding: 2px;
+  gap: 0;
+}
 
 /* ══ Página ══════════════════════════════════════════════════════════════ */
 .gf-page {
   display: flex;
   flex-direction: column;
   gap: 0;
+  background: #f8f7fa;
+  min-height: 100%;
+  font-family: 'Sora', system-ui, sans-serif;
 }
 
 /* ══ Sticky header ═══════════════════════════════════════════════════════ */
@@ -1605,7 +1587,7 @@ watch(bucket, (newBucket) => {
   position: sticky;
   top: 41px;
   z-index: 20;
-  background: #f3f4f6;
+  background: #f8f7fa;
   padding-top: 4px;
   padding-bottom: 12px;
   display: flex;
@@ -1619,7 +1601,7 @@ watch(bucket, (newBucket) => {
   right: -24px;
   bottom: 100%;
   height: 28px;
-  background: #f3f4f6;
+  background: #f8f7fa;
   pointer-events: none;
 }
 
@@ -1938,17 +1920,6 @@ watch(bucket, (newBucket) => {
 .gf-sla-of  { font-size: 13px; color: #6b5a8a; font-weight: 500; }
 
 /* ══ Avatars ═════════════════════════════════════════════════════════════ */
-.avatar-xs {
-  width: 18px; height: 18px; border-radius: 50%;
-  display: inline-flex; align-items: center; justify-content: center;
-  color: #fff; font-size: 9px; font-weight: 700; flex-shrink: 0;
-}
-.avatar-sm {
-  width: 24px; height: 24px; border-radius: 50%;
-  display: inline-flex; align-items: center; justify-content: center;
-  color: #fff; font-size: 10px; font-weight: 700; flex-shrink: 0;
-}
-.avatar-sm--empty { background: #e5e7eb !important; color: #9ca3af !important; }
 .avatar-md {
   width: 32px; height: 32px; border-radius: 50%;
   display: inline-flex; align-items: center; justify-content: center;

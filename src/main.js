@@ -2,6 +2,25 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import PrimeVue from 'primevue/config'
 import Aura from '@primevue/themes/aura'
+import { definePreset } from '@primevue/themes'
+
+const UnergPreset = definePreset(Aura, {
+  semantic: {
+    primary: {
+      50:  '{violet.50}',
+      100: '{violet.100}',
+      200: '{violet.200}',
+      300: '{violet.300}',
+      400: '{violet.400}',
+      500: '#915BD8',
+      600: '#7c4ec0',
+      700: '#6a3faa',
+      800: '#593393',
+      900: '#4a2878',
+      950: '#31175a',
+    },
+  },
+})
 import ToastService from 'primevue/toastservice'
 import ConfirmationService from 'primevue/confirmationservice'
 import 'primeicons/primeicons.css'
@@ -17,7 +36,7 @@ app.use(createPinia())
 app.use(router)
 app.use(PrimeVue, {
   theme: {
-    preset: Aura,
+    preset: UnergPreset,
     options: { darkModeSelector: '.dark', cssLayer: false },
   },
 })
