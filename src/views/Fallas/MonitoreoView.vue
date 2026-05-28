@@ -503,6 +503,114 @@
 
     <!-- ══ TAB 1 — GRÁFICOS ══════════════════════════════════════════════ -->
     <div v-if="activeTab === 1" class="mon-tab-view">
+
+      <!-- ── Sección: Generación vs P90 ─────────────────────────────────── -->
+      <div class="charts-container">
+
+        <div class="p90-section-head">
+          <div class="p90-section-title">
+            <i class="pi pi-sun" style="color:#f59e0b;font-size:13px" />
+            <span>Generación Real vs P90</span>
+            <span class="p90-section-sub">· Minigranjas y GD con servicio de operación</span>
+          </div>
+          <div class="p90-controls">
+            <DatePicker v-model="p90FechaInicio" dateFormat="yy-mm-dd" placeholder="Desde"
+              showButtonBar class="p90-dp" size="small" @hide="cargarResumenP90" />
+            <DatePicker v-model="p90FechaFin" dateFormat="yy-mm-dd" placeholder="Hasta"
+              showButtonBar class="p90-dp" size="small" @hide="cargarResumenP90" />
+            <button class="p90-reload-btn" @click="cargarResumenP90" :disabled="loadingP90">
+              <i :class="loadingP90 ? 'pi pi-spin pi-spinner' : 'pi pi-refresh'" />
+            </button>
+          </div>
+        </div>
+
+        <div v-if="resumenFiltrado.length && !loadingP90" class="p90-kpis">
+          <div class="p90-kpi">
+            <span class="p90-kpi-val" style="color:#16a34a">{{ p90Kpis.totalReal.toLocaleString('es-CO') }}</span>
+            <span class="p90-kpi-lbl">kWh reales</span>
+          </div>
+          <div class="p90-kpi">
+            <span class="p90-kpi-val" style="color:#f59e0b">{{ p90Kpis.totalP90.toLocaleString('es-CO') }}</span>
+            <span class="p90-kpi-lbl">kWh P90</span>
+          </div>
+          <div class="p90-kpi">
+            <span class="p90-kpi-val"
+              :style="{ color: p90Kpis.ratio >= 100 ? '#16a34a' : p90Kpis.ratio >= 80 ? '#d97706' : '#dc2626' }">
+              {{ p90Kpis.ratio }}%
+            </span>
+            <span class="p90-kpi-lbl">vs P90</span>
+          </div>
+          <div class="p90-kpi p90-kpi--green">
+            <span class="p90-kpi-val" style="color:#16a34a">{{ p90Kpis.sobreP90 }}</span>
+            <span class="p90-kpi-lbl">sobre P90</span>
+          </div>
+          <div v-if="p90Kpis.bajoP90 > 0" class="p90-kpi p90-kpi--red">
+            <span class="p90-kpi-val" style="color:#dc2626">{{ p90Kpis.bajoP90 }}</span>
+            <span class="p90-kpi-lbl">bajo P90 ⚠</span>
+          </div>
+        </div>
+
+        <div v-if="loadingP90" class="p90-state">
+          <i class="pi pi-spin pi-spinner" style="color:#915BD8;font-size:22px" />
+          <span>Cargando generación…</span>
+        </div>
+        <div v-else-if="!proyectosConSrvOp.length" class="p90-state">
+          <i class="pi pi-sun" style="color:#d97706;font-size:28px" />
+          <span>No hay minigranjas o GD con servicio de operación configuradas.</span>
+        </div>
+        <div v-else-if="!resumenFiltrado.length" class="p90-state">
+          <i class="pi pi-database" style="color:#9ca3af;font-size:24px" />
+          <span>Sin datos de generación para el período seleccionado.</span>
+          <small style="color:#bbb">Verifica que haya registros de generación en este rango de fechas.</small>
+        </div>
+
+        <div v-if="!loadingP90 && resumenFiltrado.length" class="chart-card chart-card--wide p90-bar-card">
+          <div class="p90-chart-legend">
+            <span class="p90-legend-item"><span class="p90-legend-dot" style="background:#16a34a"></span> Real</span>
+            <span class="p90-legend-item"><span class="p90-legend-dot" style="background:#f59e0b"></span> P90 objetivo</span>
+            <span class="p90-legend-hint">· Clic en barra para ver detalle diario</span>
+          </div>
+          <div class="chart-canvas-wrap" :style="{ height: Math.max(180, resumenFiltrado.length * 50 + 40) + 'px' }">
+            <Bar :data="barP90Data" :options="barP90Opts" />
+          </div>
+        </div>
+
+        <div v-if="proyectoP90Sel" class="p90-detail-card">
+          <div class="p90-detail-head">
+            <i class="pi pi-chart-line" style="color:#16a34a;font-size:11px" />
+            <span class="font-semibold text-sm" style="color:#2C2039">{{ proyectoP90Sel.nombre_comercial }}</span>
+            <span class="p90-section-sub">· Detalle diario</span>
+            <div v-if="!loadingP90Diario && diariosP90.length" class="p90-detail-kpis">
+              <span style="color:#16a34a">Real: {{ diarioKpis.real.toLocaleString('es-CO') }} kWh</span>
+              <span style="color:#f59e0b">P90: {{ diarioKpis.p90.toLocaleString('es-CO') }} kWh</span>
+              <span :style="{ color: diarioKpis.ratio >= 100 ? '#16a34a' : '#dc2626' }">
+                {{ diarioKpis.ratio }}%
+              </span>
+            </div>
+            <button class="p90-close-btn" @click="cerrarDetalleDiario">
+              <i class="pi pi-times" style="font-size:10px" />
+            </button>
+          </div>
+          <div v-if="loadingP90Diario" class="p90-state" style="padding:24px 20px">
+            <i class="pi pi-spin pi-spinner" style="color:#915BD8" />
+          </div>
+          <div v-else-if="!diariosP90.length" class="p90-state" style="padding:24px 20px">
+            <span>Sin datos diarios para este período.</span>
+          </div>
+          <div v-else class="chart-canvas-wrap" style="height:240px">
+            <Line :data="lineP90DiarioData" :options="lineP90DiarioOpts" />
+          </div>
+        </div>
+
+      </div><!-- /P90 section -->
+
+      <!-- ── Separador ──────────────────────────────────────────────────── -->
+      <div class="p90-separator">
+        <i class="pi pi-bolt" style="color:#915BD8;font-size:11px" />
+        <span>Análisis de Fallas</span>
+      </div>
+
+      <!-- ── Fallas charts ──────────────────────────────────────────────── -->
       <div v-if="loading" class="mon-tab-loading">
         <div class="mon-spinner" /><span>Cargando datos…</span>
       </div>
@@ -736,6 +844,15 @@ const savingForm        = ref(false)
 // ── Tab Gráficos ──────────────────────────────────────────────────────────
 const filtroGraficosProyecto = ref('')
 
+// ── Tab Gráficos: P90 ─────────────────────────────────────────────────────
+const p90FechaInicio   = ref(new Date(new Date().getFullYear(), new Date().getMonth(), 1))
+const p90FechaFin      = ref(new Date())
+const resumenP90       = ref([])
+const loadingP90       = ref(false)
+const proyectoP90Sel   = ref(null)
+const diariosP90       = ref([])
+const loadingP90Diario = ref(false)
+
 // ── Computed: lógica de buckets ───────────────────────────────────────────
 function esAlertaSLA(f) {
   return !f.estado?.es_estado_final && (f.sla_cumplido === false || (f.dias_abierta ?? 0) >= 7)
@@ -897,6 +1014,43 @@ async function cargarProyectos() {
     const { data } = await api.get('/proyectos', { params: { size: 500 } })
     proyectos.value = data.items ?? []
   } catch { /* no crítico */ }
+}
+
+// ── Carga: Generación P90 ────────────────────────────────────────────────
+async function cargarResumenP90() {
+  loadingP90.value = true
+  try {
+    const params = {}
+    if (p90FechaInicio.value) params.fecha_inicio = p90FechaInicio.value.toISOString().split('T')[0]
+    if (p90FechaFin.value)    params.fecha_fin    = p90FechaFin.value.toISOString().split('T')[0]
+    const { data } = await api.get('/generacion/resumen/por-proyecto', { params })
+    resumenP90.value = data ?? []
+  } catch {
+    resumenP90.value = []
+  } finally {
+    loadingP90.value = false
+  }
+}
+
+async function cargarDiariosP90(proyectoId) {
+  loadingP90Diario.value = true
+  diariosP90.value = []
+  try {
+    const params = { proyecto_id: proyectoId, size: 366 }
+    if (p90FechaInicio.value) params.fecha_inicio = p90FechaInicio.value.toISOString().split('T')[0]
+    if (p90FechaFin.value)    params.fecha_fin    = p90FechaFin.value.toISOString().split('T')[0]
+    const { data } = await api.get('/generacion', { params })
+    diariosP90.value = data.items ?? []
+  } catch {
+    diariosP90.value = []
+  } finally {
+    loadingP90Diario.value = false
+  }
+}
+
+function cerrarDetalleDiario() {
+  proyectoP90Sel.value = null
+  diariosP90.value = []
 }
 
 // ── Acciones ──────────────────────────────────────────────────────────────
@@ -1449,6 +1603,142 @@ const barEnergiaData = computed(() => ({
 }))
 const barEnergiaOpts = computed(() => ({ ...sharedBarHOpts, plugins: { ...sharedBarHOpts.plugins, tooltip: { callbacks: { label: ctx => ` ${Number(ctx.raw).toLocaleString('es-CO')} kWh` } } } }))
 
+// ── Computed: P90 ─────────────────────────────────────────────────────────
+const proyectosConSrvOp = computed(() =>
+  proyectos.value.filter(p =>
+    p.srv_operacion === true &&
+    ['minigranja', 'gd'].includes(p.tipo_proyecto)
+  )
+)
+
+const resumenFiltrado = computed(() => {
+  const ids = new Set(proyectosConSrvOp.value.map(p => p.id))
+  return resumenP90.value
+    .filter(r => ids.has(r.proyecto_id))
+    .sort((a, b) => Number(b.total_kwh_real || 0) - Number(a.total_kwh_real || 0))
+})
+
+const p90Kpis = computed(() => {
+  const arr       = resumenFiltrado.value
+  const totalReal = arr.reduce((s, r) => s + Number(r.total_kwh_real || 0), 0)
+  const totalP90  = arr.reduce((s, r) => s + Number(r.total_kwh_p90 || 0), 0)
+  const ratio     = totalP90 > 0 ? Math.round(totalReal / totalP90 * 100) : 0
+  const sobreP90  = arr.filter(r => Number(r.total_kwh_real || 0) >= Number(r.total_kwh_p90 || 0)).length
+  const bajoP90   = arr.filter(r =>
+    Number(r.total_kwh_real || 0) < Number(r.total_kwh_p90 || 0) &&
+    Number(r.total_kwh_p90 || 0) > 0
+  ).length
+  return { totalReal: Math.round(totalReal), totalP90: Math.round(totalP90), ratio, sobreP90, bajoP90 }
+})
+
+const diarioKpis = computed(() => {
+  const real  = diariosP90.value.reduce((s, d) => s + Number(d.kwh_real || 0), 0)
+  const p90   = diariosP90.value.reduce((s, d) => s + Number(d.kwh_p90  || 0), 0)
+  const ratio = p90 > 0 ? Math.round(real / p90 * 100) : 0
+  return { real: Math.round(real), p90: Math.round(p90), ratio }
+})
+
+// Chart data: bar resumen P90
+const barP90Data = computed(() => {
+  const labels      = resumenFiltrado.value.map(r => r.nombre_comercial)
+  const reals       = resumenFiltrado.value.map(r => +Number(r.total_kwh_real || 0).toFixed(0))
+  const p90s        = resumenFiltrado.value.map(r => +Number(r.total_kwh_p90  || 0).toFixed(0))
+  const realBgColors = resumenFiltrado.value.map(r =>
+    Number(r.total_kwh_real || 0) >= Number(r.total_kwh_p90 || 0) ? '#16a34acc' : '#dc2626cc'
+  )
+  const realBorders = resumenFiltrado.value.map(r =>
+    Number(r.total_kwh_real || 0) >= Number(r.total_kwh_p90 || 0) ? '#16a34a' : '#dc2626'
+  )
+  return {
+    labels,
+    datasets: [
+      { label: 'Real', data: reals, backgroundColor: realBgColors, borderColor: realBorders, borderWidth: 1, borderRadius: 4, barThickness: 12 },
+      { label: 'P90',  data: p90s,  backgroundColor: '#f59e0bcc',  borderColor: '#f59e0b',   borderWidth: 1, borderRadius: 4, barThickness: 12 },
+    ],
+  }
+})
+
+const barP90Opts = computed(() => ({
+  indexAxis: 'y',
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: { position: 'top', align: 'end', labels: { font: FONT, padding: 10, boxWidth: 10, boxHeight: 10, color: '#374151' } },
+    tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${Number(ctx.raw).toLocaleString('es-CO')} kWh` } },
+  },
+  scales: {
+    x: {
+      grid: { color: GRID_COLOR },
+      ticks: { font: FONT, color: '#6b7280', callback: v => `${(v / 1000).toFixed(0)}k` },
+      border: { display: false },
+    },
+    y: {
+      grid: { display: false },
+      ticks: { font: { ...FONT, size: 10 }, color: '#374151' },
+      border: { display: false },
+    },
+  },
+  borderRadius: 4,
+  onClick: (_event, elements) => {
+    if (!elements.length) return
+    const idx = elements[0].index
+    const row = resumenFiltrado.value[idx]
+    if (!row) return
+    const found = proyectosConSrvOp.value.find(p => p.id === row.proyecto_id)
+      || { id: row.proyecto_id, nombre_comercial: row.nombre_comercial }
+    proyectoP90Sel.value = found
+    cargarDiariosP90(row.proyecto_id)
+  },
+}))
+
+// Chart data: line detalle diario
+const lineP90DiarioData = computed(() => {
+  const sorted = [...diariosP90.value].sort((a, b) => a.fecha.localeCompare(b.fecha))
+  return {
+    labels: sorted.map(d =>
+      new Date(d.fecha + 'T00:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })
+    ),
+    datasets: [
+      {
+        label: 'Real',
+        data: sorted.map(d => d.kwh_real != null ? +Number(d.kwh_real).toFixed(1) : null),
+        borderColor: '#16a34a', backgroundColor: '#16a34a22',
+        borderWidth: 2, fill: false, tension: 0.3,
+        pointRadius: 3, pointHoverRadius: 5, spanGaps: true,
+      },
+      {
+        label: 'P90',
+        data: sorted.map(d => d.kwh_p90 != null ? +Number(d.kwh_p90).toFixed(1) : null),
+        borderColor: '#f59e0b', backgroundColor: '#f59e0b11',
+        borderWidth: 2, borderDash: [5, 3], fill: false, tension: 0.3,
+        pointRadius: 2, pointHoverRadius: 4, spanGaps: true,
+      },
+    ],
+  }
+})
+
+const lineP90DiarioOpts = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: { position: 'top', align: 'end', labels: { font: FONT, padding: 10, boxWidth: 10, boxHeight: 10 } },
+    tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${Number(ctx.raw).toLocaleString('es-CO')} kWh` } },
+  },
+  scales: {
+    x: {
+      grid: { color: GRID_COLOR },
+      ticks: { font: FONT, color: '#6b7280', maxRotation: 45 },
+      border: { display: false },
+    },
+    y: {
+      grid: { color: GRID_COLOR },
+      ticks: { font: FONT, color: '#6b7280' },
+      border: { display: false },
+      beginAtZero: true,
+    },
+  },
+}
+
 // ── Keyboard shortcuts ────────────────────────────────────────────────────
 function onKeydown(e) {
   const t = e.target.tagName
@@ -1479,6 +1769,7 @@ onMounted(() => {
   cargar()
   cargarCatalogos()
   cargarProyectos()
+  cargarResumenP90()
   window.addEventListener('keydown', onKeydown)
   nextTick(() => {
     measureHeader()
@@ -2219,4 +2510,78 @@ watch(bucket, (newBucket) => {
   .charts-grid { grid-template-columns:1fr; }
   .chart-card--wide { grid-column:1; }
 }
+
+/* ══ P90 Section ════════════════════════════════════════════════════════ */
+.p90-section-head {
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  background:#fff; border:1px solid #ece8f4; border-radius:12px;
+  padding:14px 18px; box-shadow:0 1px 3px rgba(28,18,50,.04);
+}
+.p90-section-title {
+  display:flex; align-items:center; gap:8px; flex:1; min-width:0;
+  font-size:13px; font-weight:700; color:#2C2039;
+}
+.p90-section-sub { font-size:11.5px; font-weight:500; color:#a094b8; }
+.p90-controls { display:flex; align-items:center; gap:6px; flex-shrink:0; }
+:deep(.p90-dp .p-datepicker-input) {
+  font-size:12px !important; padding:5px 8px !important; width:110px !important;
+}
+.p90-reload-btn {
+  width:30px; height:30px; display:flex; align-items:center; justify-content:center;
+  background:#f4f1fa; border:1px solid #e5e0f0; border-radius:8px;
+  cursor:pointer; color:#6b5a8a; font-size:12px; transition:background .12s;
+}
+.p90-reload-btn:hover:not(:disabled) { background:#e9e0f5; }
+.p90-reload-btn:disabled { opacity:.4; cursor:not-allowed; }
+
+.p90-kpis { display:flex; gap:8px; flex-wrap:wrap; }
+.p90-kpi {
+  display:flex; flex-direction:column; align-items:center;
+  background:#faf9fc; border:1px solid #ece8f4; border-radius:10px;
+  padding:8px 16px; min-width:72px;
+}
+.p90-kpi--green { background:#f0fdf4; border-color:#bbf7d0; }
+.p90-kpi--red   { background:#fef2f2; border-color:#fecaca; }
+.p90-kpi-val { font-size:20px; font-weight:900; line-height:1; }
+.p90-kpi-lbl {
+  font-size:9.5px; font-weight:700; text-transform:uppercase;
+  letter-spacing:.3px; color:#9b89b5; margin-top:3px;
+}
+
+.p90-state {
+  display:flex; flex-direction:column; align-items:center;
+  gap:8px; padding:40px 20px; font-size:12.5px; color:#9ca3af;
+}
+
+.p90-bar-card { cursor:pointer; }
+.p90-chart-legend {
+  display:flex; align-items:center; gap:12px; margin-bottom:12px; flex-wrap:wrap;
+}
+.p90-legend-item { display:flex; align-items:center; gap:5px; font-size:11.5px; color:#6b5a8a; }
+.p90-legend-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+.p90-legend-hint { font-size:11px; color:#a094b8; }
+
+.p90-detail-card {
+  background:#fff; border:1px solid #d1fae5; border-radius:12px;
+  padding:14px 18px; box-shadow:0 1px 4px rgba(22,163,74,.08);
+}
+.p90-detail-head {
+  display:flex; align-items:center; gap:8px; margin-bottom:14px; flex-wrap:wrap;
+}
+.p90-detail-kpis {
+  margin-left:auto; display:flex; align-items:center; gap:10px;
+  font-size:11.5px; font-weight:700;
+}
+.p90-close-btn {
+  width:22px; height:22px; display:flex; align-items:center; justify-content:center;
+  background:#f0eaf8; border:none; border-radius:6px;
+  cursor:pointer; color:#6b5a8a; flex-shrink:0;
+}
+
+.p90-separator {
+  display:flex; align-items:center; gap:8px;
+  font-size:11px; font-weight:700; text-transform:uppercase;
+  letter-spacing:.5px; color:#a094b8; padding:4px 0;
+}
+.p90-separator::after { content:''; flex:1; height:1px; background:#ece8f4; }
 </style>
