@@ -500,6 +500,9 @@
                 <p v-else class="text-sm text-gray-500 mt-3">Aún no hay seguimientos registrados.</p>
               </section>
 
+              <!-- ── ARCHIVOS ADJUNTOS ─────────────────────────────── -->
+              <FallaArchivos v-if="drawerFalla?.id" :fallaId="drawerFalla.id" />
+
               <!-- ── ACCIONES PRINCIPALES ───────────────────────────── -->
               <div class="gf-actions-inline">
                 <Button label="Editar completa" icon="pi pi-pencil" outlined class="flex-1"
@@ -537,44 +540,41 @@
         <p class="mon-empty-title">Sin datos de fallas</p>
         <p class="mon-empty-sub">No hay registros para generar gráficos</p>
       </div>
-      <div v-else>
+      <div v-else class="charts-container">
 
-        <!-- Filtro y KPIs -->
-        <div class="chart-filters">
-          <div class="chart-filter-field">
-            <label class="chart-filter-label">Filtrar por proyecto</label>
-            <select v-model="filtroGraficosProyecto" class="chart-select">
-              <option value="">Todos los proyectos</option>
+        <!-- ── Filtro + KPIs ─────────────────────────────────── -->
+        <div class="charts-topbar">
+          <div class="charts-filter-wrap">
+            <label class="charts-filter-lbl">Proyecto</label>
+            <select v-model="filtroGraficosProyecto" class="charts-select">
+              <option value="">Todos</option>
               <option v-for="p in proyectos" :key="p.id" :value="p.id">{{ p.nombre_comercial }}</option>
             </select>
           </div>
-          <div class="chart-total-badge">
-            <span class="chart-total-num">{{ fallasFiltGraficos.length }}</span>
-            <span class="chart-total-lbl">fallas analizadas</span>
-          </div>
-          <div class="chart-kpi-mini">
-            <div class="chart-kpi-mini-item">
-              <div class="chart-kpi-mini-val" style="color:#dc2626">{{ grafKpis.criticas }}</div>
-              <div class="chart-kpi-mini-lbl">Críticas</div>
+          <div class="charts-kpis">
+            <div class="ck">
+              <span class="ck-val" style="color:#dc2626">{{ grafKpis.criticas }}</span>
+              <span class="ck-lbl">Críticas</span>
             </div>
-            <div class="chart-kpi-mini-item">
-              <div class="chart-kpi-mini-val" style="color:#2563eb">{{ grafKpis.resueltas }}</div>
-              <div class="chart-kpi-mini-lbl">Resueltas</div>
+            <div class="ck">
+              <span class="ck-val" style="color:#2563eb">{{ grafKpis.resueltas }}</span>
+              <span class="ck-lbl">Resueltas</span>
             </div>
-            <div class="chart-kpi-mini-item">
-              <div class="chart-kpi-mini-val" style="color:#16a34a">{{ grafKpis.tasaResolucion }}%</div>
-              <div class="chart-kpi-mini-lbl">Tasa resolución</div>
+            <div class="ck">
+              <span class="ck-val" style="color:#16a34a">{{ grafKpis.tasaResolucion }}%</span>
+              <span class="ck-lbl">Resolución</span>
             </div>
-            <div class="chart-kpi-mini-item" v-tooltip.bottom="'Tiempo medio de reparación (solo fallas cerradas)'">
-              <div class="chart-kpi-mini-val" style="color:#7c3aed">{{ grafKpis.mttr }}</div>
-              <div class="chart-kpi-mini-lbl">MTTR (días)</div>
+            <div class="ck" v-tooltip.bottom="'Tiempo medio de reparación'">
+              <span class="ck-val" style="color:#7c3aed">{{ grafKpis.mttr }}</span>
+              <span class="ck-lbl">MTTR días</span>
             </div>
-            <div v-if="grafKpis.energiaTotal > 0" class="chart-kpi-mini-item"
-              v-tooltip.bottom="'Suma de energía perdida registrada'">
-              <div class="chart-kpi-mini-val" style="color:#dc2626; font-size:11px">
-                {{ grafKpis.energiaTotal.toLocaleString('es-CO') }}
-              </div>
-              <div class="chart-kpi-mini-lbl">kWh perdidos</div>
+            <div v-if="grafKpis.energiaTotal > 0" class="ck">
+              <span class="ck-val" style="color:#dc2626;font-size:13px">{{ grafKpis.energiaTotal.toLocaleString('es-CO') }}</span>
+              <span class="ck-lbl">kWh perdidos</span>
+            </div>
+            <div class="ck ck--total">
+              <span class="ck-val" style="color:#915BD8">{{ fallasFiltGraficos.length }}</span>
+              <span class="ck-lbl">Total fallas</span>
             </div>
           </div>
         </div>
@@ -588,167 +588,74 @@
           </div>
           <div class="top-proy-count">
             <div class="top-proy-num">{{ topProyecto.count }}</div>
-            <div class="top-proy-sub">fallas registradas</div>
+            <div class="top-proy-sub">fallas</div>
           </div>
         </div>
 
+        <!-- ── Grid de charts ──────────────────────────────── -->
         <div class="charts-grid">
 
-          <!-- Donut: por estado -->
+          <!-- Donut estado -->
           <div class="chart-card">
-            <div class="chart-title">Distribución por estado</div>
-            <div class="donut-wrap">
-              <svg viewBox="0 0 42 42" class="donut-svg">
-                <circle cx="21" cy="21" r="15.9" fill="none" stroke="#f0eaf8" stroke-width="4"/>
-                <circle v-for="(seg, i) in donutEstado" :key="i"
-                  cx="21" cy="21" r="15.9" fill="none"
-                  :stroke="seg.color" stroke-width="4"
-                  :stroke-dasharray="`${seg.pct} ${100 - seg.pct}`"
-                  :stroke-dashoffset="seg.offset"
-                  stroke-linecap="round"
-                  transform="rotate(-90 21 21)" />
-              </svg>
-              <div class="donut-total">
-                <div class="donut-total-num">{{ fallasFiltGraficos.length }}</div>
-                <div class="donut-total-lbl">total</div>
-              </div>
-              <div class="donut-legend">
-                <div v-for="seg in donutEstado" :key="seg.label" class="legend-row">
-                  <span class="legend-dot" :style="{ background: seg.color }"></span>
-                  <span class="legend-label">{{ seg.label }}</span>
-                  <span class="legend-val">{{ seg.count }}</span>
-                  <span class="legend-pct">{{ Math.round(seg.pct) }}%</span>
-                </div>
-              </div>
+            <p class="chart-card-title">Estado de fallas</p>
+            <div class="chart-canvas-wrap" style="height:200px">
+              <Doughnut :data="donutEstadoData" :options="sharedDonutOpts" />
             </div>
           </div>
 
-          <!-- Donut: por prioridad -->
+          <!-- Donut prioridad -->
           <div class="chart-card">
-            <div class="chart-title">Distribución por prioridad</div>
-            <div class="donut-wrap">
-              <svg viewBox="0 0 42 42" class="donut-svg">
-                <circle cx="21" cy="21" r="15.9" fill="none" stroke="#f0eaf8" stroke-width="4"/>
-                <circle v-for="(seg, i) in donutPrioridad" :key="i"
-                  cx="21" cy="21" r="15.9" fill="none"
-                  :stroke="seg.color" stroke-width="4"
-                  :stroke-dasharray="`${seg.pct} ${100 - seg.pct}`"
-                  :stroke-dashoffset="seg.offset"
-                  stroke-linecap="round"
-                  transform="rotate(-90 21 21)" />
-              </svg>
-              <div class="donut-total">
-                <div class="donut-total-num">{{ fallasFiltGraficos.length }}</div>
-                <div class="donut-total-lbl">total</div>
-              </div>
-              <div class="donut-legend">
-                <div v-for="seg in donutPrioridad" :key="seg.label" class="legend-row">
-                  <span class="legend-dot" :style="{ background: seg.color }"></span>
-                  <span class="legend-label">{{ seg.label }}</span>
-                  <span class="legend-val">{{ seg.count }}</span>
-                  <span class="legend-pct">{{ Math.round(seg.pct) }}%</span>
-                </div>
-              </div>
+            <p class="chart-card-title">Distribución por prioridad</p>
+            <div class="chart-canvas-wrap" style="height:200px">
+              <Doughnut :data="donutPrioData" :options="sharedDonutOpts" />
             </div>
           </div>
 
-          <!-- Barras: por categoría -->
-          <div class="chart-card" v-if="fallasPorCategoria.length">
-            <div class="chart-title">Fallas por categoría</div>
-            <div class="bar-chart">
-              <div v-for="g in fallasPorCategoria" :key="g.label" class="bar-row">
-                <div class="bar-label">{{ g.label }}</div>
-                <div class="bar-track">
-                  <div class="bar-fill" :style="{ width: (g.count / barMax * 100) + '%', background: g.color || '#915BD8' }" />
-                </div>
-                <div class="bar-val">{{ g.count }}</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Timeline: fallas por mes -->
+          <!-- Evolución mensual (line) - full width -->
           <div class="chart-card chart-card--wide" v-if="fallasPorMes.length > 1">
-            <div class="chart-card-header">
-              <div class="chart-title" style="margin-bottom:0">Evolución mensual de fallas</div>
-              <div class="chart-subtitle">Últimos 12 meses</div>
+            <p class="chart-card-title">Evolución mensual · últimos 12 meses</p>
+            <div class="chart-canvas-wrap" style="height:200px">
+              <Line :data="lineEvolucionData" :options="lineEvolucionOpts" />
             </div>
-            <div class="timeline-chart">
-              <div class="timeline-bars">
-                <div v-for="m in fallasPorMes" :key="m.key" class="tl-col">
-                  <div class="tl-bar-wrap">
-                    <div class="tl-bar"
-                      :style="{ height: (m.count / timelineMax * 100) + '%' }"
-                      :title="`${m.label}: ${m.count} fallas`">
-                      <span class="tl-bar-val" v-if="m.count > 0">{{ m.count }}</span>
-                    </div>
-                  </div>
-                  <div class="tl-label">{{ m.label }}</div>
-                </div>
-              </div>
+          </div>
+
+          <!-- Fallas por categoría -->
+          <div class="chart-card" v-if="fallasPorCategoria.length">
+            <p class="chart-card-title">Fallas por categoría</p>
+            <div class="chart-canvas-wrap" :style="{ height: Math.max(160, fallasPorCategoria.length * 30 + 20) + 'px' }">
+              <Bar :data="barCatData" :options="sharedBarHOpts" />
+            </div>
+          </div>
+
+          <!-- Top tipos de falla -->
+          <div class="chart-card" v-if="fallasPorTipo.length">
+            <p class="chart-card-title">Top tipos de falla</p>
+            <div class="chart-canvas-wrap" :style="{ height: Math.max(160, Math.min(fallasPorTipo.length, 8) * 30 + 20) + 'px' }">
+              <Bar :data="barTipoData" :options="sharedBarHOpts" />
+            </div>
+          </div>
+
+          <!-- MTTR por categoría -->
+          <div class="chart-card" v-if="mttrPorCategoria.length">
+            <p class="chart-card-title">MTTR por categoría <span class="chart-card-sub">(días promedio)</span></p>
+            <div class="chart-canvas-wrap" :style="{ height: Math.max(160, mttrPorCategoria.length * 30 + 20) + 'px' }">
+              <Bar :data="barMttrData" :options="barMttrOpts" />
             </div>
           </div>
 
           <!-- Top proyectos -->
           <div class="chart-card chart-card--wide" v-if="!filtroGraficosProyecto && fallasPorProyecto.length">
-            <div class="chart-title">Top proyectos con más fallas</div>
-            <div class="bar-chart">
-              <div v-for="g in fallasPorProyecto.slice(0, 10)" :key="g.label" class="bar-row">
-                <div class="bar-label">{{ g.label }}</div>
-                <div class="bar-track">
-                  <div class="bar-fill" :style="{ width: (g.count / fallasPorProyecto[0].count * 100) + '%', background: '#915BD8' }" />
-                </div>
-                <div class="bar-val">{{ g.count }}</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Top tipos de falla -->
-          <div class="chart-card chart-card--wide" v-if="fallasPorTipo.length">
-            <div class="chart-title">Top tipos de falla</div>
-            <div class="bar-chart">
-              <div v-for="g in fallasPorTipo.slice(0, 8)" :key="g.label" class="bar-row">
-                <div class="bar-label">{{ g.label }}</div>
-                <div class="bar-track">
-                  <div class="bar-fill" :style="{ width: (g.count / fallasPorTipo[0].count * 100) + '%', background: '#3b82f6' }" />
-                </div>
-                <div class="bar-val">{{ g.count }}</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- MTTR por categoría -->
-          <div class="chart-card chart-card--wide" v-if="mttrPorCategoria.length">
-            <div class="chart-card-header">
-              <div class="chart-title" style="margin-bottom:0">MTTR por categoría</div>
-              <div class="chart-subtitle">Tiempo medio de reparación en días (solo fallas cerradas)</div>
-            </div>
-            <div class="bar-chart" style="margin-top:12px">
-              <div v-for="g in mttrPorCategoria" :key="g.label" class="bar-row">
-                <div class="bar-label">{{ g.label }}</div>
-                <div class="bar-track">
-                  <div class="bar-fill"
-                    :style="{ width: (g.avg / mttrPorCategoria[0].avg * 100) + '%', background: g.color || '#915BD8' }" />
-                </div>
-                <div class="bar-val">{{ g.avg }}d</div>
-              </div>
+            <p class="chart-card-title">Top proyectos con más fallas</p>
+            <div class="chart-canvas-wrap" :style="{ height: Math.max(200, Math.min(fallasPorProyecto.length, 10) * 30 + 20) + 'px' }">
+              <Bar :data="barProyData" :options="sharedBarHOpts" />
             </div>
           </div>
 
           <!-- Energía perdida por proyecto -->
           <div class="chart-card chart-card--wide" v-if="energiaPorProyecto.length">
-            <div class="chart-card-header">
-              <div class="chart-title" style="margin-bottom:0">Energía perdida por proyecto</div>
-              <div class="chart-subtitle">kWh acumulados en fallas registradas</div>
-            </div>
-            <div class="bar-chart" style="margin-top:12px">
-              <div v-for="g in energiaPorProyecto.slice(0, 10)" :key="g.label" class="bar-row">
-                <div class="bar-label">{{ g.label }}</div>
-                <div class="bar-track">
-                  <div class="bar-fill"
-                    :style="{ width: (g.total / energiaPorProyecto[0].total * 100) + '%', background: '#dc2626' }" />
-                </div>
-                <div class="bar-val">{{ g.total.toLocaleString('es-CO') }}</div>
-              </div>
+            <p class="chart-card-title">Energía perdida por proyecto <span class="chart-card-sub">(kWh)</span></p>
+            <div class="chart-canvas-wrap" :style="{ height: Math.max(200, Math.min(energiaPorProyecto.length, 10) * 30 + 20) + 'px' }">
+              <Bar :data="barEnergiaData" :options="barEnergiaOpts" />
             </div>
           </div>
 
@@ -776,6 +683,14 @@ import DatePicker from 'primevue/datepicker'
 import Dialog from 'primevue/dialog'
 import Textarea from 'primevue/textarea'
 import FallaForm from './FallaForm.vue'
+import FallaArchivos from './FallaArchivos.vue'
+import { Doughnut, Bar, Line } from 'vue-chartjs'
+import {
+  Chart as ChartJS, ArcElement, Tooltip, Legend,
+  CategoryScale, LinearScale, BarElement,
+  PointElement, LineElement, Title, Filler
+} from 'chart.js'
+ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, PointElement, LineElement, Title, Filler)
 import api from '@/api/client'
 
 const router         = useRouter()
@@ -1480,6 +1395,97 @@ const energiaPorProyecto = computed(() => {
     .sort((a, b) => b.total - a.total)
 })
 
+// ── Chart.js data objects ──────────────────────────────────────────────────
+const FONT = { family: 'inherit', size: 11 }
+const GRID_COLOR = '#f0eaf8'
+const BRAND = '#915BD8'
+
+const sharedDonutOpts = {
+  responsive: true,
+  maintainAspectRatio: false,
+  cutout: '68%',
+  plugins: {
+    legend: { position: 'right', labels: { font: FONT, padding: 14, boxWidth: 10, boxHeight: 10, color: '#374151' } },
+    tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${ctx.raw} (${Math.round(ctx.raw / ctx.dataset.data.reduce((a,b)=>a+b,0)*100)}%)` } }
+  }
+}
+
+const sharedBarHOpts = {
+  indexAxis: 'y',
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ` ${ctx.raw}` } } },
+  scales: {
+    x: { grid: { color: GRID_COLOR }, ticks: { font: FONT, color: '#6b7280' }, border: { display: false } },
+    y: { grid: { display: false }, ticks: { font: { ...FONT, size: 11 }, color: '#374151' }, border: { display: false } }
+  },
+  borderRadius: 5,
+  barThickness: 18,
+}
+
+// Donut estado
+const donutEstadoData = computed(() => ({
+  labels: donutEstado.value.map(s => s.label),
+  datasets: [{ data: donutEstado.value.map(s => s.count), backgroundColor: donutEstado.value.map(s => s.color + 'cc'), borderColor: donutEstado.value.map(s => s.color), borderWidth: 1.5, hoverOffset: 6 }]
+}))
+
+// Donut prioridad
+const donutPrioData = computed(() => ({
+  labels: donutPrioridad.value.map(s => s.label),
+  datasets: [{ data: donutPrioridad.value.map(s => s.count), backgroundColor: donutPrioridad.value.map(s => s.color + 'cc'), borderColor: donutPrioridad.value.map(s => s.color), borderWidth: 1.5, hoverOffset: 6 }]
+}))
+
+// Bar horizontal: por categoría
+const barCatData = computed(() => ({
+  labels: fallasPorCategoria.value.map(g => g.label),
+  datasets: [{ data: fallasPorCategoria.value.map(g => g.count), backgroundColor: fallasPorCategoria.value.map(g => (g.color||BRAND)+'cc'), borderColor: fallasPorCategoria.value.map(g => g.color||BRAND), borderWidth: 1 }]
+}))
+
+// Line: evolución mensual
+const lineEvolucionData = computed(() => ({
+  labels: fallasPorMes.value.map(m => m.label),
+  datasets: [{
+    label: 'Fallas', data: fallasPorMes.value.map(m => m.count),
+    borderColor: BRAND, backgroundColor: BRAND + '22',
+    borderWidth: 2, fill: true, tension: 0.4,
+    pointBackgroundColor: BRAND, pointRadius: 4, pointHoverRadius: 6
+  }]
+}))
+const lineEvolucionOpts = {
+  responsive: true, maintainAspectRatio: false,
+  plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ` ${ctx.raw} fallas` } } },
+  scales: {
+    x: { grid: { color: GRID_COLOR }, ticks: { font: FONT, color: '#6b7280' }, border: { display: false } },
+    y: { grid: { color: GRID_COLOR }, ticks: { font: FONT, color: '#6b7280', stepSize: 1 }, border: { display: false }, beginAtZero: true }
+  }
+}
+
+// Bar horizontal: top proyectos
+const barProyData = computed(() => ({
+  labels: fallasPorProyecto.value.slice(0,10).map(g => g.label),
+  datasets: [{ data: fallasPorProyecto.value.slice(0,10).map(g => g.count), backgroundColor: BRAND + 'cc', borderColor: BRAND, borderWidth: 1 }]
+}))
+
+// Bar horizontal: top tipos
+const barTipoData = computed(() => ({
+  labels: fallasPorTipo.value.slice(0,8).map(g => g.label),
+  datasets: [{ data: fallasPorTipo.value.slice(0,8).map(g => g.count), backgroundColor: '#3b82f6cc', borderColor: '#3b82f6', borderWidth: 1 }]
+}))
+
+// Bar horizontal: MTTR por categoría
+const barMttrData = computed(() => ({
+  labels: mttrPorCategoria.value.map(g => g.label),
+  datasets: [{ data: mttrPorCategoria.value.map(g => g.avg), backgroundColor: mttrPorCategoria.value.map(g => (g.color||BRAND)+'cc'), borderColor: mttrPorCategoria.value.map(g => g.color||BRAND), borderWidth: 1 }]
+}))
+const barMttrOpts = computed(() => ({ ...sharedBarHOpts, plugins: { ...sharedBarHOpts.plugins, tooltip: { callbacks: { label: ctx => ` ${ctx.raw}d promedio` } } } }))
+
+// Bar horizontal: energía por proyecto
+const barEnergiaData = computed(() => ({
+  labels: energiaPorProyecto.value.slice(0,10).map(g => g.label),
+  datasets: [{ data: energiaPorProyecto.value.slice(0,10).map(g => g.total), backgroundColor: '#dc2626cc', borderColor: '#dc2626', borderWidth: 1 }]
+}))
+const barEnergiaOpts = computed(() => ({ ...sharedBarHOpts, plugins: { ...sharedBarHOpts.plugins, tooltip: { callbacks: { label: ctx => ` ${Number(ctx.raw).toLocaleString('es-CO')} kWh` } } } }))
+
 // ── Keyboard shortcuts ────────────────────────────────────────────────────
 function onKeydown(e) {
   const t = e.target.tagName
@@ -2174,137 +2180,69 @@ watch(bucket, (newBucket) => {
 .gf-compact-row--active .gf-compact-line2 { color: #4a3b6b; font-weight: 600; }
 
 /* ══ TAB 1 — GRÁFICOS ════════════════════════════════════════════════════ */
-.mon-tab-view {
-  padding: 24px 24px 40px;
-  background: #f5f4f8;
-}
-.mon-tab-loading {
-  display: flex; flex-direction: column; align-items: center;
-  gap: 14px; padding: 80px 20px; color: #a094b8; font-size: 13px;
-}
-.mon-spinner {
-  width: 32px; height: 32px;
-  border: 3px solid #ece8f4; border-top-color: #915BD8;
-  border-radius: 50%; animation: spin .75s linear infinite;
-}
+.mon-tab-view { padding: 24px 24px 40px; background: #f5f4f8; }
+.mon-tab-loading { display:flex; flex-direction:column; align-items:center; gap:14px; padding:80px 20px; color:#a094b8; font-size:13px; }
+.mon-spinner { width:32px; height:32px; border:3px solid #ece8f4; border-top-color:#915BD8; border-radius:50%; animation:spin .75s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
-.mon-tab-empty { text-align: center; padding: 80px 20px; }
-.mon-empty-icon  { font-size: 40px; opacity: .2; margin-bottom: 12px; }
-.mon-empty-title { font-size: 15px; font-weight: 700; color: #6b7280; margin-bottom: 5px; }
-.mon-empty-sub   { font-size: 12.5px; color: #9ca3af; }
+.mon-tab-empty { text-align:center; padding:80px 20px; }
+.mon-empty-icon { font-size:40px; opacity:.2; margin-bottom:12px; }
+.mon-empty-title { font-size:15px; font-weight:700; color:#6b7280; margin-bottom:5px; }
+.mon-empty-sub { font-size:12.5px; color:#9ca3af; }
 
-/* Filtro gráficos */
-.chart-filters {
-  display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 20px;
-}
-.chart-filter-field { display: flex; flex-direction: column; gap: 4px; }
-.chart-filter-label {
-  font-size: 10.5px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: .5px; color: #a094b8;
-}
-.chart-select {
-  background: #fff; border: 1.5px solid #e5e0f0; border-radius: 8px;
-  padding: 7px 11px; color: #2C2039; font-size: 13px; font-family: inherit;
-  outline: none; min-width: 190px; cursor: pointer; transition: border-color .14s;
-}
-.chart-select:focus { border-color: #915BD8; }
+/* Container */
+.charts-container { display:flex; flex-direction:column; gap:16px; }
 
-.chart-total-badge {
-  display: flex; flex-direction: column; align-items: center;
-  background: #fff; border: 1px solid #ece8f4; border-radius: 10px; padding: 8px 16px;
+/* Topbar: filtro + KPIs */
+.charts-topbar {
+  display:flex; align-items:center; gap:16px; flex-wrap:wrap;
+  background:#fff; border:1px solid #ece8f4; border-radius:12px; padding:14px 18px;
+  box-shadow:0 1px 3px rgba(28,18,50,.04);
 }
-.chart-total-num { font-size: 22px; font-weight: 900; color: #7c3aed; line-height: 1; }
-.chart-total-lbl { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; color: #a094b8; }
+.charts-filter-wrap { display:flex; flex-direction:column; gap:3px; }
+.charts-filter-lbl { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:#a094b8; }
+.charts-select {
+  background:#f9f7fd; border:1.5px solid #e5e0f0; border-radius:8px;
+  padding:6px 10px; color:#2C2039; font-size:12px; font-family:inherit;
+  outline:none; min-width:180px; cursor:pointer;
+}
+.charts-select:focus { border-color:#915BD8; }
+.charts-kpis { display:flex; gap:8px; flex-wrap:wrap; margin-left:auto; }
+.ck { display:flex; flex-direction:column; align-items:center; background:#f9f7fd; border:1px solid #ece8f4; border-radius:10px; padding:8px 14px; min-width:64px; }
+.ck--total { background:#f5f0ff; border-color:#d4c8e8; }
+.ck-val { font-size:20px; font-weight:900; line-height:1; }
+.ck-lbl { font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:.3px; color:#9b89b5; margin-top:3px; }
 
-.chart-kpi-mini { display: flex; gap: 12px; flex-wrap: wrap; }
-.chart-kpi-mini-item {
-  background: #fff; border: 1px solid #ece8f4; border-radius: 10px;
-  padding: 8px 14px; text-align: center; min-width: 70px;
-}
-.chart-kpi-mini-val { font-size: 20px; font-weight: 900; line-height: 1; }
-.chart-kpi-mini-lbl {
-  font-size: 9.5px; font-weight: 700; text-transform: uppercase;
-  color: #a094b8; letter-spacing: .4px; margin-top: 2px;
-}
-
-/* Top proyecto */
+/* Top proyecto card */
 .top-proyecto-card {
-  display: flex; align-items: center; gap: 16px;
-  background: linear-gradient(135deg, #4c1d95, #6d28d9);
-  border-radius: 12px; padding: 16px 20px; margin-bottom: 20px; color: #fff;
+  display:flex; align-items:center; gap:14px;
+  background:linear-gradient(135deg,#7c3aed08,#915BD814);
+  border:1px solid #d4c8e8; border-radius:12px; padding:14px 18px;
 }
-.top-proy-icon  { font-size: 28px; flex-shrink: 0; }
-.top-proy-body  { flex: 1; }
-.top-proy-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; opacity: .7; margin-bottom: 3px; }
-.top-proy-name  { font-size: 17px; font-weight: 800; }
-.top-proy-count { text-align: right; flex-shrink: 0; }
-.top-proy-num   { font-size: 36px; font-weight: 900; line-height: 1; }
-.top-proy-sub   { font-size: 11px; opacity: .7; font-weight: 600; }
+.top-proy-icon { font-size:24px; }
+.top-proy-label { font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; color:#a094b8; }
+.top-proy-name { font-size:15px; font-weight:800; color:#2C2039; margin-top:2px; }
+.top-proy-count { margin-left:auto; text-align:center; }
+.top-proy-num { font-size:28px; font-weight:900; color:#915BD8; line-height:1; }
+.top-proy-sub { font-size:10px; color:#a094b8; font-weight:600; text-transform:uppercase; }
 
 /* Charts grid */
 .charts-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 16px;
+  display:grid;
+  grid-template-columns:repeat(auto-fill, minmax(340px,1fr));
+  gap:16px;
 }
 .chart-card {
-  background: #fff; border-radius: 12px;
-  border: 1px solid #ece8f4; padding: 20px 22px;
-  box-shadow: 0 1px 3px rgba(44, 32, 57, .04);
+  background:#fff; border:1px solid #ece8f4; border-radius:12px;
+  padding:16px 18px; box-shadow:0 1px 4px rgba(28,18,50,.05);
 }
 .chart-card--wide { grid-column: 1 / -1; }
-.chart-card-header {
-  display: flex; align-items: flex-start;
-  justify-content: space-between; margin-bottom: 16px;
-}
-.chart-title {
-  font-size: 11px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: .55px; color: #a094b8; margin-bottom: 16px;
-}
-.chart-subtitle { font-size: 10.5px; color: #c0b8d4; }
+.chart-card-title { font-size:12.5px; font-weight:700; color:#2C2039; margin-bottom:14px; }
+.chart-card-sub { font-size:11px; font-weight:500; color:#a094b8; }
+.chart-canvas-wrap { position:relative; }
 
-/* Donuts */
-.donut-wrap { display: flex; align-items: center; gap: 20px; position: relative; margin-bottom: 8px; }
-.donut-svg  { width: 100px; height: 100px; flex-shrink: 0; }
-.donut-total {
-  position: absolute; left: 50px; top: 50%;
-  transform: translate(-50%, -50%); text-align: center;
-  width: 60px;
-}
-.donut-total-num { font-size: 20px; font-weight: 900; color: #2C2039; line-height: 1; }
-.donut-total-lbl { font-size: 9px; font-weight: 700; text-transform: uppercase; color: #a094b8; letter-spacing: .4px; }
-.donut-legend   { display: flex; flex-direction: column; gap: 6px; flex: 1; }
-.legend-row     { display: flex; align-items: center; gap: 8px; font-size: 12px; }
-.legend-dot     { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-.legend-label   { flex: 1; color: #4b3b72; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.legend-val     { font-weight: 700; color: #2C2039; }
-.legend-pct     { font-size: 10.5px; color: #a094b8; min-width: 28px; text-align: right; }
-
-/* Barras */
-.bar-chart { display: flex; flex-direction: column; gap: 10px; }
-.bar-row   { display: grid; grid-template-columns: 140px 1fr 32px; align-items: center; gap: 8px; }
-.bar-label { font-size: 11.5px; font-weight: 600; color: #4a3b6b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.bar-track { height: 10px; background: #f0eaf8; border-radius: 5px; overflow: hidden; }
-.bar-fill  { height: 100%; border-radius: 5px; transition: width .6s ease; min-width: 4px; }
-.bar-val   { font-size: 12px; font-weight: 700; color: #6d28d9; text-align: right; }
-
-/* Timeline */
-.timeline-chart { padding: 8px 0; }
-.timeline-bars  { display: flex; align-items: flex-end; gap: 4px; height: 130px; padding: 0 4px; }
-.tl-col { display: flex; flex-direction: column; align-items: center; flex: 1; gap: 4px; }
-.tl-bar-wrap { flex: 1; width: 100%; display: flex; align-items: flex-end; }
-.tl-bar {
-  width: 100%; min-height: 4px; border-radius: 4px 4px 0 0;
-  background: linear-gradient(180deg, #a78bfa, #7c3aed);
-  transition: height .6s ease; position: relative;
-  display: flex; align-items: flex-start; justify-content: center;
-}
-.tl-bar-val { font-size: 9px; font-weight: 700; color: #fff; padding: 2px 0; }
-.tl-label   { font-size: 9px; font-weight: 600; color: #a094b8; text-align: center; white-space: nowrap; }
-
-/* Responsive gráficos */
-@media (max-width: 768px) {
-  .mon-tab-view { padding: 16px; }
-  .bar-row { grid-template-columns: 100px 1fr 28px; }
+@media (max-width:768px) {
+  .mon-tab-view { padding:16px; }
+  .charts-grid { grid-template-columns:1fr; }
+  .chart-card--wide { grid-column:1; }
 }
 </style>
