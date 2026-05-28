@@ -2,18 +2,29 @@
   <!-- Panel inline (no overlay) — vive dentro de /operaciones/informes-mensuales -->
   <div class="em-panel">
 
-      <!-- ══ HEADER del pipeline (sub-toolbar) ══════════════════════ -->
+      <!-- ══ TOOLBAR compacto (una sola fila) ══════════════════════ -->
       <header class="em-header">
-        <div class="em-header-left">
-          <p class="em-header-sub">
-            Pipeline · <b>Edición</b> → <b>Revisión</b> → <b>Comentarios</b> → <b>Aprobación</b> → <b>Envío</b>
-          </p>
-        </div>
+        <!-- Ícono + label mínimo -->
+        <span class="em-header-label"
+              v-tooltip.bottom="'Pipeline: Edición → Revisión → Comentarios → Aprobación → Envío'">
+          <i class="pi pi-send" /> Revisión y envío
+        </span>
 
-        <div class="em-header-right">
+        <!-- Envío masivo inline (solo cuando aplica) -->
+        <button v-if="puedeEnviarBatch.length > 0 && permisoEnviar"
+                class="em-batch-inline"
+                :disabled="enviandoBatch"
+                @click="abrirConfirmEnvio"
+                v-tooltip.bottom="'Enviar todos los informes verificados al cliente'">
+          <i class="pi pi-send" />
+          Enviar {{ puedeEnviarBatch.length }} verificado{{ puedeEnviarBatch.length !== 1 ? 's' : '' }}
+        </button>
+
+        <!-- Controles -->
+        <div class="em-header-controls">
           <div class="em-search-wrap">
             <i class="pi pi-search em-search-icon" />
-            <input v-model="busqueda" type="text" placeholder="Buscar proyecto…" class="em-search-input" />
+            <input v-model="busqueda" type="text" placeholder="Buscar…" class="em-search-input" />
             <button v-if="busqueda" class="em-search-clear" @click="busqueda = ''" title="Limpiar">✕</button>
           </div>
           <div class="em-month-picker">
@@ -21,20 +32,10 @@
             <input type="month" v-model="mesSel" :max="mesMax" class="em-month-input" />
             <button class="em-month-nav" @click="cambiarMes(1)" :disabled="mesSel === mesMax" title="Mes siguiente">›</button>
           </div>
-          <Button icon="pi pi-refresh" outlined size="small" :loading="loading" @click="cargar"
-                  v-tooltip.bottom="'Actualizar lista'" />
+          <Button icon="pi pi-refresh" text size="small" :loading="loading" @click="cargar"
+                  v-tooltip.bottom="'Actualizar'" />
         </div>
       </header>
-
-      <!-- ══ Acciones masivas ══════════════════════════════════ -->
-      <div v-if="puedeEnviarBatch.length > 0 && permisoEnviar" class="em-batch-bar">
-        <span class="em-batch-info">
-          <i class="pi pi-info-circle" />
-          {{ puedeEnviarBatch.length }} informe{{ puedeEnviarBatch.length !== 1 ? 's' : '' }} verificado{{ puedeEnviarBatch.length !== 1 ? 's' : '' }} listo{{ puedeEnviarBatch.length !== 1 ? 's' : '' }} para envío
-        </span>
-        <Button label="Enviar todos al cliente" icon="pi pi-send" size="small"
-                :loading="enviandoBatch" @click="abrirConfirmEnvio" class="em-btn-send" />
-      </div>
 
       <!-- ══ Contenido (layout split o full) ══════════════════ -->
       <div class="em-content" :class="{ 'em-content--split': !!drawerInf }">
@@ -1086,17 +1087,37 @@ async function ejecutarEnvioBatch() {
   font-family: 'Sora', system-ui, sans-serif;
 }
 
-/* ── Header ───────────────────────────────────────────────────── */
+/* ── Header (una sola fila compacta) ──────────────────────────── */
 .em-header {
-  display: flex; align-items: center; justify-content: space-between; gap: 16px;
-  background: #fff; padding: 8px 16px; flex-wrap: wrap;
+  display: flex; align-items: center; gap: 10px;
+  background: #fff; padding: 5px 14px;
   border-bottom: 1px solid #ECE7F2;
   box-shadow: 0 1px 3px rgba(28,18,50,.04);
+  min-height: 36px;
+  flex-wrap: wrap;
 }
-.em-header-left  { display: inline-flex; align-items: center; gap: 12px; min-width: 0; }
-.em-header-right { display: inline-flex; align-items: center; gap: 8px; }
-.em-header-sub   { font-size: 11px; color: #6B5A8A; margin: 0; }
-.em-header-sub b { color: #6D28D9; font-weight: 700; }
+.em-header-label {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; font-weight: 700; color: #6B5A8A;
+  white-space: nowrap; cursor: default;
+  flex-shrink: 0;
+}
+.em-header-label i { color: #915BD8; font-size: 11px; }
+.em-header-controls {
+  display: inline-flex; align-items: center; gap: 6px; margin-left: auto;
+  flex-shrink: 0; flex-wrap: wrap;
+}
+/* Envío masivo inline */
+.em-batch-inline {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: #16A34A; color: #fff;
+  border: none; border-radius: 6px;
+  padding: 3px 10px; font-family: inherit; font-size: 11px; font-weight: 700;
+  cursor: pointer; transition: background .14s; white-space: nowrap;
+}
+.em-batch-inline:hover:not(:disabled) { background: #15803D; }
+.em-batch-inline:disabled { opacity: .6; cursor: not-allowed; }
+.em-batch-inline i { font-size: 10px; }
 
 .em-month-picker {
   display: inline-flex; align-items: center;
@@ -1115,14 +1136,6 @@ async function ejecutarEnvioBatch() {
   padding: 3px 4px; outline: none; color-scheme: light;
 }
 
-/* ── Batch bar ────────────────────────────────────────────────── */
-.em-batch-bar {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  background: #F0FDF4; border-bottom: 1px solid #BBF7D0;
-  padding: 8px 16px;
-}
-.em-batch-info { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #166534; font-weight: 600; }
-.em-batch-info i { color: #16A34A; }
 .em-btn-send :deep(.p-button), :deep(.em-btn-send) {
   background: #16A34A !important; border-color: #16A34A !important;
 }
