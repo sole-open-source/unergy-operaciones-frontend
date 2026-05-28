@@ -26,34 +26,6 @@
         </div>
       </header>
 
-      <!-- ══ KPI strip (compacto) ═════════════════════════════════ -->
-      <div class="em-kpis">
-        <button class="em-kpi" :class="{ 'em-kpi--on': filtro === '' }" @click="filtro = ''">
-          <span class="em-kpi-num">{{ resumen.total }}</span>
-          <span class="em-kpi-lbl">Total</span>
-        </button>
-        <button class="em-kpi em-kpi-pend" :class="{ 'em-kpi--on': filtro === 'pendiente' }" @click="filtro = filtro === 'pendiente' ? '' : 'pendiente'">
-          <span class="em-kpi-num">{{ resumen.pendiente }}</span>
-          <span class="em-kpi-lbl">Pendientes</span>
-        </button>
-        <button class="em-kpi em-kpi-coms" :class="{ 'em-kpi--on': filtro === 'comentado' }" @click="filtro = filtro === 'comentado' ? '' : 'comentado'">
-          <span class="em-kpi-num">{{ resumen.comentado }}</span>
-          <span class="em-kpi-lbl">Con comentarios</span>
-        </button>
-        <button class="em-kpi em-kpi-resol" :class="{ 'em-kpi--on': filtro === 'resuelto' }" @click="filtro = filtro === 'resuelto' ? '' : 'resuelto'">
-          <span class="em-kpi-num">{{ resumen.resuelto }}</span>
-          <span class="em-kpi-lbl">Resueltos</span>
-        </button>
-        <button class="em-kpi em-kpi-ver" :class="{ 'em-kpi--on': filtro === 'verificado' }" @click="filtro = filtro === 'verificado' ? '' : 'verificado'">
-          <span class="em-kpi-num">{{ resumen.verificado }}</span>
-          <span class="em-kpi-lbl">Verificados</span>
-        </button>
-        <button class="em-kpi em-kpi-env" :class="{ 'em-kpi--on': filtro === 'enviado' }" @click="filtro = filtro === 'enviado' ? '' : 'enviado'">
-          <span class="em-kpi-num">{{ resumen.enviado }}</span>
-          <span class="em-kpi-lbl">Enviados</span>
-        </button>
-      </div>
-
       <!-- ══ Acciones masivas ══════════════════════════════════ -->
       <div v-if="puedeEnviarBatch.length > 0 && permisoEnviar" class="em-batch-bar">
         <span class="em-batch-info">
@@ -1142,31 +1114,6 @@ async function ejecutarEnvioBatch() {
   font-family: inherit; font-size: 12px; font-weight: 700;
   padding: 3px 4px; outline: none; color-scheme: light;
 }
-
-/* ── KPIs ─────────────────────────────────────────────────────── */
-.em-kpis {
-  display: grid; grid-template-columns: repeat(6, 1fr);
-  background: #fff; border-bottom: 1px solid #ECE7F2;
-}
-@media (max-width: 800px) { .em-kpis { grid-template-columns: repeat(3, 1fr); } }
-.em-kpi {
-  display: flex; flex-direction: column; align-items: center; gap: 2px;
-  background: transparent; border: none; border-right: 1px solid #ECE7F2;
-  padding: 10px 8px; cursor: pointer; font-family: inherit; transition: background .12s; position: relative;
-}
-.em-kpi:last-child { border-right: none; }
-.em-kpi:hover  { background: #FAF8FE; }
-.em-kpi--on    { background: #F3E8FF; }
-.em-kpi--on::after {
-  content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 2px; background: #915BD8;
-}
-.em-kpi-num { font-size: 20px; font-weight: 900; color: #1A1025; line-height: 1; }
-.em-kpi-lbl { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: #6B5A8A; }
-.em-kpi-pend   .em-kpi-num { color: #92400E; }
-.em-kpi-coms   .em-kpi-num { color: #991B1B; }
-.em-kpi-resol  .em-kpi-num { color: #1D4ED8; }
-.em-kpi-ver    .em-kpi-num { color: #166534; }
-.em-kpi-env    .em-kpi-num { color: #5B21B6; }
 
 /* ── Batch bar ────────────────────────────────────────────────── */
 .em-batch-bar {
