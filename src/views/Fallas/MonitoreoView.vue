@@ -1,721 +1,598 @@
 <template>
-  <div class="fallas-page">
+  <div class="space-y-4">
 
-    <!-- ══ Hero ══════════════════════════════════════════════════════ -->
-    <div class="fallas-hero">
-      <div class="fallas-hero-left">
-        <h1 class="fallas-hero-title">Monitoreo de Fallas</h1>
-        <p class="fallas-hero-sub">Seguimiento y gestión operacional · Unergy</p>
-      </div>
-      <div class="fallas-hero-actions">
-        <button class="hero-btn hero-btn-secondary" :disabled="loading" @click="cargar" title="Actualizar">
-          <span :class="loading ? 'spin-icon' : ''">↻</span> Actualizar
-        </button>
-        <button class="hero-btn hero-btn-primary" @click="dialogVisible = true">
-          <i class="pi pi-plus" /> Registrar falla
-        </button>
-      </div>
-    </div>
-
-    <!-- ══ KPIs ═══════════════════════════════════════════════════════ -->
-    <div class="fallas-kpis">
-      <button class="kpi-card" :class="['kpi-total', { 'kpi-active': !filtroEstado && !filtroPrioridad }]"
-        @click="clearKpiFilter">
-        <span class="kpi-num">{{ todosLoaded.length }}</span>
-        <span class="kpi-label">Total activas</span>
-      </button>
-      <button class="kpi-card" :class="['kpi-abierta', { 'kpi-active': filtroEstado === 'abierta' }]"
-        @click="setFiltroEstado('abierta')">
-        <span class="kpi-num">{{ kpis.abierta }}</span>
-        <span class="kpi-label">Abiertas</span>
-      </button>
-      <button class="kpi-card" :class="['kpi-gestion', { 'kpi-active': filtroEstado === 'en_gestion' }]"
-        @click="setFiltroEstado('en_gestion')">
-        <span class="kpi-num">{{ kpis.en_gestion }}</span>
-        <span class="kpi-label">En gestión</span>
-      </button>
-      <button class="kpi-card" :class="['kpi-espera', { 'kpi-active': filtroEstado === 'en_espera' }]"
-        @click="setFiltroEstado('en_espera')">
-        <span class="kpi-num">{{ kpis.en_espera }}</span>
-        <span class="kpi-label">En espera</span>
-      </button>
-      <button class="kpi-card" :class="['kpi-critica', { 'kpi-active': filtroPrioridad === 'critica' }]"
-        @click="setFiltroPrioridad('critica')">
-        <span class="kpi-num">{{ kpis.critica }}</span>
-        <span class="kpi-label">Críticas</span>
+    <!-- Banner alertas +7 días -->
+    <div v-if="stats.alerta_7_dias > 0"
+         class="flex items-center gap-3 px-4 py-3 rounded-xl border"
+         style="background:#FFF8F0;border-color:#FDE4C0;">
+      <span class="w-2 h-2 rounded-full bg-red-500 shrink-0 animate-pulse" />
+      <p class="text-sm flex-1" style="color:#7C3400;">
+        <strong class="text-red-600">{{ stats.alerta_7_dias }} falla{{ stats.alerta_7_dias !== 1 ? 's' : '' }}</strong>
+        {{ stats.alerta_7_dias !== 1 ? 'superan' : 'supera' }} los 7 días sin resolución.
+        Requieren atención inmediata.
+      </p>
+      <button class="text-xs font-semibold px-3 py-1.5 rounded-lg border border-orange-200
+                     text-orange-700 hover:bg-orange-50 transition-colors"
+              @click="filters.solo_alerta = true; load()">
+        Ver todas
       </button>
     </div>
 
-    <!-- ══ Filtros ════════════════════════════════════════════════════ -->
-    <div class="fallas-filtros-bar">
-      <div class="fallas-filtro-group fallas-filtro-search">
-        <label class="fallas-filtro-label">Buscar</label>
-        <input
-          v-model="filtroQ"
-          type="text"
-          class="fallas-input"
-          placeholder="Código, proyecto, descripción…"
-        />
-      </div>
-      <div class="fallas-filtro-group">
-        <label class="fallas-filtro-label">Estado</label>
-        <select v-model="filtroEstado" class="fallas-select">
-          <option value="">Todos</option>
-          <option v-for="e in catalogos.estados" :key="e.id" :value="e.codigo">{{ e.etiqueta }}</option>
-        </select>
-      </div>
-      <div class="fallas-filtro-group">
-        <label class="fallas-filtro-label">Prioridad</label>
-        <select v-model="filtroPrioridad" class="fallas-select">
-          <option value="">Todas</option>
-          <option v-for="p in catalogos.prioridades" :key="p.id" :value="p.codigo">{{ p.etiqueta }}</option>
-        </select>
-      </div>
-      <div class="fallas-filtro-group">
-        <label class="fallas-filtro-label">Proyecto</label>
-        <select v-model="filtroProyecto" class="fallas-select">
-          <option value="">Todos</option>
-          <option v-for="p in proyectos" :key="p.id" :value="p.id">{{ p.nombre_comercial }}</option>
-        </select>
-      </div>
-      <button v-if="hayFiltros" class="fallas-clear-btn" @click="limpiarFiltros">✕ Limpiar</button>
-      <span v-if="!loading" class="fallas-count-label">
-        {{ fallasFiltradas.length }} resultado{{ fallasFiltradas.length !== 1 ? 's' : '' }}
-      </span>
-    </div>
-
-    <!-- ══ Loading ════════════════════════════════════════════════════ -->
-    <div v-if="loading" class="fallas-loading">
-      <div class="spin-ring" />
-      <span>Cargando fallas…</span>
-    </div>
-
-    <!-- ══ Error ══════════════════════════════════════════════════════ -->
-    <div v-else-if="error" class="fallas-error-box">
-      <span>⚠️</span>
+    <!-- Header -->
+    <div class="flex items-center justify-between">
       <div>
-        <div class="fallas-error-title">Error al cargar fallas</div>
-        <div class="fallas-error-msg">{{ error }}</div>
+        <h2 class="text-lg font-bold" style="color:#2C2039;">Monitoreo</h2>
+        <p class="text-xs mt-0.5" style="color:#9b89b5;">
+          Bitácora de eventos operativos
+          <span v-if="lastRefresh"> · Actualizado {{ lastRefresh }}</span>
+        </p>
       </div>
-      <button class="hero-btn hero-btn-secondary" @click="cargar">Reintentar</button>
+      <div class="flex items-center gap-2">
+        <button class="p-2 rounded-lg border text-sm hover:bg-gray-50 transition-colors"
+                style="border-color:#e8e0f0;color:#915BD8;"
+                @click="loadAll" title="Actualizar">
+          <i class="pi pi-refresh" :class="{ 'animate-spin': loading }" />
+        </button>
+        <Button label="Nueva falla" icon="pi pi-plus" @click="openNew" />
+      </div>
     </div>
 
-    <!-- ══ Empty ══════════════════════════════════════════════════════ -->
-    <div v-else-if="!fallasFiltradas.length" class="fallas-empty">
-      <div class="fallas-empty-icon">⚡</div>
-      <div class="fallas-empty-title">
-        {{ hayFiltros ? 'Sin resultados para los filtros aplicados' : 'No hay fallas registradas' }}
+    <!-- KPIs -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div v-for="kpi in kpis" :key="kpi.label"
+           class="rounded-xl p-4 border" style="background:#fff;border-color:#e8e0f0;">
+        <p class="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style="color:#9b89b5;">
+          {{ kpi.label }}
+        </p>
+        <p class="text-2xl font-bold" :style="{ color: kpi.color || '#2C2039' }">
+          {{ kpi.value ?? '—' }}
+        </p>
+        <p class="text-[11px] mt-1" style="color:#9b89b5;">{{ kpi.sub }}</p>
       </div>
-      <div class="fallas-empty-sub">
-        {{ hayFiltros ? 'Prueba con otros filtros' : 'El sistema está operando sin incidencias activas' }}
-      </div>
-      <button v-if="hayFiltros" class="fallas-clear-btn" style="margin-top:14px" @click="limpiarFiltros">
-        ✕ Limpiar filtros
-      </button>
     </div>
 
-    <!-- ══ Tabla ══════════════════════════════════════════════════════ -->
-    <div v-else class="fallas-table-wrapper">
-      <table class="fallas-table">
-        <thead>
-          <tr>
-            <th>Código</th>
-            <th>Proyecto</th>
-            <th>Categoría / Tipo</th>
-            <th>Estado</th>
-            <th>Prioridad</th>
-            <th>Identificada</th>
-            <th>SLA</th>
-            <th>Asignado a</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr
-            v-for="f in fallasFiltradas"
-            :key="f.id"
-            class="fallas-row"
-            @click="irDetalle(f.id)"
-          >
-            <td class="td-codigo">{{ f.codigo_interno }}</td>
-            <td class="td-proyecto">{{ f.proyecto?.nombre_comercial || '—' }}</td>
-            <td class="td-tipo">
-              <span v-if="f.tipo?.categoria" class="cat-tag"
-                :style="{ background: (f.tipo.categoria.color_hex || '#915BD8') + '22', color: f.tipo.categoria.color_hex || '#915BD8' }">
-                {{ f.tipo.categoria.etiqueta }}
-              </span>
-              <div class="tipo-sub">{{ f.tipo?.etiqueta || '—' }}</div>
-            </td>
-            <td>
-              <span class="estado-pill"
-                :style="{ background: (f.estado?.color_hex || '#915BD8') + '22', color: f.estado?.color_hex || '#915BD8' }">
-                {{ f.estado?.etiqueta || '—' }}
-              </span>
-            </td>
-            <td>
-              <span class="prio-pill" :class="'prio-' + (f.prioridad?.nivel || 4)">
-                {{ f.prioridad?.etiqueta || '—' }}
-              </span>
-            </td>
-            <td class="td-fecha">{{ formatFecha(f.fecha_identificacion) }}</td>
-            <td>
-              <span v-if="f.sla_cumplido === true"  class="sla-pill sla-ok">✓ OK</span>
-              <span v-else-if="f.sla_cumplido === false" class="sla-pill sla-vencido">Vencido</span>
-              <span v-else-if="slaEnRiesgo(f)" class="sla-pill sla-riesgo">En riesgo</span>
-              <span v-else class="td-empty">—</span>
-            </td>
-            <td class="td-asignado">
-              <span v-if="f.asignado_a">{{ f.asignado_a.nombre }}</span>
-              <span v-else class="td-empty">Sin asignar</span>
-            </td>
-            <td class="td-accion" @click.stop>
-              <button class="action-btn" @click="irDetalle(f.id)" title="Ver detalle">→</button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+    <!-- Filtros -->
+    <div class="rounded-xl border p-4 flex flex-wrap gap-3 items-end"
+         style="background:#fff;border-color:#e8e0f0;">
+
+      <div>
+        <label class="field-label">Buscar</label>
+        <IconField>
+          <InputIcon class="pi pi-search" />
+          <InputText v-model="filters.buscar" placeholder="Código, proyecto, descripción…"
+                     class="w-60" @input="onSearch" />
+        </IconField>
+      </div>
+
+      <div>
+        <label class="field-label">Proyecto</label>
+        <Select v-model="filters.proyecto_id" :options="proyectos" option-value="id"
+                option-label="nombre_display" class="w-48" placeholder="Todos" show-clear
+                @change="load" />
+      </div>
+
+      <div>
+        <label class="field-label">Estado</label>
+        <Select v-model="filters.estado_codigo" :options="catalogos.estados"
+                option-value="codigo" option-label="etiqueta"
+                class="w-40" placeholder="Todos" show-clear @change="load" />
+      </div>
+
+      <div>
+        <label class="field-label">Prioridad</label>
+        <Select v-model="filters.prioridad_codigo" :options="catalogos.prioridades"
+                option-value="codigo" option-label="etiqueta"
+                class="w-36" placeholder="Todas" show-clear @change="load" />
+      </div>
+
+      <div>
+        <label class="field-label">Tipo</label>
+        <Select v-model="filters.tipo_codigo" :options="catalogos.tipos"
+                option-value="codigo" option-label="etiqueta"
+                class="w-52" placeholder="Todos" show-clear filter @change="load" />
+      </div>
+
+      <div class="flex items-end gap-2 ml-auto">
+        <!-- Vista cards / lista -->
+        <div class="flex rounded-lg border overflow-hidden" style="border-color:#e8e0f0;">
+          <button v-for="v in views" :key="v.key"
+                  class="px-3 py-2 text-xs font-semibold transition-colors"
+                  :style="view === v.key
+                    ? 'background:#915BD8;color:#fff;'
+                    : 'background:#fff;color:#9b89b5;'"
+                  @click="view = v.key">
+            <i :class="v.icon" />
+          </button>
+        </div>
+        <button v-if="hasFilters"
+                class="text-xs px-3 py-2 rounded-lg border text-red-500 hover:bg-red-50 transition-colors"
+                style="border-color:#fecaca;"
+                @click="clearFilters">
+          <i class="pi pi-times mr-1" /> Limpiar
+        </button>
+      </div>
     </div>
 
-    <!-- ══ Dialog registrar falla ═════════════════════════════════════ -->
-    <Dialog
-      v-model:visible="dialogVisible"
-      header="Registrar nueva falla"
-      modal
-      class="w-full max-w-2xl"
-      :closable="!saving"
-    >
-      <FallaForm :catalogos="catalogos" @save="onCreate" @cancel="dialogVisible = false" />
+    <!-- ── CARDS VIEW ── -->
+    <div v-if="view === 'cards'" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+      <div v-if="loading && !items.length" v-for="n in 6" :key="n"
+           class="rounded-xl border animate-pulse h-52"
+           style="background:#f5f0fb;border-color:#e8e0f0;" />
+
+      <div v-for="f in items" :key="f.id"
+           class="rounded-xl border overflow-hidden cursor-pointer transition-all duration-150
+                  hover:shadow-md group"
+           :style="cardStyle(f)"
+           @click="openDetail(f)">
+
+        <!-- Head -->
+        <div class="px-4 pt-3 pb-2.5 border-b" style="border-color:#f0eaf8;">
+          <div class="flex items-start justify-between gap-2">
+            <div class="min-w-0">
+              <p class="text-[10px] font-bold uppercase tracking-wide mb-1"
+                 style="color:#915BD8;">
+                {{ proyectoNombre(f) }} · {{ f.codigo_interno }}
+              </p>
+              <p class="text-[13px] font-semibold leading-snug line-clamp-2"
+                 style="color:#2C2039;">
+                {{ f.tipo_falla?.etiqueta || f.descripcion || '(sin descripción)' }}
+              </p>
+            </div>
+            <span class="shrink-0">
+              <Tag :value="f.estado?.etiqueta" :style="tagStyle(f.estado)" />
+            </span>
+          </div>
+        </div>
+
+        <!-- Body -->
+        <div class="px-4 py-3 space-y-2">
+          <div class="flex justify-between items-center text-[11px]">
+            <span style="color:#9b89b5;">Tipo</span>
+            <span class="font-semibold" style="color:#2C2039;">
+              {{ f.tipo_falla?.codigo }} · {{ f.tipo_falla?.categoria?.etiqueta?.split(' ').slice(1).join(' ') || '—' }}
+            </span>
+          </div>
+          <div class="flex justify-between items-center text-[11px]">
+            <span style="color:#9b89b5;">Días abierta</span>
+            <span class="font-bold" :style="{ color: diasColor(f.dias_abierta) }">
+              {{ f.dias_abierta ?? '—' }} días
+            </span>
+          </div>
+          <div class="flex justify-between items-center text-[11px]">
+            <span style="color:#9b89b5;">Prioridad</span>
+            <Tag :value="f.prioridad?.etiqueta" :style="prioTagStyle(f.prioridad)" class="text-[10px]" />
+          </div>
+
+          <!-- Barra SLA -->
+          <div>
+            <div class="flex justify-between text-[10px] mb-1" style="color:#9b89b5;">
+              <span>SLA ({{ f.sla_limite_dias ?? '7' }}d)</span>
+              <span :style="{ color: slaColor(f) }">
+                {{ slaLabel(f) }}
+              </span>
+            </div>
+            <div class="h-1 rounded-full" style="background:#f0eaf8;">
+              <div class="h-1 rounded-full transition-all"
+                   :style="slaBarStyle(f)" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Fotos mini -->
+        <div v-if="f.tiene_fotos" class="px-4 pb-2 flex gap-1.5 items-center">
+          <i class="pi pi-image text-[10px]" style="color:#915BD8;" />
+          <span class="text-[10px]" style="color:#9b89b5;">Tiene fotos adjuntas</span>
+        </div>
+
+        <!-- Foot -->
+        <div class="px-4 py-2.5 border-t flex items-center justify-between"
+             style="border-color:#f0eaf8;background:#faf8fd;">
+          <span class="text-[10px]" style="color:#9b89b5;">
+            {{ fmtDate(f.fecha_identificacion || f.fecha_registro) }}
+          </span>
+          <div class="flex gap-2">
+            <button class="text-[10px] font-semibold px-2.5 py-1 rounded-lg border
+                           hover:bg-white transition-colors"
+                    style="color:#6b5a8a;border-color:#e0d4f5;"
+                    @click.stop="openSeguimiento(f)">
+              Seguimiento
+            </button>
+            <button class="text-[10px] font-semibold px-2.5 py-1 rounded-lg transition-colors"
+                    style="background:#f0eaf8;color:#915BD8;"
+                    @click.stop="openDetail(f)">
+              Ver detalle
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="!loading && !items.length"
+           class="col-span-full text-center py-16 text-sm" style="color:#9b89b5;">
+        <i class="pi pi-inbox text-4xl block mb-3" style="color:#e0d4f5;" />
+        No hay fallas que coincidan con los filtros.
+      </div>
+    </div>
+
+    <!-- ── TABLE VIEW ── -->
+    <div v-else class="rounded-xl border overflow-hidden" style="border-color:#e8e0f0;">
+      <DataTable :value="items" lazy :loading="loading" :rows="pageSize"
+                 :total-records="total" paginator @page="onPage" row-hover
+                 selection-mode="single" @row-select="openDetail($event.data)"
+                 class="text-sm">
+        <Column field="codigo_interno" header="Código" style="width:110px" />
+        <Column header="Proyecto" style="min-width:130px">
+          <template #body="{ data }">{{ proyectoNombre(data) }}</template>
+        </Column>
+        <Column header="Tipo de falla" style="min-width:200px">
+          <template #body="{ data }">
+            <span class="text-xs">
+              <strong>{{ data.tipo_falla?.codigo }}</strong>
+              {{ data.tipo_falla?.etiqueta }}
+            </span>
+          </template>
+        </Column>
+        <Column header="Estado" style="width:110px">
+          <template #body="{ data }">
+            <Tag :value="data.estado?.etiqueta" :style="tagStyle(data.estado)" />
+          </template>
+        </Column>
+        <Column header="Prioridad" style="width:90px">
+          <template #body="{ data }">
+            <Tag :value="data.prioridad?.etiqueta" :style="prioTagStyle(data.prioridad)" />
+          </template>
+        </Column>
+        <Column header="Días" style="width:70px">
+          <template #body="{ data }">
+            <span :style="{ color: diasColor(data.dias_abierta), fontWeight: 700 }">
+              {{ data.dias_abierta ?? '—' }}
+            </span>
+          </template>
+        </Column>
+        <Column header="SLA" style="width:90px">
+          <template #body="{ data }">
+            <span class="text-xs font-bold" :style="{ color: slaColor(data) }">
+              {{ slaLabel(data) }}
+            </span>
+          </template>
+        </Column>
+        <Column header="Fecha" style="width:100px">
+          <template #body="{ data }">
+            {{ fmtDate(data.fecha_identificacion || data.fecha_registro) }}
+          </template>
+        </Column>
+      </DataTable>
+    </div>
+
+    <!-- Paginación para cards -->
+    <div v-if="view === 'cards' && total > pageSize"
+         class="flex items-center justify-between px-1">
+      <p class="text-xs" style="color:#9b89b5;">
+        Mostrando {{ items.length }} de {{ total }} fallas
+      </p>
+      <div class="flex gap-2">
+        <button :disabled="page === 1"
+                class="px-3 py-1.5 rounded-lg border text-xs disabled:opacity-40
+                       hover:bg-purple-50 transition-colors"
+                style="border-color:#e0d4f5;color:#915BD8;"
+                @click="page--; load()">
+          ← Anterior
+        </button>
+        <button :disabled="page * pageSize >= total"
+                class="px-3 py-1.5 rounded-lg border text-xs disabled:opacity-40
+                       hover:bg-purple-50 transition-colors"
+                style="border-color:#e0d4f5;color:#915BD8;"
+                @click="page++; load()">
+          Siguiente →
+        </button>
+      </div>
+    </div>
+
+    <!-- ─── DRAWER DETALLE ─── -->
+    <Drawer v-model:visible="drawerVisible" position="right"
+            :header="selectedFalla?.codigo_interno || 'Detalle'"
+            class="!w-full md:!w-[560px]" style="--p-drawer-header-padding:1.25rem;">
+      <FallaDetalle v-if="selectedFalla"
+                    :falla="selectedFalla"
+                    :catalogos="catalogos"
+                    @update="onFallaUpdated"
+                    @close="drawerVisible = false" />
+    </Drawer>
+
+    <!-- ─── DIALOG NUEVA FALLA ─── -->
+    <Dialog v-model:visible="formVisible" header="Registrar nueva falla"
+            modal class="w-full max-w-2xl mx-4">
+      <FallaForm :catalogos="catalogos" :proyectos="proyectos"
+                 @save="onFallaCreated" @cancel="formVisible = false" />
+    </Dialog>
+
+    <!-- ─── DIALOG SEGUIMIENTO RÁPIDO ─── -->
+    <Dialog v-model:visible="segVisible" header="Agregar seguimiento"
+            modal class="w-full max-w-md mx-4">
+      <div class="space-y-3 pt-1">
+        <p class="text-xs font-semibold" style="color:#915BD8;">
+          {{ segFalla?.codigo_interno }} — {{ proyectoNombre(segFalla) }}
+        </p>
+        <div>
+          <label class="field-label">Estado nuevo <span style="color:#9b89b5;">(opcional)</span></label>
+          <Select v-model="segEstado" :options="catalogos.estados"
+                  option-value="codigo" option-label="etiqueta"
+                  class="w-full" placeholder="Sin cambio" show-clear />
+        </div>
+        <div>
+          <label class="field-label">Nota *</label>
+          <Textarea v-model="segNota" rows="4" class="w-full"
+                    placeholder="Describe la actualización, acción tomada o novedad…" />
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <Button label="Cancelar" severity="secondary" text @click="segVisible = false" />
+          <Button label="Guardar" icon="pi pi-check" :loading="segLoading"
+                  :disabled="!segNota.trim()" @click="saveSeguimiento" />
+        </div>
+      </div>
     </Dialog>
 
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, reactive, computed, onMounted } from 'vue'
+import Button from 'primevue/button'
+import DataTable from 'primevue/datatable'
+import Column from 'primevue/column'
+import Tag from 'primevue/tag'
 import Dialog from 'primevue/dialog'
+import Drawer from 'primevue/drawer'
+import Select from 'primevue/select'
+import InputText from 'primevue/inputtext'
+import Textarea from 'primevue/textarea'
+import IconField from 'primevue/iconfield'
+import InputIcon from 'primevue/inputicon'
 import { useToast } from 'primevue/usetoast'
-import FallaForm from './FallaForm.vue'
 import api from '@/api/client'
+import FallaDetalle from './FallaDetalle.vue'
+import FallaForm from './FallaForm.vue'
 
-const router = useRouter()
-const toast  = useToast()
+const toast = useToast()
 
-// ── Estado ────────────────────────────────────────────────────────
-const todosLoaded    = ref([])
-const loading        = ref(false)
-const error          = ref(null)
-const saving         = ref(false)
-const dialogVisible  = ref(false)
-const catalogos      = ref({ estados: [], prioridades: [], tipos: [], resoluciones: [] })
-const proyectos      = ref([])
+// ── estado ──────────────────────────────────────────────────
+const items      = ref([])
+const total      = ref(0)
+const page       = ref(1)
+const pageSize   = ref(21)
+const loading    = ref(false)
+const lastRefresh= ref('')
+const view       = ref('cards')  // 'cards' | 'table'
+const views      = [
+  { key: 'cards', icon: 'pi pi-th-large' },
+  { key: 'table', icon: 'pi pi-list' },
+]
 
-// ── Filtros ───────────────────────────────────────────────────────
-const filtroQ         = ref('')
-const filtroEstado    = ref('')
-const filtroPrioridad = ref('')
-const filtroProyecto  = ref('')
+const stats = ref({ total_activas: 0, en_revision: 0, resueltas_mes: 0,
+                    cumplimiento_sla_pct: null, alerta_7_dias: 0 })
 
-const hayFiltros = computed(() =>
-  filtroQ.value || filtroEstado.value || filtroPrioridad.value || filtroProyecto.value
+const catalogos = reactive({ categorias: [], tipos: [], estados: [],
+                              prioridades: [], resoluciones: [] })
+const proyectos = ref([])
+
+const filters = reactive({
+  buscar: '', proyecto_id: null, estado_codigo: null,
+  prioridad_codigo: null, tipo_codigo: null, solo_alerta: false,
+})
+
+// Drawer detalle
+const drawerVisible  = ref(false)
+const selectedFalla  = ref(null)
+
+// Dialog nueva falla
+const formVisible = ref(false)
+
+// Dialog seguimiento rápido
+const segVisible  = ref(false)
+const segFalla    = ref(null)
+const segNota     = ref('')
+const segEstado   = ref(null)
+const segLoading  = ref(false)
+
+// ── computed ─────────────────────────────────────────────────
+const hasFilters = computed(() =>
+  filters.buscar || filters.proyecto_id || filters.estado_codigo ||
+  filters.prioridad_codigo || filters.tipo_codigo || filters.solo_alerta
 )
 
-// ── KPIs ──────────────────────────────────────────────────────────
-const kpis = computed(() => ({
-  abierta:   todosLoaded.value.filter(f => f.estado?.codigo === 'abierta').length,
-  en_gestion:todosLoaded.value.filter(f => f.estado?.codigo === 'en_gestion').length,
-  en_espera: todosLoaded.value.filter(f => f.estado?.codigo === 'en_espera').length,
-  critica:   todosLoaded.value.filter(f => f.prioridad?.codigo === 'critica').length,
-}))
+const kpis = computed(() => [
+  { label: 'Fallas activas',     value: stats.value.total_activas,     color: '#EF4444', sub: `${stats.value.alerta_7_dias ?? 0} con +7 días` },
+  { label: 'En revisión',        value: stats.value.en_revision,       color: '#F59E0B', sub: 'Técnico asignado' },
+  { label: 'Resueltas este mes', value: stats.value.resueltas_mes,     color: '#10B981', sub: 'Mes en curso' },
+  { label: 'Cumplimiento SLA',
+    value: stats.value.cumplimiento_sla_pct != null
+           ? `${stats.value.cumplimiento_sla_pct}%` : '—',
+    color: stats.value.cumplimiento_sla_pct >= 90 ? '#10B981' : '#F59E0B',
+    sub: 'Últimos 30 días' },
+])
 
-// ── Filtrado ──────────────────────────────────────────────────────
-const fallasFiltradas = computed(() =>
-  todosLoaded.value.filter(f => {
-    const q = filtroQ.value.toLowerCase().trim()
-    if (q && !(
-      (f.codigo_interno || '').toLowerCase().includes(q) ||
-      (f.proyecto?.nombre_comercial || '').toLowerCase().includes(q) ||
-      (f.descripcion || '').toLowerCase().includes(q) ||
-      (f.tipo?.etiqueta || '').toLowerCase().includes(q)
-    )) return false
-    if (filtroEstado.value && f.estado?.codigo !== filtroEstado.value) return false
-    if (filtroPrioridad.value && f.prioridad?.codigo !== filtroPrioridad.value) return false
-    if (filtroProyecto.value && f.proyecto?.id !== filtroProyecto.value) return false
-    return true
-  })
-)
-
-// ── Helpers filtros KPI ───────────────────────────────────────────
-function setFiltroEstado(val) {
-  filtroPrioridad.value = ''
-  filtroEstado.value = filtroEstado.value === val ? '' : val
-}
-function setFiltroPrioridad(val) {
-  filtroEstado.value = ''
-  filtroPrioridad.value = filtroPrioridad.value === val ? '' : val
-}
-function clearKpiFilter() {
-  filtroEstado.value = ''
-  filtroPrioridad.value = ''
-}
-function limpiarFiltros() {
-  filtroQ.value = ''
-  filtroEstado.value = ''
-  filtroPrioridad.value = ''
-  filtroProyecto.value = ''
+// ── helpers visuales ─────────────────────────────────────────
+const proyectoNombre = (f) => {
+  if (!f) return '—'
+  return f.proyecto?.nombre_display || f.proyecto?.nombre_clientes || f.proyecto_nombre_raw || '—'
 }
 
-// ── SLA en riesgo ─────────────────────────────────────────────────
-function slaEnRiesgo(f) {
-  if (!f.sla_limite_horas || f.sla_cumplido !== null) return false
-  if (!f.fecha_identificacion) return false
-  const inicio   = new Date(f.fecha_identificacion + 'T00:00:00')
-  const deadline = new Date(inicio.getTime() + f.sla_limite_horas * 3_600_000)
-  const remaining = (deadline - Date.now()) / 3_600_000
-  return remaining > 0 && remaining < f.sla_limite_horas * 0.25
+const cardStyle = (f) => {
+  const border = f.estado?.es_terminal
+    ? 'border-left:3px solid #10B981'
+    : f.dias_abierta >= 7 ? 'border-left:3px solid #EF4444'
+    : f.dias_abierta >= 4 ? 'border-left:3px solid #F59E0B'
+    : 'border-left:3px solid #10B981'
+  return `background:#fff;border-color:#e8e0f0;${border}`
 }
 
-// ── Formateo ──────────────────────────────────────────────────────
-function formatFecha(d) {
+const tagStyle = (estado) => {
+  if (!estado) return 'background:#f3f4f6;color:#6b7280;border:none'
+  const m = {
+    activa:      'background:#FEF2F2;color:#EF4444;border:1px solid #FECACA',
+    en_revision: 'background:#FFFBEB;color:#B45309;border:1px solid #FDE68A',
+    programada:  'background:#EFF6FF;color:#2563EB;border:1px solid #BFDBFE',
+    terminada:   'background:#F0FDF4;color:#15803D;border:1px solid #BBF7D0',
+  }
+  return m[estado.codigo] || 'background:#f3f4f6;color:#6b7280;border:none'
+}
+
+const prioTagStyle = (p) => {
+  if (!p) return 'background:#f3f4f6;color:#6b7280;border:none'
+  const m = {
+    critica: 'background:#FEF2F2;color:#DC2626;border:1px solid #FECACA',
+    alta:    'background:#FFFBEB;color:#B45309;border:1px solid #FDE68A',
+    media:   'background:#EFF6FF;color:#1D4ED8;border:1px solid #BFDBFE',
+    baja:    'background:#F9FAFB;color:#6B7280;border:1px solid #E5E7EB',
+  }
+  return m[p.codigo] || 'background:#f3f4f6;color:#6b7280;border:none'
+}
+
+const diasColor = (d) => !d ? '#9b89b5' : d >= 7 ? '#EF4444' : d >= 4 ? '#F59E0B' : '#10B981'
+
+const slaLabel = (f) => {
+  if (!f.sla_limite_dias || f.dias_abierta == null) return '—'
+  const pct = Math.round(f.dias_abierta / f.sla_limite_dias * 100)
+  if (f.estado?.es_terminal) return f.sla_cumplido ? '✅ Cumplido' : '❌ Excedió'
+  return pct > 100 ? `❌ ${pct}%` : `${pct}%`
+}
+
+const slaColor = (f) => {
+  if (!f.sla_limite_dias || f.dias_abierta == null) return '#9b89b5'
+  const pct = f.dias_abierta / f.sla_limite_dias * 100
+  return pct >= 100 ? '#EF4444' : pct >= 70 ? '#F59E0B' : '#10B981'
+}
+
+const slaBarStyle = (f) => {
+  if (!f.sla_limite_dias || f.dias_abierta == null) return 'width:0%'
+  const pct = Math.min(f.dias_abierta / f.sla_limite_dias * 100, 100)
+  const bg = pct >= 100 ? '#EF4444' : pct >= 70 ? '#F59E0B' : '#10B981'
+  return `width:${pct}%;background:${bg}`
+}
+
+const fmtDate = (d) => {
   if (!d) return '—'
-  return new Date(d + 'T00:00:00').toLocaleDateString('es-CO', {
-    day: '2-digit', month: 'short', year: 'numeric',
-  })
+  return new Date(d).toLocaleDateString('es-CO', { day:'2-digit', month:'short', year:'numeric' })
 }
 
-// ── Carga de datos ────────────────────────────────────────────────
-async function cargar() {
+// ── carga de datos ───────────────────────────────────────────
+async function load() {
   loading.value = true
-  error.value   = null
   try {
-    const { data } = await api.get('/fallas', { params: { page: 1, size: 500 } })
-    todosLoaded.value = data.items ?? []
-  } catch (e) {
-    error.value = e.response?.data?.detail || e.message
+    const params = { page: page.value, page_size: pageSize.value }
+    if (filters.buscar)          params.buscar           = filters.buscar
+    if (filters.proyecto_id)     params.proyecto_id      = filters.proyecto_id
+    if (filters.estado_codigo)   params.estado_codigo    = filters.estado_codigo
+    if (filters.prioridad_codigo)params.prioridad_codigo = filters.prioridad_codigo
+    if (filters.tipo_codigo)     params.tipo_codigo      = filters.tipo_codigo
+    if (filters.solo_alerta)     params.solo_alerta      = true
+
+    const { data } = await api.get('/fallas', { params })
+    items.value = data.items
+    total.value = data.total
+    lastRefresh.value = new Date().toLocaleTimeString('es-CO', { hour:'2-digit', minute:'2-digit' })
+  } catch {
+    toast.add({ severity: 'error', summary: 'Error al cargar fallas', life: 3000 })
   } finally {
     loading.value = false
   }
 }
 
-async function cargarCatalogos() {
+async function loadStats() {
+  try {
+    const { data } = await api.get('/fallas/stats/resumen')
+    Object.assign(stats.value, data)
+  } catch { /* silencioso */ }
+}
+
+async function loadCatalogos() {
   try {
     const { data } = await api.get('/fallas/catalogos')
-    catalogos.value = data
-  } catch { /* no crítico */ }
+    Object.assign(catalogos, data)
+  } catch { /* silencioso */ }
 }
 
-async function cargarProyectos() {
+async function loadProyectos() {
   try {
-    const { data } = await api.get('/proyectos', { params: { size: 500 } })
-    proyectos.value = data.items ?? []
-  } catch { /* no crítico */ }
+    const { data } = await api.get('/proyectos', { params: { size: 300 } })
+    proyectos.value = data.items || data
+  } catch { /* silencioso */ }
 }
 
-// ── Crear falla ───────────────────────────────────────────────────
-async function onCreate(payload) {
-  saving.value = true
+async function loadAll() {
+  await Promise.all([load(), loadStats()])
+}
+
+onMounted(async () => {
+  await Promise.all([loadCatalogos(), loadProyectos()])
+  await loadAll()
+})
+
+// ── acciones ─────────────────────────────────────────────────
+let searchTimer
+function onSearch() {
+  clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => { page.value = 1; load() }, 350)
+}
+
+function onPage(e) { page.value = e.page + 1; load() }
+
+function clearFilters() {
+  Object.assign(filters, { buscar: '', proyecto_id: null, estado_codigo: null,
+                            prioridad_codigo: null, tipo_codigo: null, solo_alerta: false })
+  page.value = 1
+  load()
+}
+
+function openNew() { formVisible.value = true }
+
+async function openDetail(falla) {
   try {
-    const notaInicial = payload.nota_inicial
-    delete payload.nota_inicial
-    const { data: nueva } = await api.post('/fallas', payload)
-    if (notaInicial) {
-      await api.post(`/fallas/${nueva.id}/seguimientos`, { nota: notaInicial })
-    }
-    dialogVisible.value = false
-    toast.add({ severity: 'success', summary: 'Falla registrada', life: 3000 })
-    await cargar()
-  } catch (err) {
-    const msg = err?.response?.data?.detail ?? 'Error al registrar la falla'
-    toast.add({ severity: 'error', summary: 'Error', detail: msg, life: 4000 })
-  } finally {
-    saving.value = false
+    const { data } = await api.get(`/fallas/${falla.id}`)
+    selectedFalla.value = data
+    drawerVisible.value  = true
+  } catch {
+    toast.add({ severity: 'error', summary: 'No se pudo cargar el detalle', life: 3000 })
   }
 }
 
-// ── Navegación ────────────────────────────────────────────────────
-function irDetalle(id) {
-  router.push(`/fallas/${id}`)
+function openSeguimiento(falla) {
+  segFalla.value  = falla
+  segNota.value   = ''
+  segEstado.value = null
+  segVisible.value = true
 }
 
-onMounted(() => {
-  cargarCatalogos()
-  cargarProyectos()
-  cargar()
-})
+async function saveSeguimiento() {
+  if (!segNota.value.trim() || !segFalla.value) return
+  segLoading.value = true
+  try {
+    await api.post(`/fallas/${segFalla.value.id}/seguimientos`, {
+      nota:         segNota.value.trim(),
+      estado_nuevo: segEstado.value || null,
+    })
+    toast.add({ severity: 'success', summary: 'Seguimiento guardado', life: 2500 })
+    segVisible.value = false
+    loadAll()
+  } catch (e) {
+    toast.add({ severity: 'error', summary: 'Error', detail: e.response?.data?.detail, life: 3000 })
+  } finally {
+    segLoading.value = false
+  }
+}
+
+async function onFallaCreated() {
+  formVisible.value = false
+  toast.add({ severity: 'success', summary: 'Falla registrada', life: 2500 })
+  await loadAll()
+}
+
+async function onFallaUpdated(updated) {
+  selectedFalla.value = updated
+  await loadAll()
+}
 </script>
 
 <style scoped>
-/* ── Página ──────────────────────────────────────────────────────── */
-.fallas-page {
-  min-height: 100%;
-  background: #f8f7fa;
-  font-family: 'Sora', system-ui, sans-serif;
-}
-
-/* ── Hero ────────────────────────────────────────────────────────── */
-.fallas-hero {
-  background: linear-gradient(135deg, #2C2039 0%, #3d2b52 60%, #4a2d6e 100%);
-  padding: 28px 32px 24px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-  border-bottom: 1px solid rgba(145,91,216,.2);
-}
-.fallas-hero-title {
-  font-size: 24px;
-  font-weight: 900;
-  color: #FDFAF7;
-  margin: 0 0 4px;
-  letter-spacing: -0.3px;
-}
-.fallas-hero-sub {
-  font-size: 13px;
-  color: rgba(253,250,247,.55);
-  margin: 0;
-}
-.fallas-hero-actions {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-/* ── Botones hero ────────────────────────────────────────────────── */
-.hero-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border-radius: 8px;
-  padding: 9px 18px;
-  font-size: 13px;
-  font-weight: 700;
-  font-family: inherit;
-  cursor: pointer;
-  transition: all .15s;
-  white-space: nowrap;
-}
-.hero-btn:disabled { opacity: .5; cursor: not-allowed; }
-.hero-btn-secondary {
-  background: rgba(255,255,255,.1);
-  border: 1px solid rgba(255,255,255,.22);
-  color: #FDFAF7;
-}
-.hero-btn-secondary:hover:not(:disabled) { background: rgba(255,255,255,.18); }
-.hero-btn-primary {
-  background: #915BD8;
-  border: 1px solid #7c3aed;
-  color: #fff;
-}
-.hero-btn-primary:hover:not(:disabled) { background: #7c3aed; }
-
-/* ── KPIs ────────────────────────────────────────────────────────── */
-.fallas-kpis {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 0;
-  border-bottom: 1px solid #e5e2ec;
-}
-@media (max-width: 768px) { .fallas-kpis { grid-template-columns: repeat(3, 1fr); } }
-@media (max-width: 480px) { .fallas-kpis { grid-template-columns: repeat(2, 1fr); } }
-
-.kpi-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 20px 12px;
-  border: none;
-  background: #fff;
-  cursor: pointer;
-  transition: background .15s;
-  border-right: 1px solid #e5e2ec;
-  position: relative;
-  font-family: inherit;
-}
-.kpi-card:last-child { border-right: none; }
-.kpi-card:hover { background: #f4f1fa; }
-
-.kpi-card::after {
-  content: '';
-  position: absolute;
-  bottom: 0; left: 0; right: 0;
-  height: 3px;
-  border-radius: 3px 3px 0 0;
-  opacity: 0;
-  transition: opacity .15s;
-}
-.kpi-card.kpi-active::after { opacity: 1; }
-.kpi-card.kpi-active { background: #f9f7ff; }
-
-.kpi-total::after    { background: #915BD8; }
-.kpi-abierta::after  { background: #EF4444; }
-.kpi-gestion::after  { background: #F97316; }
-.kpi-espera::after   { background: #EAB308; }
-.kpi-critica::after  { background: #DC2626; }
-
-.kpi-num {
-  font-size: 32px;
-  font-weight: 900;
-  line-height: 1;
-  margin-bottom: 5px;
-}
-.kpi-total   .kpi-num { color: #6d28d9; }
-.kpi-abierta .kpi-num { color: #DC2626; }
-.kpi-gestion .kpi-num { color: #EA580C; }
-.kpi-espera  .kpi-num { color: #CA8A04; }
-.kpi-critica .kpi-num { color: #DC2626; }
-.kpi-label {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: .6px;
-  color: #9ca3af;
-}
-.kpi-card.kpi-active .kpi-label { color: #6b7280; }
-
-/* ── Filtros ─────────────────────────────────────────────────────── */
-.fallas-filtros-bar {
-  display: flex;
-  align-items: flex-end;
-  gap: 14px;
-  flex-wrap: wrap;
-  padding: 18px 32px;
-  background: #fff;
-  border-bottom: 1px solid #e5e2ec;
-}
-.fallas-filtro-group {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-.fallas-filtro-search { flex: 1; min-width: 200px; }
-.fallas-filtro-label {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: .5px;
-  color: #9ca3af;
-}
-.fallas-input, .fallas-select {
-  background: #fff;
-  border: 1.5px solid #e5e2ec;
-  border-radius: 8px;
-  padding: 7px 12px;
-  color: #2C2039;
-  font-size: 13px;
-  font-family: inherit;
-  outline: none;
-  transition: border-color .15s;
-}
-.fallas-input  { min-width: 220px; }
-.fallas-select { min-width: 150px; cursor: pointer; }
-.fallas-input:focus,
-.fallas-select:focus { border-color: #915BD8; }
-
-.fallas-clear-btn {
-  background: transparent;
-  border: 1.5px solid #e5e2ec;
-  border-radius: 8px;
-  padding: 7px 14px;
-  font-size: 12px;
-  font-weight: 700;
-  color: #6b7280;
-  cursor: pointer;
-  font-family: inherit;
-  transition: all .15s;
-  align-self: flex-end;
-}
-.fallas-clear-btn:hover { border-color: #915BD8; color: #6d28d9; }
-
-.fallas-count-label {
-  margin-left: auto;
-  align-self: flex-end;
-  font-size: 12px;
-  color: #9ca3af;
-  font-weight: 600;
-}
-
-/* ── Loading ─────────────────────────────────────────────────────── */
-.fallas-loading {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 14px;
-  padding: 80px 32px;
-  color: #9ca3af;
-  font-size: 13px;
-}
-.spin-ring {
-  width: 32px; height: 32px;
-  border: 3px solid #e5e2ec;
-  border-top-color: #915BD8;
-  border-radius: 50%;
-  animation: spin .8s linear infinite;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
-.spin-icon { display: inline-block; animation: spin .8s linear infinite; }
-
-/* ── Error ───────────────────────────────────────────────────────── */
-.fallas-error-box {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  margin: 24px 32px;
-  background: #fff5f5;
-  border: 1px solid #fecaca;
-  border-radius: 10px;
-  padding: 16px 20px;
-  font-size: 13px;
-}
-.fallas-error-title { font-size: 13px; font-weight: 700; color: #dc2626; margin-bottom: 2px; }
-.fallas-error-msg   { font-size: 12px; color: #ef4444; }
-
-/* ── Empty ───────────────────────────────────────────────────────── */
-.fallas-empty {
-  text-align: center;
-  padding: 80px 32px;
-}
-.fallas-empty-icon  { font-size: 48px; margin-bottom: 14px; opacity: .25; }
-.fallas-empty-title { font-size: 16px; font-weight: 700; color: #6b7280; margin-bottom: 6px; }
-.fallas-empty-sub   { font-size: 13px; color: #9ca3af; }
-
-/* ── Tabla ───────────────────────────────────────────────────────── */
-.fallas-table-wrapper {
-  padding: 24px 32px;
-  overflow-x: auto;
-}
-.fallas-table {
-  width: 100%;
-  border-collapse: collapse;
-  background: #fff;
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0,0,0,.07), 0 1px 2px rgba(0,0,0,.04);
-}
-.fallas-table thead tr {
-  background: #f8f7fa;
-  border-bottom: 2px solid #e5e2ec;
-}
-.fallas-table thead th {
-  padding: 12px 14px;
-  text-align: left;
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: .5px;
-  color: #9ca3af;
-  white-space: nowrap;
-}
-.fallas-row {
-  border-bottom: 1px solid #f0edf7;
-  cursor: pointer;
-  transition: background .12s;
-}
-.fallas-row:last-child { border-bottom: none; }
-.fallas-row:hover { background: #f9f7ff; }
-.fallas-row td {
-  padding: 12px 14px;
-  vertical-align: middle;
-  font-size: 13px;
-  color: #1a1025;
-}
-
-/* ── Celdas específicas ──────────────────────────────────────────── */
-.td-codigo {
-  font-family: 'Courier New', monospace;
-  font-size: 12px;
-  font-weight: 700;
-  color: #6d28d9;
-  white-space: nowrap;
-}
-.td-proyecto {
-  font-weight: 600;
-  min-width: 160px;
-}
-.td-tipo { min-width: 160px; }
-.cat-tag {
-  display: inline-block;
-  font-size: 10px;
-  font-weight: 800;
-  padding: 2px 8px;
-  border-radius: 20px;
-  letter-spacing: .3px;
-  text-transform: uppercase;
-  margin-bottom: 3px;
-}
-.tipo-sub {
-  font-size: 11px;
-  color: #6b7280;
-  margin-top: 2px;
-}
-.td-fecha {
-  font-size: 12px;
-  color: #374151;
-  white-space: nowrap;
-}
-.td-asignado {
-  font-size: 12px;
-  min-width: 110px;
-}
-.td-empty { color: #d1d5db; font-style: italic; }
-
-/* Estado pills */
-.estado-pill {
-  display: inline-block;
-  font-size: 10px;
-  font-weight: 800;
-  padding: 3px 10px;
-  border-radius: 20px;
-  letter-spacing: .3px;
-  white-space: nowrap;
-  text-transform: uppercase;
-}
-
-/* Prioridad pills */
-.prio-pill {
-  display: inline-block;
-  font-size: 10px;
-  font-weight: 800;
-  padding: 3px 10px;
-  border-radius: 20px;
-  letter-spacing: .3px;
-  white-space: nowrap;
-  text-transform: uppercase;
-}
-.prio-1 { background: rgba(220,38,38,.12);  color: #DC2626; }
-.prio-2 { background: rgba(234,88,12,.12);  color: #EA580C; }
-.prio-3 { background: rgba(202,138,4,.12);  color: #CA8A04; }
-.prio-4 { background: rgba(107,114,128,.1); color: #6B7280; }
-
-/* SLA pills */
-.sla-pill {
-  display: inline-block;
-  font-size: 10px;
-  font-weight: 800;
-  padding: 3px 9px;
-  border-radius: 20px;
-  white-space: nowrap;
-}
-.sla-ok      { background: rgba(22,163,74,.12);  color: #16A34A; }
-.sla-vencido { background: rgba(220,38,38,.12);  color: #DC2626; }
-.sla-riesgo  { background: rgba(202,138,4,.12);  color: #CA8A04; }
-
-/* Acción */
-.td-accion { width: 50px; }
-.action-btn {
-  background: transparent;
-  border: 1px solid #e5e2ec;
-  border-radius: 6px;
-  padding: 4px 10px;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 800;
-  color: #6d28d9;
-  transition: all .14s;
-}
-.action-btn:hover { background: #f3f0ff; border-color: #7c3aed; }
-
-@media (max-width: 768px) {
-  .fallas-hero, .fallas-filtros-bar, .fallas-table-wrapper { padding-left: 20px; padding-right: 20px; }
-}
+.field-label { @apply block text-xs font-medium mb-1; color: #6b5a8a; }
+.line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 </style>
