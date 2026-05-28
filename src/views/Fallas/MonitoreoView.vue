@@ -156,7 +156,15 @@
                       :style="{ background: data.tipo?.categoria?.color_hex || '#915BD8' }"
                       v-tooltip.top="data.tipo?.categoria?.etiqueta || ''" />
                     <div class="min-w-0 flex-1">
-                      <div class="text-sm font-medium text-gray-800 truncate">{{ data.tipo?.etiqueta || 'Sin tipo' }}</div>
+                      <div class="text-sm font-medium text-gray-800 flex items-center gap-1.5 flex-wrap">
+                        <span class="truncate">{{ data.tipo?.etiqueta || 'Sin tipo' }}</span>
+                        <span v-if="recurrencias(data) > 1"
+                          class="inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0"
+                          style="background: rgba(234,88,12,0.12); color: #ea580c;"
+                          v-tooltip.top="`${recurrencias(data)}× mismo tipo en este proyecto`">
+                          <i class="pi pi-replay" style="font-size:9px" />{{ recurrencias(data) }}×
+                        </span>
+                      </div>
                       <div class="text-xs text-gray-500 line-clamp-1">{{ data.descripcion }}</div>
                     </div>
                   </div>
@@ -219,6 +227,18 @@
                     class="dias-badge"
                     :class="diasClass(data)">
                     {{ data.dias_abierta }}d
+                  </span>
+                  <span v-else class="text-gray-400 text-xs">—</span>
+                </template>
+              </Column>
+
+              <!-- Energía perdida -->
+              <Column header="Energía" style="width:90px" field="energia_perdida_kwh" sortable>
+                <template #body="{ data }">
+                  <span v-if="data.energia_perdida_kwh != null"
+                    class="text-xs font-semibold"
+                    style="color:#dc2626">
+                    {{ Number(data.energia_perdida_kwh).toLocaleString('es-CO') }} kWh
                   </span>
                   <span v-else class="text-gray-400 text-xs">—</span>
                 </template>
@@ -333,6 +353,20 @@
                     <dt class="gf-fact-label"><i class="pi pi-clock" /> Días abierta</dt>
                     <dd class="gf-fact-value">
                       <span class="dias-badge" :class="diasClass(drawerFalla)">{{ drawerFalla.dias_abierta }}d</span>
+                    </dd>
+                  </div>
+                  <div v-if="tiempoEnEstadoActual && !drawerFalla.estado?.es_estado_final" class="gf-fact">
+                    <dt class="gf-fact-label"><i class="pi pi-stopwatch" /> En estado actual</dt>
+                    <dd class="gf-fact-value">{{ tiempoEnEstadoActual }}</dd>
+                  </div>
+                  <div v-if="drawerFalla.equipo_afectado" class="gf-fact">
+                    <dt class="gf-fact-label"><i class="pi pi-server" /> Equipo afectado</dt>
+                    <dd class="gf-fact-value font-medium">{{ drawerFalla.equipo_afectado }}</dd>
+                  </div>
+                  <div v-if="recurrencias(drawerFalla) > 1" class="gf-fact">
+                    <dt class="gf-fact-label"><i class="pi pi-replay" style="color:#ea580c" /> Reincidencia</dt>
+                    <dd class="gf-fact-value font-semibold" style="color:#ea580c">
+                      {{ recurrencias(drawerFalla) }}× mismo tipo en este proyecto
                     </dd>
                   </div>
                 </dl>
@@ -531,9 +565,16 @@
               <div class="chart-kpi-mini-val" style="color:#16a34a">{{ grafKpis.tasaResolucion }}%</div>
               <div class="chart-kpi-mini-lbl">Tasa resolución</div>
             </div>
-            <div class="chart-kpi-mini-item">
-              <div class="chart-kpi-mini-val" style="color:#7c3aed">{{ grafKpis.avgDias }}</div>
-              <div class="chart-kpi-mini-lbl">Días prom.</div>
+            <div class="chart-kpi-mini-item" v-tooltip.bottom="'Tiempo medio de reparación (solo fallas cerradas)'">
+              <div class="chart-kpi-mini-val" style="color:#7c3aed">{{ grafKpis.mttr }}</div>
+              <div class="chart-kpi-mini-lbl">MTTR (días)</div>
+            </div>
+            <div v-if="grafKpis.energiaTotal > 0" class="chart-kpi-mini-item"
+              v-tooltip.bottom="'Suma de energía perdida registrada'">
+              <div class="chart-kpi-mini-val" style="color:#dc2626; font-size:11px">
+                {{ grafKpis.energiaTotal.toLocaleString('es-CO') }}
+              </div>
+              <div class="chart-kpi-mini-lbl">kWh perdidos</div>
             </div>
           </div>
         </div>
@@ -671,6 +712,42 @@
                   <div class="bar-fill" :style="{ width: (g.count / fallasPorTipo[0].count * 100) + '%', background: '#3b82f6' }" />
                 </div>
                 <div class="bar-val">{{ g.count }}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- MTTR por categoría -->
+          <div class="chart-card chart-card--wide" v-if="mttrPorCategoria.length">
+            <div class="chart-card-header">
+              <div class="chart-title" style="margin-bottom:0">MTTR por categoría</div>
+              <div class="chart-subtitle">Tiempo medio de reparación en días (solo fallas cerradas)</div>
+            </div>
+            <div class="bar-chart" style="margin-top:12px">
+              <div v-for="g in mttrPorCategoria" :key="g.label" class="bar-row">
+                <div class="bar-label">{{ g.label }}</div>
+                <div class="bar-track">
+                  <div class="bar-fill"
+                    :style="{ width: (g.avg / mttrPorCategoria[0].avg * 100) + '%', background: g.color || '#915BD8' }" />
+                </div>
+                <div class="bar-val">{{ g.avg }}d</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Energía perdida por proyecto -->
+          <div class="chart-card chart-card--wide" v-if="energiaPorProyecto.length">
+            <div class="chart-card-header">
+              <div class="chart-title" style="margin-bottom:0">Energía perdida por proyecto</div>
+              <div class="chart-subtitle">kWh acumulados en fallas registradas</div>
+            </div>
+            <div class="bar-chart" style="margin-top:12px">
+              <div v-for="g in energiaPorProyecto.slice(0, 10)" :key="g.label" class="bar-row">
+                <div class="bar-label">{{ g.label }}</div>
+                <div class="bar-track">
+                  <div class="bar-fill"
+                    :style="{ width: (g.total / energiaPorProyecto[0].total * 100) + '%', background: '#dc2626' }" />
+                </div>
+                <div class="bar-val">{{ g.total.toLocaleString('es-CO') }}</div>
               </div>
             </div>
           </div>
@@ -856,6 +933,35 @@ const emptySubtitulo = computed(() => {
 const sortedSeguimientos = computed(() =>
   [...(drawerFalla.value?.seguimientos ?? [])].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
 )
+
+// ── Reincidencia: cuántas fallas del mismo tipo tiene el mismo proyecto ──
+const recurrenciaMap = computed(() => {
+  const m = {}
+  for (const f of allFallas.value) {
+    if (!f.proyecto?.id || !f.tipo?.id) continue
+    const k = `${f.proyecto.id}-${f.tipo.id}`
+    m[k] = (m[k] || 0) + 1
+  }
+  return m
+})
+
+function recurrencias(f) {
+  if (!f?.proyecto?.id || !f?.tipo?.id) return 0
+  return recurrenciaMap.value[`${f.proyecto.id}-${f.tipo.id}`] || 0
+}
+
+// ── Tiempo en estado actual (desde último cambio de estado en seguimientos) ─
+const tiempoEnEstadoActual = computed(() => {
+  if (!drawerFalla.value) return null
+  const segs = [...(drawerFalla.value.seguimientos ?? [])]
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+  const lastChange = segs.find(s => s.estado_nuevo)
+  if (!lastChange) return null
+  const diffH = (Date.now() - new Date(lastChange.created_at)) / 3_600_000
+  if (diffH < 1)  return `${Math.round(diffH * 60)} min`
+  if (diffH < 24) return `${Math.round(diffH)}h`
+  return `${Math.round(diffH / 24)}d`
+})
 
 const navIndex = computed(() => {
   if (!drawerFalla.value) return -1
@@ -1298,13 +1404,21 @@ const topProyecto = computed(() => fallasPorProyecto.value[0] || null)
 const barMax      = computed(() => Math.max(...fallasPorCategoria.value.map(g => g.count), 1))
 
 const grafKpis = computed(() => {
-  const arr      = fallasFiltGraficos.value
-  const resueltas = arr.filter(f => f.sla_cumplido === true || f.estado?.es_estado_final).length
+  const arr       = fallasFiltGraficos.value
+  const resueltas = arr.filter(f => f.estado?.es_estado_final)
   const criticas  = arr.filter(f => f.prioridad?.codigo === 'critica').length
-  const tasa      = arr.length ? Math.round(resueltas / arr.length * 100) : 0
+  const tasa      = arr.length ? Math.round(resueltas.length / arr.length * 100) : 0
   const conDias   = arr.filter(f => f.dias_abierta != null)
   const avg       = conDias.length ? Math.round(conDias.reduce((s, f) => s + f.dias_abierta, 0) / conDias.length) : 0
-  return { criticas, resueltas, tasaResolucion: tasa, avgDias: avg }
+  // MTTR: promedio de días de resolución para fallas cerradas
+  const cerradasConDias = resueltas.filter(f => f.dias_abierta != null)
+  const mttr = cerradasConDias.length
+    ? (cerradasConDias.reduce((s, f) => s + f.dias_abierta, 0) / cerradasConDias.length).toFixed(1)
+    : '—'
+  // Energía total perdida
+  const energiaTotal = arr.filter(f => f.energia_perdida_kwh != null)
+    .reduce((s, f) => s + Number(f.energia_perdida_kwh), 0)
+  return { criticas, resueltas: resueltas.length, tasaResolucion: tasa, avgDias: avg, mttr, energiaTotal }
 })
 
 const donutEstado = computed(() =>
@@ -1336,6 +1450,35 @@ const fallasPorMes = computed(() => {
 })
 
 const timelineMax = computed(() => Math.max(...fallasPorMes.value.map(m => m.count), 1))
+
+// MTTR por categoría (solo fallas cerradas)
+const mttrPorCategoria = computed(() => {
+  const g = {}
+  for (const f of fallasFiltGraficos.value) {
+    if (!f.estado?.es_estado_final || f.dias_abierta == null) continue
+    const k     = f.tipo?.categoria?.etiqueta || 'Sin categoría'
+    const color = f.tipo?.categoria?.color_hex || '#915BD8'
+    if (!g[k]) g[k] = { label: k, color, total: 0, count: 0 }
+    g[k].total += f.dias_abierta
+    g[k].count++
+  }
+  return Object.values(g)
+    .map(x => ({ ...x, avg: +(x.total / x.count).toFixed(1) }))
+    .sort((a, b) => b.avg - a.avg)
+})
+
+// Energía perdida por proyecto
+const energiaPorProyecto = computed(() => {
+  const g = {}
+  for (const f of fallasFiltGraficos.value) {
+    if (f.energia_perdida_kwh == null) continue
+    const k = f.proyecto?.nombre_comercial || 'Sin proyecto'
+    g[k] = (g[k] || 0) + Number(f.energia_perdida_kwh)
+  }
+  return Object.entries(g)
+    .map(([label, total]) => ({ label, total }))
+    .sort((a, b) => b.total - a.total)
+})
 
 // ── Keyboard shortcuts ────────────────────────────────────────────────────
 function onKeydown(e) {

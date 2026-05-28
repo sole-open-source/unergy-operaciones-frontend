@@ -120,11 +120,38 @@
           v-model="form.descripcion"
           rows="3"
           autoResize
-          placeholder="Describe la falla, síntomas observados, equipos afectados..."
+          placeholder="Describe la falla, síntomas observados, impacto en la operación..."
           class="w-full"
           :class="{ 'p-invalid': errors.descripcion }"
         />
         <small v-if="errors.descripcion" class="text-red-500 text-xs">{{ errors.descripcion }}</small>
+      </div>
+
+      <!-- Equipo afectado -->
+      <div class="sm:col-span-2 flex flex-col gap-1">
+        <label class="text-xs font-medium" style="color: #6b5a8a;">
+          Equipo afectado
+          <span style="color: #9b89b5;">(inversor, string, medidor, transformador…)</span>
+        </label>
+        <InputText
+          v-model="form.equipo_afectado"
+          placeholder="Ej: Inversor 3, String 7, Medidor principal"
+          class="w-full"
+        />
+      </div>
+
+      <!-- Energía perdida -->
+      <div class="flex flex-col gap-1">
+        <label class="text-xs font-medium" style="color: #6b5a8a;">
+          Energía perdida (kWh)
+        </label>
+        <InputNumber
+          v-model="form.energia_perdida_kwh"
+          placeholder="Ej: 150.5"
+          class="w-full"
+          :min="0"
+          :maxFractionDigits="2"
+        />
       </div>
 
       <!-- Causa raíz -->
@@ -185,6 +212,7 @@ import Select from 'primevue/select'
 import Button from 'primevue/button'
 import DatePicker from 'primevue/datepicker'
 import InputNumber from 'primevue/inputnumber'
+import InputText from 'primevue/inputtext'
 import Textarea from 'primevue/textarea'
 import api from '@/api/client'
 
@@ -211,6 +239,8 @@ const form = ref({
   sla_limite_horas: props.initial?.sla_limite_horas ?? null,
   causa_raiz: props.initial?.causa_raiz ?? '',
   acciones_correctivas: props.initial?.acciones_correctivas ?? '',
+  equipo_afectado: props.initial?.equipo_afectado ?? '',
+  energia_perdida_kwh: props.initial?.energia_perdida_kwh ?? null,
   nota_inicial: '',
 })
 
@@ -253,6 +283,8 @@ async function submit() {
     if (form.value.fecha_ocurrencia) payload.fecha_ocurrencia = form.value.fecha_ocurrencia.toISOString()
     if (form.value.causa_raiz?.trim()) payload.causa_raiz = form.value.causa_raiz.trim()
     if (form.value.acciones_correctivas?.trim()) payload.acciones_correctivas = form.value.acciones_correctivas.trim()
+    if (form.value.equipo_afectado?.trim()) payload.equipo_afectado = form.value.equipo_afectado.trim()
+    if (form.value.energia_perdida_kwh != null) payload.energia_perdida_kwh = form.value.energia_perdida_kwh
     if (form.value.nota_inicial?.trim()) payload.nota_inicial = form.value.nota_inicial.trim()
 
     emit('save', payload)
