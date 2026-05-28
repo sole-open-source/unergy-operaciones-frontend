@@ -504,105 +504,78 @@
     <!-- ══ TAB 1 — GRÁFICOS ══════════════════════════════════════════════ -->
     <div v-if="activeTab === 1" class="mon-tab-view">
 
-      <!-- ── Sección: Generación vs P90 ─────────────────────────────────── -->
+      <!-- ── Sección: Generación ───────────────────────────────────────────── -->
       <div class="charts-container">
 
-        <div class="p90-section-head">
-          <div class="p90-section-title">
-            <i class="pi pi-sun" style="color:#f59e0b;font-size:13px" />
-            <span>Generación Real vs P90</span>
-            <span class="p90-section-sub">· Minigranjas y GD con servicio de operación</span>
-          </div>
-          <div class="p90-controls">
-            <DatePicker v-model="p90FechaInicio" dateFormat="yy-mm-dd" placeholder="Desde"
-              showButtonBar class="p90-dp" size="small" @hide="cargarResumenP90" />
-            <DatePicker v-model="p90FechaFin" dateFormat="yy-mm-dd" placeholder="Hasta"
-              showButtonBar class="p90-dp" size="small" @hide="cargarResumenP90" />
-            <button class="p90-reload-btn" @click="cargarResumenP90" :disabled="loadingP90">
-              <i :class="loadingP90 ? 'pi pi-spin pi-spinner' : 'pi pi-refresh'" />
-            </button>
-          </div>
-        </div>
-
-        <div v-if="resumenFiltrado.length && !loadingP90" class="p90-kpis">
-          <div class="p90-kpi">
-            <span class="p90-kpi-val" style="color:#16a34a">{{ p90Kpis.totalReal.toLocaleString('es-CO') }}</span>
-            <span class="p90-kpi-lbl">kWh reales</span>
-          </div>
-          <div class="p90-kpi">
-            <span class="p90-kpi-val" style="color:#f59e0b">{{ p90Kpis.totalP90.toLocaleString('es-CO') }}</span>
-            <span class="p90-kpi-lbl">kWh P90</span>
-          </div>
-          <div class="p90-kpi">
-            <span class="p90-kpi-val"
-              :style="{ color: p90Kpis.ratio >= 100 ? '#16a34a' : p90Kpis.ratio >= 80 ? '#d97706' : '#dc2626' }">
-              {{ p90Kpis.ratio }}%
-            </span>
-            <span class="p90-kpi-lbl">vs P90</span>
-          </div>
-          <div class="p90-kpi p90-kpi--green">
-            <span class="p90-kpi-val" style="color:#16a34a">{{ p90Kpis.sobreP90 }}</span>
-            <span class="p90-kpi-lbl">sobre P90</span>
-          </div>
-          <div v-if="p90Kpis.bajoP90 > 0" class="p90-kpi p90-kpi--red">
-            <span class="p90-kpi-val" style="color:#dc2626">{{ p90Kpis.bajoP90 }}</span>
-            <span class="p90-kpi-lbl">bajo P90 ⚠</span>
-          </div>
-        </div>
-
-        <div v-if="loadingP90" class="p90-state">
-          <i class="pi pi-spin pi-spinner" style="color:#915BD8;font-size:22px" />
-          <span>Cargando generación…</span>
-        </div>
-        <div v-else-if="!proyectosConSrvOp.length" class="p90-state">
-          <i class="pi pi-sun" style="color:#d97706;font-size:28px" />
-          <span>No hay minigranjas o GD con servicio de operación configuradas.</span>
-        </div>
-        <div v-else-if="!resumenFiltrado.length" class="p90-state">
-          <i class="pi pi-database" style="color:#9ca3af;font-size:24px" />
-          <span>Sin datos de generación para el período seleccionado.</span>
-          <small style="color:#bbb">Verifica que haya registros de generación en este rango de fechas.</small>
-        </div>
-
-        <div v-if="!loadingP90 && resumenFiltrado.length" class="chart-card chart-card--wide p90-bar-card">
-          <div class="p90-chart-legend">
-            <span class="p90-legend-item"><span class="p90-legend-dot" style="background:#16a34a"></span> Real</span>
-            <span class="p90-legend-item"><span class="p90-legend-dot" style="background:#f59e0b"></span> P90 objetivo</span>
-            <span class="p90-legend-hint">· Clic en barra para ver detalle diario</span>
-          </div>
-          <div class="chart-canvas-wrap" :style="{ height: Math.max(180, resumenFiltrado.length * 50 + 40) + 'px' }">
-            <Bar :data="barP90Data" :options="barP90Opts" />
-          </div>
-        </div>
-
-        <div v-if="proyectoP90Sel" class="p90-detail-card">
-          <div class="p90-detail-head">
-            <i class="pi pi-chart-line" style="color:#16a34a;font-size:11px" />
-            <span class="font-semibold text-sm" style="color:#2C2039">{{ proyectoP90Sel.nombre_comercial }}</span>
-            <span class="p90-section-sub">· Detalle diario</span>
-            <div v-if="!loadingP90Diario && diariosP90.length" class="p90-detail-kpis">
-              <span style="color:#16a34a">Real: {{ diarioKpis.real.toLocaleString('es-CO') }} kWh</span>
-              <span style="color:#f59e0b">P90: {{ diarioKpis.p90.toLocaleString('es-CO') }} kWh</span>
-              <span :style="{ color: diarioKpis.ratio >= 100 ? '#16a34a' : '#dc2626' }">
-                {{ diarioKpis.ratio }}%
-              </span>
+        <!-- ── Gráfico 1: Últimos 7 días (todos los proyectos) ── -->
+        <div class="chart-card chart-card--wide">
+          <div class="gen-card-head">
+            <div class="gen-card-title">
+              <i class="pi pi-chart-line" style="color:#16a34a;font-size:13px" />
+              <span>Resumen últimos 7 días</span>
+              <span class="p90-section-sub">· Todos los proyectos · Real vs P90</span>
             </div>
-            <button class="p90-close-btn" @click="cerrarDetalleDiario">
-              <i class="pi pi-times" style="font-size:10px" />
+            <div class="gen-legend" v-if="!gen7Loading && gen7HasData">
+              <span class="p90-legend-item"><span class="p90-legend-dot" style="background:#16a34a"></span> Real</span>
+              <span v-if="gen7HasP90" class="p90-legend-item"><span class="p90-legend-dot" style="background:#f59e0b"></span> P90</span>
+              <span class="gen-kpi" style="color:#16a34a">{{ gen7TotalReal.toLocaleString('es-CO') }} kWh</span>
+              <span v-if="gen7HasP90" class="gen-kpi" style="color:#f59e0b">P90: {{ gen7TotalP90.toLocaleString('es-CO') }} kWh</span>
+            </div>
+            <button class="p90-reload-btn" @click="cargarGen7" :disabled="gen7Loading">
+              <i :class="gen7Loading ? 'pi pi-spin pi-spinner' : 'pi pi-refresh'" />
             </button>
           </div>
-          <div v-if="loadingP90Diario" class="p90-state" style="padding:24px 20px">
-            <i class="pi pi-spin pi-spinner" style="color:#915BD8" />
+          <div v-if="gen7Loading" class="p90-state" style="padding:40px">
+            <i class="pi pi-spin pi-spinner" style="color:#915BD8;font-size:22px" />
+            <span>Cargando generación…</span>
           </div>
-          <div v-else-if="!diariosP90.length" class="p90-state" style="padding:24px 20px">
-            <span>Sin datos diarios para este período.</span>
+          <div v-else-if="!gen7HasData" class="p90-state" style="padding:40px">
+            <i class="pi pi-database" style="color:#9ca3af;font-size:26px" />
+            <span>Sin datos de generación en los últimos 7 días.</span>
           </div>
-          <div v-else class="chart-canvas-wrap" style="height:240px">
-            <Line :data="lineP90DiarioData" :options="lineP90DiarioOpts" />
+          <div v-else class="chart-canvas-wrap" style="height:280px">
+            <Line :data="lineGen7Data" :options="lineGen7Opts" />
           </div>
         </div>
 
-      </div><!-- /P90 section -->
+        <!-- ── Gráfico 2: Comparar proyectos ── -->
+        <div class="chart-card chart-card--wide">
+          <div class="gen-card-head">
+            <div class="gen-card-title">
+              <i class="pi pi-objects-column" style="color:#7c3aed;font-size:13px" />
+              <span>Comparar proyectos</span>
+              <span class="p90-section-sub">· Generación real diaria por proyecto</span>
+            </div>
+          </div>
+          <div class="gen-pr-controls">
+            <MultiSelect v-model="genPrSel" :options="proyectosGenOp" optionLabel="nombre_comercial" optionValue="id"
+              placeholder="Seleccionar proyectos…" class="gen-multiselect" filter
+              :maxSelectedLabels="2" selectedItemsLabel="{0} proyectos seleccionados" />
+            <DatePicker v-model="genPrFechaInicio" dateFormat="yy-mm-dd" placeholder="Desde"
+              showButtonBar class="p90-dp" size="small" />
+            <DatePicker v-model="genPrFechaFin" dateFormat="yy-mm-dd" placeholder="Hasta"
+              showButtonBar class="p90-dp" size="small" />
+            <Button label="Ver" icon="pi pi-chart-line" size="small"
+              @click="cargarGenPr" :loading="genPrLoading" :disabled="!genPrSel.length" />
+          </div>
+          <div v-if="!genPrSel.length" class="p90-state" style="padding:40px">
+            <i class="pi pi-hand-pointer" style="color:#a094b8;font-size:26px" />
+            <span>Selecciona uno o más proyectos para comparar.</span>
+          </div>
+          <div v-else-if="genPrLoading" class="p90-state" style="padding:40px">
+            <i class="pi pi-spin pi-spinner" style="color:#915BD8;font-size:22px" />
+            <span>Cargando datos…</span>
+          </div>
+          <div v-else-if="genPrDays.length === 0 && genPrCargado" class="p90-state" style="padding:40px">
+            <i class="pi pi-database" style="color:#9ca3af;font-size:26px" />
+            <span>Sin datos para los proyectos y período seleccionados.</span>
+          </div>
+          <div v-else-if="genPrDays.length" class="chart-canvas-wrap" style="height:280px">
+            <Line :data="lineGenPrData" :options="lineGenPrOpts" />
+          </div>
+        </div>
+
+      </div><!-- /Generación section -->
 
       <!-- ── Separador ──────────────────────────────────────────────────── -->
       <div class="p90-separator">
@@ -764,6 +737,7 @@ import InputIcon from 'primevue/inputicon'
 import DatePicker from 'primevue/datepicker'
 import Dialog from 'primevue/dialog'
 import Textarea from 'primevue/textarea'
+import MultiSelect from 'primevue/multiselect'
 import FallaForm from './FallaForm.vue'
 import FallaArchivos from './FallaArchivos.vue'
 const FallasMapView = defineAsyncComponent(() => import('./FallasMapView.vue'))
@@ -844,14 +818,15 @@ const savingForm        = ref(false)
 // ── Tab Gráficos ──────────────────────────────────────────────────────────
 const filtroGraficosProyecto = ref('')
 
-// ── Tab Gráficos: P90 ─────────────────────────────────────────────────────
-const p90FechaInicio   = ref(new Date(new Date().getFullYear(), new Date().getMonth(), 1))
-const p90FechaFin      = ref(new Date())
-const resumenP90       = ref([])
-const loadingP90       = ref(false)
-const proyectoP90Sel   = ref(null)
-const diariosP90       = ref([])
-const loadingP90Diario = ref(false)
+// ── Tab Gráficos: Generación ───────────────────────────────────────────────
+const gen7Loading        = ref(false)
+const gen7Days           = ref([])       // [{fecha, real, p90}] — últimos 7 días
+const genPrLoading       = ref(false)
+const genPrCargado       = ref(false)
+const genPrSel           = ref([])       // IDs seleccionados
+const genPrFechaInicio   = ref(new Date(Date.now() - 29 * 86400000))
+const genPrFechaFin      = ref(new Date())
+const genPrDays          = ref([])       // rows de /generacion filtrados
 
 // ── Computed: lógica de buckets ───────────────────────────────────────────
 function esAlertaSLA(f) {
@@ -1016,41 +991,64 @@ async function cargarProyectos() {
   } catch { /* no crítico */ }
 }
 
-// ── Carga: Generación P90 ────────────────────────────────────────────────
-async function cargarResumenP90() {
-  loadingP90.value = true
+// ── Carga: Generación últimos 7 días ────────────────────────────────────
+async function cargarGen7() {
+  gen7Loading.value = true
+  gen7Days.value = []
   try {
-    const params = {}
-    if (p90FechaInicio.value) params.fecha_inicio = p90FechaInicio.value.toISOString().split('T')[0]
-    if (p90FechaFin.value)    params.fecha_fin    = p90FechaFin.value.toISOString().split('T')[0]
-    const { data } = await api.get('/generacion/resumen/por-proyecto', { params })
-    resumenP90.value = data ?? []
+    const hoy   = new Date()
+    const hace7 = new Date(hoy); hace7.setDate(hace7.getDate() - 6)
+    const fi    = hace7.toISOString().split('T')[0]
+    const ff    = hoy.toISOString().split('T')[0]
+    const { data } = await api.get('/generacion', { params: { fecha_inicio: fi, fecha_fin: ff, size: 2000 } })
+
+    // Agregar por fecha (solo proyectos minigranja/GD con srv_operacion)
+    const ids = genOpIds.value
+    const byDate = {}
+    for (const row of data.items ?? []) {
+      if (ids.size > 0 && !ids.has(row.proyecto_id)) continue
+      if (!byDate[row.fecha]) byDate[row.fecha] = { real: 0, p90: 0 }
+      byDate[row.fecha].real += Number(row.kwh_real || 0)
+      byDate[row.fecha].p90  += Number(row.kwh_p90  || 0)
+    }
+
+    // Rellenar los 7 días (incluye días sin datos como null)
+    const result = []
+    const cursor = new Date(hace7)
+    while (cursor <= hoy) {
+      const key = cursor.toISOString().split('T')[0]
+      result.push({
+        fecha: key,
+        real: byDate[key] ? +byDate[key].real.toFixed(1) : null,
+        p90:  byDate[key] ? +byDate[key].p90.toFixed(1)  : null,
+      })
+      cursor.setDate(cursor.getDate() + 1)
+    }
+    gen7Days.value = result
   } catch {
-    resumenP90.value = []
+    gen7Days.value = []
   } finally {
-    loadingP90.value = false
+    gen7Loading.value = false
   }
 }
 
-async function cargarDiariosP90(proyectoId) {
-  loadingP90Diario.value = true
-  diariosP90.value = []
+// ── Carga: Generación multi-proyecto ─────────────────────────────────────
+async function cargarGenPr() {
+  if (!genPrSel.value.length) return
+  genPrLoading.value = true
+  genPrCargado.value = false
+  genPrDays.value = []
   try {
-    const params = { proyecto_id: proyectoId, size: 366 }
-    if (p90FechaInicio.value) params.fecha_inicio = p90FechaInicio.value.toISOString().split('T')[0]
-    if (p90FechaFin.value)    params.fecha_fin    = p90FechaFin.value.toISOString().split('T')[0]
-    const { data } = await api.get('/generacion', { params })
-    diariosP90.value = data.items ?? []
+    const fi = genPrFechaInicio.value.toISOString().split('T')[0]
+    const ff = genPrFechaFin.value.toISOString().split('T')[0]
+    const { data } = await api.get('/generacion', { params: { fecha_inicio: fi, fecha_fin: ff, size: 2000 } })
+    genPrDays.value = (data.items ?? []).filter(r => genPrSel.value.includes(r.proyecto_id))
   } catch {
-    diariosP90.value = []
+    genPrDays.value = []
   } finally {
-    loadingP90Diario.value = false
+    genPrLoading.value = false
+    genPrCargado.value = true
   }
-}
-
-function cerrarDetalleDiario() {
-  proyectoP90Sel.value = null
-  diariosP90.value = []
 }
 
 // ── Acciones ──────────────────────────────────────────────────────────────
@@ -1603,139 +1601,92 @@ const barEnergiaData = computed(() => ({
 }))
 const barEnergiaOpts = computed(() => ({ ...sharedBarHOpts, plugins: { ...sharedBarHOpts.plugins, tooltip: { callbacks: { label: ctx => ` ${Number(ctx.raw).toLocaleString('es-CO')} kWh` } } } }))
 
-// ── Computed: P90 ─────────────────────────────────────────────────────────
-const proyectosConSrvOp = computed(() =>
+// ── Computed: Generación ──────────────────────────────────────────────────
+// Proyectos minigranja/GD con servicio de operación (para el selector)
+const proyectosGenOp = computed(() =>
   proyectos.value.filter(p =>
     p.srv_operacion === true &&
     ['minigranja', 'gd'].includes(p.tipo_proyecto)
   )
 )
+// IDs de esos proyectos para filtrar filas de generación
+const genOpIds = computed(() => new Set(proyectosGenOp.value.map(p => p.id)))
 
-const resumenFiltrado = computed(() => {
-  const ids = new Set(proyectosConSrvOp.value.map(p => p.id))
-  return resumenP90.value
-    .filter(r => ids.has(r.proyecto_id))
-    .sort((a, b) => Number(b.total_kwh_real || 0) - Number(a.total_kwh_real || 0))
-})
+// Chart 1 ─ Últimos 7 días
+const gen7HasData   = computed(() => gen7Days.value.some(d => d.real != null))
+const gen7HasP90    = computed(() => gen7Days.value.some(d => d.p90 != null && d.p90 > 0))
+const gen7TotalReal = computed(() => +gen7Days.value.reduce((s, d) => s + (d.real || 0), 0).toFixed(0))
+const gen7TotalP90  = computed(() => +gen7Days.value.reduce((s, d) => s + (d.p90  || 0), 0).toFixed(0))
 
-const p90Kpis = computed(() => {
-  const arr       = resumenFiltrado.value
-  const totalReal = arr.reduce((s, r) => s + Number(r.total_kwh_real || 0), 0)
-  const totalP90  = arr.reduce((s, r) => s + Number(r.total_kwh_p90 || 0), 0)
-  const ratio     = totalP90 > 0 ? Math.round(totalReal / totalP90 * 100) : 0
-  const sobreP90  = arr.filter(r => Number(r.total_kwh_real || 0) >= Number(r.total_kwh_p90 || 0)).length
-  const bajoP90   = arr.filter(r =>
-    Number(r.total_kwh_real || 0) < Number(r.total_kwh_p90 || 0) &&
-    Number(r.total_kwh_p90 || 0) > 0
-  ).length
-  return { totalReal: Math.round(totalReal), totalP90: Math.round(totalP90), ratio, sobreP90, bajoP90 }
-})
-
-const diarioKpis = computed(() => {
-  const real  = diariosP90.value.reduce((s, d) => s + Number(d.kwh_real || 0), 0)
-  const p90   = diariosP90.value.reduce((s, d) => s + Number(d.kwh_p90  || 0), 0)
-  const ratio = p90 > 0 ? Math.round(real / p90 * 100) : 0
-  return { real: Math.round(real), p90: Math.round(p90), ratio }
-})
-
-// Chart data: bar resumen P90
-const barP90Data = computed(() => {
-  const labels      = resumenFiltrado.value.map(r => r.nombre_comercial)
-  const reals       = resumenFiltrado.value.map(r => +Number(r.total_kwh_real || 0).toFixed(0))
-  const p90s        = resumenFiltrado.value.map(r => +Number(r.total_kwh_p90  || 0).toFixed(0))
-  const realBgColors = resumenFiltrado.value.map(r =>
-    Number(r.total_kwh_real || 0) >= Number(r.total_kwh_p90 || 0) ? '#16a34acc' : '#dc2626cc'
-  )
-  const realBorders = resumenFiltrado.value.map(r =>
-    Number(r.total_kwh_real || 0) >= Number(r.total_kwh_p90 || 0) ? '#16a34a' : '#dc2626'
-  )
-  return {
-    labels,
-    datasets: [
-      { label: 'Real', data: reals, backgroundColor: realBgColors, borderColor: realBorders, borderWidth: 1, borderRadius: 4, barThickness: 12 },
-      { label: 'P90',  data: p90s,  backgroundColor: '#f59e0bcc',  borderColor: '#f59e0b',   borderWidth: 1, borderRadius: 4, barThickness: 12 },
-    ],
-  }
-})
-
-const barP90Opts = computed(() => ({
-  indexAxis: 'y',
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: { position: 'top', align: 'end', labels: { font: FONT, padding: 10, boxWidth: 10, boxHeight: 10, color: '#374151' } },
-    tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${Number(ctx.raw).toLocaleString('es-CO')} kWh` } },
-  },
-  scales: {
-    x: {
-      grid: { color: GRID_COLOR },
-      ticks: { font: FONT, color: '#6b7280', callback: v => `${(v / 1000).toFixed(0)}k` },
-      border: { display: false },
+const lineGen7Data = computed(() => ({
+  labels: gen7Days.value.map(d =>
+    new Date(d.fecha + 'T00:00:00').toLocaleDateString('es-CO', { weekday: 'short', day: '2-digit', month: 'short' })
+  ),
+  datasets: [
+    {
+      label: 'Real (kWh)',
+      data: gen7Days.value.map(d => d.real),
+      borderColor: '#16a34a', backgroundColor: '#16a34a20',
+      borderWidth: 2.5, fill: true, tension: 0.4,
+      pointRadius: 5, pointHoverRadius: 7, spanGaps: true,
     },
-    y: {
-      grid: { display: false },
-      ticks: { font: { ...FONT, size: 10 }, color: '#374151' },
-      border: { display: false },
-    },
-  },
-  borderRadius: 4,
-  onClick: (_event, elements) => {
-    if (!elements.length) return
-    const idx = elements[0].index
-    const row = resumenFiltrado.value[idx]
-    if (!row) return
-    const found = proyectosConSrvOp.value.find(p => p.id === row.proyecto_id)
-      || { id: row.proyecto_id, nombre_comercial: row.nombre_comercial }
-    proyectoP90Sel.value = found
-    cargarDiariosP90(row.proyecto_id)
-  },
+    ...(gen7HasP90.value ? [{
+      label: 'P90 (kWh)',
+      data: gen7Days.value.map(d => d.p90),
+      borderColor: '#f59e0b', backgroundColor: 'transparent',
+      borderWidth: 2, borderDash: [6, 3], fill: false, tension: 0.4,
+      pointRadius: 3, pointHoverRadius: 5, spanGaps: true,
+    }] : []),
+  ],
 }))
 
-// Chart data: line detalle diario
-const lineP90DiarioData = computed(() => {
-  const sorted = [...diariosP90.value].sort((a, b) => a.fecha.localeCompare(b.fecha))
+const lineGen7Opts = {
+  responsive: true, maintainAspectRatio: false,
+  plugins: {
+    legend: { position: 'top', align: 'end', labels: { font: FONT, padding: 12, boxWidth: 12, boxHeight: 12 } },
+    tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${Number(ctx.raw ?? 0).toLocaleString('es-CO')} kWh` } },
+  },
+  scales: {
+    x: { grid: { color: GRID_COLOR }, ticks: { font: FONT, color: '#6b7280' }, border: { display: false } },
+    y: { grid: { color: GRID_COLOR }, ticks: { font: FONT, color: '#6b7280' }, border: { display: false }, beginAtZero: true },
+  },
+}
+
+// Chart 2 ─ Multi-proyecto
+const GEN_COLORS = ['#3b82f6','#7c3aed','#ec4899','#f59e0b','#10b981','#ef4444','#06b6d4','#84cc16','#f97316','#a855f7']
+
+const lineGenPrData = computed(() => {
+  const selProys = proyectosGenOp.value.filter(p => genPrSel.value.includes(p.id))
+  const dateSet  = [...new Set(genPrDays.value.map(r => r.fecha))].sort()
   return {
-    labels: sorted.map(d =>
-      new Date(d.fecha + 'T00:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })
+    labels: dateSet.map(d =>
+      new Date(d + 'T00:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })
     ),
-    datasets: [
-      {
-        label: 'Real',
-        data: sorted.map(d => d.kwh_real != null ? +Number(d.kwh_real).toFixed(1) : null),
-        borderColor: '#16a34a', backgroundColor: '#16a34a22',
-        borderWidth: 2, fill: false, tension: 0.3,
+    datasets: selProys.map((p, i) => {
+      const byDate = {}
+      genPrDays.value.filter(r => r.proyecto_id === p.id)
+        .forEach(r => { byDate[r.fecha] = +Number(r.kwh_real || 0).toFixed(1) })
+      return {
+        label: p.nombre_comercial,
+        data: dateSet.map(d => byDate[d] ?? null),
+        borderColor: GEN_COLORS[i % GEN_COLORS.length],
+        backgroundColor: GEN_COLORS[i % GEN_COLORS.length] + '18',
+        borderWidth: 2, fill: false, tension: 0.4,
         pointRadius: 3, pointHoverRadius: 5, spanGaps: true,
-      },
-      {
-        label: 'P90',
-        data: sorted.map(d => d.kwh_p90 != null ? +Number(d.kwh_p90).toFixed(1) : null),
-        borderColor: '#f59e0b', backgroundColor: '#f59e0b11',
-        borderWidth: 2, borderDash: [5, 3], fill: false, tension: 0.3,
-        pointRadius: 2, pointHoverRadius: 4, spanGaps: true,
-      },
-    ],
+      }
+    }),
   }
 })
 
-const lineP90DiarioOpts = {
-  responsive: true,
-  maintainAspectRatio: false,
+const lineGenPrOpts = {
+  responsive: true, maintainAspectRatio: false,
   plugins: {
-    legend: { position: 'top', align: 'end', labels: { font: FONT, padding: 10, boxWidth: 10, boxHeight: 10 } },
-    tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${Number(ctx.raw).toLocaleString('es-CO')} kWh` } },
+    legend: { position: 'top', labels: { font: FONT, padding: 12, boxWidth: 12, boxHeight: 12 } },
+    tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${Number(ctx.raw ?? 0).toLocaleString('es-CO')} kWh` } },
   },
   scales: {
-    x: {
-      grid: { color: GRID_COLOR },
-      ticks: { font: FONT, color: '#6b7280', maxRotation: 45 },
-      border: { display: false },
-    },
-    y: {
-      grid: { color: GRID_COLOR },
-      ticks: { font: FONT, color: '#6b7280' },
-      border: { display: false },
-      beginAtZero: true,
-    },
+    x: { grid: { color: GRID_COLOR }, ticks: { font: FONT, color: '#6b7280', maxRotation: 45 }, border: { display: false } },
+    y: { grid: { color: GRID_COLOR }, ticks: { font: FONT, color: '#6b7280' }, border: { display: false }, beginAtZero: true },
   },
 }
 
@@ -1769,7 +1720,7 @@ onMounted(() => {
   cargar()
   cargarCatalogos()
   cargarProyectos()
-  cargarResumenP90()
+  cargarGen7()
   window.addEventListener('keydown', onKeydown)
   nextTick(() => {
     measureHeader()
@@ -2584,4 +2535,25 @@ watch(bucket, (newBucket) => {
   letter-spacing:.5px; color:#a094b8; padding:4px 0;
 }
 .p90-separator::after { content:''; flex:1; height:1px; background:#ece8f4; }
+
+/* ── Gen cards ── */
+.gen-card-head {
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:14px;
+}
+.gen-card-title {
+  display:flex; align-items:center; gap:8px; flex:1; min-width:0;
+  font-size:13px; font-weight:700; color:#2C2039;
+}
+.gen-legend {
+  display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-left:auto;
+}
+.gen-kpi {
+  font-size:11.5px; font-weight:700;
+}
+.gen-pr-controls {
+  display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:14px;
+}
+:deep(.gen-multiselect) {
+  min-width:220px; flex:1; font-size:12px;
+}
 </style>
