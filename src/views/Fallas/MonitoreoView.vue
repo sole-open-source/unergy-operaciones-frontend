@@ -1531,6 +1531,15 @@ watch(drawerVisible, (val) => {
   if (!val) setTimeout(() => { drawerFalla.value = null }, 200)
 })
 
+// Al cambiar de tab, volver arriba
+watch(activeTab, () => {
+  nextTick(() => {
+    const main = document.querySelector('main')
+    if (main) main.scrollTop = 0
+    else window.scrollTo(0, 0)
+  })
+})
+
 // Si cambia bucket y la falla abierta no pertenece al nuevo bucket, cerrar panel
 watch(bucket, (newBucket) => {
   if (!drawerVisible.value || !drawerFalla.value) return
