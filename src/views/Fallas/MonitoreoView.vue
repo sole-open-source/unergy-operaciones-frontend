@@ -538,6 +538,38 @@
           </div>
         </div>
 
+        <!-- ── Gráfico 3: Generación de hoy ── -->
+        <div class="chart-card chart-card--wide">
+          <div class="gen-card-head">
+            <div class="gen-card-title">
+              <i class="pi pi-sun" style="color:#f59e0b;font-size:13px" />
+              <span>Generación de hoy</span>
+              <span class="p90-section-sub">· Real vs P90 por proyecto · {{ hoyLabel }}</span>
+            </div>
+            <div v-if="!genHoyLoading && genHoyRows.length" class="gen-legend">
+              <span class="p90-legend-item"><span class="p90-legend-dot" style="background:#16a34a"></span> Real</span>
+              <span class="p90-legend-item"><span class="p90-legend-dot" style="background:#f59e0b"></span> P90</span>
+              <span class="gen-kpi" :style="{ color: genHoyKpi.ratio >= 100 ? '#16a34a' : genHoyKpi.ratio >= 80 ? '#d97706' : '#dc2626' }">
+                {{ genHoyKpi.ratio }}% vs P90
+              </span>
+            </div>
+            <button class="p90-reload-btn" @click="cargarGenHoy" :disabled="genHoyLoading">
+              <i :class="genHoyLoading ? 'pi pi-spin pi-spinner' : 'pi pi-refresh'" />
+            </button>
+          </div>
+          <div v-if="genHoyLoading" class="p90-state" style="padding:32px">
+            <i class="pi pi-spin pi-spinner" style="color:#915BD8;font-size:22px" />
+          </div>
+          <div v-else-if="!genHoyRows.length" class="p90-state" style="padding:32px">
+            <i class="pi pi-database" style="color:#9ca3af;font-size:24px" />
+            <span>Sin datos de generación para hoy.</span>
+            <small style="color:#bbb">Los datos suelen estar disponibles desde mediodía.</small>
+          </div>
+          <div v-else class="chart-canvas-wrap" :style="{ height: Math.max(180, genHoyRows.length * 44 + 40) + 'px' }">
+            <Bar :data="barGenHoyData" :options="barGenHoyOpts" />
+          </div>
+        </div>
+
         <!-- ── Gráfico 2: Comparar proyectos ── -->
         <div class="chart-card chart-card--wide">
           <div class="gen-card-head">
@@ -819,6 +851,9 @@ const savingForm        = ref(false)
 const filtroGraficosProyecto = ref('')
 
 // ── Tab Gráficos: Generación ───────────────────────────────────────────────
+const genHoyLoading      = ref(false)
+const genHoyRows         = ref([])   // [{nombre_comercial, real, p90}]
+const hoyLabel           = new Date().toLocaleDateString('es-CO', { weekday:'long', day:'2-digit', month:'long' })
 const gen7Loading        = ref(false)
 const gen7Days           = ref([])       // [{fecha, real, p90}] — últimos 7 días
 const genPrLoading       = ref(false)
@@ -989,6 +1024,32 @@ async function cargarProyectos() {
     const { data } = await api.get('/proyectos', { params: { size: 500 } })
     proyectos.value = data.items ?? []
   } catch { /* no crítico */ }
+}
+
+// ── Carga: Generación de hoy ─────────────────────────────────────────────
+async function cargarGenHoy() {
+  genHoyLoading.value = true
+  genHoyRows.value = []
+  try {
+    const hoy = new Date().toISOString().split('T')[0]
+    const { data } = await api.get('/generacion', { params: { fecha_inicio: hoy, fecha_fin: hoy, size: 500 } })
+    const ids = genOpIds.value
+    const byProyecto = {}
+    for (const row of data.items ?? []) {
+      if (ids.size > 0 && !ids.has(row.proyecto_id)) continue
+      const nombre = row.proyecto?.nombre_comercial ?? `Proyecto ${row.proyecto_id}`
+      if (!byProyecto[row.proyecto_id]) byProyecto[row.proyecto_id] = { nombre, real: 0, p90: 0 }
+      byProyecto[row.proyecto_id].real += Number(row.kwh_real || 0)
+      byProyecto[row.proyecto_id].p90  += Number(row.kwh_p90  || 0)
+    }
+    genHoyRows.value = Object.values(byProyecto)
+      .map(r => ({ ...r, real: +r.real.toFixed(1), p90: +r.p90.toFixed(1) }))
+      .sort((a, b) => b.real - a.real)
+  } catch {
+    genHoyRows.value = []
+  } finally {
+    genHoyLoading.value = false
+  }
 }
 
 // ── Carga: Generación últimos 7 días ────────────────────────────────────
@@ -1652,6 +1713,44 @@ const lineGen7Opts = {
   },
 }
 
+// Chart 3 ─ Hoy
+const genHoyKpi = computed(() => {
+  const totalReal = genHoyRows.value.reduce((s, r) => s + r.real, 0)
+  const totalP90  = genHoyRows.value.reduce((s, r) => s + r.p90,  0)
+  return { totalReal: +totalReal.toFixed(1), totalP90: +totalP90.toFixed(1), ratio: totalP90 > 0 ? Math.round(totalReal / totalP90 * 100) : 0 }
+})
+
+const barGenHoyData = computed(() => ({
+  labels: genHoyRows.value.map(r => r.nombre),
+  datasets: [
+    {
+      label: 'Real (kWh)',
+      data: genHoyRows.value.map(r => r.real),
+      backgroundColor: genHoyRows.value.map(r => r.p90 > 0 && r.real >= r.p90 ? '#16a34acc' : '#dc2626cc'),
+      borderColor:     genHoyRows.value.map(r => r.p90 > 0 && r.real >= r.p90 ? '#16a34a'   : '#dc2626'),
+      borderWidth: 1, borderRadius: 4, barThickness: 14,
+    },
+    {
+      label: 'P90 (kWh)',
+      data: genHoyRows.value.map(r => r.p90),
+      backgroundColor: '#f59e0bcc', borderColor: '#f59e0b',
+      borderWidth: 1, borderRadius: 4, barThickness: 14,
+    },
+  ],
+}))
+
+const barGenHoyOpts = {
+  indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+  plugins: {
+    legend: { position: 'top', align: 'end', labels: { font: FONT, padding: 12, boxWidth: 12, boxHeight: 12 } },
+    tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${Number(ctx.raw).toLocaleString('es-CO')} kWh` } },
+  },
+  scales: {
+    x: { grid: { color: GRID_COLOR }, ticks: { font: FONT, color: '#6b7280' }, border: { display: false } },
+    y: { grid: { display: false }, ticks: { font: { ...FONT, size: 11 }, color: '#374151' }, border: { display: false } },
+  },
+}
+
 // Chart 2 ─ Multi-proyecto
 const GEN_COLORS = ['#3b82f6','#7c3aed','#ec4899','#f59e0b','#10b981','#ef4444','#06b6d4','#84cc16','#f97316','#a855f7']
 
@@ -1720,6 +1819,7 @@ onMounted(() => {
   cargar()
   cargarCatalogos()
   cargarProyectos()
+  cargarGenHoy()
   cargarGen7()
   window.addEventListener('keydown', onKeydown)
   nextTick(() => {
