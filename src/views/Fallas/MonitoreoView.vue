@@ -1562,13 +1562,16 @@ watch(bucket, (newBucket) => {
 </script>
 
 <style scoped>
-/* ══ TAB BAR (fuera del sticky) ══════════════════════════════════════════ */
+/* ══ TAB BAR ══════════════════════════════════════════════════════════════ */
 .mon-tab-bar {
   display: flex;
   border-bottom: 1px solid #e5e7eb;
   background: #f3f4f6;
   padding: 0 16px;
   flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 25;
 }
 .mon-tab {
   display: inline-flex;
@@ -1600,7 +1603,7 @@ watch(bucket, (newBucket) => {
 /* ══ Sticky header ═══════════════════════════════════════════════════════ */
 .gf-sticky-header {
   position: sticky;
-  top: 0;
+  top: 41px;
   z-index: 20;
   background: #f3f4f6;
   padding-top: 4px;
