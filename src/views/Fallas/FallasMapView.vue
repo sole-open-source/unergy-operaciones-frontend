@@ -9,6 +9,18 @@
         <span class="text-xs text-gray-400 hidden sm:inline">· Proyectos con fallas activas</span>
       </div>
       <div class="fmv-controls">
+        <!-- Selector de operador -->
+        <Select
+          v-model="operadorSel"
+          :options="operadores"
+          optionLabel="name"
+          optionValue="code"
+          placeholder="Operador de red"
+          class="fmv-or-select"
+          :loading="loadingOps"
+          showClear
+          @change="cargar"
+        />
         <button class="fmv-btn-icon" @click="cargar" :disabled="loading" title="Recargar">
           <i :class="loading ? 'pi pi-spin pi-spinner' : 'pi pi-refresh'" />
         </button>
@@ -17,12 +29,18 @@
 
     <!-- ── Leyenda ─────────────────────────────────────────── -->
     <div class="fmv-legend">
-      <span class="fmv-legend-item"><span class="fmv-dot" style="background:#16a34a"></span> Sin fallas activas</span>
+      <span class="fmv-legend-item"><span class="fmv-dot" style="background:#16a34a"></span> Sin fallas</span>
       <span class="fmv-legend-item"><span class="fmv-dot" style="background:#d97706"></span> 1–2 fallas</span>
       <span class="fmv-legend-item"><span class="fmv-dot" style="background:#dc2626"></span> 3+ fallas</span>
+      <span class="fmv-legend-item" v-if="operadorSel">
+        <span class="fmv-dot" style="background:#3b82f6;border-radius:2px"></span> Circuitos
+      </span>
+      <span class="fmv-legend-item" v-if="operadorSel">
+        <span class="fmv-dot" style="background:#7c3aed;border-radius:2px"></span> Subestaciones
+      </span>
       <span class="fmv-legend-item fmv-legend-item--muted" v-if="sinCoordenadas > 0">
         <i class="pi pi-exclamation-triangle text-yellow-500" style="font-size:10px"/>
-        {{ sinCoordenadas }} proyecto{{ sinCoordenadas !== 1 ? 's' : '' }} sin coordenadas
+        {{ sinCoordenadas }} sin coordenadas
       </span>
     </div>
 
@@ -88,13 +106,36 @@
       </div>
     </transition>
 
+    <!-- ── Panel subestación ──────────────────────────────── -->
+    <transition name="fmv-slide">
+      <div v-if="subSel" class="fmv-panel fmv-panel--sub">
+        <div class="fmv-panel-header">
+          <i class="pi pi-building" style="color:#7c3aed;font-size:12px" />
+          <span class="font-bold text-sm text-gray-800 truncate flex-1">{{ subSel.name }}</span>
+          <button class="fmv-close" @click="subSel = null"><i class="pi pi-times text-xs" /></button>
+        </div>
+        <div class="fmv-panel-body">
+          <div class="fmv-info-row" v-if="subSel.capacity138">
+            <i class="pi pi-bolt" /> 138 kV: {{ subSel.capacity138 }} MVA
+          </div>
+          <div class="fmv-info-row" v-if="subSel.capacity345">
+            <i class="pi pi-bolt" /> 345 kV: {{ subSel.capacity345 }} MVA
+          </div>
+          <div class="fmv-info-row">
+            <i class="pi pi-share-alt" /> {{ subSel.circuit_count }} circuito{{ subSel.circuit_count !== 1 ? 's' : '' }}
+          </div>
+        </div>
+      </div>
+    </transition>
+
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
+import Select from 'primevue/select'
 import api from '@/api/client'
 
 const props = defineProps({
@@ -103,13 +144,18 @@ const props = defineProps({
 
 const mapContainer = ref(null)
 const proyectos    = ref([])
+const operadores   = ref([])
+const operadorSel  = ref(null)
 const loading      = ref(false)
+const loadingOps   = ref(false)
 const error        = ref(null)
 const mapListo     = ref(false)
 const proyectoSel  = ref(null)
+const subSel       = ref(null)
 
 let map     = null
 let markers = []
+let subMarkers = []
 
 // ── Fallas activas agrupadas por proyecto ───────────────────
 const fallasPorId = computed(() => {
@@ -147,42 +193,61 @@ function diasClass(f) {
   return 'dias-green'
 }
 
-// ── Carga proyectos y renderiza ─────────────────────────────
-async function cargar() {
-  loading.value = true
-  error.value   = null
+// ── Carga operadores ────────────────────────────────────────
+async function cargarOperadores() {
+  loadingOps.value = true
   try {
-    const { data } = await api.get('/proyectos', { params: { size: 500 } })
-    proyectos.value = (data.items ?? []).filter(p => p.latitud && p.longitud)
+    const { data } = await api.get('/mapa/operadores')
+    operadores.value = data ?? []
+  } catch { /* no crítico */ } finally {
+    loadingOps.value = false
+  }
+}
+
+// ── Carga proyectos + OR data y renderiza ───────────────────
+async function cargar() {
+  loading.value  = true
+  error.value    = null
+  proyectoSel.value = null
+  subSel.value   = null
+  try {
+    const [proyRes, mapaRes] = await Promise.allSettled([
+      api.get('/proyectos', { params: { size: 500 } }),
+      operadorSel.value ? api.get('/mapa', { params: { operator: operadorSel.value } }) : Promise.resolve(null),
+    ])
+
+    proyectos.value = proyRes.status === 'fulfilled'
+      ? (proyRes.value.data.items ?? []).filter(p => p.latitud && p.longitud)
+      : []
+
+    const mapaData = mapaRes.status === 'fulfilled' && mapaRes.value
+      ? mapaRes.value.data
+      : null
+
     await nextTick()
-    renderMapa()
+    renderMapa(mapaData)
   } catch (e) {
-    error.value = 'Error al cargar proyectos: ' + (e.message || 'Sin conexión')
+    error.value = 'Error al cargar: ' + (e.message || 'Sin conexión')
   } finally {
     loading.value = false
   }
 }
 
-function renderMapa() {
+function renderMapa(mapaData) {
   if (!mapContainer.value) return
 
-  // Destruir mapa previo si existe
   if (map) { map.remove(); map = null }
   markers.forEach(m => m.remove()); markers = []
+  subMarkers.forEach(m => m.remove()); subMarkers = []
 
   const conCoords = proyectos.value
-  if (!conCoords.length) {
-    // Mostrar Colombia centrada, sin marcadores
-    iniciarMapa(-74.297, 4.571)
-    return
-  }
+  const center = conCoords.length
+    ? [
+        conCoords.reduce((s, p) => s + Number(p.longitud), 0) / conCoords.length,
+        conCoords.reduce((s, p) => s + Number(p.latitud),  0) / conCoords.length,
+      ]
+    : [-74.297, 4.571]
 
-  const avgLng = conCoords.reduce((s, p) => s + Number(p.longitud), 0) / conCoords.length
-  const avgLat = conCoords.reduce((s, p) => s + Number(p.latitud),  0) / conCoords.length
-  iniciarMapa(avgLng, avgLat)
-}
-
-function iniciarMapa(lng, lat) {
   map = new maplibregl.Map({
     container: mapContainer.value,
     style: {
@@ -197,8 +262,8 @@ function iniciarMapa(lng, lat) {
       },
       layers: [{ id: 'osm', type: 'raster', source: 'osm' }],
     },
-    center: [lng, lat],
-    zoom: proyectos.value.length ? 8 : 5,
+    center,
+    zoom: conCoords.length ? 8 : 5,
   })
 
   map.addControl(new maplibregl.NavigationControl(), 'top-right')
@@ -206,10 +271,116 @@ function iniciarMapa(lng, lat) {
 
   map.on('load', () => {
     mapListo.value = true
+    if (mapaData) agregarCapasOR(mapaData)
     agregarMarcadores()
+    if (mapaData?.substations) agregarSubestaciones(mapaData.substations)
   })
 }
 
+// ── Capas GeoJSON: circuitos ─────────────────────────────────
+function agregarCapasOR(mapaData) {
+  const lines = (mapaData.circuitLines ?? []).filter(c => c.geojson)
+  if (!lines.length) return
+
+  const features = lines.map(c => ({
+    type: 'Feature',
+    properties: {
+      circuit_id:    c.circuit_id,
+      circuit_name:  c.circuit_name,
+      tension_level: c.tension_level,
+      substation_name: c.substation_name,
+    },
+    geometry: JSON.parse(c.geojson),
+  }))
+
+  map.addSource('circuits', {
+    type: 'geojson',
+    data: { type: 'FeatureCollection', features },
+  })
+
+  // Halo (stroke más ancho y transparente)
+  map.addLayer({
+    id: 'circuits-halo',
+    type: 'line',
+    source: 'circuits',
+    layout: { 'line-join': 'round', 'line-cap': 'round' },
+    paint: {
+      'line-color': '#fff',
+      'line-width': 4,
+      'line-opacity': 0.5,
+    },
+  })
+
+  // Línea coloreada por tensión
+  map.addLayer({
+    id: 'circuits-line',
+    type: 'line',
+    source: 'circuits',
+    layout: { 'line-join': 'round', 'line-cap': 'round' },
+    paint: {
+      'line-color': [
+        'interpolate', ['linear'], ['get', 'tension_level'],
+        13.2,  '#3b82f6',
+        34.5,  '#22c55e',
+        115,   '#f59e0b',
+        220,   '#ef4444',
+      ],
+      'line-width': [
+        'interpolate', ['linear'], ['get', 'tension_level'],
+        13.2, 1.5,
+        115,  2.5,
+      ],
+    },
+  })
+
+  // Tooltip al pasar el mouse sobre un circuito
+  const popup = new maplibregl.Popup({ closeButton: false, closeOnClick: false })
+  map.on('mouseenter', 'circuits-line', (e) => {
+    map.getCanvas().style.cursor = 'pointer'
+    const p = e.features[0].properties
+    popup.setLngLat(e.lngLat)
+      .setHTML(`<div style="font-size:12px;font-weight:600">${p.circuit_name}</div><div style="font-size:11px;color:#6b5a8a">${p.tension_level} kV · ${p.substation_name || ''}</div>`)
+      .addTo(map)
+  })
+  map.on('mouseleave', 'circuits-line', () => {
+    map.getCanvas().style.cursor = ''
+    popup.remove()
+  })
+}
+
+// ── Marcadores: subestaciones ────────────────────────────────
+function agregarSubestaciones(substations) {
+  subMarkers.forEach(m => m.remove()); subMarkers = []
+
+  for (const s of substations) {
+    const el = document.createElement('div')
+    el.style.cssText = `
+      width:16px; height:16px;
+      background:#7c3aed;
+      border:2px solid #fff;
+      border-radius:3px;
+      box-shadow:0 2px 8px rgba(0,0,0,.3);
+      cursor:pointer;
+      display:flex; align-items:center; justify-content:center;
+    `
+    el.innerHTML = '<svg width="8" height="8" viewBox="0 0 8 8"><polygon points="4,0 8,8 0,8" fill="#fff"/></svg>'
+
+    const marker = new maplibregl.Marker({ element: el })
+      .setLngLat([s.lng, s.lat])
+      .addTo(map)
+
+    el.addEventListener('click', (e) => {
+      e.stopPropagation()
+      subSel.value = s
+      proyectoSel.value = null
+      map.flyTo({ center: [s.lng, s.lat], zoom: 12, duration: 700 })
+    })
+
+    subMarkers.push(marker)
+  }
+}
+
+// ── Marcadores: proyectos ────────────────────────────────────
 function agregarMarcadores() {
   markers.forEach(m => m.remove()); markers = []
 
@@ -229,6 +400,7 @@ function agregarMarcadores() {
       display:flex; align-items:center; justify-content:center;
       font-size:9px; font-weight:900; color:#fff;
       transition:transform .12s, box-shadow .12s;
+      position:relative; z-index:1;
     `
     if (n > 0) el.textContent = n
 
@@ -238,6 +410,7 @@ function agregarMarcadores() {
 
     el.addEventListener('click', () => {
       proyectoSel.value = p
+      subSel.value = null
       map.flyTo({ center: [Number(p.longitud), Number(p.latitud)], zoom: 12, duration: 800 })
     })
     el.addEventListener('mouseenter', () => {
@@ -253,10 +426,19 @@ function agregarMarcadores() {
   }
 }
 
-onMounted(cargar)
+// Refresca marcadores al cambiar fallas (sin reiniciar el mapa)
+watch(() => props.fallas, () => {
+  if (map && mapListo.value) agregarMarcadores()
+}, { deep: true })
+
+onMounted(async () => {
+  await cargarOperadores()
+  await cargar()
+})
 onBeforeUnmount(() => {
   if (map) map.remove()
   markers.forEach(m => m.remove())
+  subMarkers.forEach(m => m.remove())
 })
 </script>
 
@@ -281,7 +463,17 @@ onBeforeUnmount(() => {
   flex-shrink: 0;
 }
 .fmv-header-left { display: flex; align-items: center; gap: 8px; flex: 1; }
-.fmv-controls    { display: flex; align-items: center; gap: 6px; }
+.fmv-controls    { display: flex; align-items: center; gap: 8px; }
+
+.fmv-or-select {
+  font-size: 12px;
+  height: 32px;
+}
+:deep(.fmv-or-select .p-select) {
+  height: 32px;
+  font-size: 12px;
+  min-width: 180px;
+}
 
 .fmv-btn-icon {
   width: 30px; height: 30px;
@@ -324,6 +516,7 @@ onBeforeUnmount(() => {
   border: 1px solid #ece8f4;
   box-shadow: 0 8px 24px rgba(28,18,50,.14); z-index: 10; overflow: hidden;
 }
+.fmv-panel--sub { border-color: #ede9fe; }
 .fmv-panel-header {
   display: flex; align-items: center; gap: 8px;
   padding: 10px 12px; border-bottom: 1px solid #f0eaf8; background: #faf7ff;
