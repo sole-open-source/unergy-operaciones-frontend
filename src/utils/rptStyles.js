@@ -240,17 +240,29 @@ body {
 .fmo-sla-err { color: #CC0000; font-weight: 800; text-align: center; }
 
 /* ── Impresión ── */
-@page { margin: 12mm 14mm; size: A4 portrait; }
+/*
+  6mm top/bottom + 8mm left/right = mínimo seguro en impresoras modernas.
+  Área de contenido resultante: (210-16)mm × (297-12)mm = 194mm × 285mm ≈ 733px × 1078px.
+  NO reducir más de 6mm o las impresoras de borde pueden cortar.
+*/
+@page { margin: 6mm 8mm; size: A4 portrait; }
 @media print {
-  body { background: #fff !important; }
+  body { background: #fff !important; margin: 0 !important; padding: 0 !important; }
   .rpt-page {
     box-shadow: none !important;
-    margin: 0 !important;
     border-radius: 0 !important;
+    /* Ocupa el 100% del área de contenido sin margen entre páginas */
+    margin: 0 !important;
+    padding: 0 10px !important;   /* padding lateral mínimo para que el header no se pegue al borde */
     page-break-after: always;
     break-after: page;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
   }
   .rpt-page:last-child { page-break-after: avoid; break-after: avoid; }
+  /* El header negativo necesita ajustarse al nuevo padding de la página */
+  .rpt-header { margin: 0 -10px 18px !important; border-radius: 0 !important; }
   .rpt-page-sep { display: none !important; }
   .rpt-edit-hint { display: none !important; }
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
@@ -258,30 +270,68 @@ body {
 `
 
 /**
- * Construye el documento HTML completo para mostrar (o editar) un informe en un iframe / ventana de impresión.
- * @param {string} html  - Fragmento HTML del informe (div.rpt-page o múltiples páginas)
- * @param {object} opts
- *   @param {string}  opts.title    - Título del documento
- *   @param {boolean} opts.bgGray   - Si true, fondo gris (#ECE9F2) como en la plataforma; si false, fondo blanco (impresión)
- *   @param {boolean} opts.editable - Si true, añade contenteditable al body (modo editor)
- *   @param {string}  opts.padding  - Padding del body (default "18px" con bgGray, "0" sin él)
+ * Construye el documento HTML completo para mostrar (o editar) un informe.
+ *
+ * Modos:
+ *  - bgGray=true, editable=false  → previsualización en el panel detalle (fondo gris plataforma)
+ *  - bgGray=false, editable=false → ventana de impresión/PDF (fondo blanco, sin padding)
+ *  - editable=true                → editor pantalla completa:
+ *      • Fondo gris oscuro tipo Acrobat (#525659)
+ *      • Cada .rpt-page se muestra a exactamente 733px (= A4 194mm @ 96dpi con 8mm márgenes)
+ *      • Centrado y con sombra de página → el usuario ve en pantalla lo que entregará en PDF
+ *
+ * A4 @ 96 DPI = 793.7px ≈ 794px.  Con @page margin 8mm cada lado (16mm total):
+ *   ancho área contenido = (210 - 16) mm × 3.7795 px/mm ≈ 733 px
  */
 export function buildReportHtmlDoc(html, opts = {}) {
   const {
     title    = 'Informe Operacional',
     bgGray   = true,
     editable = false,
-    padding  = bgGray ? '20px' : '0',
   } = opts
 
+  // ── CSS extra según el modo ──────────────────────────────────────────
+  let modeCSS = ''
+
+  if (editable) {
+    // Modo editor: simula visor PDF con páginas A4 centradas
+    modeCSS = `
+      html, body {
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #525659 !important;
+        min-height: 100vh;
+        cursor: text;
+      }
+      /* Wrapper centrador que simula el fondo gris del visor */
+      body {
+        padding: 28px 0 40px !important;
+      }
+      /* Cada página se muestra a exactamente el ancho de contenido A4 */
+      .rpt-page {
+        width: 733px !important;
+        max-width: 733px !important;
+        min-width: 733px !important;
+        margin: 0 auto 24px auto !important;
+        box-shadow: 0 4px 24px rgba(0,0,0,.55) !important;
+        box-sizing: border-box !important;
+      }
+      .rpt-page-sep { height: 0 !important; }
+      [contenteditable]:focus { outline: 2px solid rgba(145,91,216,.6); outline-offset: -2px; }
+    `
+  } else if (bgGray) {
+    // Modo previsualización (panel detalle): fondo gris plataforma, sin restricción de ancho
+    modeCSS = `
+      body { margin: 0; padding: 18px; background: #ECE9F2; }
+    `
+  } else {
+    // Modo impresión: sin padding, sin fondo
+    modeCSS = `
+      body { margin: 0; padding: 0; background: #fff; }
+    `
+  }
+
   const bodyAttrs = editable ? ' contenteditable="true"' : ''
-  const bodyStyle = `
-    margin: 0;
-    padding: ${padding};
-    font-family: 'Sora', system-ui, sans-serif;
-    background: ${bgGray ? '#ECE9F2' : '#fff'};
-    ${editable ? 'min-height: 100vh; cursor: text;' : ''}
-  `.trim()
 
   return `<!doctype html>
 <html lang="es">
@@ -292,8 +342,12 @@ export function buildReportHtmlDoc(html, opts = {}) {
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<style>${RPT_CSS}</style>
+<style>
+${RPT_CSS}
+/* ── modo ── */
+${modeCSS}
+</style>
 </head>
-<body style="${bodyStyle}"${bodyAttrs}>${html}</body>
+<body${bodyAttrs}>${html}</body>
 </html>`
 }
