@@ -692,7 +692,7 @@
               </div>
               <div class="genproj-falla-row" v-for="f in genProjFallas" :key="f.id">
                 <code class="genproj-codigo">{{ f.codigo_interno }}</code>
-                <span class="genproj-fecha">{{ (f.fecha_reporte || '').split('T')[0] }}</span>
+                <span class="genproj-fecha">{{ (f.fecha_identificacion || '').split('T')[0] }}</span>
                 <span class="genproj-estado"
                   :style="{ background: (f.estado?.color_hex || '#9ca3af') + '22', color: f.estado?.color_hex || '#6b7280', border: `1px solid ${(f.estado?.color_hex || '#9ca3af')}44` }">
                   {{ f.estado?.etiqueta || '—' }}
@@ -1619,11 +1619,11 @@ const genProjFallasByDate = computed(() => {
   const ff = genProjFechaFin.value?.toISOString().split('T')[0] || ''
   const map = {}
   allFallas.value
-    .filter(f => f.proyecto?.id === genProjSel.value &&
-      (f.fecha_reporte || '').split('T')[0] >= fi &&
-      (f.fecha_reporte || '').split('T')[0] <= ff)
+    .filter(f => Number(f.proyecto?.id) === Number(genProjSel.value) &&
+      (f.fecha_identificacion || '').split('T')[0] >= fi &&
+      (f.fecha_identificacion || '').split('T')[0] <= ff)
     .forEach(f => {
-      const d = (f.fecha_reporte || '').split('T')[0]
+      const d = (f.fecha_identificacion || '').split('T')[0]
       if (!map[d]) map[d] = []
       map[d].push(f)
     })
@@ -1635,10 +1635,10 @@ const genProjFallas = computed(() => {
   const fi = genProjFechaInicio.value?.toISOString().split('T')[0] || ''
   const ff = genProjFechaFin.value?.toISOString().split('T')[0] || ''
   return allFallas.value
-    .filter(f => f.proyecto?.id === genProjSel.value &&
-      (f.fecha_reporte || '').split('T')[0] >= fi &&
-      (f.fecha_reporte || '').split('T')[0] <= ff)
-    .sort((a, b) => (a.fecha_reporte || '').localeCompare(b.fecha_reporte || ''))
+    .filter(f => Number(f.proyecto?.id) === Number(genProjSel.value) &&
+      (f.fecha_identificacion || '').split('T')[0] >= fi &&
+      (f.fecha_identificacion || '').split('T')[0] <= ff)
+    .sort((a, b) => (a.fecha_identificacion || '').localeCompare(b.fecha_identificacion || ''))
 })
 
 const barGenProjData = computed(() => {
