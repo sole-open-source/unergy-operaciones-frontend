@@ -1023,28 +1023,55 @@ async function cargarProyectos() {
   try {
     const { data } = await api.get('/proyectos', { params: { size: 500 } })
     proyectos.value = data.items ?? []
+    // Cargar gráficos de generación una vez que los proyectos estén disponibles
+    cargarGenHoy()
+    cargarGen7()
   } catch { /* no crítico */ }
 }
 
+// ── Helpers P90 ──────────────────────────────────────────────────────────
+// P90 diario de un proyecto para una fecha: p90_mensual_kwh[mes] / días del mes
+function dailyP90(proyectoId, fecha) {
+  const p = proyectos.value.find(x => x.id === proyectoId)
+  const arr = p?.p90_mensual_kwh
+  if (!arr || !arr.length) return 0
+  const dt = new Date(fecha + 'T00:00:00')
+  const month = dt.getMonth()                                         // 0-indexed
+  const daysInMonth = new Date(dt.getFullYear(), month + 1, 0).getDate()
+  return (Number(arr[month]) || 0) / daysInMonth
+}
+// P90 diario sumado de TODOS los proyectos genOp para una fecha
+function dailyP90Total(fecha) {
+  return proyectosGenOp.value.reduce((sum, p) => sum + dailyP90(p.id, fecha), 0)
+}
+
 // ── Carga: Generación de hoy ─────────────────────────────────────────────
+// P90 siempre disponible desde proyectos; real desde API si ya está reportado
 async function cargarGenHoy() {
+  const projs = proyectosGenOp.value
+  if (!projs.length) return
   genHoyLoading.value = true
   genHoyRows.value = []
   try {
     const hoy = new Date().toISOString().split('T')[0]
-    const { data } = await api.get('/generacion', { params: { fecha_inicio: hoy, fecha_fin: hoy, size: 500 } })
-    const ids = genOpIds.value
+    // 1. Construir fila por proyecto con P90 derivado del modelo (siempre disponible)
     const byProyecto = {}
-    for (const row of data.items ?? []) {
-      if (ids.size > 0 && !ids.has(row.proyecto_id)) continue
-      const nombre = row.proyecto?.nombre_comercial ?? `Proyecto ${row.proyecto_id}`
-      if (!byProyecto[row.proyecto_id]) byProyecto[row.proyecto_id] = { nombre, real: 0, p90: 0 }
-      byProyecto[row.proyecto_id].real += Number(row.kwh_real || 0)
-      byProyecto[row.proyecto_id].p90  += Number(row.kwh_p90  || 0)
+    for (const p of projs) {
+      const p90 = dailyP90(p.id, hoy)
+      if (p90 > 0) byProyecto[p.id] = { nombre: p.nombre_comercial, real: 0, p90 }
     }
+    // 2. Superponer datos reales si la API ya los tiene para hoy
+    try {
+      const { data } = await api.get('/generacion', { params: { fecha_inicio: hoy, fecha_fin: hoy, size: 500 } })
+      for (const row of data.items ?? []) {
+        if (byProyecto[row.proyecto_id] !== undefined) {
+          byProyecto[row.proyecto_id].real += Number(row.kwh_real || 0)
+        }
+      }
+    } catch { /* datos reales aún no disponibles — mostrar solo P90 */ }
     genHoyRows.value = Object.values(byProyecto)
       .map(r => ({ ...r, real: +r.real.toFixed(1), p90: +r.p90.toFixed(1) }))
-      .sort((a, b) => b.real - a.real)
+      .sort((a, b) => b.p90 - a.p90)
   } catch {
     genHoyRows.value = []
   } finally {
@@ -1052,8 +1079,10 @@ async function cargarGenHoy() {
   }
 }
 
-// ── Carga: Generación últimos 7 días ────────────────────────────────────
+// ── Carga: Generación últimos 7 días ─────────────────────────────────────
+// P90 sumado de proyectos genOp por fecha (sin depender de kwh_p90 en BD)
 async function cargarGen7() {
+  if (!proyectosGenOp.value.length) return
   gen7Loading.value = true
   gen7Days.value = []
   try {
@@ -1063,25 +1092,24 @@ async function cargarGen7() {
     const ff    = hoy.toISOString().split('T')[0]
     const { data } = await api.get('/generacion', { params: { fecha_inicio: fi, fecha_fin: ff, size: 2000 } })
 
-    // Agregar por fecha (solo proyectos minigranja/GD con srv_operacion)
+    // Agregar generación real por fecha (solo proyectos genOp)
     const ids = genOpIds.value
-    const byDate = {}
+    const realByDate = {}
     for (const row of data.items ?? []) {
       if (ids.size > 0 && !ids.has(row.proyecto_id)) continue
-      if (!byDate[row.fecha]) byDate[row.fecha] = { real: 0, p90: 0 }
-      byDate[row.fecha].real += Number(row.kwh_real || 0)
-      byDate[row.fecha].p90  += Number(row.kwh_p90  || 0)
+      realByDate[row.fecha] = (realByDate[row.fecha] || 0) + Number(row.kwh_real || 0)
     }
 
-    // Rellenar los 7 días (incluye días sin datos como null)
+    // Rellenar los 7 días; P90 siempre calculado desde proyectos
     const result = []
     const cursor = new Date(hace7)
     while (cursor <= hoy) {
-      const key = cursor.toISOString().split('T')[0]
+      const key  = cursor.toISOString().split('T')[0]
+      const p90  = dailyP90Total(key)
       result.push({
         fecha: key,
-        real: byDate[key] ? +byDate[key].real.toFixed(1) : null,
-        p90:  byDate[key] ? +byDate[key].p90.toFixed(1)  : null,
+        real: realByDate[key] != null ? +realByDate[key].toFixed(1) : null,
+        p90:  p90 > 0 ? +p90.toFixed(1) : null,
       })
       cursor.setDate(cursor.getDate() + 1)
     }
@@ -1818,9 +1846,7 @@ function measureHeader() {
 onMounted(() => {
   cargar()
   cargarCatalogos()
-  cargarProyectos()
-  cargarGenHoy()
-  cargarGen7()
+  cargarProyectos()   // cargarGenHoy + cargarGen7 se llaman desde aquí tras cargar proyectos
   window.addEventListener('keydown', onKeydown)
   nextTick(() => {
     measureHeader()
