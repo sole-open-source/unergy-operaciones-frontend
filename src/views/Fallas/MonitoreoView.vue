@@ -499,6 +499,29 @@
           @save="onSaveForm" @cancel="formDialogVisible = false" />
       </Dialog>
 
+      <!-- ══ DIALOG RESOLVER FALLA ══════════════════════════════════════════ -->
+      <Dialog v-model:visible="resolveDialogVisible" modal class="w-full max-w-sm"
+        header="Resolver falla" :closable="!resolvingFalla">
+        <div v-if="resolveFallaTarget" class="resolve-dialog-body">
+          <p class="resolve-dialog-code">{{ resolveFallaTarget.codigo_interno }} — {{ resolveFallaTarget.proyecto?.nombre_comercial }}</p>
+          <div class="resolve-dialog-field">
+            <label class="resolve-dialog-label">Fecha y hora de solución *</label>
+            <DatePicker v-model="resolveFecha" showTime hourFormat="24"
+              dateFormat="yy-mm-dd" class="w-full" showIcon />
+          </div>
+          <div class="resolve-dialog-field">
+            <label class="resolve-dialog-label">Tipo de solución</label>
+            <Select v-model="resolveTipoSolucion" :options="TIPOS_SOLUCION_RESOLVE"
+              placeholder="Seleccionar (opcional)" showClear class="w-full" />
+          </div>
+        </div>
+        <template #footer>
+          <Button label="Cancelar" severity="secondary" outlined @click="resolveDialogVisible = false" :disabled="resolvingFalla" />
+          <Button label="Marcar resuelta" icon="pi pi-check" severity="success"
+            :loading="resolvingFalla" @click="confirmarResolve" />
+        </template>
+      </Dialog>
+
     </template><!-- /TAB 0 -->
 
     <!-- ══ TAB 1 — GRÁFICOS ══════════════════════════════════════════════ -->
@@ -805,7 +828,24 @@ const drawerFalla    = ref(null)
 const quickEdit      = reactive({ estado_id: null, prioridad_id: null })
 const savingQuick    = ref(false)
 const savedFlash     = ref(false)
-const resolvingFalla = ref(false)
+const resolvingFalla       = ref(false)
+const resolveDialogVisible = ref(false)
+const resolveFallaTarget   = ref(null)
+const resolveFecha         = ref(new Date())
+const resolveTipoSolucion  = ref(null)
+
+const TIPOS_SOLUCION_RESOLVE = [
+  'Reemplazo de componente',
+  'Reparación mecánica',
+  'Reparación eléctrica',
+  'Actualización de firmware',
+  'Limpieza y mantenimiento',
+  'Reconexión / rearme',
+  'Configuración / calibración',
+  'Gestión con OR / proveedor',
+  'Solución remota',
+  'Otro',
+]
 const addingSeg      = ref(false)
 const nuevaNota      = reactive({ nota: '', estado_id: null })
 
@@ -1238,8 +1278,9 @@ async function onSaveForm(payload) {
       toast.add({ severity: 'success', summary: 'Falla actualizada', life: 2500 })
     } else {
       // ── Creación (uno o más proyectos) ──────────────────────────────────
-      const { proyecto_ids, nota_inicial, ...base } = payload
-      const ids = proyecto_ids ?? []
+      const { proyecto_ids, nota_inicial, _archivos, ...base } = payload
+      const ids      = proyecto_ids ?? []
+      const archivos = _archivos ?? []
 
       // Una falla por proyecto, en paralelo
       const nuevas = await Promise.all(
@@ -1249,6 +1290,18 @@ async function onSaveForm(payload) {
       if (nota_inicial) {
         await Promise.all(
           nuevas.map(f => api.post(`/fallas/${f.id}/seguimientos`, { nota: nota_inicial }))
+        )
+      }
+      // Subir archivos adjuntos a cada falla (si los hay)
+      if (archivos.length) {
+        await Promise.all(
+          nuevas.flatMap(f =>
+            archivos.map(file => {
+              const fd = new FormData()
+              fd.append('archivo', file)
+              return api.post(`/fallas/${f.id}/archivos`, fd)
+            })
+          )
         )
       }
       const n = nuevas.length
@@ -1304,37 +1357,41 @@ async function guardarQuickEdit() {
   }
 }
 
-async function quickResolve(falla) {
+function quickResolve(falla) {
   const estadoFinal = catalogos.value.estados.find(e => e.es_estado_final)
   if (!estadoFinal) {
     toast.add({ severity: 'warn', summary: 'Sin estado final configurado', life: 3000 })
     return
   }
-  confirmService.require({
-    message: `¿Marcar la falla ${falla.codigo_interno} como ${estadoFinal.etiqueta.toLowerCase()}?`,
-    header: 'Resolver falla',
-    icon: 'pi pi-check-circle',
-    rejectProps: { label: 'Cancelar', severity: 'secondary' },
-    acceptProps: { label: 'Marcar resuelta', severity: 'success' },
-    accept: async () => {
-      resolvingFalla.value = true
-      try {
-        const { data } = await api.patch(`/fallas/${falla.id}`, {
-          estado_id:       estadoFinal.id,
-          fecha_resolucion: new Date().toISOString(),
-          sla_cumplido:    !slaVencido(falla),
-        })
-        const idx = allFallas.value.findIndex(f => f.id === data.id)
-        if (idx >= 0) allFallas.value[idx] = data
-        if (drawerFalla.value?.id === data.id) drawerFalla.value = data
-        toast.add({ severity: 'success', summary: 'Falla resuelta', life: 2500 })
-      } catch (err) {
-        toast.add({ severity: 'error', summary: 'Error', detail: err?.response?.data?.detail, life: 3000 })
-      } finally {
-        resolvingFalla.value = false
-      }
-    },
-  })
+  resolveFallaTarget.value  = falla
+  resolveFecha.value        = new Date()
+  resolveTipoSolucion.value = null
+  resolveDialogVisible.value = true
+}
+
+async function confirmarResolve() {
+  const falla = resolveFallaTarget.value
+  if (!falla) return
+  const estadoFinal = catalogos.value.estados.find(e => e.es_estado_final)
+  resolvingFalla.value = true
+  try {
+    const payload = {
+      estado_id:        estadoFinal.id,
+      fecha_resolucion: resolveFecha.value?.toISOString() ?? new Date().toISOString(),
+      sla_cumplido:     !slaVencido(falla),
+    }
+    if (resolveTipoSolucion.value) payload.tipo_solucion = resolveTipoSolucion.value
+    const { data } = await api.patch(`/fallas/${falla.id}`, payload)
+    const idx = allFallas.value.findIndex(f => f.id === data.id)
+    if (idx >= 0) allFallas.value[idx] = data
+    if (drawerFalla.value?.id === data.id) drawerFalla.value = data
+    resolveDialogVisible.value = false
+    toast.add({ severity: 'success', summary: 'Falla resuelta', life: 2500 })
+  } catch (err) {
+    toast.add({ severity: 'error', summary: 'Error', detail: err?.response?.data?.detail, life: 3000 })
+  } finally {
+    resolvingFalla.value = false
+  }
 }
 
 async function reabrirFalla() {
@@ -2824,5 +2881,32 @@ watch(bucket, (newBucket) => {
   padding: 8px 20px 12px;
   font-size: 11px;
   color: #16a34a;
+}
+
+/* ══ DIALOG RESOLVER FALLA ══════════════════════════════════════════════════ */
+.resolve-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 4px 0 8px;
+}
+.resolve-dialog-code {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b5a8a;
+  background: #f5f0ff;
+  border-radius: 6px;
+  padding: 6px 10px;
+  margin: 0;
+}
+.resolve-dialog-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.resolve-dialog-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #4a3b6b;
 }
 </style>

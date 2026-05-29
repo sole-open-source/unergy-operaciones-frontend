@@ -173,6 +173,36 @@
       </div>
     </div>
 
+    <!-- ── SECCIÓN: Archivos adjuntos (solo al crear) ─────── -->
+    <div v-if="!initial" class="ff-section">
+      <div class="ff-section-title"><i class="pi pi-paperclip" /> Archivos adjuntos</div>
+      <!-- Dropzone -->
+      <div class="ff-dropzone"
+        :class="{ 'ff-dropzone--over': dropOver }"
+        @dragover.prevent="dropOver = true"
+        @dragleave.prevent="dropOver = false"
+        @drop.prevent="onDrop"
+        @click="fileInputRef.click()">
+        <i class="pi pi-upload" style="font-size:18px;color:#9b89b5" />
+        <span class="ff-dropzone-text">Arrastra archivos aquí o <span class="ff-dropzone-link">haz clic</span></span>
+        <span class="ff-dropzone-hint">Imágenes, PDF, Excel, Word, CSV</span>
+        <input ref="fileInputRef" type="file" class="ff-hidden-input"
+          accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv" multiple
+          @change="onFileInputChange" />
+      </div>
+      <!-- Lista de archivos staged -->
+      <div v-if="archivosStaged.length" class="ff-staged-list">
+        <div v-for="(f, i) in archivosStaged" :key="i" class="ff-staged-row">
+          <i :class="iconoArchivo(f)" style="font-size:13px;color:#7c3aed" />
+          <span class="ff-staged-name">{{ f.name }}</span>
+          <span class="ff-staged-size">{{ formatSize(f.size) }}</span>
+          <button type="button" class="ff-staged-remove" @click="archivosStaged.splice(i, 1)">
+            <i class="pi pi-times" />
+          </button>
+        </div>
+      </div>
+    </div>
+
     <div class="ff-footer">
       <Button label="Cancelar" severity="secondary" type="button" @click="$emit('cancel')" />
       <Button :label="initial ? 'Guardar cambios' : 'Registrar falla'"
@@ -211,9 +241,42 @@ const props = defineProps({
 })
 const emit = defineEmits(['save', 'cancel'])
 
-const proyectos = ref([])
-const saving    = ref(false)
-const errors    = ref({})
+const proyectos      = ref([])
+const saving         = ref(false)
+const errors         = ref({})
+const archivosStaged = ref([])  // File[] — solo al crear
+const dropOver       = ref(false)
+const fileInputRef   = ref(null)
+
+function iconoArchivo(file) {
+  const name = file.name || ''
+  if (/\.(pdf)$/i.test(name)) return 'pi pi-file-pdf'
+  if (/\.(xls|xlsx|csv)$/i.test(name)) return 'pi pi-file-excel'
+  if (/\.(doc|docx)$/i.test(name)) return 'pi pi-file-word'
+  if (/\.(png|jpg|jpeg|gif|webp|svg)$/i.test(name)) return 'pi pi-image'
+  return 'pi pi-file'
+}
+function formatSize(bytes) {
+  if (!bytes) return ''
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+function addFiles(files) {
+  for (const f of Array.from(files)) {
+    if (!archivosStaged.value.find(x => x.name === f.name && x.size === f.size)) {
+      archivosStaged.value.push(f)
+    }
+  }
+}
+function onDrop(e) {
+  dropOver.value = false
+  addFiles(e.dataTransfer.files)
+}
+function onFileInputChange(e) {
+  addFiles(e.target.files)
+  e.target.value = ''
+}
 
 const form = ref({
   proyecto_id:          props.initial?.proyecto?.id ?? props.initial?.proyecto_id ?? null,
@@ -291,8 +354,8 @@ async function submit() {
       // Edición: un solo proyecto
       emit('save', { ...base, proyecto_id: form.value.proyecto_id })
     } else {
-      // Creación: uno o más proyectos
-      emit('save', { ...base, proyecto_ids: form.value.proyecto_ids })
+      // Creación: uno o más proyectos + archivos staged
+      emit('save', { ...base, proyecto_ids: form.value.proyecto_ids, _archivos: archivosStaged.value })
     }
   } finally {
     saving.value = false
@@ -369,6 +432,64 @@ onMounted(async () => {
   color: #dc2626;
   font-size: 11px;
 }
+
+/* ── Dropzone ── */
+.ff-dropzone {
+  border: 1.5px dashed #c4b5e0;
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+  background: #faf8ff;
+}
+.ff-dropzone:hover, .ff-dropzone--over {
+  border-color: #7c3aed;
+  background: #f5f0ff;
+}
+.ff-dropzone-text { font-size: 12px; color: #4a3b6b; }
+.ff-dropzone-link { color: #7c3aed; font-weight: 600; }
+.ff-dropzone-hint { font-size: 10.5px; color: #9b89b5; }
+.ff-hidden-input  { display: none; }
+
+/* ── Staged files ── */
+.ff-staged-list {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ff-staged-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 8px;
+  background: #f5f0ff;
+  border-radius: 6px;
+  font-size: 11.5px;
+}
+.ff-staged-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #3b1f6b;
+}
+.ff-staged-size { color: #9b89b5; white-space: nowrap; }
+.ff-staged-remove {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #dc2626;
+  padding: 0 2px;
+  font-size: 10px;
+  opacity: .7;
+}
+.ff-staged-remove:hover { opacity: 1; }
 
 .ff-footer {
   display: flex;
