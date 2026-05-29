@@ -611,19 +611,51 @@
             <div class="gen-card-title">
               <i class="pi pi-chart-bar" style="color:#7c3aed;font-size:13px" />
               <span>Generación por proyecto</span>
-              <span class="p90-section-sub">· kWh diarios + fallas asociadas</span>
+              <span class="p90-section-sub">· kWh desde Solenium + fallas asociadas</span>
             </div>
           </div>
-          <div class="gen-pr-controls">
+
+          <!-- Fila 1: proyecto + filtros rápidos -->
+          <div class="genproj-controls">
             <Select v-model="genProjSel" :options="proyectosGenOp" optionLabel="nombre_comercial" optionValue="id"
-              placeholder="Seleccionar proyecto…" filter showClear class="gen-multiselect" />
-            <DatePicker v-model="genProjFechaInicio" dateFormat="yy-mm-dd" placeholder="Desde"
-              showButtonBar class="p90-dp" size="small" />
-            <DatePicker v-model="genProjFechaFin" dateFormat="yy-mm-dd" placeholder="Hasta"
-              showButtonBar class="p90-dp" size="small" />
-            <Button label="Ver" icon="pi pi-chart-bar" size="small"
+              placeholder="Seleccionar proyecto…" filter showClear class="genproj-select"
+              @change="genProjCargado = false; genProjPuntos = []" />
+            <div class="genproj-quick-btns">
+              <button v-for="f in GENPROJ_FILTROS" :key="f.key"
+                class="genproj-quick-btn"
+                :class="{ 'genproj-quick-btn--active': genProjFiltro === f.key }"
+                @click="aplicarFiltroGenProj(f.key)">{{ f.label }}</button>
+            </div>
+            <!-- Fechas personalizadas (solo si filtro='custom') -->
+            <template v-if="genProjFiltro === 'custom'">
+              <DatePicker v-model="genProjFechaInicio" dateFormat="yy-mm-dd" placeholder="Desde"
+                showButtonBar class="p90-dp" size="small" />
+              <DatePicker v-model="genProjFechaFin" dateFormat="yy-mm-dd" placeholder="Hasta"
+                showButtonBar class="p90-dp" size="small" />
+            </template>
+          </div>
+
+          <!-- Fila 2: toggle granularidad + botón Ver -->
+          <div class="genproj-controls genproj-controls--row2">
+            <div class="genproj-gran-toggle">
+              <button class="genproj-gran-btn"
+                :class="{ 'genproj-gran-btn--active': genProjGran === 'day' }"
+                @click="genProjGran = 'day'">
+                <i class="pi pi-calendar" /> Por día
+              </button>
+              <button class="genproj-gran-btn"
+                :class="{ 'genproj-gran-btn--active': genProjGran === 'hour' }"
+                :disabled="genProjDiasRango > 7"
+                :title="genProjDiasRango > 7 ? 'Máx. 7 días para vista horaria' : ''"
+                @click="genProjGran = 'hour'">
+                <i class="pi pi-clock" /> Por hora
+              </button>
+            </div>
+            <Button label="Ver generación" icon="pi pi-chart-bar" size="small"
               @click="cargarGenProj" :loading="genProjLoading" :disabled="!genProjSel" />
           </div>
+
+          <!-- Estados -->
           <div v-if="!genProjSel" class="p90-state" style="padding:40px">
             <i class="pi pi-hand-pointer" style="color:#a094b8;font-size:26px" />
             <span>Selecciona un proyecto para ver su generación y fallas.</span>
@@ -632,18 +664,29 @@
             <i class="pi pi-spin pi-spinner" style="color:#915BD8;font-size:22px" />
             <span>Cargando datos…</span>
           </div>
-          <div v-else-if="genProjDays.length === 0 && genProjCargado" class="p90-state" style="padding:40px">
+          <div v-else-if="genProjPuntos.length === 0 && genProjCargado" class="p90-state" style="padding:40px">
             <i class="pi pi-database" style="color:#9ca3af;font-size:26px" />
-            <span>Sin datos de generación para este período.</span>
+            <span>Sin datos de generación para este período en Solenium.</span>
           </div>
-          <template v-else-if="genProjDays.length">
-            <div class="chart-canvas-wrap" style="height:260px">
+
+          <!-- Gráfico + tabla de fallas -->
+          <template v-else-if="genProjPuntos.length">
+            <!-- KPI total -->
+            <div class="genproj-kpi">
+              <span class="genproj-kpi-val">{{ genProjTotalKwh.toLocaleString('es-CO', { maximumFractionDigits: 0 }) }} kWh</span>
+              <span class="genproj-kpi-lbl">total del período</span>
+              <span class="genproj-kpi-sep">·</span>
+              <span class="genproj-kpi-lbl">{{ genProjPuntos.length }} {{ genProjGran === 'hour' ? 'horas' : 'días' }}</span>
+            </div>
+            <div class="chart-canvas-wrap" :style="{ height: genProjGran === 'hour' ? '240px' : '240px' }">
               <Bar :data="barGenProjData" :options="barGenProjOpts" />
             </div>
             <div class="genproj-leyenda">
-              <span><span class="genproj-dot" style="background:#7c3aedcc"></span>Generación normal</span>
-              <span><span class="genproj-dot" style="background:#fb923ccc;border:2px solid #ea580c"></span>Día con falla activa</span>
+              <span><span class="genproj-dot" style="background:#7c3aedcc"></span>Generación</span>
+              <span v-if="genProjGran === 'day'"><span class="genproj-dot" style="background:#dc2626cc;border:1.5px solid #b91c1c"></span>Día con falla</span>
             </div>
+
+            <!-- Tabla de fallas del período -->
             <div v-if="genProjFallas.length" class="genproj-fallas">
               <div class="genproj-fallas-header">
                 <i class="pi pi-bolt" style="color:#dc2626;font-size:11px" />
@@ -920,10 +963,51 @@ const gen7Loading        = ref(false)
 const gen7Days           = ref([])       // [{fecha, real, p90}] — últimos 7 días
 const genProjLoading      = ref(false)
 const genProjCargado      = ref(false)
-const genProjSel          = ref(null)        // ID de un solo proyecto
+const genProjSel          = ref(null)        // ID de un solo proyecto (nuestra BD)
+const genProjFiltro       = ref('30d')       // ayer | semana | mes | 30d | custom
+const genProjGran         = ref('day')       // day | hour
 const genProjFechaInicio  = ref(new Date(Date.now() - 29 * 86400000))
 const genProjFechaFin     = ref(new Date())
-const genProjDays         = ref([])          // rows de /generacion del proyecto
+const genProjPuntos       = ref([])          // [{ label, kwh }] desde Solenium
+const genProjTotalKwh     = ref(0)
+
+const GENPROJ_FILTROS = [
+  { key: 'ayer',   label: 'Ayer' },
+  { key: 'semana', label: 'Esta semana' },
+  { key: 'mes',    label: 'Este mes' },
+  { key: '30d',    label: 'Últimos 30 días' },
+  { key: 'custom', label: 'Personalizado' },
+]
+
+function aplicarFiltroGenProj(key) {
+  genProjFiltro.value = key
+  const hoy = new Date(); hoy.setHours(0, 0, 0, 0)
+  if (key === 'ayer') {
+    const ayer = new Date(hoy); ayer.setDate(ayer.getDate() - 1)
+    genProjFechaInicio.value = ayer
+    genProjFechaFin.value    = ayer
+  } else if (key === 'semana') {
+    const lunes = new Date(hoy)
+    lunes.setDate(hoy.getDate() - ((hoy.getDay() + 6) % 7))
+    genProjFechaInicio.value = lunes
+    genProjFechaFin.value    = hoy
+  } else if (key === 'mes') {
+    genProjFechaInicio.value = new Date(hoy.getFullYear(), hoy.getMonth(), 1)
+    genProjFechaFin.value    = hoy
+  } else if (key === '30d') {
+    const d = new Date(hoy); d.setDate(d.getDate() - 29)
+    genProjFechaInicio.value = d
+    genProjFechaFin.value    = hoy
+  }
+  // 'custom' no cambia las fechas — el usuario las elige con DatePicker
+}
+
+const genProjDiasRango = computed(() => {
+  const fi = genProjFechaInicio.value
+  const ff = genProjFechaFin.value
+  if (!fi || !ff) return 1
+  return Math.max(1, Math.round((ff - fi) / 86400000) + 1)
+})
 
 // ── Computed: lógica de buckets ───────────────────────────────────────────
 function esAlertaSLA(f) {
@@ -1189,21 +1273,29 @@ async function cargarGen7() {
   }
 }
 
-// ── Carga: Generación por proyecto ───────────────────────────────────────
+// ── Carga: Generación por proyecto (desde Solenium vía backend) ──────────
 async function cargarGenProj() {
   if (!genProjSel.value) return
+  // Si granularidad=hour y rango > 7 días, forzar día
+  if (genProjGran.value === 'hour' && genProjDiasRango.value > 7) {
+    genProjGran.value = 'day'
+  }
   genProjLoading.value = true
   genProjCargado.value = false
-  genProjDays.value = []
+  genProjPuntos.value  = []
+  genProjTotalKwh.value = 0
   try {
     const fi = genProjFechaInicio.value.toISOString().split('T')[0]
     const ff = genProjFechaFin.value.toISOString().split('T')[0]
-    const { data } = await api.get('/generacion', { params: { fecha_inicio: fi, fecha_fin: ff, size: 1000 } })
-    genProjDays.value = (data.items ?? [])
-      .filter(r => r.proyecto_id === genProjSel.value)
-      .sort((a, b) => a.fecha.localeCompare(b.fecha))
+    const { data } = await api.get(
+      `/generacion-solar/proyecto/${genProjSel.value}/historial`,
+      { params: { fecha_inicio: fi, fecha_fin: ff, granularidad: genProjGran.value } }
+    )
+    genProjPuntos.value   = data.puntos ?? []
+    genProjTotalKwh.value = data.total_kwh ?? 0
   } catch {
-    genProjDays.value = []
+    genProjPuntos.value   = []
+    genProjTotalKwh.value = 0
   } finally {
     genProjLoading.value = false
     genProjCargado.value = true
@@ -1860,7 +1952,7 @@ const barGenHoyOpts = {
   },
 }
 
-// Chart 2 ─ Generación por proyecto (con fallas como contexto)
+// Chart 2 ─ Generación por proyecto (puntos desde Solenium + fallas superpuestas)
 const genProjFallasByDate = computed(() => {
   if (!genProjSel.value) return {}
   const fi = genProjFechaInicio.value?.toISOString().split('T')[0] || ''
@@ -1891,16 +1983,37 @@ const genProjFallas = computed(() => {
 
 const barGenProjData = computed(() => {
   const fbd = genProjFallasByDate.value
+  const isHour = genProjGran.value === 'hour'
   return {
-    labels: genProjDays.value.map(r =>
-      new Date(r.fecha + 'T00:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })
-    ),
+    labels: genProjPuntos.value.map(pt => {
+      if (isHour) {
+        // "2026-05-22 08:00" → "22 may 08h"
+        const [day, time] = pt.label.split(' ')
+        const d = new Date(day + 'T00:00:00')
+        return `${d.toLocaleDateString('es-CO', { day:'2-digit', month:'short' })} ${time?.slice(0, 5) || ''}`
+      }
+      // "2026-05-22" → "22 may"
+      return new Date(pt.label + 'T00:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })
+    }),
     datasets: [{
       label: 'Generación (kWh)',
-      data: genProjDays.value.map(r => +(Number(r.kwh_real || 0).toFixed(1))),
-      backgroundColor: genProjDays.value.map(r => fbd[r.fecha]?.length ? '#fb923ccc' : '#7c3aedcc'),
-      borderColor:     genProjDays.value.map(r => fbd[r.fecha]?.length ? '#ea580c'   : '#7c3aed'),
-      borderWidth:     genProjDays.value.map(r => fbd[r.fecha]?.length ? 2           : 1),
+      data: genProjPuntos.value.map(pt => pt.kwh),
+      // Barras rojas en días con falla (solo en vista diaria)
+      backgroundColor: genProjPuntos.value.map(pt => {
+        if (isHour) return '#7c3aedcc'
+        const day = pt.label.split(' ')[0]
+        return fbd[day]?.length ? '#dc2626cc' : '#7c3aedcc'
+      }),
+      borderColor: genProjPuntos.value.map(pt => {
+        if (isHour) return '#7c3aed'
+        const day = pt.label.split(' ')[0]
+        return fbd[day]?.length ? '#b91c1c' : '#7c3aed'
+      }),
+      borderWidth: genProjPuntos.value.map(pt => {
+        if (isHour) return 1
+        const day = pt.label.split(' ')[0]
+        return fbd[day]?.length ? 2 : 1
+      }),
       borderRadius: 3,
     }],
   }
@@ -1908,20 +2021,27 @@ const barGenProjData = computed(() => {
 
 const barGenProjOpts = computed(() => {
   const fbd = genProjFallasByDate.value
-  const days = genProjDays.value
+  const puntos = genProjPuntos.value
+  const isHour = genProjGran.value === 'hour'
   return {
     responsive: true, maintainAspectRatio: false,
     plugins: {
       legend: { display: false },
       tooltip: {
         callbacks: {
+          title: (items) => {
+            const pt = puntos[items[0]?.dataIndex]
+            return pt ? pt.label : ''
+          },
           label: ctx => ` ${Number(ctx.raw ?? 0).toLocaleString('es-CO')} kWh`,
           afterBody: (items) => {
-            const idx = items[0]?.dataIndex
-            if (idx == null || !days[idx]) return []
-            const fallas = fbd[days[idx].fecha] || []
+            if (isHour) return []
+            const pt = puntos[items[0]?.dataIndex]
+            if (!pt) return []
+            const day = pt.label.split(' ')[0]
+            const fallas = fbd[day] || []
             if (!fallas.length) return []
-            const lines = [``, `⚡ ${fallas.length} falla(s):`]
+            const lines = ['', `⚡ ${fallas.length} falla(s):`]
             fallas.forEach(f => lines.push(`  · ${f.codigo_interno}: ${(f.descripcion || '').slice(0, 45)}`))
             return lines
           },
@@ -1929,8 +2049,17 @@ const barGenProjOpts = computed(() => {
       },
     },
     scales: {
-      x: { grid: { color: GRID_COLOR }, ticks: { font: FONT, color: '#6b7280', maxRotation: 45 }, border: { display: false } },
-      y: { grid: { color: GRID_COLOR }, ticks: { font: FONT, color: '#6b7280', callback: v => `${v.toLocaleString('es-CO')} kWh` }, border: { display: false }, beginAtZero: true },
+      x: {
+        grid: { color: GRID_COLOR },
+        ticks: { font: FONT, color: '#6b7280', maxRotation: 45, maxTicksLimit: isHour ? 24 : 31 },
+        border: { display: false },
+      },
+      y: {
+        grid: { color: GRID_COLOR },
+        ticks: { font: FONT, color: '#6b7280', callback: v => `${v.toLocaleString('es-CO')} kWh` },
+        border: { display: false },
+        beginAtZero: true,
+      },
     },
   }
 })
@@ -2883,6 +3012,81 @@ watch(bucket, (newBucket) => {
   background: #f3f4f6;
   color: #9ca3af;
 }
+
+/* ── Generación por proyecto — controles ── */
+.genproj-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 20px 10px;
+  flex-wrap: wrap;
+}
+.genproj-controls--row2 {
+  padding-top: 0;
+  padding-bottom: 12px;
+}
+.genproj-select {
+  min-width: 220px;
+  flex: 1;
+  max-width: 300px;
+  font-size: 12px;
+}
+.genproj-quick-btns {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.genproj-quick-btn {
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 500;
+  border: 1px solid #e5e7eb;
+  border-radius: 999px;
+  background: #f9fafb;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.genproj-quick-btn:hover { border-color: #915BD8; color: #915BD8; }
+.genproj-quick-btn--active {
+  background: #915BD8;
+  border-color: #915BD8;
+  color: #fff;
+}
+.genproj-gran-toggle {
+  display: flex;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.genproj-gran-btn {
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #6b7280;
+  background: #f9fafb;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s;
+}
+.genproj-gran-btn + .genproj-gran-btn { border-left: 1px solid #e5e7eb; }
+.genproj-gran-btn--active { background: #7c3aed; color: #fff; }
+.genproj-gran-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.genproj-kpi {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 20px 8px;
+  font-size: 11px;
+  color: #6b7280;
+}
+.genproj-kpi-val { font-size: 15px; font-weight: 700; color: #7c3aed; }
+.genproj-kpi-lbl { color: #9ca3af; }
+.genproj-kpi-sep { color: #d1d5db; }
 
 /* ── Generación por proyecto ── */
 .genproj-leyenda {
