@@ -1071,7 +1071,7 @@ function dailyP90Total(fecha) {
 }
 
 // ── Carga: Generación de hoy ─────────────────────────────────────────────
-// P90 desde p90_mensual_kwh; real en tiempo real desde Solenium
+// P90 desde p90_mensual_kwh; real desde API Unergy vía /monitoreo/resumen-generacion (mismo que 7 días)
 async function cargarGenHoy() {
   const projs = proyectosGenOp.value
   if (!projs.length) return
@@ -1079,21 +1079,23 @@ async function cargarGenHoy() {
   genHoyRows.value = []
   try {
     const hoy = new Date().toISOString().split('T')[0]
-    // 1. Construir fila por proyecto con P90 (siempre disponible)
+    // 1. Construir fila por proyecto con P90
     const byProyecto = {}
     for (const p of projs) {
       const p90 = dailyP90(p.id, hoy)
       if (p90 > 0) byProyecto[p.id] = { nombre: p.nombre_comercial, real: 0, p90 }
     }
-    // 2. Superponer generación real del día desde Solenium (se actualiza en tiempo real)
+    // 2. Generación real del día desde la misma API Unergy que usa el gráfico de 7 días
     try {
-      const { data } = await api.get('/generacion-solar/generacion-hoy')
-      for (const row of data.proyectos ?? []) {
+      const { data } = await api.get('/monitoreo/resumen-generacion', {
+        params: { date_from: hoy, date_to: hoy }
+      })
+      for (const row of data.by_project ?? []) {
         if (byProyecto[row.proyecto_id] !== undefined) {
           byProyecto[row.proyecto_id].real = Number(row.kwh_real || 0)
         }
       }
-    } catch { /* Solenium no disponible — mostrar solo P90 */ }
+    } catch { /* API no disponible — mostrar solo P90 */ }
     genHoyRows.value = Object.values(byProyecto)
       .map(r => ({ ...r, real: +r.real.toFixed(1), p90: +r.p90.toFixed(1) }))
       .sort((a, b) => b.p90 - a.p90)
