@@ -178,6 +178,11 @@
                             v-tooltip.bottom="permisoEnviar ? 'Enviar al correo del cliente' : 'Sólo Laura H. (o admin) puede enviar'">
                       <i :class="enviandoIds.has(row.id) ? 'pi pi-spin pi-spinner' : 'pi pi-send'" />
                     </button>
+                    <button v-if="row.estado !== 'aprobado' && !row.correo_enviado" class="em-icon-btn em-btn-del"
+                            @click="eliminarInforme(row)"
+                            v-tooltip.bottom="row.tipo === 'op' ? 'Eliminar (no afecta a los portafolios que lo incluyen)' : 'Eliminar informe'">
+                      <i class="pi pi-trash" />
+                    </button>
                   </td>
                 </tr>
                 </template>
@@ -983,6 +988,23 @@ function imprimirEditor() {
   setTimeout(() => w.print(), 600)
 }
 
+// ── Eliminar informe ───────────────────────────────────────────
+async function eliminarInforme(inf) {
+  const esPort = inf.tipo === 'port'
+  const aviso = inf.tipo === 'op'
+    ? ' Su sección quedará conservada en los portafolios que lo incluyen (no se verán afectados).'
+    : ''
+  if (!confirm(`¿Eliminar el ${esPort ? 'portafolio' : 'informe'} de "${inf.proyecto_nombre || inf.sub_project}"?${aviso}`)) return
+  try {
+    await api.delete(`/informes/${inf.id}`)
+    informes.value = informes.value.filter(i => i.id !== inf.id)
+    if (drawerInf.value?.id === inf.id) cerrarDrawer()
+    toast('🗑️ Informe eliminado')
+  } catch (e) {
+    toast('⚠️ ' + (e.response?.data?.detail || e.message), true)
+  }
+}
+
 // ── Comentarios ────────────────────────────────────────────────
 async function agregarComentario() {
   if (!nuevoComentario.value.trim() || !drawerInf.value) return
@@ -1369,6 +1391,8 @@ async function ejecutarEnvioBatch() {
 .em-btn-verify:hover:not(:disabled) { background: #F0FDF4; }
 .em-btn-send    { color: #2563EB; border-color: #BFDBFE; }
 .em-btn-send:hover:not(:disabled) { background: #EFF6FF; }
+.em-btn-del     { color: #DC2626; border-color: #FECACA; }
+.em-btn-del:hover:not(:disabled) { background: #FEF2F2; }
 .em-btn-coms-on       { color: #DC2626; border-color: #FECACA; background: #FEF2F2; }
 .em-btn-coms-on:hover:not(:disabled) { background: #FEE2E2; }
 .em-btn-coms-resolved { color: #2563EB; border-color: #BFDBFE; }

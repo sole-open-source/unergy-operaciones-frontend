@@ -22,6 +22,11 @@
           <span>Revisión y envío</span>
           <span class="imv-tab-badge" v-if="badgePipeline">{{ badgePipeline }}</span>
         </button>
+        <button class="imv-tab" :class="{ 'imv-tab--on': tab === 'portafolios' }"
+                @click="tab = 'portafolios'">
+          <i class="pi pi-th-large" />
+          <span>Gestión de portafolios</span>
+        </button>
       </div>
 
       <div class="imv-topbar-spacer" />
@@ -33,6 +38,9 @@
     <!-- Pipeline de verificación + envío -->
     <EnvioMensualPanel v-else-if="tab === 'pipeline'" />
 
+    <!-- Gestión de portafolios (drag-and-drop) -->
+    <PortafoliosGestionPanel v-else-if="tab === 'portafolios'" />
+
   </div>
 </template>
 
@@ -41,20 +49,22 @@ import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import InformesMensualesPanel from './InformesMensualesPanel.vue'
 import EnvioMensualPanel from './EnvioMensualPanel.vue'
+import PortafoliosGestionPanel from './PortafoliosGestionPanel.vue'
 import api from '@/api/client'
 
 const route = useRoute()
 const router = useRouter()
 
-const tab = ref(route.query.tab === 'pipeline' ? 'pipeline' : 'generar')
+const _TABS = ['generar', 'pipeline', 'portafolios']
+const tab = ref(_TABS.includes(route.query.tab) ? route.query.tab : 'generar')
 const badgePipeline = ref(null)   // cantidad de informes del mes en curso pendientes/comentados
 
 // Sync con query string para deep-link
 function setTab(t) {
   tab.value = t
   const q = { ...route.query }
-  if (t === 'pipeline') q.tab = 'pipeline'
-  else delete q.tab
+  if (t === 'generar') delete q.tab
+  else q.tab = t
   router.replace({ query: q })
 }
 // Watcher para sincronizar query con tab activa (cuando cambia desde el UI)
