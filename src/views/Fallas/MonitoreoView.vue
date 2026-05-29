@@ -714,142 +714,6 @@
 
       </div><!-- /Generación section -->
 
-      <!-- ── Separador ──────────────────────────────────────────────────── -->
-      <div class="p90-separator">
-        <i class="pi pi-bolt" style="color:#915BD8;font-size:11px" />
-        <span>Análisis de Fallas</span>
-      </div>
-
-      <!-- ── Fallas charts ──────────────────────────────────────────────── -->
-      <div v-if="loading" class="mon-tab-loading">
-        <div class="mon-spinner" /><span>Cargando datos…</span>
-      </div>
-      <div v-else-if="!allFallas.length" class="mon-tab-empty">
-        <div class="mon-empty-icon">📊</div>
-        <p class="mon-empty-title">Sin datos de fallas</p>
-        <p class="mon-empty-sub">No hay registros para generar gráficos</p>
-      </div>
-      <div v-else class="charts-container">
-
-        <!-- ── Filtro + KPIs ─────────────────────────────────── -->
-        <div class="charts-topbar">
-          <div class="charts-filter-wrap">
-            <label class="charts-filter-lbl">Proyecto</label>
-            <select v-model="filtroGraficosProyecto" class="charts-select">
-              <option value="">Todos</option>
-              <option v-for="p in proyectos" :key="p.id" :value="p.id">{{ p.nombre_comercial }}</option>
-            </select>
-          </div>
-          <div class="charts-kpis">
-            <div class="ck">
-              <span class="ck-val" style="color:#dc2626">{{ grafKpis.criticas }}</span>
-              <span class="ck-lbl">Críticas</span>
-            </div>
-            <div class="ck">
-              <span class="ck-val" style="color:#2563eb">{{ grafKpis.resueltas }}</span>
-              <span class="ck-lbl">Resueltas</span>
-            </div>
-            <div class="ck">
-              <span class="ck-val" style="color:#16a34a">{{ grafKpis.tasaResolucion }}%</span>
-              <span class="ck-lbl">Resolución</span>
-            </div>
-            <div class="ck" v-tooltip.bottom="'Tiempo medio de reparación'">
-              <span class="ck-val" style="color:#7c3aed">{{ grafKpis.mttr }}</span>
-              <span class="ck-lbl">MTTR días</span>
-            </div>
-            <div v-if="grafKpis.energiaTotal > 0" class="ck">
-              <span class="ck-val" style="color:#dc2626;font-size:13px">{{ grafKpis.energiaTotal.toLocaleString('es-CO') }}</span>
-              <span class="ck-lbl">kWh perdidos</span>
-            </div>
-            <div class="ck ck--total">
-              <span class="ck-val" style="color:#915BD8">{{ fallasFiltGraficos.length }}</span>
-              <span class="ck-lbl">Total fallas</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Proyecto con más fallas -->
-        <div v-if="!filtroGraficosProyecto && topProyecto" class="top-proyecto-card">
-          <div class="top-proy-icon">🏆</div>
-          <div class="top-proy-body">
-            <div class="top-proy-label">Proyecto con más fallas</div>
-            <div class="top-proy-name">{{ topProyecto.label }}</div>
-          </div>
-          <div class="top-proy-count">
-            <div class="top-proy-num">{{ topProyecto.count }}</div>
-            <div class="top-proy-sub">fallas</div>
-          </div>
-        </div>
-
-        <!-- ── Grid de charts ──────────────────────────────── -->
-        <div class="charts-grid">
-
-          <!-- Donut estado -->
-          <div class="chart-card">
-            <p class="chart-card-title">Estado de fallas</p>
-            <div class="chart-canvas-wrap" style="height:200px">
-              <Doughnut :data="donutEstadoData" :options="sharedDonutOpts" />
-            </div>
-          </div>
-
-          <!-- Donut prioridad -->
-          <div class="chart-card">
-            <p class="chart-card-title">Distribución por prioridad</p>
-            <div class="chart-canvas-wrap" style="height:200px">
-              <Doughnut :data="donutPrioData" :options="sharedDonutOpts" />
-            </div>
-          </div>
-
-          <!-- Evolución mensual (line) - full width -->
-          <div class="chart-card chart-card--wide" v-if="fallasPorMes.length > 1">
-            <p class="chart-card-title">Evolución mensual · últimos 12 meses</p>
-            <div class="chart-canvas-wrap" style="height:200px">
-              <Line :data="lineEvolucionData" :options="lineEvolucionOpts" />
-            </div>
-          </div>
-
-          <!-- Fallas por categoría -->
-          <div class="chart-card" v-if="fallasPorCategoria.length">
-            <p class="chart-card-title">Fallas por categoría</p>
-            <div class="chart-canvas-wrap" :style="{ height: Math.max(160, fallasPorCategoria.length * 30 + 20) + 'px' }">
-              <Bar :data="barCatData" :options="sharedBarHOpts" />
-            </div>
-          </div>
-
-          <!-- Top tipos de falla -->
-          <div class="chart-card" v-if="fallasPorTipo.length">
-            <p class="chart-card-title">Top tipos de falla</p>
-            <div class="chart-canvas-wrap" :style="{ height: Math.max(160, Math.min(fallasPorTipo.length, 8) * 30 + 20) + 'px' }">
-              <Bar :data="barTipoData" :options="sharedBarHOpts" />
-            </div>
-          </div>
-
-          <!-- MTTR por categoría -->
-          <div class="chart-card" v-if="mttrPorCategoria.length">
-            <p class="chart-card-title">MTTR por categoría <span class="chart-card-sub">(días promedio)</span></p>
-            <div class="chart-canvas-wrap" :style="{ height: Math.max(160, mttrPorCategoria.length * 30 + 20) + 'px' }">
-              <Bar :data="barMttrData" :options="barMttrOpts" />
-            </div>
-          </div>
-
-          <!-- Top proyectos -->
-          <div class="chart-card chart-card--wide" v-if="!filtroGraficosProyecto && fallasPorProyecto.length">
-            <p class="chart-card-title">Top proyectos con más fallas</p>
-            <div class="chart-canvas-wrap" :style="{ height: Math.max(200, Math.min(fallasPorProyecto.length, 10) * 30 + 20) + 'px' }">
-              <Bar :data="barProyData" :options="sharedBarHOpts" />
-            </div>
-          </div>
-
-          <!-- Energía perdida por proyecto -->
-          <div class="chart-card chart-card--wide" v-if="energiaPorProyecto.length">
-            <p class="chart-card-title">Energía perdida por proyecto <span class="chart-card-sub">(kWh)</span></p>
-            <div class="chart-canvas-wrap" :style="{ height: Math.max(200, Math.min(energiaPorProyecto.length, 10) * 30 + 20) + 'px' }">
-              <Bar :data="barEnergiaData" :options="barEnergiaOpts" />
-            </div>
-          </div>
-
-        </div>
-      </div>
     </div><!-- /TAB 1 -->
 
     <!-- ══ TAB 2 — MAPA ══════════════════════════════════════════════════ -->
@@ -878,13 +742,13 @@ import MultiSelect from 'primevue/multiselect'
 import FallaForm from './FallaForm.vue'
 import FallaArchivos from './FallaArchivos.vue'
 const FallasMapView = defineAsyncComponent(() => import('./FallasMapView.vue'))
-import { Doughnut, Bar, Line } from 'vue-chartjs'
+import { Bar, Line } from 'vue-chartjs'
 import {
-  Chart as ChartJS, ArcElement, Tooltip, Legend,
+  Chart as ChartJS, Tooltip, Legend,
   CategoryScale, LinearScale, BarElement,
   PointElement, LineElement, Title, Filler
 } from 'chart.js'
-ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, PointElement, LineElement, Title, Filler)
+ChartJS.register(Tooltip, Legend, CategoryScale, LinearScale, BarElement, PointElement, LineElement, Title, Filler)
 import api from '@/api/client'
 
 const router         = useRouter()
@@ -951,9 +815,6 @@ const nuevaNota      = reactive({ nota: '', estado_id: null })
 const formDialogVisible = ref(false)
 const editingFalla      = ref(null)
 const savingForm        = ref(false)
-
-// ── Tab Gráficos ──────────────────────────────────────────────────────────
-const filtroGraficosProyecto = ref('')
 
 // ── Tab Gráficos: Generación ───────────────────────────────────────────────
 const genHoyLoading      = ref(false)
@@ -1638,220 +1499,6 @@ function startOfDay(d) {
   const x = new Date(d); x.setHours(0, 0, 0, 0); return x
 }
 
-// ── Gráficos ──────────────────────────────────────────────────────────────
-const fallasFiltGraficos = computed(() => {
-  if (!filtroGraficosProyecto.value) return allFallas.value
-  return allFallas.value.filter(f => f.proyecto?.id === filtroGraficosProyecto.value)
-})
-
-function groupBy(arr, keyFn, colorFn, labelFn) {
-  const g = {}
-  for (const f of arr) {
-    const k = keyFn(f) || 'Sin dato'
-    if (!g[k]) g[k] = { label: labelFn ? labelFn(f) : k, color: colorFn ? colorFn(f) : '#915BD8', count: 0 }
-    g[k].count++
-  }
-  return Object.values(g).sort((a, b) => b.count - a.count)
-}
-
-function buildDonut(arr, keyFn, colorFn) {
-  const segments = groupBy(arr, keyFn, colorFn)
-  const total    = segments.reduce((s, g) => s + g.count, 0)
-  if (!total) return []
-  let offset = 25
-  return segments.map(seg => {
-    const pct = (seg.count / total) * 100
-    const out = { ...seg, pct, offset: 100 - offset }
-    offset += pct
-    return out
-  })
-}
-
-const fallasPorCategoria = computed(() =>
-  groupBy(fallasFiltGraficos.value,
-    f => f.tipo?.categoria?.etiqueta,
-    f => f.tipo?.categoria?.color_hex || '#915BD8')
-)
-
-const fallasPorProyecto = computed(() =>
-  groupBy(allFallas.value, f => f.proyecto?.nombre_comercial)
-)
-
-const fallasPorTipo = computed(() =>
-  groupBy(fallasFiltGraficos.value, f => f.tipo?.etiqueta)
-)
-
-const topProyecto = computed(() => fallasPorProyecto.value[0] || null)
-const barMax      = computed(() => Math.max(...fallasPorCategoria.value.map(g => g.count), 1))
-
-const grafKpis = computed(() => {
-  const arr       = fallasFiltGraficos.value
-  const resueltas = arr.filter(f => f.estado?.es_estado_final)
-  const criticas  = arr.filter(f => f.prioridad?.codigo === 'critica').length
-  const tasa      = arr.length ? Math.round(resueltas.length / arr.length * 100) : 0
-  const conDias   = arr.filter(f => f.dias_abierta != null)
-  const avg       = conDias.length ? Math.round(conDias.reduce((s, f) => s + f.dias_abierta, 0) / conDias.length) : 0
-  // MTTR: promedio de días de resolución para fallas cerradas
-  const cerradasConDias = resueltas.filter(f => f.dias_abierta != null)
-  const mttr = cerradasConDias.length
-    ? (cerradasConDias.reduce((s, f) => s + f.dias_abierta, 0) / cerradasConDias.length).toFixed(1)
-    : '—'
-  // Energía total perdida
-  const energiaTotal = arr.filter(f => f.energia_perdida_kwh != null)
-    .reduce((s, f) => s + Number(f.energia_perdida_kwh), 0)
-  return { criticas, resueltas: resueltas.length, tasaResolucion: tasa, avgDias: avg, mttr, energiaTotal }
-})
-
-const donutEstado = computed(() =>
-  buildDonut(fallasFiltGraficos.value,
-    f => f.estado?.etiqueta,
-    f => f.estado?.color_hex || '#915BD8')
-)
-
-const donutPrioridad = computed(() =>
-  buildDonut(fallasFiltGraficos.value,
-    f => f.prioridad?.etiqueta,
-    f => PRIO_COLORS[f.prioridad?.codigo] || '#915BD8')
-)
-
-const fallasPorMes = computed(() => {
-  const g = {}
-  for (const f of fallasFiltGraficos.value) {
-    if (!f.fecha_identificacion) continue
-    const key = f.fecha_identificacion.slice(0, 7)
-    g[key] = (g[key] || 0) + 1
-  }
-  return Object.entries(g)
-    .sort((a, b) => a[0].localeCompare(b[0]))
-    .slice(-12)
-    .map(([key, count]) => ({
-      key, count,
-      label: new Date(key + '-15').toLocaleDateString('es-CO', { month: 'short', year: '2-digit' }),
-    }))
-})
-
-const timelineMax = computed(() => Math.max(...fallasPorMes.value.map(m => m.count), 1))
-
-// MTTR por categoría (solo fallas cerradas)
-const mttrPorCategoria = computed(() => {
-  const g = {}
-  for (const f of fallasFiltGraficos.value) {
-    if (!f.estado?.es_estado_final || f.dias_abierta == null) continue
-    const k     = f.tipo?.categoria?.etiqueta || 'Sin categoría'
-    const color = f.tipo?.categoria?.color_hex || '#915BD8'
-    if (!g[k]) g[k] = { label: k, color, total: 0, count: 0 }
-    g[k].total += f.dias_abierta
-    g[k].count++
-  }
-  return Object.values(g)
-    .map(x => ({ ...x, avg: +(x.total / x.count).toFixed(1) }))
-    .sort((a, b) => b.avg - a.avg)
-})
-
-// Energía perdida por proyecto
-const energiaPorProyecto = computed(() => {
-  const g = {}
-  for (const f of fallasFiltGraficos.value) {
-    if (f.energia_perdida_kwh == null) continue
-    const k = f.proyecto?.nombre_comercial || 'Sin proyecto'
-    g[k] = (g[k] || 0) + Number(f.energia_perdida_kwh)
-  }
-  return Object.entries(g)
-    .map(([label, total]) => ({ label, total }))
-    .sort((a, b) => b.total - a.total)
-})
-
-// ── Chart.js data objects ──────────────────────────────────────────────────
-const FONT = { family: 'inherit', size: 11 }
-const GRID_COLOR = '#f0eaf8'
-const BRAND = '#915BD8'
-
-const sharedDonutOpts = {
-  responsive: true,
-  maintainAspectRatio: false,
-  cutout: '68%',
-  plugins: {
-    legend: { position: 'right', labels: { font: FONT, padding: 14, boxWidth: 10, boxHeight: 10, color: '#374151' } },
-    tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${ctx.raw} (${Math.round(ctx.raw / ctx.dataset.data.reduce((a,b)=>a+b,0)*100)}%)` } }
-  }
-}
-
-const sharedBarHOpts = {
-  indexAxis: 'y',
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ` ${ctx.raw}` } } },
-  scales: {
-    x: { grid: { color: GRID_COLOR }, ticks: { font: FONT, color: '#6b7280' }, border: { display: false } },
-    y: { grid: { display: false }, ticks: { font: { ...FONT, size: 11 }, color: '#374151' }, border: { display: false } }
-  },
-  borderRadius: 5,
-  barThickness: 18,
-}
-
-// Donut estado
-const donutEstadoData = computed(() => ({
-  labels: donutEstado.value.map(s => s.label),
-  datasets: [{ data: donutEstado.value.map(s => s.count), backgroundColor: donutEstado.value.map(s => s.color + 'cc'), borderColor: donutEstado.value.map(s => s.color), borderWidth: 1.5, hoverOffset: 6 }]
-}))
-
-// Donut prioridad
-const donutPrioData = computed(() => ({
-  labels: donutPrioridad.value.map(s => s.label),
-  datasets: [{ data: donutPrioridad.value.map(s => s.count), backgroundColor: donutPrioridad.value.map(s => s.color + 'cc'), borderColor: donutPrioridad.value.map(s => s.color), borderWidth: 1.5, hoverOffset: 6 }]
-}))
-
-// Bar horizontal: por categoría
-const barCatData = computed(() => ({
-  labels: fallasPorCategoria.value.map(g => g.label),
-  datasets: [{ data: fallasPorCategoria.value.map(g => g.count), backgroundColor: fallasPorCategoria.value.map(g => (g.color||BRAND)+'cc'), borderColor: fallasPorCategoria.value.map(g => g.color||BRAND), borderWidth: 1 }]
-}))
-
-// Line: evolución mensual
-const lineEvolucionData = computed(() => ({
-  labels: fallasPorMes.value.map(m => m.label),
-  datasets: [{
-    label: 'Fallas', data: fallasPorMes.value.map(m => m.count),
-    borderColor: BRAND, backgroundColor: BRAND + '22',
-    borderWidth: 2, fill: true, tension: 0.4,
-    pointBackgroundColor: BRAND, pointRadius: 4, pointHoverRadius: 6
-  }]
-}))
-const lineEvolucionOpts = {
-  responsive: true, maintainAspectRatio: false,
-  plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ` ${ctx.raw} fallas` } } },
-  scales: {
-    x: { grid: { color: GRID_COLOR }, ticks: { font: FONT, color: '#6b7280' }, border: { display: false } },
-    y: { grid: { color: GRID_COLOR }, ticks: { font: FONT, color: '#6b7280', stepSize: 1 }, border: { display: false }, beginAtZero: true }
-  }
-}
-
-// Bar horizontal: top proyectos
-const barProyData = computed(() => ({
-  labels: fallasPorProyecto.value.slice(0,10).map(g => g.label),
-  datasets: [{ data: fallasPorProyecto.value.slice(0,10).map(g => g.count), backgroundColor: BRAND + 'cc', borderColor: BRAND, borderWidth: 1 }]
-}))
-
-// Bar horizontal: top tipos
-const barTipoData = computed(() => ({
-  labels: fallasPorTipo.value.slice(0,8).map(g => g.label),
-  datasets: [{ data: fallasPorTipo.value.slice(0,8).map(g => g.count), backgroundColor: '#3b82f6cc', borderColor: '#3b82f6', borderWidth: 1 }]
-}))
-
-// Bar horizontal: MTTR por categoría
-const barMttrData = computed(() => ({
-  labels: mttrPorCategoria.value.map(g => g.label),
-  datasets: [{ data: mttrPorCategoria.value.map(g => g.avg), backgroundColor: mttrPorCategoria.value.map(g => (g.color||BRAND)+'cc'), borderColor: mttrPorCategoria.value.map(g => g.color||BRAND), borderWidth: 1 }]
-}))
-const barMttrOpts = computed(() => ({ ...sharedBarHOpts, plugins: { ...sharedBarHOpts.plugins, tooltip: { callbacks: { label: ctx => ` ${ctx.raw}d promedio` } } } }))
-
-// Bar horizontal: energía por proyecto
-const barEnergiaData = computed(() => ({
-  labels: energiaPorProyecto.value.slice(0,10).map(g => g.label),
-  datasets: [{ data: energiaPorProyecto.value.slice(0,10).map(g => g.total), backgroundColor: '#dc2626cc', borderColor: '#dc2626', borderWidth: 1 }]
-}))
-const barEnergiaOpts = computed(() => ({ ...sharedBarHOpts, plugins: { ...sharedBarHOpts.plugins, tooltip: { callbacks: { label: ctx => ` ${Number(ctx.raw).toLocaleString('es-CO')} kWh` } } } }))
-
 // ── Computed: Generación ──────────────────────────────────────────────────
 // Proyectos para los gráficos de generación.
 // Prioridad: 1) srv_operacion + minigranja/gd  2) cualquier proyecto con P90
@@ -1873,6 +1520,11 @@ const proyectosGenOp = computed(() => {
 })
 // IDs de esos proyectos para filtrar filas de generación
 const genOpIds = computed(() => new Set(proyectosGenOp.value.map(p => p.id)))
+
+// ── Constantes Chart.js ───────────────────────────────────────────────────
+const FONT       = { family: 'inherit', size: 11 }
+const GRID_COLOR = '#f0eaf8'
+const BRAND      = '#915BD8'
 
 // Chart 1 ─ Últimos 7 días
 const gen7HasData   = computed(() => gen7Days.value.some(d => d.real != null || d.p90 != null))
@@ -2781,45 +2433,7 @@ watch(bucket, (newBucket) => {
 /* Container */
 .charts-container { display:flex; flex-direction:column; gap:16px; }
 
-/* Topbar: filtro + KPIs */
-.charts-topbar {
-  display:flex; align-items:center; gap:16px; flex-wrap:wrap;
-  background:#fff; border:1px solid #ece8f4; border-radius:12px; padding:14px 18px;
-  box-shadow:0 1px 3px rgba(28,18,50,.04);
-}
-.charts-filter-wrap { display:flex; flex-direction:column; gap:3px; }
-.charts-filter-lbl { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:#a094b8; }
-.charts-select {
-  background:#f9f7fd; border:1.5px solid #e5e0f0; border-radius:8px;
-  padding:6px 10px; color:#2C2039; font-size:12px; font-family:inherit;
-  outline:none; min-width:180px; cursor:pointer;
-}
-.charts-select:focus { border-color:#915BD8; }
-.charts-kpis { display:flex; gap:8px; flex-wrap:wrap; margin-left:auto; }
-.ck { display:flex; flex-direction:column; align-items:center; background:#f9f7fd; border:1px solid #ece8f4; border-radius:10px; padding:8px 14px; min-width:64px; }
-.ck--total { background:#f5f0ff; border-color:#d4c8e8; }
-.ck-val { font-size:20px; font-weight:900; line-height:1; }
-.ck-lbl { font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:.3px; color:#9b89b5; margin-top:3px; }
-
-/* Top proyecto card */
-.top-proyecto-card {
-  display:flex; align-items:center; gap:14px;
-  background:linear-gradient(135deg,#7c3aed08,#915BD814);
-  border:1px solid #d4c8e8; border-radius:12px; padding:14px 18px;
-}
-.top-proy-icon { font-size:24px; }
-.top-proy-label { font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; color:#a094b8; }
-.top-proy-name { font-size:15px; font-weight:800; color:#2C2039; margin-top:2px; }
-.top-proy-count { margin-left:auto; text-align:center; }
-.top-proy-num { font-size:28px; font-weight:900; color:#915BD8; line-height:1; }
-.top-proy-sub { font-size:10px; color:#a094b8; font-weight:600; text-transform:uppercase; }
-
 /* Charts grid */
-.charts-grid {
-  display:grid;
-  grid-template-columns:repeat(auto-fill, minmax(340px,1fr));
-  gap:16px;
-}
 .chart-card {
   background:#fff; border:1px solid #ece8f4; border-radius:12px;
   padding:16px 18px; box-shadow:0 1px 4px rgba(28,18,50,.05);
@@ -2831,7 +2445,6 @@ watch(bucket, (newBucket) => {
 
 @media (max-width:768px) {
   .mon-tab-view { padding:16px; }
-  .charts-grid { grid-template-columns:1fr; }
   .chart-card--wide { grid-column:1; }
 }
 
