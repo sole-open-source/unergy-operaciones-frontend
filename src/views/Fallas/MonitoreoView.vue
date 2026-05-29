@@ -605,41 +605,68 @@
           </div>
         </div>
 
-        <!-- ── Gráfico 2: Comparar proyectos ── -->
+        <!-- ── Gráfico: Generación por proyecto ── -->
         <div class="chart-card chart-card--wide">
           <div class="gen-card-head">
             <div class="gen-card-title">
-              <i class="pi pi-objects-column" style="color:#7c3aed;font-size:13px" />
-              <span>Comparar proyectos</span>
-              <span class="p90-section-sub">· Generación real diaria por proyecto</span>
+              <i class="pi pi-chart-bar" style="color:#7c3aed;font-size:13px" />
+              <span>Generación por proyecto</span>
+              <span class="p90-section-sub">· kWh diarios + fallas asociadas</span>
             </div>
           </div>
           <div class="gen-pr-controls">
-            <MultiSelect v-model="genPrSel" :options="proyectosGenOp" optionLabel="nombre_comercial" optionValue="id"
-              placeholder="Seleccionar proyectos…" class="gen-multiselect" filter
-              :maxSelectedLabels="2" selectedItemsLabel="{0} proyectos seleccionados" />
-            <DatePicker v-model="genPrFechaInicio" dateFormat="yy-mm-dd" placeholder="Desde"
+            <Select v-model="genProjSel" :options="proyectosGenOp" optionLabel="nombre_comercial" optionValue="id"
+              placeholder="Seleccionar proyecto…" filter showClear class="gen-multiselect" />
+            <DatePicker v-model="genProjFechaInicio" dateFormat="yy-mm-dd" placeholder="Desde"
               showButtonBar class="p90-dp" size="small" />
-            <DatePicker v-model="genPrFechaFin" dateFormat="yy-mm-dd" placeholder="Hasta"
+            <DatePicker v-model="genProjFechaFin" dateFormat="yy-mm-dd" placeholder="Hasta"
               showButtonBar class="p90-dp" size="small" />
-            <Button label="Ver" icon="pi pi-chart-line" size="small"
-              @click="cargarGenPr" :loading="genPrLoading" :disabled="!genPrSel.length" />
+            <Button label="Ver" icon="pi pi-chart-bar" size="small"
+              @click="cargarGenProj" :loading="genProjLoading" :disabled="!genProjSel" />
           </div>
-          <div v-if="!genPrSel.length" class="p90-state" style="padding:40px">
+          <div v-if="!genProjSel" class="p90-state" style="padding:40px">
             <i class="pi pi-hand-pointer" style="color:#a094b8;font-size:26px" />
-            <span>Selecciona uno o más proyectos para comparar.</span>
+            <span>Selecciona un proyecto para ver su generación y fallas.</span>
           </div>
-          <div v-else-if="genPrLoading" class="p90-state" style="padding:40px">
+          <div v-else-if="genProjLoading" class="p90-state" style="padding:40px">
             <i class="pi pi-spin pi-spinner" style="color:#915BD8;font-size:22px" />
             <span>Cargando datos…</span>
           </div>
-          <div v-else-if="genPrDays.length === 0 && genPrCargado" class="p90-state" style="padding:40px">
+          <div v-else-if="genProjDays.length === 0 && genProjCargado" class="p90-state" style="padding:40px">
             <i class="pi pi-database" style="color:#9ca3af;font-size:26px" />
-            <span>Sin datos para los proyectos y período seleccionados.</span>
+            <span>Sin datos de generación para este período.</span>
           </div>
-          <div v-else-if="genPrDays.length" class="chart-canvas-wrap" style="height:280px">
-            <Line :data="lineGenPrData" :options="lineGenPrOpts" />
-          </div>
+          <template v-else-if="genProjDays.length">
+            <div class="chart-canvas-wrap" style="height:260px">
+              <Bar :data="barGenProjData" :options="barGenProjOpts" />
+            </div>
+            <div class="genproj-leyenda">
+              <span><span class="genproj-dot" style="background:#7c3aedcc"></span>Generación normal</span>
+              <span><span class="genproj-dot" style="background:#fb923ccc;border:2px solid #ea580c"></span>Día con falla activa</span>
+            </div>
+            <div v-if="genProjFallas.length" class="genproj-fallas">
+              <div class="genproj-fallas-header">
+                <i class="pi pi-bolt" style="color:#dc2626;font-size:11px" />
+                <span>{{ genProjFallas.length }} falla{{ genProjFallas.length !== 1 ? 's' : '' }} en este período</span>
+              </div>
+              <div class="genproj-falla-row" v-for="f in genProjFallas" :key="f.id">
+                <code class="genproj-codigo">{{ f.codigo_interno }}</code>
+                <span class="genproj-fecha">{{ (f.fecha_reporte || '').split('T')[0] }}</span>
+                <span class="genproj-estado"
+                  :style="{ background: (f.estado?.color_hex || '#9ca3af') + '22', color: f.estado?.color_hex || '#6b7280', border: `1px solid ${(f.estado?.color_hex || '#9ca3af')}44` }">
+                  {{ f.estado?.etiqueta || '—' }}
+                </span>
+                <span class="genproj-prio" :style="{ color: prioColor(f.prioridad?.codigo) }">
+                  {{ f.prioridad?.etiqueta || '—' }}
+                </span>
+                <span class="genproj-desc">{{ f.descripcion || '—' }}</span>
+              </div>
+            </div>
+            <div v-else-if="genProjCargado" class="genproj-sin-fallas">
+              <i class="pi pi-check-circle" style="color:#16a34a;font-size:13px" />
+              Sin fallas registradas en este período
+            </div>
+          </template>
         </div>
 
       </div><!-- /Generación section -->
@@ -891,12 +918,12 @@ const genHoyRows         = ref([])   // [{nombre_comercial, real, p90}]
 const hoyLabel           = new Date().toLocaleDateString('es-CO', { weekday:'long', day:'2-digit', month:'long' })
 const gen7Loading        = ref(false)
 const gen7Days           = ref([])       // [{fecha, real, p90}] — últimos 7 días
-const genPrLoading       = ref(false)
-const genPrCargado       = ref(false)
-const genPrSel           = ref([])       // IDs seleccionados
-const genPrFechaInicio   = ref(new Date(Date.now() - 29 * 86400000))
-const genPrFechaFin      = ref(new Date())
-const genPrDays          = ref([])       // rows de /generacion filtrados
+const genProjLoading      = ref(false)
+const genProjCargado      = ref(false)
+const genProjSel          = ref(null)        // ID de un solo proyecto
+const genProjFechaInicio  = ref(new Date(Date.now() - 29 * 86400000))
+const genProjFechaFin     = ref(new Date())
+const genProjDays         = ref([])          // rows de /generacion del proyecto
 
 // ── Computed: lógica de buckets ───────────────────────────────────────────
 function esAlertaSLA(f) {
@@ -1162,22 +1189,24 @@ async function cargarGen7() {
   }
 }
 
-// ── Carga: Generación multi-proyecto ─────────────────────────────────────
-async function cargarGenPr() {
-  if (!genPrSel.value.length) return
-  genPrLoading.value = true
-  genPrCargado.value = false
-  genPrDays.value = []
+// ── Carga: Generación por proyecto ───────────────────────────────────────
+async function cargarGenProj() {
+  if (!genProjSel.value) return
+  genProjLoading.value = true
+  genProjCargado.value = false
+  genProjDays.value = []
   try {
-    const fi = genPrFechaInicio.value.toISOString().split('T')[0]
-    const ff = genPrFechaFin.value.toISOString().split('T')[0]
+    const fi = genProjFechaInicio.value.toISOString().split('T')[0]
+    const ff = genProjFechaFin.value.toISOString().split('T')[0]
     const { data } = await api.get('/generacion', { params: { fecha_inicio: fi, fecha_fin: ff, size: 1000 } })
-    genPrDays.value = (data.items ?? []).filter(r => genPrSel.value.includes(r.proyecto_id))
+    genProjDays.value = (data.items ?? [])
+      .filter(r => r.proyecto_id === genProjSel.value)
+      .sort((a, b) => a.fecha.localeCompare(b.fecha))
   } catch {
-    genPrDays.value = []
+    genProjDays.value = []
   } finally {
-    genPrLoading.value = false
-    genPrCargado.value = true
+    genProjLoading.value = false
+    genProjCargado.value = true
   }
 }
 
@@ -1831,43 +1860,80 @@ const barGenHoyOpts = {
   },
 }
 
-// Chart 2 ─ Multi-proyecto
-const GEN_COLORS = ['#3b82f6','#7c3aed','#ec4899','#f59e0b','#10b981','#ef4444','#06b6d4','#84cc16','#f97316','#a855f7']
+// Chart 2 ─ Generación por proyecto (con fallas como contexto)
+const genProjFallasByDate = computed(() => {
+  if (!genProjSel.value) return {}
+  const fi = genProjFechaInicio.value?.toISOString().split('T')[0] || ''
+  const ff = genProjFechaFin.value?.toISOString().split('T')[0] || ''
+  const map = {}
+  allFallas.value
+    .filter(f => f.proyecto?.id === genProjSel.value &&
+      (f.fecha_reporte || '').split('T')[0] >= fi &&
+      (f.fecha_reporte || '').split('T')[0] <= ff)
+    .forEach(f => {
+      const d = (f.fecha_reporte || '').split('T')[0]
+      if (!map[d]) map[d] = []
+      map[d].push(f)
+    })
+  return map
+})
 
-const lineGenPrData = computed(() => {
-  const selProys = proyectosGenOp.value.filter(p => genPrSel.value.includes(p.id))
-  const dateSet  = [...new Set(genPrDays.value.map(r => r.fecha))].sort()
+const genProjFallas = computed(() => {
+  if (!genProjSel.value) return []
+  const fi = genProjFechaInicio.value?.toISOString().split('T')[0] || ''
+  const ff = genProjFechaFin.value?.toISOString().split('T')[0] || ''
+  return allFallas.value
+    .filter(f => f.proyecto?.id === genProjSel.value &&
+      (f.fecha_reporte || '').split('T')[0] >= fi &&
+      (f.fecha_reporte || '').split('T')[0] <= ff)
+    .sort((a, b) => (a.fecha_reporte || '').localeCompare(b.fecha_reporte || ''))
+})
+
+const barGenProjData = computed(() => {
+  const fbd = genProjFallasByDate.value
   return {
-    labels: dateSet.map(d =>
-      new Date(d + 'T00:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })
+    labels: genProjDays.value.map(r =>
+      new Date(r.fecha + 'T00:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })
     ),
-    datasets: selProys.map((p, i) => {
-      const byDate = {}
-      genPrDays.value.filter(r => r.proyecto_id === p.id)
-        .forEach(r => { byDate[r.fecha] = +Number(r.kwh_real || 0).toFixed(1) })
-      return {
-        label: p.nombre_comercial,
-        data: dateSet.map(d => byDate[d] ?? null),
-        borderColor: GEN_COLORS[i % GEN_COLORS.length],
-        backgroundColor: GEN_COLORS[i % GEN_COLORS.length] + '18',
-        borderWidth: 2, fill: false, tension: 0.4,
-        pointRadius: 3, pointHoverRadius: 5, spanGaps: true,
-      }
-    }),
+    datasets: [{
+      label: 'Generación (kWh)',
+      data: genProjDays.value.map(r => +(Number(r.kwh_real || 0).toFixed(1))),
+      backgroundColor: genProjDays.value.map(r => fbd[r.fecha]?.length ? '#fb923ccc' : '#7c3aedcc'),
+      borderColor:     genProjDays.value.map(r => fbd[r.fecha]?.length ? '#ea580c'   : '#7c3aed'),
+      borderWidth:     genProjDays.value.map(r => fbd[r.fecha]?.length ? 2           : 1),
+      borderRadius: 3,
+    }],
   }
 })
 
-const lineGenPrOpts = {
-  responsive: true, maintainAspectRatio: false,
-  plugins: {
-    legend: { position: 'top', labels: { font: FONT, padding: 12, boxWidth: 12, boxHeight: 12 } },
-    tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${Number(ctx.raw ?? 0).toLocaleString('es-CO')} kWh` } },
-  },
-  scales: {
-    x: { grid: { color: GRID_COLOR }, ticks: { font: FONT, color: '#6b7280', maxRotation: 45 }, border: { display: false } },
-    y: { grid: { color: GRID_COLOR }, ticks: { font: FONT, color: '#6b7280' }, border: { display: false }, beginAtZero: true },
-  },
-}
+const barGenProjOpts = computed(() => {
+  const fbd = genProjFallasByDate.value
+  const days = genProjDays.value
+  return {
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label: ctx => ` ${Number(ctx.raw ?? 0).toLocaleString('es-CO')} kWh`,
+          afterBody: (items) => {
+            const idx = items[0]?.dataIndex
+            if (idx == null || !days[idx]) return []
+            const fallas = fbd[days[idx].fecha] || []
+            if (!fallas.length) return []
+            const lines = [``, `⚡ ${fallas.length} falla(s):`]
+            fallas.forEach(f => lines.push(`  · ${f.codigo_interno}: ${(f.descripcion || '').slice(0, 45)}`))
+            return lines
+          },
+        },
+      },
+    },
+    scales: {
+      x: { grid: { color: GRID_COLOR }, ticks: { font: FONT, color: '#6b7280', maxRotation: 45 }, border: { display: false } },
+      y: { grid: { color: GRID_COLOR }, ticks: { font: FONT, color: '#6b7280', callback: v => `${v.toLocaleString('es-CO')} kWh` }, border: { display: false }, beginAtZero: true },
+    },
+  }
+})
 
 // ── Keyboard shortcuts ────────────────────────────────────────────────────
 function onKeydown(e) {
@@ -2816,5 +2882,94 @@ watch(bucket, (newBucket) => {
 .gen-fuente-badge--nd {
   background: #f3f4f6;
   color: #9ca3af;
+}
+
+/* ── Generación por proyecto ── */
+.genproj-leyenda {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  padding: 6px 20px 0;
+  font-size: 11px;
+  color: #6b7280;
+}
+.genproj-dot {
+  display: inline-block;
+  width: 10px; height: 10px;
+  border-radius: 2px;
+  margin-right: 5px;
+  vertical-align: middle;
+  box-sizing: border-box;
+}
+.genproj-fallas {
+  margin: 14px 20px 4px;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.genproj-fallas-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #fff7f7;
+  padding: 7px 12px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #dc2626;
+  border-bottom: 1px solid #fecaca;
+}
+.genproj-falla-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  font-size: 11px;
+  color: #374151;
+  border-bottom: 1px solid #f3f4f6;
+  flex-wrap: wrap;
+}
+.genproj-falla-row:last-child { border-bottom: none; }
+.genproj-codigo {
+  font-family: monospace;
+  font-size: 10.5px;
+  background: #f3f4f6;
+  color: #374151;
+  padding: 1px 5px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.genproj-fecha {
+  color: #6b7280;
+  flex-shrink: 0;
+  min-width: 72px;
+}
+.genproj-estado {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+.genproj-prio {
+  font-size: 10.5px;
+  font-weight: 600;
+  flex-shrink: 0;
+  min-width: 60px;
+}
+.genproj-desc {
+  color: #6b7280;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+.genproj-sin-fallas {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 20px 12px;
+  font-size: 11px;
+  color: #16a34a;
 }
 </style>
