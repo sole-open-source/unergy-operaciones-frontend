@@ -549,6 +549,8 @@
             <div v-if="!genHoyLoading && genHoyRows.length" class="gen-legend">
               <span class="p90-legend-item"><span class="p90-legend-dot" style="background:#16a34a"></span> Real</span>
               <span class="p90-legend-item"><span class="p90-legend-dot" style="background:#f59e0b"></span> P90</span>
+              <span class="gen-fuente-badge gen-fuente-badge--inv" v-tooltip.top="'Datos de inversores'">INV</span>
+              <span class="gen-fuente-badge gen-fuente-badge--med" v-tooltip.top="'Datos de medidor de frontera'">MED</span>
               <span class="gen-kpi" :style="{ color: genHoyKpi.ratio >= 100 ? '#16a34a' : genHoyKpi.ratio >= 80 ? '#d97706' : '#dc2626' }">
                 {{ genHoyKpi.ratio }}% vs P90
               </span>
@@ -573,6 +575,15 @@
                   <span :style="{ color: r.p90 > 0 && r.real >= r.p90 ? '#16a34a' : r.real > 0 ? '#d97706' : '#9ca3af', fontWeight: 600 }">
                     {{ r.real.toLocaleString('es-CO') }} kWh
                   </span>
+                  <span v-if="r.fuente === 'inversor'"
+                    class="gen-fuente-badge gen-fuente-badge--inv"
+                    v-tooltip.top="'Dato de inversores'">INV</span>
+                  <span v-else-if="r.fuente === 'medidor'"
+                    class="gen-fuente-badge gen-fuente-badge--med"
+                    v-tooltip.top="'Dato de medidor de frontera'">MED</span>
+                  <span v-else-if="r.fuente === 'sin_dato'"
+                    class="gen-fuente-badge gen-fuente-badge--nd"
+                    v-tooltip.top="'Sin dato disponible en Solenium'">S/D</span>
                   <span style="color:#d1d5db;margin:0 4px">/</span>
                   <span style="color:#f59e0b">{{ r.p90.toLocaleString('es-CO') }} kWh P90</span>
                   <span class="gen-hoy-pct"
@@ -1092,13 +1103,15 @@ async function cargarGenHoy() {
     try {
       const { data } = await api.get('/generacion-solar/generacion-hoy')
       for (const row of data.proyectos ?? []) {
-        if (byProyecto[row.proyecto_id] !== undefined)
-          byProyecto[row.proyecto_id].real = Number(row.kwh_real || 0)
+        if (byProyecto[row.proyecto_id] !== undefined) {
+          byProyecto[row.proyecto_id].real   = Number(row.kwh_real || 0)
+          byProyecto[row.proyecto_id].fuente = row.fuente || 'sin_dato'
+        }
       }
     } catch { /* Solenium no disponible — solo P90 */ }
 
     genHoyRows.value = Object.values(byProyecto)
-      .map(r => ({ ...r, real: +r.real.toFixed(1), p90: +r.p90.toFixed(1) }))
+      .map(r => ({ ...r, real: +r.real.toFixed(1), p90: +r.p90.toFixed(1), fuente: r.fuente || 'sin_dato' }))
       .sort((a, b) => b.p90 - a.p90)
   } catch {
     genHoyRows.value = []
@@ -2777,5 +2790,31 @@ watch(bucket, (newBucket) => {
   border-radius: 999px;
   transition: width 0.5s cubic-bezier(.4,0,.2,1);
   min-width: 2px;
+}
+
+/* ── Badges de fuente de datos (INV / MED / S/D) ── */
+.gen-fuente-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 1px 4px;
+  border-radius: 3px;
+  margin-left: 3px;
+  vertical-align: middle;
+  cursor: default;
+}
+.gen-fuente-badge--inv {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+.gen-fuente-badge--med {
+  background: #d1fae5;
+  color: #065f46;
+}
+.gen-fuente-badge--nd {
+  background: #f3f4f6;
+  color: #9ca3af;
 }
 </style>
