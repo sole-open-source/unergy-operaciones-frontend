@@ -1,637 +1,1333 @@
 <template>
-  <div class="space-y-6">
-    <!-- Header -->
-    <div class="flex items-center justify-between">
-      <div>
-        <h1 class="text-xl font-bold" style="color: #2C2039;">Generación Solar</h1>
-        <p class="text-sm" style="color: #6b5a8a;">Datos en tiempo real de Solenium</p>
+  <div class="gs-page">
+
+    <!-- ══ HEADER BAR ══════════════════════════════════════════════════════ -->
+    <div class="gs-header">
+      <div class="gs-header-left">
+        <h1 class="gs-title">Generación Solar</h1>
+        <p class="gs-subtitle">
+          <span v-if="monitoringData">
+            {{ monitoringData.fleet.total }} proyectos conectados
+          </span>
+          <span v-else>Cargando flota...</span>
+          <span v-if="lastUpdated" class="gs-last-updated">
+            &nbsp;· Actualizado {{ lastUpdated }}
+          </span>
+        </p>
       </div>
-      <button @click="loadData" :disabled="loading"
-              class="px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors"
-              :style="{ backgroundColor: loading ? '#a78bcc' : '#915BD8' }">
-        <i :class="loading ? 'pi pi-spin pi-spinner' : 'pi pi-refresh'" class="mr-1" />
-        Actualizar
-      </button>
-    </div>
-
-    <!-- Fleet KPIs -->
-    <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
-      <div v-for="kpi in fleetKpis" :key="kpi.label"
-           class="bg-white rounded-xl shadow-sm p-4" style="border: 1px solid #e8e0f0;">
-        <p class="text-xs uppercase tracking-wide font-semibold" style="color: #6b5a8a;">{{ kpi.label }}</p>
-        <p class="text-2xl font-bold mt-1" :style="{ color: kpi.color || '#2C2039' }">{{ kpi.value }}</p>
-        <p v-if="kpi.sub" class="text-xs mt-0.5" style="color: #915BD8;">{{ kpi.sub }}</p>
-      </div>
-    </div>
-
-    <!-- Tabs -->
-    <div class="flex gap-1 bg-white rounded-lg p-1 shadow-sm" style="border: 1px solid #e8e0f0;">
-      <button v-for="(tab, i) in TABS" :key="tab" @click="activeTab = i"
-              class="px-4 py-2 rounded-md text-sm font-medium transition-colors"
-              :style="activeTab === i
-                ? { backgroundColor: '#915BD8', color: 'white' }
-                : { color: '#6b5a8a' }">
-        {{ tab }}
-      </button>
-    </div>
-
-    <!-- Tab 0: Fleet Table -->
-    <div v-if="activeTab === 0" class="bg-white rounded-xl shadow-sm p-5" style="border: 1px solid #e8e0f0;">
-      <div class="flex items-center gap-3 mb-4">
-        <div class="flex gap-1 bg-gray-100 rounded-lg p-0.5">
-          <button @click="fleetFilter = 'all'" class="px-3 py-1 text-xs rounded-md font-medium"
-                  :style="fleetFilter === 'all' ? { backgroundColor: '#915BD8', color: 'white' } : { color: '#6b5a8a' }">
-            Todos
-          </button>
-          <button @click="fleetFilter = 'minifarm'" class="px-3 py-1 text-xs rounded-md font-medium"
-                  :style="fleetFilter === 'minifarm' ? { backgroundColor: '#915BD8', color: 'white' } : { color: '#6b5a8a' }">
-            Minigranjas
-          </button>
-          <button @click="fleetFilter = 'gd'" class="px-3 py-1 text-xs rounded-md font-medium"
-                  :style="fleetFilter === 'gd' ? { backgroundColor: '#915BD8', color: 'white' } : { color: '#6b5a8a' }">
-            GD / Autoconsumo
-          </button>
+      <div class="gs-header-right">
+        <!-- Auto-refresh countdown chip -->
+        <div class="gs-countdown-chip" :class="{ 'gs-countdown-chip--urgent': countdown <= 30 }">
+          <i class="pi pi-clock" style="font-size:11px" />
+          {{ countdownDisplay }}
         </div>
-        <input v-model="searchText" type="text" placeholder="Buscar proyecto..."
-               class="px-3 py-1.5 rounded-lg border text-sm flex-1" style="border-color: #e8e0f0;" />
+        <!-- Refresh button -->
+        <button class="gs-refresh-btn" @click="cargar" :disabled="loading">
+          <i :class="loading ? 'pi pi-spin pi-spinner' : 'pi pi-refresh'" />
+          Actualizar
+        </button>
+      </div>
+    </div>
+
+    <!-- ══ KPI STRIP ════════════════════════════════════════════════════════ -->
+    <div v-if="monitoringData" class="gs-kpi-strip">
+      <!-- Online -->
+      <div class="gs-kpi gs-kpi--online">
+        <div class="gs-kpi-icon">
+          <span class="gs-status-dot" style="background:#16a34a;width:10px;height:10px;" />
+        </div>
+        <div class="gs-kpi-body">
+          <span class="gs-kpi-value" style="color:#16a34a">{{ monitoringData.fleet.online }}</span>
+          <span class="gs-kpi-label">Online</span>
+        </div>
       </div>
 
-      <DataTable :value="filteredProjects" size="small" stripedRows :rowHover="true"
-                 :paginator="filteredProjects.length > 25" :rows="25"
-                 scrollable scrollHeight="500px" sortField="power_kw" :sortOrder="-1"
-                 class="text-sm">
-        <Column field="name" header="Proyecto" style="min-width:220px" sortable>
-          <template #body="{ data }">
-            <div>
-              <span class="font-medium" style="color: #2C2039;">{{ data.name }}</span>
-              <span v-if="data.is_minifarm" class="ml-1 text-xs px-1.5 py-0.5 rounded-full"
-                    style="background: rgba(145,91,216,0.1); color: #915BD8;">MGS</span>
+      <!-- Caídos (hidden if 0) -->
+      <div v-if="monitoringData.fleet.caido > 0" class="gs-kpi gs-kpi--caido">
+        <div class="gs-kpi-icon">
+          <span class="gs-status-dot" style="background:#dc2626;width:10px;height:10px;" />
+        </div>
+        <div class="gs-kpi-body">
+          <span class="gs-kpi-value" style="color:#dc2626">{{ monitoringData.fleet.caido }}</span>
+          <span class="gs-kpi-label">Caídos</span>
+        </div>
+      </div>
+
+      <!-- Sin comunicación (hidden if 0) -->
+      <div v-if="monitoringData.fleet.sin_comunicacion > 0" class="gs-kpi gs-kpi--sincom">
+        <div class="gs-kpi-icon">
+          <span class="gs-status-dot" style="background:#9ca3af;width:10px;height:10px;" />
+        </div>
+        <div class="gs-kpi-body">
+          <span class="gs-kpi-value" style="color:#6b7280">{{ monitoringData.fleet.sin_comunicacion }}</span>
+          <span class="gs-kpi-label">Sin comunicación</span>
+        </div>
+      </div>
+
+      <!-- Degradados (hidden if 0) -->
+      <div v-if="monitoringData.fleet.degradado > 0" class="gs-kpi gs-kpi--degradado">
+        <div class="gs-kpi-icon">
+          <span class="gs-status-dot" style="background:#d97706;width:10px;height:10px;" />
+        </div>
+        <div class="gs-kpi-body">
+          <span class="gs-kpi-value" style="color:#d97706">{{ monitoringData.fleet.degradado }}</span>
+          <span class="gs-kpi-label">Degradados</span>
+        </div>
+      </div>
+
+      <!-- Potencia total -->
+      <div class="gs-kpi">
+        <div class="gs-kpi-icon">
+          <i class="pi pi-bolt" style="color:#915BD8;font-size:14px;" />
+        </div>
+        <div class="gs-kpi-body">
+          <span class="gs-kpi-value" style="color:#915BD8">{{ formatPower(monitoringData.fleet.total_power_kw) }}</span>
+          <span class="gs-kpi-label">Potencia total</span>
+        </div>
+      </div>
+
+      <!-- Utilización -->
+      <div class="gs-kpi">
+        <div class="gs-kpi-icon">
+          <i class="pi pi-chart-bar" style="color:#2C2039;font-size:14px;" />
+        </div>
+        <div class="gs-kpi-body">
+          <div class="gs-kpi-util-row">
+            <span class="gs-kpi-value" style="color:#2C2039">{{ monitoringData.fleet.utilization_pct }}%</span>
+            <span class="gs-kpi-label">Utilización</span>
+          </div>
+          <div class="gs-util-bar">
+            <div class="gs-util-bar-fill"
+              :style="{ width: Math.min(monitoringData.fleet.utilization_pct, 100) + '%',
+                        backgroundColor: monitoringData.fleet.utilization_pct >= 50 ? '#16a34a'
+                          : monitoringData.fleet.utilization_pct >= 20 ? '#d97706' : '#dc2626' }" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- KPI skeleton -->
+    <div v-else class="gs-kpi-strip">
+      <div v-for="i in 5" :key="i" class="gs-kpi gs-kpi--skeleton" />
+    </div>
+
+    <!-- ══ FILTER BAR ═══════════════════════════════════════════════════════ -->
+    <div class="gs-filter-bar">
+      <div class="gs-status-pills">
+        <button v-for="pill in STATUS_PILLS" :key="pill.key"
+          class="gs-pill" :class="{ 'gs-pill--active': activeFilter === pill.key }"
+          :style="activeFilter === pill.key ? { backgroundColor: pill.color, borderColor: pill.color, color: '#fff' } : {}"
+          @click="activeFilter = pill.key">
+          {{ pill.label }}
+        </button>
+      </div>
+      <div class="gs-search-wrap">
+        <i class="pi pi-search gs-search-icon" />
+        <input v-model="searchText" type="text" placeholder="Buscar proyecto..." class="gs-search-input" />
+      </div>
+    </div>
+
+    <!-- ══ PROJECT CARDS GRID ════════════════════════════════════════════════ -->
+    <div v-if="monitoringData" class="gs-cards-grid">
+      <div v-if="!filteredProjects.length" class="gs-empty">
+        <i class="pi pi-search text-3xl mb-2" style="color:#9ca3af" />
+        <p style="color:#6b5a8a">Sin proyectos que coincidan con el filtro</p>
+      </div>
+
+      <div v-for="proj in filteredProjects" :key="proj.proyecto_id"
+        class="gs-card"
+        :class="{ 'gs-card--selected': selectedProyId === proj.proyecto_id }"
+        :style="{
+          borderLeftColor: STATUS_CFG[proj.status]?.border || '#e5e7eb',
+          backgroundColor: selectedProyId === proj.proyecto_id ? '#faf7ff' : '#fff',
+        }"
+        @click="selectProject(proj)">
+
+        <!-- Status badge top-right -->
+        <div class="gs-card-badge"
+          :style="{ background: STATUS_CFG[proj.status]?.bg, color: STATUS_CFG[proj.status]?.color }">
+          <span class="gs-status-dot"
+            :style="{ background: STATUS_CFG[proj.status]?.dot }" />
+          {{ STATUS_CFG[proj.status]?.label || proj.status }}
+        </div>
+
+        <!-- Project name -->
+        <div class="gs-card-name">{{ proj.nombre }}</div>
+
+        <!-- Power -->
+        <div class="gs-card-power">
+          <span class="gs-card-power-val">{{ proj.power_kw != null ? proj.power_kw.toLocaleString('es-CO', { maximumFractionDigits: 1 }) : '—' }}</span>
+          <span class="gs-card-power-unit">kW</span>
+        </div>
+
+        <!-- Utilization bar -->
+        <div class="gs-card-util">
+          <div class="gs-util-bar gs-util-bar--card">
+            <div class="gs-util-bar-fill"
+              :style="{
+                width: Math.min(proj.utilization_pct || 0, 100) + '%',
+                backgroundColor: STATUS_CFG[proj.status]?.dot || '#9ca3af',
+              }" />
+          </div>
+          <span class="gs-card-util-pct">{{ proj.utilization_pct != null ? proj.utilization_pct + '%' : '—' }}</span>
+        </div>
+
+        <!-- Bottom stats row -->
+        <div class="gs-card-stats">
+          <div class="gs-card-stat">
+            <span class="gs-card-stat-label">kWh hoy</span>
+            <span class="gs-card-stat-val">
+              {{ proj.energy_today_kwh != null ? proj.energy_today_kwh.toLocaleString('es-CO', { maximumFractionDigits: 1 }) : '—' }}
+            </span>
+          </div>
+          <div class="gs-card-stat">
+            <span class="gs-card-stat-label">Disponib.</span>
+            <span class="gs-card-stat-val">
+              {{ proj.availability_pct != null ? proj.availability_pct + '%' : '—' }}
+            </span>
+          </div>
+        </div>
+
+        <!-- Crear falla button -->
+        <button class="gs-card-falla-btn"
+          @click.stop="openFallaDialog(proj)">
+          <i class="pi pi-bolt" style="font-size:10px" />
+          Crear falla
+        </button>
+      </div>
+    </div>
+
+    <!-- Cards skeleton -->
+    <div v-else class="gs-cards-grid">
+      <div v-for="i in 8" :key="i" class="gs-card gs-card--skeleton" />
+    </div>
+
+    <!-- ══ DETAIL PANEL ══════════════════════════════════════════════════════ -->
+    <Transition name="gs-panel-slide">
+      <div v-if="selectedProyId && detailData" class="gs-detail-panel">
+
+        <!-- Detail header -->
+        <div class="gs-detail-header">
+          <div class="gs-detail-header-left">
+            <h2 class="gs-detail-title">{{ detailData.nombre }}</h2>
+            <div class="gs-detail-meta">
+              <span class="gs-sol-badge">SOL #{{ detailData.sol_id }}</span>
+              <span class="gs-detail-cap">{{ detailData.capacity_kwp }} kWp instalados</span>
+              <span class="gs-detail-total">{{ detailData.total_30d_kwh?.toLocaleString('es-CO') }} kWh últimos 30d</span>
             </div>
-            <span class="text-xs" style="color: #6b5a8a;">{{ data.location }}</span>
-          </template>
-        </Column>
-        <Column field="capacity_kwp" header="Cap. (kWp)" style="min-width:100px" sortable>
-          <template #body="{ data }">
-            <span class="font-mono text-xs">{{ (data.capacity_kwp || 0).toLocaleString() }}</span>
-          </template>
-        </Column>
-        <Column field="power_kw" header="Potencia (kW)" style="min-width:120px" sortable>
-          <template #body="{ data }">
-            <span class="font-mono text-sm font-semibold"
-                  :style="{ color: data.power_kw > 0 ? '#10B981' : '#9CA3AF' }">
-              {{ (data.power_kw || 0).toFixed(1) }}
-            </span>
-          </template>
-        </Column>
-        <Column header="Utilización" style="min-width:130px" sortable sortField="utilization">
-          <template #body="{ data }">
-            <div class="flex items-center gap-2">
-              <div class="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
-                <div class="h-full rounded-full transition-all"
-                     :style="{ width: Math.min(data.utilization || 0, 100) + '%',
-                               backgroundColor: data.utilization > 50 ? '#10B981' : data.utilization > 20 ? '#F0C040' : '#D64455' }" />
-              </div>
-              <span class="text-xs font-mono w-10 text-right" style="color: #6b5a8a;">
-                {{ (data.utilization || 0).toFixed(0) }}%
-              </span>
-            </div>
-          </template>
-        </Column>
-        <Column header="kWh/kWp" style="min-width:90px" sortable sortField="kwh_per_kwp">
-          <template #body="{ data }">
-            <span v-if="data.capacity_kwp > 0 && data.energy_today_kwh != null"
-              class="font-mono text-xs font-semibold" style="color: #915BD8;">
-              {{ (data.energy_today_kwh / data.capacity_kwp).toFixed(2) }}
-            </span>
-            <span v-else class="text-xs" style="color: #9CA3AF;">—</span>
-          </template>
-        </Column>
-        <Column header="Fuente" style="min-width:90px">
-          <template #body="{ data }">
-            <span class="text-xs px-2 py-0.5 rounded-full"
-              :style="data.data_source === 'quoia'
-                ? 'background: rgba(145,91,216,0.1); color: #915BD8'
-                : 'background: rgba(16,185,129,0.1); color: #10B981'">
-              {{ data.data_source === 'quoia' ? 'Quoia' : 'Solenium' }}
-            </span>
-          </template>
-        </Column>
-        <Column header="Últ. dato" style="min-width:110px" sortable sortField="last_update">
-          <template #body="{ data }">
-            <span v-if="data.last_update" class="text-xs font-mono" style="color: #6b5a8a;">
-              {{ formatLastUpdate(data.last_update) }}
-            </span>
-            <span v-else class="text-xs" style="color: #D64455;">sin datos</span>
-          </template>
-        </Column>
-        <Column field="irradiance_w_m2" header="Irrad. (W/m²)" style="min-width:110px" sortable>
-          <template #body="{ data }">
-            <span class="font-mono text-xs" :style="{ color: data.irradiance_w_m2 ? '#D4A017' : '#9CA3AF' }">
-              {{ data.irradiance_w_m2 ? data.irradiance_w_m2.toFixed(0) : '—' }}
-            </span>
-          </template>
-        </Column>
-        <Column header="" style="min-width:60px">
-          <template #body="{ data }">
-            <button @click="selectProject(data)" class="text-xs px-2 py-1 rounded"
-                    style="color: #915BD8; background: rgba(145,91,216,0.08);">
-              <i class="pi pi-eye" />
+          </div>
+          <div class="gs-detail-header-right">
+            <button class="gs-card-falla-btn gs-card-falla-btn--lg"
+              @click="openFallaDialog(null)">
+              <i class="pi pi-bolt" style="font-size:11px" />
+              Crear falla
             </button>
-          </template>
-        </Column>
-      </DataTable>
-    </div>
-
-    <!-- Tab 1: Availability -->
-    <div v-if="activeTab === 1" class="bg-white rounded-xl shadow-sm p-5" style="border: 1px solid #e8e0f0;">
-      <h3 class="text-sm font-semibold mb-4" style="color: #2C2039;">Disponibilidad de Flota</h3>
-      <div v-if="availability" class="space-y-4">
-        <div v-for="(cat, key) in availability.categories" :key="key"
-             class="rounded-lg p-4" :style="{ background: catColors[key]?.bg || '#f5f5f5' }">
-          <div class="flex items-center justify-between mb-2">
-            <span class="text-sm font-semibold" :style="{ color: catColors[key]?.color || '#333' }">
-              {{ catLabels[key] || key }} ({{ cat.count }})
-            </span>
-          </div>
-          <div v-if="cat.projects?.length" class="flex flex-wrap gap-2">
-            <span v-for="p in cat.projects" :key="p.id"
-                  class="text-xs px-2 py-1 rounded" style="background: rgba(255,255,255,0.7);">
-              {{ p.name }}
-              <span v-if="p.availability != null" class="font-mono ml-1">{{ p.availability }}%</span>
-            </span>
-          </div>
-          <p v-else class="text-xs" style="color: #6b5a8a;">Sin proyectos</p>
-        </div>
-      </div>
-      <p v-else class="text-sm" style="color: #6b5a8a;">Cargando disponibilidad...</p>
-    </div>
-
-    <!-- Tab 2: Generation History -->
-    <div v-if="activeTab === 2" class="space-y-4">
-      <div class="bg-white rounded-xl shadow-sm p-5" style="border: 1px solid #e8e0f0;">
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="text-sm font-semibold" style="color: #2C2039;">Generación Diaria Flota ({{ histDays }} días)</h3>
-          <div class="flex gap-1">
-            <button v-for="d in [7, 30, 90]" :key="d" @click="histDays = d; loadHistory()"
-                    class="px-3 py-1 text-xs rounded-md font-medium"
-                    :style="histDays === d ? { backgroundColor: '#915BD8', color: 'white' } : { color: '#6b5a8a' }">
-              {{ d }}d
+            <button class="gs-close-btn" @click="closeDetail">
+              <i class="pi pi-times" />
             </button>
           </div>
         </div>
 
-        <div v-if="!histData.length" class="flex flex-col items-center py-8 gap-2 text-gray-400">
-          <i class="pi pi-database text-3xl" />
-          <p class="text-sm">Sin datos históricos de generación.</p>
-          <p class="text-xs" style="color: #6b5a8a;">Los datos se sincronizarán automáticamente desde Solenium.</p>
+        <!-- Loading detail -->
+        <div v-if="loadingDetail" class="gs-detail-loading">
+          <i class="pi pi-spin pi-spinner" style="font-size:24px;color:#915BD8" />
+          <span style="color:#6b5a8a">Cargando detalle...</span>
         </div>
 
         <template v-else>
-          <div class="grid grid-cols-3 gap-4 mb-4">
-            <div class="rounded-lg p-3" style="background: #f8f6fb;">
-              <p class="text-xs" style="color: #6b5a8a;">Total generado</p>
-              <p class="text-2xl font-bold" style="color: #2C2039;">{{ histTotal }} MWh</p>
-            </div>
-            <div class="rounded-lg p-3" style="background: #f8f6fb;">
-              <p class="text-xs" style="color: #6b5a8a;">Promedio diario</p>
-              <p class="text-2xl font-bold" style="color: #D4A017;">{{ histAvg }} MWh</p>
-            </div>
-            <div class="rounded-lg p-3" style="background: #f8f6fb;">
-              <p class="text-xs" style="color: #6b5a8a;">Días con datos</p>
-              <p class="text-2xl font-bold" style="color: #915BD8;">{{ histData.length }}</p>
-            </div>
-          </div>
 
-          <svg :viewBox="`0 0 ${histChartW} ${histChartH}`" class="w-full" style="max-height: 260px;">
-            <line v-for="y in histGridY" :key="'g'+y.val"
-              :x1="histPadL" :x2="histChartW - 10" :y1="y.py" :y2="y.py"
-              stroke="#e5e7eb" stroke-width="0.5" />
-            <text v-for="y in histGridY" :key="'t'+y.val"
-              :x="histPadL - 4" :y="y.py + 3" text-anchor="end"
-              fill="#9ca3af" font-size="9">{{ y.label }}</text>
-            <rect v-for="(bar, i) in histBars" :key="i"
-              :x="bar.x" :y="bar.y" :width="bar.w" :height="bar.h"
-              fill="#915BD8" opacity="0.85" rx="2" />
-            <text v-for="(lbl, i) in histXLabels" :key="'xl'+i"
-              :x="lbl.x" :y="histChartH - 2" text-anchor="middle"
-              fill="#9ca3af" font-size="8">{{ lbl.text }}</text>
-          </svg>
-        </template>
-      </div>
-
-      <!-- Per-project generation ranking -->
-      <div v-if="histByProject.length" class="bg-white rounded-xl shadow-sm p-5" style="border: 1px solid #e8e0f0;">
-        <h3 class="text-sm font-semibold mb-3" style="color: #2C2039;">Generación por Proyecto</h3>
-        <DataTable :value="histByProject" size="small" stripedRows :rowHover="true"
-                   sortField="mwh" :sortOrder="-1" class="text-sm">
-          <Column field="name" header="Proyecto" style="min-width:200px" sortable />
-          <Column field="mwh" header="MWh" style="min-width:100px" sortable>
-            <template #body="{ data }">
-              <span class="font-mono text-sm font-semibold" style="color: #D4A017;">{{ data.mwh.toLocaleString() }}</span>
-            </template>
-          </Column>
-          <Column field="capacity_kwp" header="Cap. (kWp)" style="min-width:100px">
-            <template #body="{ data }">
-              <span class="font-mono text-xs">{{ data.capacity_kwp ? data.capacity_kwp.toLocaleString() : '—' }}</span>
-            </template>
-          </Column>
-          <Column field="days_with_data" header="Días" style="min-width:80px" sortable />
-          <Column field="last_date" header="Último dato" style="min-width:110px">
-            <template #body="{ data }">
-              <span class="text-xs" style="color: #6b5a8a;">{{ data.last_date || '—' }}</span>
-            </template>
-          </Column>
-        </DataTable>
-      </div>
-    </div>
-
-    <!-- Tab 3: Project Detail (selected) -->
-    <div v-if="activeTab === 3" class="space-y-4">
-      <div v-if="!selectedProject" class="bg-white rounded-xl shadow-sm p-8 text-center" style="border: 1px solid #e8e0f0;">
-        <i class="pi pi-info-circle text-3xl mb-2" style="color: #6b5a8a;" />
-        <p class="text-sm" style="color: #6b5a8a;">Selecciona un proyecto de la tabla para ver detalle</p>
-      </div>
-      <template v-else>
-        <div class="bg-white rounded-xl shadow-sm p-5" style="border: 1px solid #e8e0f0;">
-          <div class="flex items-center justify-between mb-4">
-            <div>
-              <h3 class="text-lg font-bold" style="color: #2C2039;">{{ selectedProject.name }}</h3>
-              <p class="text-sm" style="color: #6b5a8a;">{{ selectedProject.location }}</p>
-            </div>
-            <button @click="selectedProject = null" class="text-xs px-3 py-1 rounded-lg"
-                    style="color: #915BD8; background: rgba(145,91,216,0.08);">
-              ← Volver a flota
-            </button>
-          </div>
-
-          <!-- Project detail info -->
-          <div v-if="projectDetail" class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-            <div v-for="item in projectDetailKpis" :key="item.label" class="p-3 rounded-lg" style="background: #f8f6fb;">
-              <p class="text-xs" style="color: #6b5a8a;">{{ item.label }}</p>
-              <p class="text-lg font-bold" style="color: #2C2039;">{{ item.value }}</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Inverters -->
-        <div v-if="projectDetail?.inverters?.length" class="bg-white rounded-xl shadow-sm p-5" style="border: 1px solid #e8e0f0;">
-          <h4 class="text-sm font-semibold mb-3" style="color: #2C2039;">
-            Inversores ({{ projectDetail.inverters.length }})
-          </h4>
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            <div v-for="inv in projectDetail.inverters" :key="inv.id"
-                 class="p-3 rounded-lg flex items-center justify-between" style="border: 1px solid #e8e0f0;">
-              <div>
-                <p class="text-sm font-medium" style="color: #2C2039;">{{ inv.dev_name }}</p>
-                <p class="text-xs" :style="{ color: inv.state === 'Grid-connected' ? '#10B981' : '#D64455' }">
-                  {{ inv.state }}
-                </p>
-              </div>
-              <div class="text-right">
-                <p class="text-lg font-bold" :style="{ color: inv.power > 0 ? '#10B981' : '#9CA3AF' }">
-                  {{ (inv.power || 0).toFixed(1) }}
-                </p>
-                <p class="text-xs" style="color: #6b5a8a;">kW</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Power curve today -->
-        <div v-if="projectDetail?.power_today" class="bg-white rounded-xl shadow-sm p-5" style="border: 1px solid #e8e0f0;">
-          <h4 class="text-sm font-semibold mb-3" style="color: #2C2039;">Curva de Potencia Hoy</h4>
-          <div class="overflow-x-auto">
-            <svg :viewBox="`0 0 800 200`" class="w-full" style="max-height: 200px;">
-              <template v-for="(curve, invName) in powerCurves" :key="invName">
-                <polyline :points="curve.points" fill="none" :stroke="curve.color" stroke-width="2" />
-              </template>
-              <!-- X axis labels -->
-              <text v-for="h in [0,4,8,12,16,20]" :key="h"
-                    :x="h/24*780+10" y="195" fill="#6b5a8a" font-size="10" text-anchor="middle">
-                {{ h }}:00
-              </text>
-            </svg>
-          </div>
-          <div class="flex flex-wrap gap-3 mt-2">
-            <span v-for="(curve, invName) in powerCurves" :key="invName"
-                  class="text-xs flex items-center gap-1">
-              <span class="w-3 h-1 rounded-full inline-block" :style="{ backgroundColor: curve.color }" />
-              {{ invName }}
-            </span>
-          </div>
-        </div>
-      </template>
-    </div>
-
-    <!-- Tab 4: Completitud de datos -->
-    <div v-if="activeTab === 4" class="space-y-4">
-      <div class="bg-white rounded-xl shadow-sm p-5" style="border: 1px solid #e8e0f0;">
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="text-sm font-semibold" style="color: #2C2039;">Completitud de Datos — {{ completeness?.month }}/{{ completeness?.year }}</h3>
-          <div class="flex items-center gap-2">
-            <span class="text-xs" style="color: #6b5a8a;">{{ completeness?.days_elapsed || 0 }} días transcurridos</span>
-          </div>
-        </div>
-
-        <!-- Completeness KPIs -->
-        <div v-if="completeness" class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-          <div class="p-3 rounded-lg" style="background: #f8f6fb;">
-            <p class="text-xs" style="color: #6b5a8a;">Proyectos con datos</p>
-            <p class="text-xl font-bold" style="color: #10B981;">{{ completeness.with_data }}</p>
-          </div>
-          <div class="p-3 rounded-lg" :style="completeness.without_data > 0 ? 'background: rgba(214,68,85,0.05)' : 'background: #f8f6fb'">
-            <p class="text-xs" style="color: #6b5a8a;">Sin datos</p>
-            <p class="text-xl font-bold" :style="{ color: completeness.without_data > 0 ? '#D64455' : '#10B981' }">{{ completeness.without_data }}</p>
-          </div>
-          <div class="p-3 rounded-lg" style="background: #f8f6fb;">
-            <p class="text-xs" style="color: #6b5a8a;">Completitud</p>
-            <p class="text-xl font-bold" :style="{ color: completeness.completeness_pct >= 80 ? '#10B981' : completeness.completeness_pct >= 50 ? '#F0C040' : '#D64455' }">
-              {{ completeness.completeness_pct }}%
-            </p>
-          </div>
-          <div class="p-3 rounded-lg" style="background: #f8f6fb;">
-            <p class="text-xs" style="color: #6b5a8a;">Total proyectos</p>
-            <p class="text-xl font-bold" style="color: #2C2039;">{{ completeness.projects_total }}</p>
-          </div>
-        </div>
-
-        <!-- Projects table -->
-        <DataTable v-if="completeness?.projects" :value="completenessProjects" size="small" stripedRows
-                   :paginator="completenessProjects.length > 25" :rows="25"
-                   sortField="completeness_pct" :sortOrder="1" :rowHover="true">
-          <Column field="nombre" header="Proyecto" sortable style="min-width: 180px">
-            <template #body="{ data }">
-              <span class="font-semibold text-sm" style="color: #2C2039;">{{ data.nombre }}</span>
-            </template>
-          </Column>
-          <Column field="completeness_pct" header="Completitud" sortable style="min-width: 160px">
-            <template #body="{ data }">
-              <div class="flex items-center gap-2">
-                <div class="flex-1 h-2.5 rounded-full" style="background: #f3f0f7;">
-                  <div class="h-full rounded-full transition-all"
-                       :style="{ width: data.completeness_pct + '%', backgroundColor: data.completeness_pct >= 80 ? '#10B981' : data.completeness_pct >= 50 ? '#F0C040' : '#D64455' }" />
+          <!-- ── Inverter cards ── -->
+          <div v-if="detailData.inverters?.length" class="gs-inverters-section">
+            <h3 class="gs-section-title">Inversores ({{ detailData.inverters.length }})</h3>
+            <div class="gs-inverters-grid">
+              <div v-for="inv in detailData.inverters" :key="inv.id"
+                class="gs-inv-card"
+                :style="{ borderLeftColor: STATUS_CFG[inv.inv_status]?.border || '#e5e7eb' }">
+                <div class="gs-inv-top">
+                  <span class="gs-inv-name">{{ inv.name }}</span>
+                  <span class="gs-status-dot"
+                    :style="{ background: STATUS_CFG[inv.inv_status]?.dot || '#9ca3af' }" />
                 </div>
-                <span class="text-xs font-mono w-10 text-right" :style="{ color: data.completeness_pct >= 80 ? '#10B981' : data.completeness_pct >= 50 ? '#F0C040' : '#D64455' }">
-                  {{ data.completeness_pct }}%
-                </span>
+                <div class="gs-inv-state" :style="{ color: STATUS_CFG[inv.inv_status]?.color || '#6b7280' }">
+                  {{ inv.state }}
+                </div>
+                <div class="gs-inv-power">
+                  <span class="gs-inv-power-val"
+                    :style="{ color: inv.power_kw > 0 ? '#16a34a' : '#9ca3af' }">
+                    {{ inv.power_kw != null ? inv.power_kw.toFixed(2) : '—' }}
+                  </span>
+                  <span class="gs-inv-power-unit">kW</span>
+                </div>
               </div>
-            </template>
-          </Column>
-          <Column field="days_with_data" header="Días" sortable style="min-width: 80px">
-            <template #body="{ data }">
-              <span class="font-mono text-sm">{{ data.days_with_data }}/{{ data.days_expected }}</span>
-            </template>
-          </Column>
-          <Column field="total_kwh" header="kWh" sortable style="min-width: 100px">
-            <template #body="{ data }">
-              <span class="font-mono text-sm">{{ data.total_kwh > 0 ? data.total_kwh.toLocaleString('es-CO') : '—' }}</span>
-            </template>
-          </Column>
-          <Column field="capacidad_kwp" header="kWp" sortable style="min-width: 80px">
-            <template #body="{ data }">
-              {{ data.capacidad_kwp ? data.capacidad_kwp.toFixed(0) : '—' }}
-            </template>
-          </Column>
-          <Column field="fuente" header="Fuente" sortable style="min-width: 100px">
-            <template #body="{ data }">
-              <span v-if="data.fuente" class="text-xs px-2 py-0.5 rounded-full"
-                    :style="data.fuente === 'solenium' ? 'background: rgba(16,185,129,0.1); color: #10B981' : 'background: rgba(145,91,216,0.1); color: #915BD8'">
-                {{ data.fuente }}
-              </span>
-              <span v-else class="text-xs" style="color: #D64455;">sin datos</span>
-            </template>
-          </Column>
-          <Column field="last_date" header="Último dato" sortable style="min-width: 110px">
-            <template #body="{ data }">
-              <span class="font-mono text-xs">{{ data.last_date || '—' }}</span>
-            </template>
-          </Column>
-        </DataTable>
+            </div>
+          </div>
+
+          <!-- ── Charts row ── -->
+          <div class="gs-charts-row">
+
+            <!-- Power curve today -->
+            <div class="gs-chart-card">
+              <h3 class="gs-section-title">Curva de potencia hoy</h3>
+              <div v-if="powerCurveData.labels.length > 0" class="gs-chart-container">
+                <Line :data="powerCurveData" :options="powerCurveOptions" />
+              </div>
+              <div v-else class="gs-chart-empty">
+                <i class="pi pi-chart-line" style="font-size:28px;color:#d1d5db" />
+                <p>Sin datos de potencia para hoy</p>
+              </div>
+            </div>
+
+            <!-- 30d generation -->
+            <div class="gs-chart-card">
+              <h3 class="gs-section-title">Generación últimos 30 días</h3>
+              <div v-if="generation30dData.labels.length > 0" class="gs-chart-container">
+                <Bar :data="generation30dData" :options="generation30dOptions" />
+              </div>
+              <div v-else class="gs-chart-empty">
+                <i class="pi pi-chart-bar" style="font-size:28px;color:#d1d5db" />
+                <p>Sin datos de generación en los últimos 30 días</p>
+              </div>
+            </div>
+
+          </div>
+        </template>
+
       </div>
-    </div>
+    </Transition>
+
+    <!-- Detail loading placeholder (before data arrives) -->
+    <Transition name="gs-panel-slide">
+      <div v-if="selectedProyId && !detailData && loadingDetail" class="gs-detail-panel">
+        <div class="gs-detail-loading">
+          <i class="pi pi-spin pi-spinner" style="font-size:24px;color:#915BD8" />
+          <span style="color:#6b5a8a">Cargando detalle del proyecto...</span>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- ══ FALLA DIALOG ══════════════════════════════════════════════════════ -->
+    <Dialog v-model:visible="fallaDialogVisible" modal
+      header="Nueva falla"
+      class="w-full max-w-2xl"
+      :closable="!savingFalla">
+      <FallaForm
+        :key="fallaFormKey"
+        :initial="null"
+        :catalogos="catalogos"
+        @save="onSaveFalla"
+        @cancel="fallaDialogVisible = false" />
+    </Dialog>
+
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import DataTable from 'primevue/datatable'
-import Column from 'primevue/column'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler,
+} from 'chart.js'
+import { Bar, Line } from 'vue-chartjs'
+import Dialog from 'primevue/dialog'
+import { useToast } from 'primevue/usetoast'
 import api from '@/api/client'
-import { proyectoActivoEnMes } from '@/utils/proyectoActivo'
+import FallaForm from './Fallas/FallaForm.vue'
 
-const TABS = ['Flota', 'Disponibilidad', 'Histórico', 'Detalle Proyecto', 'Completitud']
-const activeTab = ref(0)
-const loading = ref(true)
-const fleetFilter = ref('all')
-const searchText = ref('')
+// ── Register Chart.js components ────────────────────────────────────────────
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler,
+)
 
-const fleet = ref({})
-const availability = ref(null)
-const selectedProject = ref(null)
-const projectDetail = ref(null)
-const backendProyectos = ref([])
+// ── Toast ────────────────────────────────────────────────────────────────────
+const toast = useToast()
 
-const catLabels = { high: '> 90%', medium: '66-90%', low: '33-66%', critical: '< 33%', disconnect: 'Sin datos' }
-const catColors = {
-  high: { color: '#10B981', bg: 'rgba(16,185,129,0.08)' },
-  medium: { color: '#3B82F6', bg: 'rgba(59,130,246,0.08)' },
-  low: { color: '#F0C040', bg: 'rgba(240,192,64,0.08)' },
-  critical: { color: '#D64455', bg: 'rgba(214,68,85,0.08)' },
-  disconnect: { color: '#9CA3AF', bg: 'rgba(156,163,175,0.05)' },
+// ── Status config ────────────────────────────────────────────────────────────
+const STATUS_CFG = {
+  online:           { label: 'Online',           color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0', dot: '#16a34a' },
+  degradado:        { label: 'Degradado',         color: '#d97706', bg: '#fffbeb', border: '#fde68a', dot: '#d97706' },
+  caido:            { label: 'Caído',             color: '#dc2626', bg: '#fef2f2', border: '#fecaca', dot: '#dc2626' },
+  sin_comunicacion: { label: 'Sin comunicación',  color: '#6b7280', bg: '#f9fafb', border: '#e5e7eb', dot: '#9ca3af' },
+  offline:          { label: 'Offline',           color: '#9ca3af', bg: '#f9fafb', border: '#e5e7eb', dot: '#d1d5db' },
 }
 
-const CHART_COLORS = ['#915BD8', '#10B981', '#3B82F6', '#F0C040', '#D64455', '#14B8A6', '#6366F1', '#EC4899']
+const STATUS_PILLS = [
+  { key: 'all',     label: 'Todos',       color: '#915BD8' },
+  { key: 'alertas', label: '⚠️ Alertas',  color: '#dc2626' },
+  { key: 'online',  label: '✅ Online',   color: '#16a34a' },
+  { key: 'sincom',  label: '📡 Sin com.', color: '#6b7280' },
+]
 
-const fleetKpis = computed(() => {
-  const d = fleet.value
-  return [
-    { label: 'Proyectos', value: d.total_projects ?? '—' },
-    { label: 'Online', value: d.online ?? '—', color: '#10B981' },
-    { label: 'Potencia Total', value: d.total_power_kw != null ? `${d.total_power_kw > 1000 ? (d.total_power_kw/1000).toFixed(1)+' MW' : d.total_power_kw+' kW'}` : '—', color: '#D4A017' },
-    { label: 'Capacidad', value: d.total_capacity_kwp != null ? `${(d.total_capacity_kwp/1000).toFixed(1)} MWp` : '—' },
-    { label: 'Utilización', value: d.utilization_pct != null ? `${d.utilization_pct}%` : '—', color: d.utilization_pct > 30 ? '#10B981' : '#D64455' },
-  ]
+// ── State ────────────────────────────────────────────────────────────────────
+const loading        = ref(false)
+const loadingDetail  = ref(false)
+const monitoringData = ref(null)
+const selectedProyId = ref(null)
+const detailData     = ref(null)
+const activeFilter   = ref('all')
+const searchText     = ref('')
+const lastUpdated    = ref('')
+
+// Auto-refresh countdown (300s)
+const REFRESH_INTERVAL = 300
+const countdown        = ref(REFRESH_INTERVAL)
+let   countdownTimer   = null
+let   refreshTimer     = null
+
+const countdownDisplay = computed(() => {
+  const m = Math.floor(countdown.value / 60)
+  const s = countdown.value % 60
+  return `${m}:${s.toString().padStart(2, '0')}`
 })
 
-const projectsWithUtil = computed(() => {
-  const projects = fleet.value.projects || []
-  return projects.map(p => ({
-    ...p,
-    utilization: p.capacity_kwp > 0 ? (p.power_kw / p.capacity_kwp * 100) : 0,
-    kwh_per_kwp: p.capacity_kwp > 0 && p.energy_today_kwh != null ? (p.energy_today_kwh / p.capacity_kwp) : 0,
-  }))
-})
+// ── Falla dialog ─────────────────────────────────────────────────────────────
+const fallaDialogVisible = ref(false)
+const fallaProyectoIds   = ref([])
+const fallaFormKey       = ref(0)
+const savingFalla        = ref(false)
+const catalogos          = ref({ estados: [], prioridades: [], tipos: [] })
 
+// ── Computed ─────────────────────────────────────────────────────────────────
 const filteredProjects = computed(() => {
-  const today = new Date()
-  const anio = today.getFullYear()
-  const mes = today.getMonth() + 1
-  const inactiveNames = new Set(
-    backendProyectos.value
-      .filter(p => !proyectoActivoEnMes(p, anio, mes))
-      .map(p => (p.nombre_comercial || '').toLowerCase()),
-  )
-  let list = projectsWithUtil.value
-  if (inactiveNames.size) list = list.filter(p => !inactiveNames.has((p.name || '').toLowerCase()))
-  if (fleetFilter.value === 'minifarm') list = list.filter(p => p.is_minifarm)
-  if (fleetFilter.value === 'gd') list = list.filter(p => !p.is_minifarm)
-  if (searchText.value) {
-    const q = searchText.value.toLowerCase()
-    list = list.filter(p => p.name.toLowerCase().includes(q) || (p.location || '').toLowerCase().includes(q))
+  if (!monitoringData.value) return []
+  let list = monitoringData.value.projects
+
+  if (activeFilter.value === 'alertas') {
+    list = list.filter(p => p.status === 'caido' || p.status === 'sin_comunicacion' || p.status === 'degradado')
+  } else if (activeFilter.value === 'online') {
+    list = list.filter(p => p.status === 'online')
+  } else if (activeFilter.value === 'sincom') {
+    list = list.filter(p => p.status === 'sin_comunicacion')
   }
+
+  if (searchText.value.trim()) {
+    const q = searchText.value.toLowerCase()
+    list = list.filter(p => p.nombre?.toLowerCase().includes(q))
+  }
+
   return list
 })
 
-const projectDetailKpis = computed(() => {
-  if (!projectDetail.value) return []
-  const p = projectDetail.value.project || {}
-  return [
-    { label: 'Capacidad (kWp)', value: p.installed_capacity || '—' },
-    { label: 'Voltaje red (V)', value: p.grid_voltage || '—' },
-    { label: 'Paneles', value: p.panel_quantity || '—' },
-    { label: 'Operador Red', value: p.grid_operator || '—' },
-    { label: 'Inversores', value: p.inverter_quantity || '—' },
-    { label: 'Pot. inversor (kW)', value: p.inverter_power || '—' },
-    { label: 'Tipo', value: p.is_minifarm ? 'Minigranja' : 'GD/Autoconsumo' },
-    { label: 'Ubicación', value: p.location || '—' },
-  ]
-})
+// ── Chart data ────────────────────────────────────────────────────────────────
+const BRAND_PURPLE      = '#915BD8'
+const BRAND_PURPLE_DARK = '#6b3aab'
 
-const powerCurves = computed(() => {
-  const data = projectDetail.value?.power_today
-  if (!data?.power) return {}
-  const result = {}
-  let idx = 0
-  for (const [invName, timeseries] of Object.entries(data.power)) {
-    const entries = Object.entries(timeseries).sort(([a], [b]) => a.localeCompare(b))
-    if (!entries.length) continue
-    const maxPower = Math.max(...entries.map(([, v]) => v), 1)
-    const points = entries.map(([time, val]) => {
-      const parts = time.split(' ')[1]?.split(':') || ['0', '0']
-      const hours = parseInt(parts[0]) + parseInt(parts[1]) / 60
-      const x = (hours / 24) * 780 + 10
-      const y = 180 - (val / maxPower) * 170
-      return `${x},${y}`
-    }).join(' ')
-    result[invName] = { points, color: CHART_COLORS[idx % CHART_COLORS.length] }
-    idx++
-  }
-  return result
-})
-
-function formatLastUpdate(dateStr) {
-  if (!dateStr) return '—'
-  const d = new Date(dateStr)
-  const now = new Date()
-  const diffMs = now - d
-  const mins = Math.floor(diffMs / 60000)
-  if (mins < 1) return 'Ahora'
-  if (mins < 60) return `${mins}min`
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return `${hrs}h`
-  return d.toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })
-}
-
-async function selectProject(proj) {
-  selectedProject.value = proj
-  activeTab.value = 3
-  try {
-    const res = await api.get(`/generacion-solar/project/${proj.id}`)
-    projectDetail.value = res.data
-  } catch {
-    projectDetail.value = null
-  }
-}
-
-const histDays = ref(30)
-const histData = ref([])
-const histByProject = ref([])
-
-const histChartW = 700
-const histChartH = 200
-const histPadL = 50
-
-const histTotal = computed(() => histData.value.reduce((s, d) => s + d.mwh, 0).toFixed(1))
-const histAvg = computed(() => histData.value.length ? (histTotal.value / histData.value.length).toFixed(1) : '0')
-
-const histMaxMwh = computed(() => Math.max(...histData.value.map(d => d.mwh), 1) * 1.1)
-
-const histBars = computed(() => {
-  const n = histData.value.length
-  if (!n) return []
-  const barW = Math.max(2, (histChartW - histPadL - 10) / n - 1)
-  return histData.value.map((d, i) => {
-    const h = (d.mwh / histMaxMwh.value) * (histChartH - 30)
-    return {
-      x: histPadL + i * ((histChartW - histPadL - 10) / n),
-      y: histChartH - 20 - h,
-      w: barW,
-      h: Math.max(0, h),
-    }
+const powerCurveData = computed(() => {
+  if (!detailData.value?.power_curve?.length) return { labels: [], datasets: [] }
+  const curve = detailData.value.power_curve
+  const labels = curve.map(pt => {
+    // "2026-05-22 08:00" → "08:00"
+    const ts = pt.time || ''
+    return ts.includes(' ') ? ts.split(' ')[1].slice(0, 5) : ts.slice(0, 5)
   })
+  const values = curve.map(pt => pt.kw)
+  return {
+    labels,
+    datasets: [{
+      label: 'Potencia (kW)',
+      data: values,
+      borderColor: BRAND_PURPLE,
+      backgroundColor: 'rgba(145, 91, 216, 0.15)',
+      fill: true,
+      tension: 0.3,
+      pointRadius: labels.length > 50 ? 0 : 2,
+      pointHoverRadius: 4,
+      borderWidth: 2,
+    }],
+  }
 })
 
-const histGridY = computed(() => {
-  const max = histMaxMwh.value
-  const steps = 4
-  return Array.from({ length: steps + 1 }, (_, i) => {
-    const val = (max * i) / steps
-    const py = histChartH - 20 - (val / max) * (histChartH - 30)
-    return { val, py, label: val.toFixed(0) }
+const powerCurveOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      callbacks: {
+        label: ctx => `${ctx.parsed.y?.toFixed(2)} kW`,
+      },
+    },
+  },
+  scales: {
+    x: {
+      ticks: {
+        maxTicksLimit: 12,
+        font: { size: 10 },
+        color: '#9ca3af',
+      },
+      grid: { display: false },
+    },
+    y: {
+      ticks: { font: { size: 10 }, color: '#9ca3af' },
+      grid: { color: 'rgba(0,0,0,0.05)' },
+      title: { display: true, text: 'kW', font: { size: 10 }, color: '#9ca3af' },
+    },
+  },
+}
+
+const generation30dData = computed(() => {
+  if (!detailData.value?.generation_30d?.length) return { labels: [], datasets: [] }
+  const gen30 = detailData.value.generation_30d
+  const today = new Date().toISOString().split('T')[0]
+  const labels = gen30.map(d => {
+    const dt = new Date(d.date + 'T12:00:00')
+    return dt.toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })
   })
+  const values = gen30.map(d => d.kwh)
+  const colors = gen30.map(d => d.date === today ? BRAND_PURPLE : 'rgba(145, 91, 216, 0.65)')
+  return {
+    labels,
+    datasets: [{
+      label: 'Generación (kWh)',
+      data: values,
+      backgroundColor: colors,
+      borderRadius: 3,
+      borderSkipped: false,
+    }],
+  }
 })
 
-const histXLabels = computed(() => {
-  const n = histData.value.length
-  if (!n) return []
-  const step = Math.max(1, Math.floor(n / 8))
-  return histData.value.filter((_, i) => i % step === 0).map((d, i) => ({
-    x: histPadL + (i * step) * ((histChartW - histPadL - 10) / n) + ((histChartW - histPadL - 10) / n) / 2,
-    text: d.date.slice(5),
-  }))
-})
-
-async function loadHistory() {
-  try {
-    const [histRes, projRes] = await Promise.all([
-      api.get('/generacion-solar/fleet/history', { params: { days: histDays.value } }).catch(() => null),
-      api.get('/generacion-solar/fleet/history/by-project', { params: { days: histDays.value } }).catch(() => null),
-    ])
-    if (histRes?.data?.days) histData.value = histRes.data.days
-    if (projRes?.data) histByProject.value = projRes.data
-  } catch { /* degrade */ }
+const generation30dOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      callbacks: {
+        label: ctx => `${ctx.parsed.y?.toLocaleString('es-CO', { maximumFractionDigits: 1 })} kWh`,
+      },
+    },
+  },
+  scales: {
+    x: {
+      ticks: {
+        maxTicksLimit: 10,
+        font: { size: 10 },
+        color: '#9ca3af',
+      },
+      grid: { display: false },
+    },
+    y: {
+      ticks: { font: { size: 10 }, color: '#9ca3af' },
+      grid: { color: 'rgba(0,0,0,0.05)' },
+      title: { display: true, text: 'kWh', font: { size: 10 }, color: '#9ca3af' },
+    },
+  },
 }
 
-const completeness = ref(null)
-const completenessProjects = computed(() => {
-  if (!completeness.value?.projects) return []
-  return [...completeness.value.projects].sort((a, b) => a.completeness_pct - b.completeness_pct)
-})
-
-async function loadCompleteness() {
-  try {
-    const res = await api.get('/generacion-solar/data-completeness').catch(() => null)
-    if (res?.data) completeness.value = res.data
-  } catch { /* degrade */ }
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function formatPower(kw) {
+  if (kw == null) return '—'
+  if (kw >= 1000) return (kw / 1000).toFixed(1) + ' MW'
+  return kw.toFixed(1) + ' kW'
 }
 
-async function loadData() {
+function formatTime(isoStr) {
+  if (!isoStr) return ''
+  const d = new Date(isoStr)
+  return d.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
+}
+
+// ── Data loading ──────────────────────────────────────────────────────────────
+async function cargar() {
   loading.value = true
+  resetCountdown()
   try {
-    const [fleetRes, availRes, proyRes] = await Promise.all([
-      api.get('/generacion-solar/fleet').catch(() => null),
-      api.get('/generacion-solar/availability').catch(() => null),
-      api.get('/proyectos', { params: { size: 200 } }).catch(() => null),
-    ])
-    if (fleetRes?.data) fleet.value = fleetRes.data
-    if (availRes?.data) availability.value = availRes.data
-    if (proyRes?.data) backendProyectos.value = proyRes.data.items || []
+    const res = await api.get('/generacion-solar/monitoring')
+    monitoringData.value = res.data
+    const now = new Date()
+    lastUpdated.value = now.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
+  } catch (err) {
+    toast.add({ severity: 'error', summary: 'Error al cargar monitoreo', detail: err?.message, life: 4000 })
   } finally {
     loading.value = false
   }
-  loadHistory()
-  loadCompleteness()
 }
 
-onMounted(loadData)
+async function loadDetail(proyectoId) {
+  loadingDetail.value = true
+  detailData.value = null
+  try {
+    const res = await api.get(`/generacion-solar/monitoring/${proyectoId}`)
+    detailData.value = res.data
+  } catch (err) {
+    toast.add({ severity: 'warn', summary: 'Sin detalle', detail: 'No se pudo cargar el detalle del proyecto', life: 3000 })
+    detailData.value = null
+  } finally {
+    loadingDetail.value = false
+  }
+}
+
+async function loadCatalogos() {
+  try {
+    const res = await api.get('/fallas/catalogos')
+    catalogos.value = res.data
+  } catch { /* no crítico */ }
+}
+
+// ── Project selection ─────────────────────────────────────────────────────────
+function selectProject(proj) {
+  if (selectedProyId.value === proj.proyecto_id) {
+    closeDetail()
+    return
+  }
+  selectedProyId.value = proj.proyecto_id
+  loadDetail(proj.proyecto_id)
+}
+
+function closeDetail() {
+  selectedProyId.value = null
+  detailData.value = null
+}
+
+// ── Falla dialog ──────────────────────────────────────────────────────────────
+function openFallaDialog(proj) {
+  if (proj) {
+    fallaProyectoIds.value = [proj.proyecto_id]
+  } else if (selectedProyId.value) {
+    fallaProyectoIds.value = [selectedProyId.value]
+  } else {
+    fallaProyectoIds.value = []
+  }
+  fallaFormKey.value++     // reset form
+  fallaDialogVisible.value = true
+}
+
+async function onSaveFalla(payload) {
+  savingFalla.value = true
+  try {
+    const { proyecto_ids, nota_inicial, _archivos, ...base } = payload
+    const ids      = fallaProyectoIds.value.length ? fallaProyectoIds.value : (proyecto_ids ?? [])
+    const archivos = _archivos ?? []
+
+    if (!ids.length) {
+      toast.add({ severity: 'warn', summary: 'Sin proyecto', detail: 'Selecciona un proyecto para la falla', life: 3000 })
+      return
+    }
+
+    // Create one falla per project in parallel
+    const nuevas = await Promise.all(
+      ids.map(pid => api.post('/fallas', { ...base, proyecto_id: pid }).then(r => r.data))
+    )
+
+    // Nota inicial
+    if (nota_inicial) {
+      await Promise.all(
+        nuevas.map(f => api.post(`/fallas/${f.id}/seguimientos`, { nota: nota_inicial }))
+      )
+    }
+
+    // File attachments
+    if (archivos.length) {
+      await Promise.all(
+        nuevas.flatMap(f =>
+          archivos.map(file => {
+            const fd = new FormData()
+            fd.append('archivo', file)
+            return api.post(`/fallas/${f.id}/archivos`, fd)
+          })
+        )
+      )
+    }
+
+    const n = nuevas.length
+    toast.add({
+      severity: 'success',
+      summary: n === 1 ? 'Falla registrada' : `${n} fallas registradas`,
+      life: 3000,
+    })
+    fallaDialogVisible.value = false
+    // Reload monitoring data to reflect any status changes
+    cargar()
+  } catch (err) {
+    toast.add({ severity: 'error', summary: 'Error al guardar', detail: err?.response?.data?.detail || err?.message, life: 4000 })
+  } finally {
+    savingFalla.value = false
+  }
+}
+
+// ── Auto-refresh countdown ────────────────────────────────────────────────────
+function resetCountdown() {
+  countdown.value = REFRESH_INTERVAL
+}
+
+function startTimers() {
+  // Countdown ticks every second
+  countdownTimer = setInterval(() => {
+    if (countdown.value > 0) {
+      countdown.value--
+    }
+  }, 1000)
+
+  // Auto-refresh every 300s
+  refreshTimer = setInterval(() => {
+    cargar()
+  }, REFRESH_INTERVAL * 1000)
+}
+
+function stopTimers() {
+  if (countdownTimer) clearInterval(countdownTimer)
+  if (refreshTimer)   clearInterval(refreshTimer)
+}
+
+// ── Lifecycle ─────────────────────────────────────────────────────────────────
+onMounted(() => {
+  cargar()
+  loadCatalogos()
+  startTimers()
+})
+
+onUnmounted(() => {
+  stopTimers()
+})
 </script>
+
+<style scoped>
+.gs-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  font-family: 'Sora', system-ui, sans-serif;
+}
+
+/* ── Header ── */
+.gs-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.gs-title {
+  font-size: 20px;
+  font-weight: 800;
+  color: #2C2039;
+  margin: 0;
+}
+
+.gs-subtitle {
+  font-size: 12px;
+  color: #6b5a8a;
+  margin: 2px 0 0;
+}
+
+.gs-last-updated {
+  color: #9ca3af;
+}
+
+.gs-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.gs-countdown-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #f3f0f9;
+  color: #6b5a8a;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: 'Courier New', monospace;
+  border: 1px solid #e8e0f0;
+  transition: all 0.3s;
+}
+
+.gs-countdown-chip--urgent {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #dc2626;
+}
+
+.gs-refresh-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  border-radius: 8px;
+  background: #915BD8;
+  color: white;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: background 0.2s;
+}
+
+.gs-refresh-btn:disabled {
+  background: #a78bcc;
+  cursor: not-allowed;
+}
+
+.gs-refresh-btn:not(:disabled):hover {
+  background: #7a3fc0;
+}
+
+/* ── KPI strip ── */
+.gs-kpi-strip {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.gs-kpi {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: white;
+  border: 1px solid #e8e0f0;
+  border-radius: 12px;
+  padding: 12px 16px;
+  flex: 1;
+  min-width: 130px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+.gs-kpi--skeleton {
+  min-height: 60px;
+  background: linear-gradient(90deg, #f3f0f9 25%, #ece8f5 50%, #f3f0f9 75%);
+  background-size: 200% 100%;
+  animation: gs-shimmer 1.4s infinite;
+}
+
+@keyframes gs-shimmer {
+  0%   { background-position: 200% 0 }
+  100% { background-position: -200% 0 }
+}
+
+.gs-kpi-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  flex-shrink: 0;
+}
+
+.gs-kpi-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.gs-kpi-value {
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.1;
+  color: #2C2039;
+}
+
+.gs-kpi-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #9ca3af;
+}
+
+.gs-kpi-util-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.gs-util-bar {
+  height: 5px;
+  background: #f3f0f9;
+  border-radius: 999px;
+  overflow: hidden;
+  margin-top: 4px;
+  min-width: 80px;
+}
+
+.gs-util-bar--card {
+  width: 100%;
+  min-width: 0;
+}
+
+.gs-util-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.5s ease;
+}
+
+/* ── Status dot ── */
+.gs-status-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ── Filter bar ── */
+.gs-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.gs-status-pills {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.gs-pill {
+  padding: 5px 14px;
+  border-radius: 999px;
+  border: 1px solid #e8e0f0;
+  background: white;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b5a8a;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.gs-pill:hover {
+  border-color: #915BD8;
+  color: #915BD8;
+}
+
+.gs-pill--active {
+  border-color: transparent;
+  color: white !important;
+}
+
+.gs-search-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 180px;
+  max-width: 320px;
+}
+
+.gs-search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #9ca3af;
+  font-size: 12px;
+}
+
+.gs-search-input {
+  width: 100%;
+  padding: 7px 12px 7px 32px;
+  border: 1px solid #e8e0f0;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #2C2039;
+  background: white;
+  outline: none;
+  transition: border-color 0.15s;
+  box-sizing: border-box;
+}
+
+.gs-search-input:focus {
+  border-color: #915BD8;
+}
+
+.gs-search-input::placeholder {
+  color: #c4b5e0;
+}
+
+/* ── Cards grid ── */
+.gs-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+@media (min-width: 1280px) {
+  .gs-cards-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.gs-empty {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 48px 0;
+  gap: 8px;
+}
+
+/* ── Project card ── */
+.gs-card {
+  position: relative;
+  background: white;
+  border: 1px solid #e8e0f0;
+  border-left-width: 4px;
+  border-radius: 12px;
+  padding: 14px;
+  cursor: pointer;
+  transition: box-shadow 0.15s, transform 0.15s;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+.gs-card:hover {
+  box-shadow: 0 4px 12px rgba(145,91,216,0.15);
+  transform: translateY(-1px);
+}
+
+.gs-card--selected {
+  outline: 2px solid #915BD8;
+  outline-offset: 1px;
+}
+
+.gs-card--skeleton {
+  min-height: 160px;
+  background: linear-gradient(90deg, #f9f7fc 25%, #f0ecf8 50%, #f9f7fc 75%);
+  background-size: 200% 100%;
+  animation: gs-shimmer 1.4s infinite;
+  cursor: default;
+}
+
+.gs-card-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.gs-card-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: #2C2039;
+  padding-right: 80px;
+  line-height: 1.3;
+}
+
+.gs-card-power {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.gs-card-power-val {
+  font-size: 26px;
+  font-weight: 800;
+  color: #2C2039;
+  line-height: 1;
+}
+
+.gs-card-power-unit {
+  font-size: 12px;
+  color: #9ca3af;
+  font-weight: 600;
+}
+
+.gs-card-util {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.gs-card-util-pct {
+  font-size: 11px;
+  color: #6b7280;
+  font-weight: 600;
+  white-space: nowrap;
+  min-width: 34px;
+  text-align: right;
+}
+
+.gs-card-stats {
+  display: flex;
+  gap: 8px;
+}
+
+.gs-card-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+}
+
+.gs-card-stat-label {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #9ca3af;
+}
+
+.gs-card-stat-val {
+  font-size: 13px;
+  font-weight: 700;
+  color: #2C2039;
+}
+
+.gs-card-falla-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid #e8e0f0;
+  background: white;
+  color: #915BD8;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+  align-self: flex-start;
+}
+
+.gs-card-falla-btn:hover {
+  background: rgba(145,91,216,0.08);
+  border-color: #915BD8;
+}
+
+.gs-card-falla-btn--lg {
+  font-size: 12px;
+  padding: 7px 14px;
+}
+
+/* ── Detail panel ── */
+.gs-detail-panel {
+  background: white;
+  border: 1px solid #e8e0f0;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 4px 20px rgba(145,91,216,0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.gs-panel-slide-enter-active,
+.gs-panel-slide-leave-active {
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.gs-panel-slide-enter-from,
+.gs-panel-slide-leave-to {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.gs-detail-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 40px;
+  font-size: 14px;
+}
+
+.gs-detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.gs-detail-header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.gs-detail-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: #2C2039;
+  margin: 0;
+}
+
+.gs-detail-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.gs-sol-badge {
+  background: rgba(145,91,216,0.1);
+  color: #915BD8;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.gs-detail-cap,
+.gs-detail-total {
+  font-size: 12px;
+  color: #6b5a8a;
+}
+
+.gs-detail-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gs-close-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid #e8e0f0;
+  background: white;
+  color: #6b7280;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  transition: all 0.15s;
+}
+
+.gs-close-btn:hover {
+  background: #f9f7fc;
+  border-color: #915BD8;
+  color: #915BD8;
+}
+
+.gs-section-title {
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #6b5a8a;
+  margin: 0 0 12px;
+}
+
+/* ── Inverters ── */
+.gs-inverters-section {
+  display: flex;
+  flex-direction: column;
+}
+
+.gs-inverters-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px;
+}
+
+.gs-inv-card {
+  background: #faf8ff;
+  border: 1px solid #f0eaf8;
+  border-left-width: 3px;
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.gs-inv-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.gs-inv-name {
+  font-size: 11px;
+  font-weight: 700;
+  color: #2C2039;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gs-inv-state {
+  font-size: 10px;
+  font-weight: 600;
+  min-height: 14px;
+}
+
+.gs-inv-power {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+  margin-top: 2px;
+}
+
+.gs-inv-power-val {
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.gs-inv-power-unit {
+  font-size: 10px;
+  color: #9ca3af;
+  font-weight: 600;
+}
+
+/* ── Charts ── */
+.gs-charts-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 768px) {
+  .gs-charts-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.gs-chart-card {
+  background: #faf8ff;
+  border: 1px solid #f0eaf8;
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+}
+
+.gs-chart-container {
+  height: 220px;
+  position: relative;
+}
+
+.gs-chart-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 220px;
+  gap: 8px;
+  color: #9ca3af;
+  font-size: 12px;
+}
+</style>
