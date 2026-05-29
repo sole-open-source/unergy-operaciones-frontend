@@ -290,6 +290,75 @@
             </div>
 
           </div>
+
+          <!-- ── String behavior chart ── -->
+          <div v-if="detailData.has_strings && stringsChartData.labels.length" class="gs-strings-section">
+            <div class="gs-section-header">
+              <h3 class="gs-section-title">Comportamiento de strings (DC)</h3>
+              <div class="gs-toggle-pills">
+                <button class="gs-toggle-pill" :class="{ active: stringMetric === 'voltage' }" @click="stringMetric = 'voltage'">Tensión (V)</button>
+                <button class="gs-toggle-pill" :class="{ active: stringMetric === 'current' }" @click="stringMetric = 'current'">Corriente (A)</button>
+                <button class="gs-toggle-pill" :class="{ active: stringMetric === 'power' }" @click="stringMetric = 'power'">Potencia (kW)</button>
+              </div>
+            </div>
+            <div class="gs-chart-card" style="padding: 14px;">
+              <div class="gs-chart-container gs-chart-container--strings">
+                <Bar :data="stringsChartData" :options="stringsChartOptions" />
+              </div>
+            </div>
+          </div>
+
+          <!-- ── Electrical metrics per inverter (medidores) ── -->
+          <div v-if="detailData.has_ac_metrics" class="gs-metrics-section">
+            <h3 class="gs-section-title">Métricas eléctricas por inversor</h3>
+            <div class="gs-metrics-table-wrap">
+              <table class="gs-metrics-table">
+                <thead>
+                  <tr>
+                    <th class="gs-mt-inv">Inversor</th>
+                    <th>Va (V)</th>
+                    <th>Vb (V)</th>
+                    <th>Vc (V)</th>
+                    <th>Ia (A)</th>
+                    <th>Ib (A)</th>
+                    <th>Ic (A)</th>
+                    <th>FP</th>
+                    <th>Pac (kW)</th>
+                    <th>Qac (kVAr)</th>
+                    <th>η (%)</th>
+                    <th>E-día (kWh)</th>
+                    <th>T (°C)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="inv in detailData.inverters" :key="inv.id">
+                    <td class="gs-mt-inv">
+                      <div class="gs-mt-inv-cell">
+                        <span class="gs-status-dot" :style="{ background: STATUS_CFG[inv.inv_status]?.dot || '#9ca3af' }" />
+                        {{ inv.name }}
+                      </div>
+                    </td>
+                    <td>{{ fmtAC(inv.ac_metrics?.vac_a) }}</td>
+                    <td>{{ fmtAC(inv.ac_metrics?.vac_b) }}</td>
+                    <td>{{ fmtAC(inv.ac_metrics?.vac_c) }}</td>
+                    <td>{{ fmtAC(inv.ac_metrics?.iac_a) }}</td>
+                    <td>{{ fmtAC(inv.ac_metrics?.iac_b) }}</td>
+                    <td>{{ fmtAC(inv.ac_metrics?.iac_c) }}</td>
+                    <td :class="fpClass(inv.ac_metrics?.power_factor)">
+                      {{ fmtAC(inv.ac_metrics?.power_factor) }}
+                    </td>
+                    <td>{{ fmtAC(inv.ac_metrics?.pac_kw) }}</td>
+                    <td>{{ fmtAC(inv.ac_metrics?.qac_kvar) }}</td>
+                    <td :class="effClass(inv.ac_metrics?.efficiency_pct)">
+                      {{ fmtAC(inv.ac_metrics?.efficiency_pct) }}
+                    </td>
+                    <td>{{ fmtAC(inv.ac_metrics?.e_day_kwh) }}</td>
+                    <td>{{ fmtAC(inv.ac_metrics?.temperature_c) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
         </template>
 
       </div>
@@ -529,6 +598,123 @@ const generation30dOptions = {
       title: { display: true, text: 'kWh', font: { size: 10 }, color: '#9ca3af' },
     },
   },
+}
+
+// ── String chart ─────────────────────────────────────────────────────────────
+const stringMetric = ref('voltage')   // 'voltage' | 'current' | 'power'
+
+const stringsChartData = computed(() => {
+  const inverters = detailData.value?.inverters || []
+  if (!inverters.some(inv => inv.strings?.length)) return { labels: [], datasets: [] }
+
+  const labels  = []
+  const values  = []
+  const bgColors = []
+
+  // Distinct colors per inverter (cycle through a palette)
+  const PALETTE = [
+    'rgba(145, 91, 216, 0.8)',   // purple
+    'rgba(22, 163, 74, 0.8)',    // green
+    'rgba(217, 119, 6, 0.8)',    // amber
+    'rgba(14, 165, 233, 0.8)',   // sky
+    'rgba(220, 38, 38, 0.8)',    // red
+    'rgba(20, 184, 166, 0.8)',   // teal
+    'rgba(168, 85, 247, 0.8)',   // violet
+    'rgba(245, 158, 11, 0.8)',   // yellow
+  ]
+
+  let invIdx = 0
+  for (const inv of inverters) {
+    if (!inv.strings?.length) continue
+    const baseColor = PALETTE[invIdx % PALETTE.length]
+
+    // Compute per-inverter average for anomaly detection
+    const vAvg = inv.strings.reduce((s, x) => s + (x.voltage_v ?? 0), 0) / inv.strings.length
+
+    for (const s of inv.strings) {
+      labels.push(`${inv.name} · ${s.label}`)
+
+      let val = 0
+      if (stringMetric.value === 'voltage') val = s.voltage_v ?? 0
+      else if (stringMetric.value === 'current') val = s.current_a ?? 0
+      else val = s.power_kw ?? 0
+
+      values.push(val)
+
+      // Anomaly coloring (voltage only)
+      if (stringMetric.value === 'voltage' && s.voltage_v != null) {
+        if (s.voltage_v === 0) bgColors.push('rgba(220, 38, 38, 0.85)')
+        else if (vAvg > 50 && s.voltage_v < vAvg * 0.8) bgColors.push('rgba(217, 119, 6, 0.85)')
+        else bgColors.push(baseColor)
+      } else {
+        bgColors.push(val === 0 ? 'rgba(220, 38, 38, 0.7)' : baseColor)
+      }
+    }
+    invIdx++
+  }
+
+  const metricLabel = stringMetric.value === 'voltage' ? 'Tensión (V)'
+    : stringMetric.value === 'current' ? 'Corriente (A)' : 'Potencia (kW)'
+
+  return {
+    labels,
+    datasets: [{
+      label: metricLabel,
+      data: values,
+      backgroundColor: bgColors,
+      borderRadius: 3,
+      borderSkipped: false,
+    }],
+  }
+})
+
+const stringsChartOptions = computed(() => {
+  const yLabel = stringMetric.value === 'voltage' ? 'V'
+    : stringMetric.value === 'current' ? 'A' : 'kW'
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label: ctx => `${ctx.parsed.y?.toFixed(1)} ${yLabel}`,
+          title: ctx => ctx[0]?.label || '',
+        },
+      },
+    },
+    scales: {
+      x: {
+        ticks: {
+          font: { size: 9 },
+          color: '#9ca3af',
+          maxRotation: 45,
+          minRotation: 30,
+        },
+        grid: { display: false },
+      },
+      y: {
+        ticks: { font: { size: 10 }, color: '#9ca3af' },
+        grid: { color: 'rgba(0,0,0,0.04)' },
+        title: { display: true, text: yLabel, font: { size: 10 }, color: '#9ca3af' },
+        beginAtZero: true,
+      },
+    },
+  }
+})
+
+// ── AC metrics helpers ───────────────────────────────────────────────────────
+function fmtAC(v) {
+  if (v == null) return '—'
+  return v.toLocaleString('es-CO', { maximumFractionDigits: 2 })
+}
+function fpClass(v) {
+  if (v == null) return ''
+  return v < 0.85 ? 'gs-mt-warn' : v >= 0.95 ? 'gs-mt-good' : ''
+}
+function effClass(v) {
+  if (v == null) return ''
+  return v < 90 ? 'gs-mt-warn' : v >= 97 ? 'gs-mt-good' : ''
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -1330,5 +1516,132 @@ onUnmounted(() => {
   gap: 8px;
   color: #9ca3af;
   font-size: 12px;
+}
+
+/* ── Strings section ── */
+.gs-strings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.gs-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.gs-toggle-pills {
+  display: flex;
+  gap: 4px;
+}
+
+.gs-toggle-pill {
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid #e8e0f0;
+  background: white;
+  color: #6b5a8a;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.gs-toggle-pill.active {
+  background: #915BD8;
+  border-color: #915BD8;
+  color: white;
+}
+
+.gs-chart-container--strings {
+  height: 240px;
+}
+
+/* ── Metrics table section ── */
+.gs-metrics-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.gs-metrics-table-wrap {
+  overflow-x: auto;
+  border-radius: 10px;
+  border: 1px solid #f0eaf8;
+}
+
+.gs-metrics-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  min-width: 780px;
+}
+
+.gs-metrics-table thead tr {
+  background: #f5f3fc;
+}
+
+.gs-metrics-table th {
+  padding: 7px 10px;
+  text-align: right;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: #6b5a8a;
+  white-space: nowrap;
+  border-bottom: 1px solid #ede8f8;
+}
+
+.gs-metrics-table th.gs-mt-inv {
+  text-align: left;
+  padding-left: 12px;
+}
+
+.gs-metrics-table tbody tr {
+  border-bottom: 1px solid #f3f0f9;
+  transition: background 0.1s;
+}
+
+.gs-metrics-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.gs-metrics-table tbody tr:hover {
+  background: #faf8ff;
+}
+
+.gs-metrics-table td {
+  padding: 8px 10px;
+  text-align: right;
+  color: #374151;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.gs-metrics-table td.gs-mt-inv {
+  text-align: left;
+  font-weight: 700;
+  color: #2C2039;
+  padding-left: 12px;
+}
+
+.gs-mt-inv-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.gs-mt-good {
+  color: #16a34a !important;
+  font-weight: 700;
+}
+
+.gs-mt-warn {
+  color: #dc2626 !important;
+  font-weight: 700;
 }
 </style>
