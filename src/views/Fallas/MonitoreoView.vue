@@ -640,14 +640,12 @@
             <div class="genproj-gran-toggle">
               <button class="genproj-gran-btn"
                 :class="{ 'genproj-gran-btn--active': genProjGran === 'day' }"
-                @click="genProjGran = 'day'">
+                @click="genProjGran = 'day'; if (genProjSel && genProjCargado) cargarGenProj()">
                 <i class="pi pi-calendar" /> Por día
               </button>
               <button class="genproj-gran-btn"
                 :class="{ 'genproj-gran-btn--active': genProjGran === 'hour' }"
-                :disabled="genProjDiasRango > 7"
-                :title="genProjDiasRango > 7 ? 'Máx. 7 días para vista horaria' : ''"
-                @click="genProjGran = 'hour'">
+                @click="setGranHour">
                 <i class="pi pi-clock" /> Por hora
               </button>
             </div>
@@ -861,6 +859,16 @@ function aplicarFiltroGenProj(key) {
     genProjFechaFin.value    = hoy
   }
   // 'custom' no cambia las fechas — el usuario las elige con DatePicker
+}
+
+function setGranHour() {
+  genProjGran.value = 'hour'
+  // Si el rango es > 7 días, reducir a "Ayer" automáticamente
+  if (genProjDiasRango.value > 7) {
+    aplicarFiltroGenProj('ayer')
+  }
+  // Recargar si ya había datos
+  if (genProjSel.value && genProjCargado.value) cargarGenProj()
 }
 
 const genProjDiasRango = computed(() => {
