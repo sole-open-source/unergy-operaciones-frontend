@@ -1064,9 +1064,10 @@ function dailyP90(proyectoId, fecha) {
   const daysInMonth = new Date(dt.getFullYear(), month + 1, 0).getDate()
   return (Number(arr[month]) || 0) / daysInMonth
 }
-// P90 diario sumado de TODOS los proyectos genOp para una fecha
+// P90 diario sumado de proyectos genOp (o todos si genOp está vacío)
 function dailyP90Total(fecha) {
-  return proyectosGenOp.value.reduce((sum, p) => sum + dailyP90(p.id, fecha), 0)
+  const projs = proyectosGenOp.value.length ? proyectosGenOp.value : proyectos.value
+  return projs.reduce((sum, p) => sum + dailyP90(p.id, fecha), 0)
 }
 
 // ── Carga: Generación de hoy ─────────────────────────────────────────────
@@ -1106,7 +1107,6 @@ async function cargarGenHoy() {
 // ── Carga: Generación últimos 7 días ─────────────────────────────────────
 // P90 sumado de proyectos genOp por fecha (sin depender de kwh_p90 en BD)
 async function cargarGen7() {
-  if (!proyectosGenOp.value.length) return
   gen7Loading.value = true
   gen7Days.value = []
   try {
@@ -1715,18 +1715,23 @@ const barEnergiaData = computed(() => ({
 const barEnergiaOpts = computed(() => ({ ...sharedBarHOpts, plugins: { ...sharedBarHOpts.plugins, tooltip: { callbacks: { label: ctx => ` ${Number(ctx.raw).toLocaleString('es-CO')} kWh` } } } }))
 
 // ── Computed: Generación ──────────────────────────────────────────────────
-// Proyectos minigranja/GD con servicio de operación
-// Si el filtro estricto devuelve vacío (campo sin configurar), usa todos los
-// proyectos que tengan al menos un mes de P90 cargado en la BD.
+// Proyectos para los gráficos de generación.
+// Prioridad: 1) srv_operacion + minigranja/gd  2) cualquier proyecto con P90
+// 3) todos los proyectos (último recurso para que siempre haya datos).
 const proyectosGenOp = computed(() => {
+  if (!proyectos.value.length) return []
   const conOp = proyectos.value.filter(p =>
-    p.srv_operacion === true &&
-    ['minigranja', 'gd'].includes(p.tipo_proyecto)
+    p.srv_operacion === true && ['minigranja', 'gd'].includes(p.tipo_proyecto)
   )
   if (conOp.length) return conOp
-  return proyectos.value.filter(p =>
-    Array.isArray(p.p90_mensual_kwh) && p.p90_mensual_kwh.some(v => Number(v) > 0)
-  )
+  const conP90 = proyectos.value.filter(p => {
+    const arr = p.p90_mensual_kwh
+    return Array.isArray(arr) ? arr.some(v => Number(v) > 0)
+         : arr && typeof arr === 'object' ? Object.values(arr).some(v => Number(v) > 0)
+         : false
+  })
+  if (conP90.length) return conP90
+  return proyectos.value   // muestra todos si no hay mejor opción
 })
 // IDs de esos proyectos para filtrar filas de generación
 const genOpIds = computed(() => new Set(proyectosGenOp.value.map(p => p.id)))
