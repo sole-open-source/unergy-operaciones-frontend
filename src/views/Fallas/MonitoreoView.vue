@@ -1230,17 +1230,34 @@ async function onSaveForm(payload) {
   savingForm.value = true
   try {
     if (editingFalla.value) {
+      // ── Edición (un solo proyecto) ──────────────────────────────────────
       const notaInicial = payload.nota_inicial
       delete payload.nota_inicial
       await api.patch(`/fallas/${editingFalla.value.id}`, payload)
       if (notaInicial) await api.post(`/fallas/${editingFalla.value.id}/seguimientos`, { nota: notaInicial })
       toast.add({ severity: 'success', summary: 'Falla actualizada', life: 2500 })
     } else {
-      const notaInicial = payload.nota_inicial
-      delete payload.nota_inicial
-      const { data: nueva } = await api.post('/fallas', payload)
-      if (notaInicial) await api.post(`/fallas/${nueva.id}/seguimientos`, { nota: notaInicial })
-      toast.add({ severity: 'success', summary: 'Falla registrada', life: 2500 })
+      // ── Creación (uno o más proyectos) ──────────────────────────────────
+      const { proyecto_ids, nota_inicial, ...base } = payload
+      const ids = proyecto_ids ?? []
+
+      // Una falla por proyecto, en paralelo
+      const nuevas = await Promise.all(
+        ids.map(pid => api.post('/fallas', { ...base, proyecto_id: pid }).then(r => r.data))
+      )
+      // Nota inicial para cada falla creada (si la hay)
+      if (nota_inicial) {
+        await Promise.all(
+          nuevas.map(f => api.post(`/fallas/${f.id}/seguimientos`, { nota: nota_inicial }))
+        )
+      }
+      const n = nuevas.length
+      toast.add({
+        severity: 'success',
+        summary: n === 1 ? 'Falla registrada' : `${n} fallas registradas`,
+        detail: n > 1 ? `Se creó una falla independiente por cada proyecto seleccionado` : undefined,
+        life: 3000,
+      })
     }
     formDialogVisible.value = false
     await cargar()

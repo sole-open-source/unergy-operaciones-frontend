@@ -6,7 +6,21 @@
       <div class="ff-section-title"><i class="pi pi-tag" /> Identificación</div>
       <div class="ff-grid">
 
-        <div class="ff-field ff-span2">
+        <!-- Al crear: MultiSelect (varios proyectos → una falla por cada uno) -->
+        <div v-if="!initial" class="ff-field ff-span2">
+          <label class="ff-label">
+            Proyecto(s) *
+            <span class="ff-hint">(selecciona varios para crear una falla por cada uno)</span>
+          </label>
+          <MultiSelect v-model="form.proyecto_ids" :options="proyectos"
+            optionLabel="nombre_comercial" optionValue="id"
+            placeholder="Seleccionar proyecto(s)" filter class="w-full"
+            :class="{ 'p-invalid': errors.proyecto_ids }"
+            display="chip" />
+          <small v-if="errors.proyecto_ids" class="ff-error">{{ errors.proyecto_ids }}</small>
+        </div>
+        <!-- Al editar: Select simple -->
+        <div v-else class="ff-field ff-span2">
           <label class="ff-label">Proyecto *</label>
           <Select v-model="form.proyecto_id" :options="proyectos"
             optionLabel="nombre_comercial" optionValue="id"
@@ -170,6 +184,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import Select from 'primevue/select'
+import MultiSelect from 'primevue/multiselect'
 import Button from 'primevue/button'
 import DatePicker from 'primevue/datepicker'
 import InputNumber from 'primevue/inputnumber'
@@ -202,6 +217,7 @@ const errors    = ref({})
 
 const form = ref({
   proyecto_id:          props.initial?.proyecto?.id ?? props.initial?.proyecto_id ?? null,
+  proyecto_ids:         [],   // solo al crear: lista de proyectos seleccionados
   tipo_id:              props.initial?.tipo?.id ?? null,
   estado_id:            props.initial?.estado?.id ?? null,
   prioridad_id:         props.initial?.prioridad?.id ?? null,
@@ -230,7 +246,11 @@ const tiposAgrupados = computed(() => {
 
 function validate() {
   const e = {}
-  if (!form.value.proyecto_id)          e.proyecto_id = 'Requerido'
+  if (props.initial) {
+    if (!form.value.proyecto_id) e.proyecto_id = 'Requerido'
+  } else {
+    if (!form.value.proyecto_ids?.length) e.proyecto_ids = 'Selecciona al menos un proyecto'
+  }
   if (!form.value.tipo_id)              e.tipo_id = 'Requerido'
   if (!form.value.estado_id)            e.estado_id = 'Requerido'
   if (!form.value.prioridad_id)         e.prioridad_id = 'Requerido'
@@ -250,24 +270,30 @@ async function submit() {
   if (!validate()) return
   saving.value = true
   try {
-    const payload = {
-      proyecto_id:          form.value.proyecto_id,
+    const base = {
       tipo_id:              form.value.tipo_id,
       estado_id:            form.value.estado_id,
       prioridad_id:         form.value.prioridad_id,
       descripcion:          form.value.descripcion,
       fecha_identificacion: formatDate(form.value.fecha_identificacion),
     }
-    if (form.value.sla_limite_horas)              payload.sla_limite_horas     = form.value.sla_limite_horas
-    if (form.value.fecha_ocurrencia)              payload.fecha_ocurrencia     = form.value.fecha_ocurrencia.toISOString()
-    if (form.value.fecha_resolucion)              payload.fecha_resolucion     = formatDate(form.value.fecha_resolucion)
-    if (form.value.tipo_solucion)                 payload.tipo_solucion        = form.value.tipo_solucion
-    if (form.value.causa_raiz?.trim())            payload.causa_raiz           = form.value.causa_raiz.trim()
-    if (form.value.acciones_correctivas?.trim())  payload.acciones_correctivas = form.value.acciones_correctivas.trim()
-    if (form.value.equipo_afectado?.trim())       payload.equipo_afectado      = form.value.equipo_afectado.trim()
-    if (form.value.energia_perdida_kwh != null)   payload.energia_perdida_kwh  = form.value.energia_perdida_kwh
-    if (form.value.nota_inicial?.trim())          payload.nota_inicial         = form.value.nota_inicial.trim()
-    emit('save', payload)
+    if (form.value.sla_limite_horas)              base.sla_limite_horas     = form.value.sla_limite_horas
+    if (form.value.fecha_ocurrencia)              base.fecha_ocurrencia     = form.value.fecha_ocurrencia.toISOString()
+    if (form.value.fecha_resolucion)              base.fecha_resolucion     = formatDate(form.value.fecha_resolucion)
+    if (form.value.tipo_solucion)                 base.tipo_solucion        = form.value.tipo_solucion
+    if (form.value.causa_raiz?.trim())            base.causa_raiz           = form.value.causa_raiz.trim()
+    if (form.value.acciones_correctivas?.trim())  base.acciones_correctivas = form.value.acciones_correctivas.trim()
+    if (form.value.equipo_afectado?.trim())       base.equipo_afectado      = form.value.equipo_afectado.trim()
+    if (form.value.energia_perdida_kwh != null)   base.energia_perdida_kwh  = form.value.energia_perdida_kwh
+    if (form.value.nota_inicial?.trim())          base.nota_inicial         = form.value.nota_inicial.trim()
+
+    if (props.initial) {
+      // Edición: un solo proyecto
+      emit('save', { ...base, proyecto_id: form.value.proyecto_id })
+    } else {
+      // Creación: uno o más proyectos
+      emit('save', { ...base, proyecto_ids: form.value.proyecto_ids })
+    }
   } finally {
     saving.value = false
   }
