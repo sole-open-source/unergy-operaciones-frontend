@@ -1114,7 +1114,7 @@ async function cargarGen7() {
     const hace7 = new Date(hoy); hace7.setDate(hace7.getDate() - 6)
     const fi    = hace7.toISOString().split('T')[0]
     const ff    = hoy.toISOString().split('T')[0]
-    const { data } = await api.get('/generacion', { params: { fecha_inicio: fi, fecha_fin: ff, size: 2000 } })
+    const { data } = await api.get('/generacion', { params: { fecha_inicio: fi, fecha_fin: ff, size: 1000 } })
 
     // Agregar generación real por fecha (solo proyectos genOp)
     const ids = genOpIds.value
@@ -1154,7 +1154,7 @@ async function cargarGenPr() {
   try {
     const fi = genPrFechaInicio.value.toISOString().split('T')[0]
     const ff = genPrFechaFin.value.toISOString().split('T')[0]
-    const { data } = await api.get('/generacion', { params: { fecha_inicio: fi, fecha_fin: ff, size: 2000 } })
+    const { data } = await api.get('/generacion', { params: { fecha_inicio: fi, fecha_fin: ff, size: 1000 } })
     genPrDays.value = (data.items ?? []).filter(r => genPrSel.value.includes(r.proyecto_id))
   } catch {
     genPrDays.value = []
