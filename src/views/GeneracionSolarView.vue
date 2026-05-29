@@ -127,84 +127,20 @@
       </div>
     </div>
 
-    <!-- ══ PROJECT CARDS GRID ════════════════════════════════════════════════ -->
-    <div v-if="monitoringData" class="gs-cards-grid">
-      <div v-if="!filteredProjects.length" class="gs-empty">
-        <i class="pi pi-search text-3xl mb-2" style="color:#9ca3af" />
-        <p style="color:#6b5a8a">Sin proyectos que coincidan con el filtro</p>
-      </div>
-
-      <div v-for="proj in filteredProjects" :key="proj.proyecto_id"
-        class="gs-card"
-        :class="{ 'gs-card--selected': selectedProyId === proj.proyecto_id }"
-        :style="{
-          borderLeftColor: STATUS_CFG[proj.status]?.border || '#e5e7eb',
-          backgroundColor: selectedProyId === proj.proyecto_id ? '#faf7ff' : '#fff',
-        }"
-        @click="selectProject(proj)">
-
-        <!-- Status badge top-right -->
-        <div class="gs-card-badge"
-          :style="{ background: STATUS_CFG[proj.status]?.bg, color: STATUS_CFG[proj.status]?.color }">
-          <span class="gs-status-dot"
-            :style="{ background: STATUS_CFG[proj.status]?.dot }" />
-          {{ STATUS_CFG[proj.status]?.label || proj.status }}
-        </div>
-
-        <!-- Project name -->
-        <div class="gs-card-name">{{ proj.nombre }}</div>
-
-        <!-- Power -->
-        <div class="gs-card-power">
-          <span class="gs-card-power-val">{{ proj.power_kw != null ? proj.power_kw.toLocaleString('es-CO', { maximumFractionDigits: 1 }) : '—' }}</span>
-          <span class="gs-card-power-unit">kW</span>
-        </div>
-
-        <!-- Utilization bar -->
-        <div class="gs-card-util">
-          <div class="gs-util-bar gs-util-bar--card">
-            <div class="gs-util-bar-fill"
-              :style="{
-                width: Math.min(proj.utilization_pct || 0, 100) + '%',
-                backgroundColor: STATUS_CFG[proj.status]?.dot || '#9ca3af',
-              }" />
-          </div>
-          <span class="gs-card-util-pct">{{ proj.utilization_pct != null ? proj.utilization_pct + '%' : '—' }}</span>
-        </div>
-
-        <!-- Bottom stats row -->
-        <div class="gs-card-stats">
-          <div class="gs-card-stat">
-            <span class="gs-card-stat-label">kWh hoy</span>
-            <span class="gs-card-stat-val">
-              {{ proj.energy_today_kwh != null ? proj.energy_today_kwh.toLocaleString('es-CO', { maximumFractionDigits: 1 }) : '—' }}
-            </span>
-          </div>
-          <div class="gs-card-stat">
-            <span class="gs-card-stat-label">Disponib.</span>
-            <span class="gs-card-stat-val">
-              {{ proj.availability_pct != null ? proj.availability_pct + '%' : '—' }}
-            </span>
-          </div>
-        </div>
-
-        <!-- Crear falla button -->
-        <button class="gs-card-falla-btn"
-          @click.stop="openFallaDialog(proj)">
-          <i class="pi pi-bolt" style="font-size:10px" />
-          Crear falla
-        </button>
-      </div>
-    </div>
-
-    <!-- Cards skeleton -->
-    <div v-else class="gs-cards-grid">
-      <div v-for="i in 8" :key="i" class="gs-card gs-card--skeleton" />
-    </div>
-
-    <!-- ══ DETAIL PANEL ══════════════════════════════════════════════════════ -->
+    <!-- ══ DETAIL PANEL (encima de las cards) ═════════════════════════════════ -->
+    <!-- Loading placeholder -->
     <Transition name="gs-panel-slide">
-      <div v-if="selectedProyId && detailData" class="gs-detail-panel">
+      <div v-if="selectedProyId && !detailData && loadingDetail" ref="detailRef" class="gs-detail-panel">
+        <div class="gs-detail-loading">
+          <i class="pi pi-spin pi-spinner" style="font-size:24px;color:#915BD8" />
+          <span style="color:#6b5a8a">Cargando detalle del proyecto...</span>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- Detail con datos -->
+    <Transition name="gs-panel-slide">
+      <div v-if="selectedProyId && detailData" ref="detailRef" class="gs-detail-panel">
 
         <!-- Detail header -->
         <div class="gs-detail-header">
@@ -228,7 +164,7 @@
           </div>
         </div>
 
-        <!-- Loading detail -->
+        <!-- Loading detail (inside panel when refreshing) -->
         <div v-if="loadingDetail" class="gs-detail-loading">
           <i class="pi pi-spin pi-spinner" style="font-size:24px;color:#915BD8" />
           <span style="color:#6b5a8a">Cargando detalle...</span>
@@ -236,7 +172,7 @@
 
         <template v-else>
 
-          <!-- ── Inverter cards ── -->
+          <!-- ── Inversores ── -->
           <div v-if="detailData.inverters?.length" class="gs-inverters-section">
             <h3 class="gs-section-title">Inversores ({{ detailData.inverters.length }})</h3>
             <div class="gs-inverters-grid">
@@ -264,8 +200,6 @@
 
           <!-- ── Charts row ── -->
           <div class="gs-charts-row">
-
-            <!-- Power curve today -->
             <div class="gs-chart-card">
               <h3 class="gs-section-title">Curva de potencia hoy</h3>
               <div v-if="powerCurveData.labels.length > 0" class="gs-chart-container">
@@ -276,8 +210,6 @@
                 <p>Sin datos de potencia para hoy</p>
               </div>
             </div>
-
-            <!-- 30d generation -->
             <div class="gs-chart-card">
               <h3 class="gs-section-title">Generación últimos 30 días</h3>
               <div v-if="generation30dData.labels.length > 0" class="gs-chart-container">
@@ -288,7 +220,6 @@
                 <p>Sin datos de generación en los últimos 30 días</p>
               </div>
             </div>
-
           </div>
 
           <!-- ── String behavior chart ── -->
@@ -318,52 +249,41 @@
               </span>
             </div>
 
-            <!-- KPI row -->
+            <!-- KPI strip -->
             <div class="gs-gaia-kpis">
-              <!-- Potencia activa inyectada -->
               <div class="gs-gaia-kpi">
                 <div class="gs-gaia-kpi-label">Potencia activa</div>
-                <div class="gs-gaia-kpi-val" style="color:#7c3aed">
-                  {{ fmtW(detailData.gaia_snapshot.ap_total) }}
-                </div>
+                <div class="gs-gaia-kpi-val" style="color:#7c3aed">{{ fmtW(detailData.gaia_snapshot.ap_total) }}</div>
                 <div class="gs-gaia-kpi-sub">kW inyectados</div>
               </div>
-              <!-- Potencia reactiva -->
               <div class="gs-gaia-kpi">
                 <div class="gs-gaia-kpi-label">Potencia reactiva</div>
-                <div class="gs-gaia-kpi-val" style="color:#0891b2">
-                  {{ fmtVAR(detailData.gaia_snapshot.rp_total) }}
-                </div>
+                <div class="gs-gaia-kpi-val" style="color:#0891b2">{{ fmtVAR(detailData.gaia_snapshot.rp_total) }}</div>
                 <div class="gs-gaia-kpi-sub">kVAr</div>
               </div>
-              <!-- Factor de potencia -->
+              <div class="gs-gaia-kpi">
+                <div class="gs-gaia-kpi-label">Potencia aparente</div>
+                <div class="gs-gaia-kpi-val" style="color:#6366f1">{{ fmtVA(detailData.gaia_snapshot.ap_total, detailData.gaia_snapshot.rp_total) }}</div>
+                <div class="gs-gaia-kpi-sub">kVA</div>
+              </div>
               <div class="gs-gaia-kpi">
                 <div class="gs-gaia-kpi-label">Factor de potencia</div>
-                <div class="gs-gaia-kpi-val"
-                  :style="{ color: fpColor(detailData.gaia_snapshot.pf_avg) }">
-                  {{ fmtPF(detailData.gaia_snapshot.pf_avg) }}
-                </div>
+                <div class="gs-gaia-kpi-val" :style="{ color: fpColor(detailData.gaia_snapshot.pf_avg) }">{{ fmtPF(detailData.gaia_snapshot.pf_avg) }}</div>
                 <div class="gs-gaia-kpi-sub">promedio</div>
               </div>
-              <!-- Energía exportada hoy -->
               <div class="gs-gaia-kpi">
                 <div class="gs-gaia-kpi-label">Energía exportada hoy</div>
-                <div class="gs-gaia-kpi-val" style="color:#059669">
-                  {{ fmtWh(detailData.gaia_snapshot.eae_wh) }}
-                </div>
+                <div class="gs-gaia-kpi-val" style="color:#059669">{{ fmtWh(detailData.gaia_snapshot.eae_wh) }}</div>
                 <div class="gs-gaia-kpi-sub">kWh medidor</div>
               </div>
-              <!-- Pérdida inversores vs medidor -->
               <div v-if="lossPct != null" class="gs-gaia-kpi">
                 <div class="gs-gaia-kpi-label">Pérdida sistema</div>
-                <div class="gs-gaia-kpi-val" :style="{ color: lossColor(lossPct) }">
-                  {{ lossPct }}%
-                </div>
+                <div class="gs-gaia-kpi-val" :style="{ color: lossColor(lossPct) }">{{ lossPct }}%</div>
                 <div class="gs-gaia-kpi-sub">inv. → medidor</div>
               </div>
             </div>
 
-            <!-- Full table -->
+            <!-- Tabla completa -->
             <div class="gs-metrics-table-wrap">
               <table class="gs-metrics-table">
                 <thead>
@@ -411,6 +331,11 @@
                     <td :class="fpClass(detailData.gaia_snapshot.pf3)">{{ fmtPF(detailData.gaia_snapshot.pf3) }}</td>
                     <td class="gs-mt-total" :class="fpClass(detailData.gaia_snapshot.pf_avg)">{{ fmtPF(detailData.gaia_snapshot.pf_avg) }}</td>
                   </tr>
+                  <tr>
+                    <td class="gs-mt-inv">Desequilibrio de tensión (%)</td>
+                    <td colspan="3" style="text-align:center;color:#6b7280">—</td>
+                    <td class="gs-mt-total">{{ fmtDesequilibrio(detailData.gaia_snapshot) }}</td>
+                  </tr>
                   <tr style="background:#f0fdf4">
                     <td class="gs-mt-inv" style="color:#059669;font-weight:700">Energía exportada (kWh)</td>
                     <td>{{ fmtWh(detailData.gaia_snapshot.eae1_wh) }}</td>
@@ -437,9 +362,8 @@
             </div>
           </div>
 
-          <!-- No Gaia data notice -->
-          <div v-else-if="detailData.gaia_node_id === null && !loadingDetail"
-               class="gs-gaia-empty">
+          <!-- Sin nodo Gaia -->
+          <div v-else-if="detailData.gaia_node_id === null && !loadingDetail" class="gs-gaia-empty">
             <i class="pi pi-info-circle" style="font-size:16px;color:#9ca3af" />
             <span>Medidor eléctrico no registrado en Gaia para este proyecto</span>
           </div>
@@ -448,15 +372,72 @@
       </div>
     </Transition>
 
-    <!-- Detail loading placeholder (before data arrives) -->
-    <Transition name="gs-panel-slide">
-      <div v-if="selectedProyId && !detailData && loadingDetail" class="gs-detail-panel">
-        <div class="gs-detail-loading">
-          <i class="pi pi-spin pi-spinner" style="font-size:24px;color:#915BD8" />
-          <span style="color:#6b5a8a">Cargando detalle del proyecto...</span>
-        </div>
+    <!-- ══ PROJECT CARDS GRID ════════════════════════════════════════════════ -->
+    <div v-if="monitoringData" class="gs-cards-grid">
+      <div v-if="!filteredProjects.length" class="gs-empty">
+        <i class="pi pi-search text-3xl mb-2" style="color:#9ca3af" />
+        <p style="color:#6b5a8a">Sin proyectos que coincidan con el filtro</p>
       </div>
-    </Transition>
+
+      <div v-for="proj in filteredProjects" :key="proj.proyecto_id"
+        class="gs-card"
+        :class="{ 'gs-card--selected': selectedProyId === proj.proyecto_id }"
+        :style="{
+          borderLeftColor: STATUS_CFG[proj.status]?.border || '#e5e7eb',
+          backgroundColor: selectedProyId === proj.proyecto_id ? '#faf7ff' : '#fff',
+        }"
+        @click="selectProject(proj)">
+
+        <div class="gs-card-badge"
+          :style="{ background: STATUS_CFG[proj.status]?.bg, color: STATUS_CFG[proj.status]?.color }">
+          <span class="gs-status-dot" :style="{ background: STATUS_CFG[proj.status]?.dot }" />
+          {{ STATUS_CFG[proj.status]?.label || proj.status }}
+        </div>
+
+        <div class="gs-card-name">{{ proj.nombre }}</div>
+
+        <div class="gs-card-power">
+          <span class="gs-card-power-val">{{ proj.power_kw != null ? proj.power_kw.toLocaleString('es-CO', { maximumFractionDigits: 1 }) : '—' }}</span>
+          <span class="gs-card-power-unit">kW</span>
+        </div>
+
+        <div class="gs-card-util">
+          <div class="gs-util-bar gs-util-bar--card">
+            <div class="gs-util-bar-fill"
+              :style="{
+                width: Math.min(proj.utilization_pct || 0, 100) + '%',
+                backgroundColor: STATUS_CFG[proj.status]?.dot || '#9ca3af',
+              }" />
+          </div>
+          <span class="gs-card-util-pct">{{ proj.utilization_pct != null ? proj.utilization_pct + '%' : '—' }}</span>
+        </div>
+
+        <div class="gs-card-stats">
+          <div class="gs-card-stat">
+            <span class="gs-card-stat-label">kWh hoy</span>
+            <span class="gs-card-stat-val">
+              {{ proj.energy_today_kwh != null ? proj.energy_today_kwh.toLocaleString('es-CO', { maximumFractionDigits: 1 }) : '—' }}
+            </span>
+          </div>
+          <div class="gs-card-stat">
+            <span class="gs-card-stat-label">Disponib.</span>
+            <span class="gs-card-stat-val">
+              {{ proj.availability_pct != null ? proj.availability_pct + '%' : '—' }}
+            </span>
+          </div>
+        </div>
+
+        <button class="gs-card-falla-btn" @click.stop="openFallaDialog(proj)">
+          <i class="pi pi-bolt" style="font-size:10px" />
+          Crear falla
+        </button>
+      </div>
+    </div>
+
+    <!-- Cards skeleton -->
+    <div v-else class="gs-cards-grid">
+      <div v-for="i in 8" :key="i" class="gs-card gs-card--skeleton" />
+    </div>
 
     <!-- ══ FALLA DIALOG ══════════════════════════════════════════════════════ -->
     <Dialog v-model:visible="fallaDialogVisible" modal
@@ -476,7 +457,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -536,6 +517,7 @@ const detailData     = ref(null)
 const activeFilter   = ref('all')
 const searchText     = ref('')
 const lastUpdated    = ref('')
+const detailRef      = ref(null)
 
 // Auto-refresh countdown (300s)
 const REFRESH_INTERVAL = 300
@@ -813,6 +795,19 @@ function fmtGaiaTime(iso) {
   const d = new Date(iso)
   return d.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
 }
+function fmtVA(p, q) {
+  if (p == null && q == null) return '—'
+  const s = Math.sqrt((p ?? 0) ** 2 + (q ?? 0) ** 2)
+  return (s / 1000).toFixed(2) + ' kVA'
+}
+function fmtDesequilibrio(snap) {
+  const vs = [snap.vp1, snap.vp2, snap.vp3].filter(v => v != null)
+  if (vs.length < 3) return '—'
+  const avg = vs.reduce((s, v) => s + v, 0) / 3
+  if (!avg) return '—'
+  const dev = Math.max(...vs.map(v => Math.abs(v - avg)))
+  return (dev / avg * 100).toFixed(2) + ' %'
+}
 function avgPhases(snap, prefix) {
   const vals = [snap[prefix + '1'], snap[prefix + '2'], snap[prefix + '3']].filter(v => v != null)
   return vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : null
@@ -872,6 +867,9 @@ async function cargar() {
 async function loadDetail(proyectoId) {
   loadingDetail.value = true
   detailData.value = null
+  // Scroll al panel inmediatamente (aparece el spinner)
+  await nextTick()
+  detailRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   try {
     const res = await api.get(`/generacion-solar/monitoring/${proyectoId}`)
     detailData.value = res.data
