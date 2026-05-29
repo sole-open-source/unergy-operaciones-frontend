@@ -1071,7 +1071,7 @@ function dailyP90Total(fecha) {
 }
 
 // ── Carga: Generación de hoy ─────────────────────────────────────────────
-// P90 siempre disponible desde proyectos; real desde API si ya está reportado
+// P90 desde proyectos; real desde API Unergy vía /monitoreo/resumen-generacion
 async function cargarGenHoy() {
   const projs = proyectosGenOp.value
   if (!projs.length) return
@@ -1079,21 +1079,23 @@ async function cargarGenHoy() {
   genHoyRows.value = []
   try {
     const hoy = new Date().toISOString().split('T')[0]
-    // 1. Construir fila por proyecto con P90 derivado del modelo (siempre disponible)
+    // 1. Construir fila por proyecto con P90 derivado del modelo
     const byProyecto = {}
     for (const p of projs) {
       const p90 = dailyP90(p.id, hoy)
       if (p90 > 0) byProyecto[p.id] = { nombre: p.nombre_comercial, real: 0, p90 }
     }
-    // 2. Superponer datos reales si la API ya los tiene para hoy
+    // 2. Superponer datos reales desde Unergy (by_project del endpoint fleet)
     try {
-      const { data } = await api.get('/generacion', { params: { fecha_inicio: hoy, fecha_fin: hoy, size: 500 } })
-      for (const row of data.items ?? []) {
+      const { data } = await api.get('/monitoreo/resumen-generacion', {
+        params: { date_from: hoy, date_to: hoy }
+      })
+      for (const row of data.by_project ?? []) {
         if (byProyecto[row.proyecto_id] !== undefined) {
-          byProyecto[row.proyecto_id].real += Number(row.kwh_real || 0)
+          byProyecto[row.proyecto_id].real = Number(row.kwh_real || 0)
         }
       }
-    } catch { /* datos reales aún no disponibles — mostrar solo P90 */ }
+    } catch { /* real no disponible aún — mostrar solo P90 */ }
     genHoyRows.value = Object.values(byProyecto)
       .map(r => ({ ...r, real: +r.real.toFixed(1), p90: +r.p90.toFixed(1) }))
       .sort((a, b) => b.p90 - a.p90)
@@ -1105,7 +1107,7 @@ async function cargarGenHoy() {
 }
 
 // ── Carga: Generación últimos 7 días ─────────────────────────────────────
-// P90 sumado de proyectos genOp por fecha (sin depender de kwh_p90 en BD)
+// Real desde API Unergy vía /monitoreo/resumen-generacion; P90 desde proyectos
 async function cargarGen7() {
   gen7Loading.value = true
   gen7Days.value = []
@@ -1114,25 +1116,26 @@ async function cargarGen7() {
     const hace7 = new Date(hoy); hace7.setDate(hace7.getDate() - 6)
     const fi    = hace7.toISOString().split('T')[0]
     const ff    = hoy.toISOString().split('T')[0]
-    const { data } = await api.get('/generacion', { params: { fecha_inicio: fi, fecha_fin: ff, size: 1000 } })
 
-    // Agregar generación real por fecha (solo proyectos genOp)
-    const ids = genOpIds.value
+    const { data } = await api.get('/monitoreo/resumen-generacion', {
+      params: { date_from: fi, date_to: ff }
+    })
+
+    // Indexar real por fecha desde la respuesta del backend
     const realByDate = {}
-    for (const row of data.items ?? []) {
-      if (ids.size > 0 && !ids.has(row.proyecto_id)) continue
-      realByDate[row.fecha] = (realByDate[row.fecha] || 0) + Number(row.kwh_real || 0)
+    for (const entry of data.dates ?? []) {
+      realByDate[entry.fecha] = entry.kwh_real
     }
 
-    // Rellenar los 7 días; P90 siempre calculado desde proyectos
+    // Rellenar los 7 días; P90 calculado desde proyectos
     const result = []
     const cursor = new Date(hace7)
     while (cursor <= hoy) {
-      const key  = cursor.toISOString().split('T')[0]
-      const p90  = dailyP90Total(key)
+      const key = cursor.toISOString().split('T')[0]
+      const p90 = dailyP90Total(key)
       result.push({
         fecha: key,
-        real: realByDate[key] != null ? +realByDate[key].toFixed(1) : null,
+        real: realByDate[key] != null ? realByDate[key] : null,
         p90:  p90 > 0 ? +p90.toFixed(1) : null,
       })
       cursor.setDate(cursor.getDate() + 1)
