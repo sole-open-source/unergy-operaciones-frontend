@@ -1101,24 +1101,35 @@ async function cargarGenHoy() {
 }
 
 // ── Carga: Generación últimos 7 días ─────────────────────────────────────
-// Real desde API Unergy vía /monitoreo/resumen-generacion; P90 desde proyectos
+// Histórico: Unergy API. Hoy: Solenium (mismo origen que "Generación de hoy").
 async function cargarGen7() {
   gen7Loading.value = true
   gen7Days.value = []
   try {
-    const hoy   = new Date()
-    const hace7 = new Date(hoy); hace7.setDate(hace7.getDate() - 6)
-    const fi    = hace7.toISOString().split('T')[0]
-    const ff    = hoy.toISOString().split('T')[0]
+    const hoy    = new Date()
+    const hoyStr = hoy.toISOString().split('T')[0]
+    const hace7  = new Date(hoy); hace7.setDate(hace7.getDate() - 6)
+    const fi     = hace7.toISOString().split('T')[0]
+    const ff     = hoyStr
 
-    const { data } = await api.get('/monitoreo/resumen-generacion', {
-      params: { date_from: fi, date_to: ff }
-    })
+    // Fetch Unergy (histórico) y Solenium (hoy) en paralelo
+    const [unergRes, solRes] = await Promise.allSettled([
+      api.get('/monitoreo/resumen-generacion', { params: { date_from: fi, date_to: ff } }),
+      api.get('/generacion-solar/generacion-hoy'),
+    ])
 
-    // Indexar real por fecha desde la respuesta del backend
+    // Indexar real por fecha (Unergy histórico)
     const realByDate = {}
-    for (const entry of data.dates ?? []) {
-      realByDate[entry.fecha] = entry.kwh_real
+    if (unergRes.status === 'fulfilled') {
+      for (const entry of unergRes.value.data.dates ?? []) {
+        realByDate[entry.fecha] = entry.kwh_real
+      }
+    }
+
+    // Reemplazar hoy con el total de Solenium (más real-time, mismo origen que "Generación de hoy")
+    if (solRes.status === 'fulfilled') {
+      const solTotal = Number(solRes.value.data.total ?? 0)
+      if (solTotal > 0) realByDate[hoyStr] = +solTotal.toFixed(1)
     }
 
     // Rellenar los 7 días; P90 calculado desde proyectos
