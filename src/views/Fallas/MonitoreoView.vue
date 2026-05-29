@@ -561,12 +561,36 @@
             <i class="pi pi-spin pi-spinner" style="color:#915BD8;font-size:22px" />
           </div>
           <div v-else-if="!genHoyRows.length" class="p90-state" style="padding:32px">
-            <i class="pi pi-database" style="color:#9ca3af;font-size:24px" />
-            <span>Sin datos de generación para hoy.</span>
-            <small style="color:#bbb">Los datos suelen estar disponibles desde mediodía.</small>
+            <i class="pi pi-sun" style="color:#f59e0b;font-size:24px" />
+            <span>P90 no configurado para estos proyectos.</span>
+            <small style="color:#bbb">Agrega p90_mensual_kwh en los proyectos para ver la meta diaria.</small>
           </div>
-          <div v-else class="chart-canvas-wrap" :style="{ height: Math.max(180, genHoyRows.length * 44 + 40) + 'px' }">
-            <Bar :data="barGenHoyData" :options="barGenHoyOpts" />
+          <div v-else class="gen-hoy-rows">
+            <div v-for="r in genHoyRows" :key="r.nombre" class="gen-hoy-item">
+              <div class="gen-hoy-item-header">
+                <span class="gen-hoy-item-name">{{ r.nombre }}</span>
+                <div class="gen-hoy-item-vals">
+                  <span :style="{ color: r.p90 > 0 && r.real >= r.p90 ? '#16a34a' : r.real > 0 ? '#d97706' : '#9ca3af', fontWeight: 600 }">
+                    {{ r.real.toLocaleString('es-CO') }} kWh
+                  </span>
+                  <span style="color:#d1d5db;margin:0 4px">/</span>
+                  <span style="color:#f59e0b">{{ r.p90.toLocaleString('es-CO') }} kWh P90</span>
+                  <span class="gen-hoy-pct"
+                    :style="{ color: r.p90 > 0 && r.real >= r.p90 ? '#16a34a' : r.real >= r.p90 * 0.75 ? '#d97706' : '#dc2626' }">
+                    {{ r.p90 > 0 ? Math.round(r.real / r.p90 * 100) + '%' : '—' }}
+                  </span>
+                </div>
+              </div>
+              <div class="gen-hoy-track">
+                <div class="gen-hoy-fill" :style="{
+                  width: r.p90 > 0 ? Math.min(100, r.real / r.p90 * 100) + '%' : '0%',
+                  background: r.p90 > 0 && r.real >= r.p90 ? '#16a34a'
+                    : r.real >= r.p90 * 0.75 ? '#d97706'
+                    : r.real > 0 ? '#dc2626'
+                    : '#e5e7eb'
+                }" />
+              </div>
+            </div>
           </div>
         </div>
 
@@ -1691,18 +1715,24 @@ const barEnergiaData = computed(() => ({
 const barEnergiaOpts = computed(() => ({ ...sharedBarHOpts, plugins: { ...sharedBarHOpts.plugins, tooltip: { callbacks: { label: ctx => ` ${Number(ctx.raw).toLocaleString('es-CO')} kWh` } } } }))
 
 // ── Computed: Generación ──────────────────────────────────────────────────
-// Proyectos minigranja/GD con servicio de operación (para el selector)
-const proyectosGenOp = computed(() =>
-  proyectos.value.filter(p =>
+// Proyectos minigranja/GD con servicio de operación
+// Si el filtro estricto devuelve vacío (campo sin configurar), usa todos los
+// proyectos que tengan al menos un mes de P90 cargado en la BD.
+const proyectosGenOp = computed(() => {
+  const conOp = proyectos.value.filter(p =>
     p.srv_operacion === true &&
     ['minigranja', 'gd'].includes(p.tipo_proyecto)
   )
-)
+  if (conOp.length) return conOp
+  return proyectos.value.filter(p =>
+    Array.isArray(p.p90_mensual_kwh) && p.p90_mensual_kwh.some(v => Number(v) > 0)
+  )
+})
 // IDs de esos proyectos para filtrar filas de generación
 const genOpIds = computed(() => new Set(proyectosGenOp.value.map(p => p.id)))
 
 // Chart 1 ─ Últimos 7 días
-const gen7HasData   = computed(() => gen7Days.value.some(d => d.real != null))
+const gen7HasData   = computed(() => gen7Days.value.some(d => d.real != null || d.p90 != null))
 const gen7HasP90    = computed(() => gen7Days.value.some(d => d.p90 != null && d.p90 > 0))
 const gen7TotalReal = computed(() => +gen7Days.value.reduce((s, d) => s + (d.real || 0), 0).toFixed(0))
 const gen7TotalP90  = computed(() => +gen7Days.value.reduce((s, d) => s + (d.p90  || 0), 0).toFixed(0))
@@ -2681,5 +2711,62 @@ watch(bucket, (newBucket) => {
 }
 :deep(.gen-multiselect) {
   min-width:220px; flex:1; font-size:12px;
+}
+
+/* ── Generación de hoy — lista de barras de progreso ── */
+.gen-hoy-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 20px 18px;
+  max-height: 420px;
+  overflow-y: auto;
+}
+.gen-hoy-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.gen-hoy-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.gen-hoy-item-name {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #374151;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+.gen-hoy-item-vals {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+.gen-hoy-pct {
+  font-size: 11px;
+  font-weight: 700;
+  margin-left: 6px;
+  min-width: 34px;
+  text-align: right;
+}
+.gen-hoy-track {
+  height: 7px;
+  background: #f3f4f6;
+  border-radius: 999px;
+  overflow: hidden;
+}
+.gen-hoy-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.5s cubic-bezier(.4,0,.2,1);
+  min-width: 2px;
 }
 </style>
