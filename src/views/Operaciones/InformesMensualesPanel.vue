@@ -210,6 +210,9 @@ const reportRef = ref(null)
 const informeIdGuardado = ref(null)   // id luego de guardar
 const ultimoSubProject = ref('')      // para upsert
 const ultimoRange = ref(null)
+const ultimoTipo = ref('')            // 'op' | 'fmo' | 'port' del último generado
+const ultimaConsolidada = ref('')     // portafolio: HTML de la página consolidada (sin secciones)
+const ultimosMiembros = ref([])       // portafolio: [{ sub_project, nombre, orden, html }]
 const toastMsg = ref('')
 const toastErr = ref(false)
 let _toastTimer = null
@@ -1225,12 +1228,25 @@ async function generar() {
         return tb - ta
       })
       const totalPages = results.length + 1
-      const pages = [buildConsolidatedPage(portName, results, range, totalPages)]
-      results.forEach((pd, i) => pages.push(buildProjectPage(pd.cfg, pd.genRes, pd.mf, range, i + 2, totalPages)))
-      htmlContent.value = pages.join('<div class="rpt-page-sep"></div>')
+      const consolidada = buildConsolidatedPage(portName, results, range, totalPages)
+      const miembros = results.map((pd, i) => {
+        const sp = pd.cfg.sub_project
+        const html = buildProjectPage(pd.cfg, pd.genRes, pd.mf, range, i + 2, totalPages)
+          .replace('<div class="rpt-page">', `<div class="rpt-page" data-sub-project="${sp}">`)
+        return {
+          sub_project: sp,
+          nombre: pd.cfg.nombre_clientes || pd.cfg.nombre_display || pd.cfg.nombre_comercial || sp,
+          orden: i,
+          html,
+        }
+      })
+      ultimaConsolidada.value = consolidada
+      ultimosMiembros.value = miembros
+      htmlContent.value = [consolidada, ...miembros.map(m => m.html)].join('<div class="rpt-page-sep"></div>')
       resultTitle.value = portName
       rangeLabel.value = range.label
     }
+    ultimoTipo.value = tipo.value === 'portafolio' ? 'port' : tipo.value === 'fmo' ? 'fmo' : 'op'
   } catch (e) {
     console.error('[InformesMensuales] generar error', e)
     error.value = { title: 'Error al generar el informe', detail: e.response?.data?.detail || e.message }
@@ -1242,12 +1258,40 @@ async function generar() {
 }
 
 // ── Guardar ─────────────────────────────────────────────────────────
+// Para portafolio: averigua qué proyectos ya tienen informe individual ('op') guardado
+// para el mismo período. Los que sí → se vinculan (html_inline=null, el portafolio usa
+// el individual vivo). Los que no → se embeben (html_inline = sección generada/editada).
+async function buildMiembrosPayload() {
+  const from = ultimoRange.value.from
+  const pages = [...reportRef.value.querySelectorAll('.rpt-page')]
+  const secciones = pages.slice(1)   // pages[0] = consolidada
+  const miembros = []
+  for (let i = 0; i < ultimosMiembros.value.length; i++) {
+    const m = ultimosMiembros.value[i]
+    const el = secciones.find(p => p.getAttribute('data-sub-project') === m.sub_project) || secciones[i]
+    const sectionHtml = el ? el.outerHTML : m.html
+    let existeIndiv = false
+    try {
+      const { data } = await api.get('/informes/', {
+        params: { tipo: 'op', sub_project: m.sub_project, periodo_desde_gte: from, periodo_desde_lte: from, limit: 1 },
+      })
+      existeIndiv = Array.isArray(data) && data.length > 0
+    } catch { /* si falla la consulta, embebemos por seguridad */ }
+    miembros.push({
+      sub_project: m.sub_project,
+      nombre: m.nombre,
+      orden: i,
+      html_inline: existeIndiv ? null : sectionHtml,
+    })
+  }
+  return miembros
+}
+
 async function guardar() {
   if (!htmlContent.value || !reportRef.value || !ultimoRange.value) return
   guardando.value = true
   try {
-    const finalHtml = reportRef.value.innerHTML
-    const tipoApi = tipo.value === 'portafolio' ? 'port' : tipo.value === 'fmo' ? 'fmo' : 'op'
+    const tipoApi = ultimoTipo.value || (tipo.value === 'portafolio' ? 'port' : tipo.value === 'fmo' ? 'fmo' : 'op')
     const payload = {
       tipo: tipoApi,
       sub_project: ultimoSubProject.value,
@@ -1255,7 +1299,14 @@ async function guardar() {
       periodo_hasta: ultimoRange.value.to,
       periodo_display: ultimoRange.value.label,
       proyecto_nombre: resultTitle.value,
-      html_content: finalHtml,
+      html_content: reportRef.value.innerHTML,
+    }
+    if (tipoApi === 'port') {
+      // El portafolio guarda SOLO la página consolidada como html_content; las secciones
+      // van en miembros (vinculadas o embebidas).
+      const pages = [...reportRef.value.querySelectorAll('.rpt-page')]
+      payload.html_content = pages.length ? pages[0].outerHTML : ultimaConsolidada.value
+      payload.miembros = await buildMiembrosPayload()
     }
     const { data } = await api.post('/informes/', payload)
     informeIdGuardado.value = data.id

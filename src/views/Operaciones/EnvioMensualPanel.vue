@@ -108,72 +108,79 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="inf in filtrados" :key="inf.id"
-                    class="em-row"
-                    :class="{ 'em-row--active': drawerInf?.id === inf.id }"
-                    @click="abrirDrawer(inf)">
+                <template v-for="row in filasAgrupadas" :key="row._group || row.id">
+                <tr v-if="row._group" class="em-group-row">
+                  <td colspan="7">
+                    <i class="pi" :class="row._icon" /> {{ row._group }}
+                    <span class="em-group-count">{{ row._count }}</span>
+                  </td>
+                </tr>
+                <tr v-else :class="['em-row', { 'em-row--active': drawerInf?.id === row.id }]"
+                    @click="abrirDrawer(row)">
                   <td>
-                    <span :class="['em-state-pill', `em-pill-${pipelineEstado(inf)}`]">
-                      {{ estadoLabel(pipelineEstado(inf)) }}
+                    <span :class="['em-state-pill', `em-pill-${pipelineEstado(row)}`]">
+                      {{ estadoLabel(pipelineEstado(row)) }}
                     </span>
                   </td>
                   <td class="em-td-proj">
-                    <div class="em-proj-nombre">{{ inf.proyecto_nombre || inf.sub_project }}</div>
-                    <div class="em-proj-sub" v-if="inf.proyecto_nombre && inf.sub_project !== inf.proyecto_nombre">{{ inf.sub_project }}</div>
+                    <div class="em-proj-nombre">{{ row.proyecto_nombre || row.sub_project }}</div>
+                    <div class="em-proj-sub" v-if="row.tipo === 'port'">{{ (row.miembros || []).length }} proyecto{{ (row.miembros || []).length !== 1 ? 's' : '' }}</div>
+                    <div class="em-proj-sub" v-else-if="row.proyecto_nombre && row.sub_project !== row.proyecto_nombre">{{ row.sub_project }}</div>
                   </td>
                   <td>
-                    <span class="em-tipo-tag">{{ tipoLabel(inf.tipo) }}</span>
+                    <span class="em-tipo-tag">{{ tipoLabel(row.tipo) }}</span>
                   </td>
                   <td class="em-td-fecha">
-                    <div>{{ inf.editado_en ? formatFecha(inf.editado_en) : '—' }}</div>
-                    <div class="em-fecha-sub" v-if="inf.editado_por_nombre">{{ inf.editado_por_nombre }}</div>
+                    <div>{{ row.editado_en ? formatFecha(row.editado_en) : '—' }}</div>
+                    <div class="em-fecha-sub" v-if="row.editado_por_nombre">{{ row.editado_por_nombre }}</div>
                   </td>
                   <td class="em-td-fecha">
-                    <div v-if="inf.aprobado_por_nombre">
-                      <span class="em-fecha-sub">{{ inf.aprobado_por_nombre }}</span>
+                    <div v-if="row.aprobado_por_nombre">
+                      <span class="em-fecha-sub">{{ row.aprobado_por_nombre }}</span>
                     </div>
                     <div v-else class="em-td-empty">—</div>
                   </td>
                   <td class="em-td-fecha">
-                    <div v-if="inf.correo_enviado">
-                      <span class="em-mail-ok">📧 {{ inf.correo_enviado_en ? formatFecha(inf.correo_enviado_en) : '✓' }}</span>
-                      <div class="em-fecha-sub" v-if="inf.enviado_por_nombre">{{ inf.enviado_por_nombre }}</div>
+                    <div v-if="row.correo_enviado">
+                      <span class="em-mail-ok">📧 {{ row.correo_enviado_en ? formatFecha(row.correo_enviado_en) : '✓' }}</span>
+                      <div class="em-fecha-sub" v-if="row.enviado_por_nombre">{{ row.enviado_por_nombre }}</div>
                     </div>
                     <div v-else class="em-td-empty">—</div>
                   </td>
                   <td class="em-td-acciones" @click.stop>
-                    <button class="em-icon-btn em-btn-edit" @click="editar(inf)"
+                    <button class="em-icon-btn em-btn-edit" @click="editar(row)"
                             v-tooltip.bottom="'Editar informe en pantalla completa'">
                       <i class="pi pi-pencil" />
                     </button>
                     <button class="em-icon-btn"
                             :class="{
-                              'em-btn-coms-on': comentariosPendientes(inf) > 0,
-                              'em-btn-coms-resolved': comentariosTotales(inf) > 0 && comentariosPendientes(inf) === 0,
-                              'em-btn-coms-empty': comentariosTotales(inf) === 0,
+                              'em-btn-coms-on': comentariosPendientes(row) > 0,
+                              'em-btn-coms-resolved': comentariosTotales(row) > 0 && comentariosPendientes(row) === 0,
+                              'em-btn-coms-empty': comentariosTotales(row) === 0,
                             }"
-                            @click="abrirDrawer(inf, 'comentarios')"
-                            v-tooltip.bottom="comentariosTooltip(inf)">
+                            @click="abrirDrawer(row, 'comentarios')"
+                            v-tooltip.bottom="comentariosTooltip(row)">
                       <i class="pi pi-comments" />
-                      <span v-if="comentariosTotales(inf) > 0" class="em-coms-badge"
-                            :class="{ 'em-coms-badge--err': comentariosPendientes(inf) > 0 }">
-                        {{ comentariosPendientes(inf) || comentariosTotales(inf) }}
+                      <span v-if="comentariosTotales(row) > 0" class="em-coms-badge"
+                            :class="{ 'em-coms-badge--err': comentariosPendientes(row) > 0 }">
+                        {{ comentariosPendientes(row) || comentariosTotales(row) }}
                       </span>
                     </button>
-                    <button v-if="puedeVerificar(inf)" class="em-icon-btn em-btn-verify"
+                    <button v-if="puedeVerificar(row)" class="em-icon-btn em-btn-verify"
                             :disabled="!permisoVerificar"
-                            @click="abrirDrawer(inf, 'verificar')"
+                            @click="abrirDrawer(row, 'verificar')"
                             v-tooltip.bottom="permisoVerificar ? 'Revisar y verificar (aprobar)' : 'Sólo Juan José puede verificar'">
                       <i class="pi pi-check-circle" />
                     </button>
-                    <button v-if="inf.estado === 'aprobado' && !inf.correo_enviado" class="em-icon-btn em-btn-send"
-                            :disabled="!permisoEnviar || enviandoIds.has(inf.id)"
-                            @click="enviarUno(inf)"
+                    <button v-if="row.estado === 'aprobado' && !row.correo_enviado" class="em-icon-btn em-btn-send"
+                            :disabled="!permisoEnviar || enviandoIds.has(row.id)"
+                            @click="enviarUno(row)"
                             v-tooltip.bottom="permisoEnviar ? 'Enviar al correo del cliente' : 'Sólo Laura H. (o admin) puede enviar'">
-                      <i :class="enviandoIds.has(inf.id) ? 'pi pi-spin pi-spinner' : 'pi pi-send'" />
+                      <i :class="enviandoIds.has(row.id) ? 'pi pi-spin pi-spinner' : 'pi pi-send'" />
                     </button>
                   </td>
                 </tr>
+                </template>
               </tbody>
             </table>
 
@@ -662,6 +669,21 @@ const filtrados = computed(() => {
   }
   return list
 })
+// Separar portafolio vs individuales (op/fmo) y aplanar con marcadores de grupo
+const filtradosPort  = computed(() => filtrados.value.filter(i => i.tipo === 'port'))
+const filtradosIndiv = computed(() => filtrados.value.filter(i => i.tipo !== 'port'))
+const filasAgrupadas = computed(() => {
+  const out = []
+  if (filtradosPort.value.length) {
+    out.push({ _group: 'Informes de portafolio', _icon: 'pi-folder', _count: filtradosPort.value.length })
+    filtradosPort.value.forEach(i => out.push(i))
+  }
+  if (filtradosIndiv.value.length) {
+    out.push({ _group: 'Informes individuales', _icon: 'pi-file', _count: filtradosIndiv.value.length })
+    filtradosIndiv.value.forEach(i => out.push(i))
+  }
+  return out
+})
 const resumen = computed(() => {
   const r = { total: informes.value.length, pendiente: 0, comentado: 0, resuelto: 0, verificado: 0, enviado: 0 }
   informes.value.forEach(i => { r[pipelineEstado(i)] = (r[pipelineEstado(i)] || 0) + 1 })
@@ -786,7 +808,13 @@ async function abrirDrawer(inf, tab = 'preview') {
     const idx = informes.value.findIndex(i => i.id === inf.id)
     if (idx >= 0) Object.assign(informes.value[idx], data)
     drawerInf.value = informes.value[idx] || data
-    detalleHtml.value = data.html_content || ''
+    if (data.tipo === 'port') {
+      // Portafolio: previsualizar el documento COMPUESTO (consolidada + secciones vivas)
+      const { data: comp } = await api.get(`/informes/${inf.id}/compuesto`)
+      detalleHtml.value = comp.html_content || ''
+    } else {
+      detalleHtml.value = data.html_content || ''
+    }
   } catch (e) {
     toast('⚠️ Error al cargar el informe', true)
   } finally {
@@ -826,7 +854,13 @@ async function editar(inf) {
   } else {
     try {
       const { data } = await api.get(`/informes/${inf.id}`)
-      htmlToEdit = data.html_content || ''
+      // Portafolio: se edita el documento COMPUESTO (consolidada + secciones vivas)
+      if (data.tipo === 'port') {
+        const { data: comp } = await api.get(`/informes/${inf.id}/compuesto`)
+        htmlToEdit = comp.html_content || ''
+      } else {
+        htmlToEdit = data.html_content || ''
+      }
       // Actualizar el cache local también
       const idx = informes.value.findIndex(i => i.id === inf.id)
       if (idx >= 0) Object.assign(informes.value[idx], data)
@@ -863,6 +897,45 @@ async function guardarEditor() {
     if (!body) throw new Error('No se pudo acceder al contenido del editor')
     const newHtml = body.innerHTML
     const inf = editorInf.value
+
+    if (inf.tipo === 'port') {
+      // Edición bidireccional del portafolio:
+      //  - página consolidada → html_content del portafolio (sin tocar miembros)
+      //  - cada sección de proyecto → write-back al individual vinculado (si editable)
+      //    o al html_inline del miembro, vía PATCH /seccion.
+      const pages = [...body.querySelectorAll('.rpt-page')]
+      const consolidada = pages.length ? pages[0].outerHTML : newHtml
+      const secciones = pages.slice(1)
+      const { data } = await api.post('/informes/', {
+        tipo: 'port', sub_project: inf.sub_project,
+        periodo_desde: inf.periodo_desde, periodo_hasta: inf.periodo_hasta,
+        periodo_display: inf.periodo_display, proyecto_nombre: inf.proyecto_nombre,
+        html_content: consolidada,
+      })
+      const bloqueadas = []
+      for (const el of secciones) {
+        const sp = el.getAttribute('data-sub-project')
+        if (!sp) continue
+        try {
+          await api.patch(`/informes/${inf.id}/seccion`, { sub_project: sp, html_content: el.outerHTML })
+        } catch (e) {
+          const d = e.response?.data?.detail
+          bloqueadas.push(typeof d === 'string' ? d : sp)
+        }
+      }
+      const idx = informes.value.findIndex(i => i.id === inf.id)
+      if (idx >= 0) Object.assign(informes.value[idx], data)
+      if (drawerInf.value?.id === inf.id) {
+        drawerInf.value = informes.value[idx] || data
+        detalleHtml.value = newHtml
+        previewKey.value++
+      }
+      if (bloqueadas.length) toast('⚠️ Guardado parcial — secciones bloqueadas: ' + bloqueadas.join(' | '), true)
+      else toast('💾 Cambios guardados (portafolio + individuales)')
+      cerrarEditor()
+      return
+    }
+
     const payload = {
       tipo:            inf.tipo,
       sub_project:     inf.sub_project,
@@ -1241,6 +1314,16 @@ async function ejecutarEnvioBatch() {
 }
 .em-col-estado   { width: 130px; }
 .em-col-acciones { width: 140px; text-align: right; }
+.em-group-row td {
+  padding: 8px 12px 4px; font-size: 10px; font-weight: 800; letter-spacing: .6px;
+  text-transform: uppercase; color: #6D28D9; background: #FAF8FE;
+  border-bottom: 1px solid #ECE7F2;
+}
+.em-group-row td .pi { font-size: 10px; margin-right: 4px; }
+.em-group-count {
+  display: inline-block; margin-left: 6px; background: #EDE9FE; color: #6D28D9;
+  border-radius: 9px; padding: 0 7px; font-size: 10px; font-weight: 800;
+}
 .em-row { border-bottom: 1px solid #F3F0F9; cursor: pointer; transition: background .12s; }
 .em-row:last-child { border-bottom: none; }
 .em-row:hover { background: #FAF8FE; }
