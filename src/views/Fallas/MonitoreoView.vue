@@ -1071,38 +1071,33 @@ function dailyP90Total(fecha) {
 }
 
 // ── Carga: Generación de hoy ─────────────────────────────────────────────
-// Real desde Unergy (/monitoreo/resumen-generacion con date=hoy).
-// Construye filas desde by_project (proyectos con sub_project en BD)
-// y añade P90 desde p90_mensual_kwh del proyecto.
+// P90: desde p90_mensual_kwh del proyecto (ya funciona).
+// Real: desde Solenium vía /generacion-solar/generacion-hoy (proyecto_id + kwh_real).
 async function cargarGenHoy() {
+  const projs = proyectosGenOp.value
+  if (!projs.length) return
   genHoyLoading.value = true
   genHoyRows.value = []
   try {
     const hoy = new Date().toISOString().split('T')[0]
-    const { data } = await api.get('/monitoreo/resumen-generacion', {
-      params: { date_from: hoy, date_to: hoy }
-    })
 
-    const rows = []
-    const vistos = new Set()
-
-    // 1. Filas con generación real desde Unergy (by_project tiene proyecto_id + kwh_real)
-    for (const row of data.by_project ?? []) {
-      const p = proyectos.value.find(x => x.id === row.proyecto_id)
-      if (!p) continue
-      vistos.add(p.id)
+    // 1. byProyecto con P90 por proyecto (ya funciona)
+    const byProyecto = {}
+    for (const p of projs) {
       const p90 = dailyP90(p.id, hoy)
-      rows.push({ nombre: p.nombre_comercial, real: Number(row.kwh_real || 0), p90 })
+      if (p90 > 0) byProyecto[p.id] = { nombre: p.nombre_comercial, real: 0, p90 }
     }
 
-    // 2. Proyectos con P90 configurado pero sin sub_project (no en Unergy) — solo meta
-    for (const p of proyectosGenOp.value) {
-      if (vistos.has(p.id)) continue
-      const p90 = dailyP90(p.id, hoy)
-      if (p90 > 0) rows.push({ nombre: p.nombre_comercial, real: 0, p90 })
-    }
+    // 2. Real desde Solenium — el backend empareja por project_id_solenium o por nombre
+    try {
+      const { data } = await api.get('/generacion-solar/generacion-hoy')
+      for (const row of data.proyectos ?? []) {
+        if (byProyecto[row.proyecto_id] !== undefined)
+          byProyecto[row.proyecto_id].real = Number(row.kwh_real || 0)
+      }
+    } catch { /* Solenium no disponible — solo P90 */ }
 
-    genHoyRows.value = rows
+    genHoyRows.value = Object.values(byProyecto)
       .map(r => ({ ...r, real: +r.real.toFixed(1), p90: +r.p90.toFixed(1) }))
       .sort((a, b) => b.p90 - a.p90)
   } catch {
