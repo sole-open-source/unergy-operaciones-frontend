@@ -1401,8 +1401,9 @@ async function ejecutarEnvioBatch() {
 }
 
 /* ── Comentarios ──────────────────────────────────────────────── */
-.em-coms-wrap  { display: flex; flex-direction: column; gap: 12px; }
-.em-coms-list  { display: flex; flex-direction: column; gap: 10px; }
+.em-coms-wrap  { display: flex; flex-direction: column; gap: 12px; height: 100%; min-height: 0; }
+/* Solo la lista hace scroll; el form inferior queda fijo y siempre visible */
+.em-coms-list  { display: flex; flex-direction: column; gap: 10px; flex: 1 1 auto; overflow-y: auto; min-height: 0; padding-right: 2px; }
 .em-com {
   background: #FEF2F2; border: 1px solid #FECACA; border-radius: 10px;
   padding: 10px 12px; position: relative;
@@ -1458,13 +1459,15 @@ async function ejecutarEnvioBatch() {
 .em-textarea:disabled { background: #F4F1FA; color: #9CA3AF; }
 .em-com-add {
   background: #FAF8FE; border: 1px dashed #DAD3EA; border-radius: 10px; padding: 12px;
+  flex-shrink: 0;
 }
 .em-com-add-actions { display: flex; justify-content: flex-end; margin-top: 8px; }
 .em-aprobado-msg {
   background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 10px;
   padding: 10px 12px; font-size: 12px; color: #166534;
+  flex-shrink: 0;
 }
-.em-state-coms-empty { background: #FAF8FE; border-color: #ECE7F2; padding: 30px 20px; }
+.em-state-coms-empty { background: #FAF8FE; border-color: #ECE7F2; padding: 30px 20px; flex: 1 1 auto; min-height: 0; justify-content: center; }
 
 /* ── Verificar ────────────────────────────────────────────────── */
 .em-verify-wrap { display: flex; flex-direction: column; gap: 14px; }
