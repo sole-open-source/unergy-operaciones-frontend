@@ -236,8 +236,9 @@ const TIPOS_SOLUCION = [
 ]
 
 const props = defineProps({
-  initial: { type: Object, default: null },
-  catalogos: { type: Object, required: true },
+  initial:            { type: Object, default: null },
+  catalogos:          { type: Object, required: true },
+  prefillProyectoIds: { type: Array,  default: () => [] },  // pre-seleccionar proyectos al crear
 })
 const emit = defineEmits(['save', 'cancel'])
 
@@ -280,7 +281,7 @@ function onFileInputChange(e) {
 
 const form = ref({
   proyecto_id:          props.initial?.proyecto?.id ?? props.initial?.proyecto_id ?? null,
-  proyecto_ids:         [],   // solo al crear: lista de proyectos seleccionados
+  proyecto_ids:         [...(props.prefillProyectoIds ?? [])],  // pre-seleccionados al crear
   tipo_id:              props.initial?.tipo?.id ?? null,
   estado_id:            props.initial?.estado?.id ?? null,
   prioridad_id:         props.initial?.prioridad?.id ?? null,

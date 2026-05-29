@@ -314,6 +314,7 @@
         :key="fallaFormKey"
         :initial="null"
         :catalogos="catalogos"
+        :prefillProyectoIds="fallaProyectoIds"
         @save="onSaveFalla"
         @cancel="fallaDialogVisible = false" />
     </Dialog>
@@ -612,7 +613,7 @@ async function onSaveFalla(payload) {
   savingFalla.value = true
   try {
     const { proyecto_ids, nota_inicial, _archivos, ...base } = payload
-    const ids      = fallaProyectoIds.value.length ? fallaProyectoIds.value : (proyecto_ids ?? [])
+    const ids = proyecto_ids ?? []
     const archivos = _archivos ?? []
 
     if (!ids.length) {
