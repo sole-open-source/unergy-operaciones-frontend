@@ -1,65 +1,58 @@
 <template>
   <!-- Mobile overlay -->
-  <div v-if="mobileOpen" class="fixed inset-0 z-40 bg-black/50 lg:hidden" @click="mobileOpen = false" />
+  <div v-if="mobileOpen" class="fixed inset-0 z-40 bg-black/40 lg:hidden" @click="mobileOpen = false" />
 
   <aside :class="[
-    'flex flex-col shrink-0 z-50 transition-transform duration-200',
-    'fixed inset-y-0 left-0 w-64 lg:relative lg:translate-x-0',
+    'flex flex-col shrink-0 z-50 transition-transform duration-200 sb-aside',
+    'fixed inset-y-0 left-0 w-[264px] lg:relative lg:translate-x-0',
     mobileOpen ? 'translate-x-0' : '-translate-x-full'
-  ]" style="background-color: #2C2039;">
-    <!-- Logo -->
-    <div class="px-6 py-5 flex items-center justify-between border-b" style="border-color: rgba(255,255,255,0.08);">
-      <div>
-        <img src="/logos/Logo_avena.png" alt="Unergy" class="h-7 w-auto object-contain" />
-        <span class="text-xs mt-1.5 block" style="color: rgba(253,250,247,0.45);">Plataforma Operaciones</span>
+  ]">
+    <!-- Marca -->
+    <div class="sb-brand">
+      <div class="flex items-center gap-2.5 min-w-0">
+        <div class="sb-logo">U</div>
+        <div class="min-w-0">
+          <div class="sb-brand-name">Unergy</div>
+          <div class="sb-brand-sub">Plataforma Operaciones</div>
+        </div>
       </div>
-      <button class="lg:hidden text-white/60 hover:text-white" @click="mobileOpen = false">
-        <i class="pi pi-times text-lg" />
+      <button class="lg:hidden sb-icon-btn" @click="mobileOpen = false">
+        <i class="pi pi-times" />
       </button>
     </div>
 
     <!-- Nav -->
-    <nav class="flex-1 px-3 py-4 overflow-y-auto">
+    <nav class="flex-1 px-2.5 py-2 overflow-y-auto sb-nav">
       <template v-for="group in navGroups" :key="group.label || '__main__'">
-        <div v-if="group.label" class="px-3 pt-4 pb-1.5">
-          <span class="text-[10px] font-bold uppercase tracking-widest" style="color: rgba(145,91,216,0.7);">
-            {{ group.label }}
-          </span>
-        </div>
+        <div v-if="group.label" class="sb-group">{{ group.label }}</div>
 
         <RouterLink
           v-for="item in group.items"
           :key="item.to"
           :to="item.to"
-          class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150 nav-item"
-          active-class="nav-active"
+          class="sb-item"
+          active-class="sb-item--active"
           @click="mobileOpen = false"
         >
-          <i :class="[item.icon, 'text-base w-5 text-center shrink-0']" />
-          {{ item.label }}
+          <i :class="[item.icon, 'sb-item-ico']" />
+          <span class="truncate">{{ item.label }}</span>
         </RouterLink>
       </template>
     </nav>
 
     <!-- User footer -->
-    <div class="px-3 py-3 border-t relative" style="border-color: rgba(255,255,255,0.08);">
-      <div class="flex items-center gap-2">
-        <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
-             style="background-color: #915BD8; color: #FDFAF7;">
-          {{ initials }}
-        </div>
+    <div class="sb-footer">
+      <div class="sb-user">
+        <div class="sb-avatar">{{ initials }}</div>
         <div class="min-w-0 flex-1">
-          <p class="text-xs font-medium truncate" style="color: #FDFAF7;">{{ auth.user?.nombre || auth.user?.email }}</p>
-          <span class="text-[10px] uppercase tracking-wide" style="color: #915BD8;">{{ auth.role }}</span>
+          <p class="sb-user-name">{{ auth.user?.nombre || auth.user?.email }}</p>
+          <p class="sb-user-mail">{{ auth.user?.email }}</p>
         </div>
         <!-- Bell -->
         <div class="relative" ref="bellRef">
-          <button @click="toggleNotifications" class="relative w-8 h-8 rounded-lg flex items-center justify-center transition-colors hover:bg-white/10"
-            title="Notificaciones">
-            <i class="pi pi-bell text-sm" style="color: rgba(253,250,247,0.7);" />
-            <span v-if="unreadCount > 0"
-              class="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 flex items-center justify-center rounded-full text-[9px] font-bold text-white px-1"
-              style="background-color: #D64455;">
+          <button @click="toggleNotifications" class="sb-icon-btn relative" title="Notificaciones">
+            <i class="pi pi-bell" />
+            <span v-if="unreadCount > 0" class="sb-badge">
               {{ unreadCount > 99 ? '99+' : unreadCount }}
             </span>
           </button>
@@ -104,10 +97,8 @@
           </div>
         </div>
         <!-- Logout -->
-        <button @click="handleLogout"
-          class="w-8 h-8 rounded-lg flex items-center justify-center transition-colors hover:bg-white/10"
-          title="Cerrar sesión">
-          <i class="pi pi-sign-out text-sm" style="color: rgba(253,250,247,0.7);" />
+        <button @click="handleLogout" class="sb-icon-btn" title="Cerrar sesión">
+          <i class="pi pi-sign-out" />
         </button>
       </div>
     </div>
@@ -288,21 +279,66 @@ const navGroups = computed(() =>
 </script>
 
 <style scoped>
-.nav-item {
-  color: rgba(253, 250, 247, 0.6);
+.sb-aside {
+  background: #fff;
+  border-right: 1px solid #ECE7F2;
+  font-family: 'Sora', system-ui, sans-serif;
 }
-.nav-item:hover {
-  background-color: rgba(145, 91, 216, 0.12);
-  color: #FDFAF7;
+
+/* Marca */
+.sb-brand {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px; border-bottom: 1px solid #F0ECF6; flex-shrink: 0;
 }
-.nav-active {
-  background-color: rgba(145, 91, 216, 0.2) !important;
-  color: #FDFAF7 !important;
-  border-left: 3px solid #915BD8;
-  padding-left: calc(0.75rem - 3px);
-  font-weight: 600;
+.sb-logo {
+  width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0;
+  background: linear-gradient(135deg, #915BD8, #6D28D9);
+  color: #fff; font-weight: 800; font-size: 18px;
+  display: flex; align-items: center; justify-content: center;
 }
-.nav-active i {
-  color: #915BD8;
+.sb-brand-name { font-size: 15px; font-weight: 800; color: #2C2039; line-height: 1.1; }
+.sb-brand-sub  { font-size: 10.5px; color: #9b8fb0; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Nav */
+.sb-nav::-webkit-scrollbar { width: 6px; }
+.sb-nav::-webkit-scrollbar-thumb { background: #E5DEF0; border-radius: 3px; }
+.sb-nav::-webkit-scrollbar-track { background: transparent; }
+.sb-group {
+  font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+  color: #A89EC0; padding: 14px 12px 4px;
+}
+.sb-item {
+  display: flex; align-items: center; gap: 11px; padding: 8px 10px; margin-bottom: 1px;
+  border-radius: 9px; font-size: 13.5px; font-weight: 600; color: #5b5470;
+  transition: background .12s, color .12s; cursor: pointer;
+}
+.sb-item:hover { background: #F5F2FB; color: #2C2039; }
+.sb-item-ico { font-size: 15px; width: 18px; text-align: center; color: #9990ad; flex-shrink: 0; transition: color .12s; }
+.sb-item:hover .sb-item-ico { color: #6D28D9; }
+.sb-item--active { background: #F1EAF9 !important; color: #2C2039 !important; font-weight: 700; }
+.sb-item--active .sb-item-ico { color: #6D28D9; }
+
+/* Footer usuario */
+.sb-footer { border-top: 1px solid #F0ECF6; padding: 10px 12px; flex-shrink: 0; }
+.sb-user { display: flex; align-items: center; gap: 9px; }
+.sb-avatar {
+  width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+  background: linear-gradient(135deg, #915BD8, #6D28D9); color: #fff;
+  font-weight: 800; font-size: 12px; display: flex; align-items: center; justify-content: center;
+}
+.sb-user-name { font-size: 12.5px; font-weight: 700; color: #2C2039; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sb-user-mail { font-size: 10.5px; color: #9b8fb0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sb-icon-btn {
+  width: 30px; height: 30px; border-radius: 8px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: #8a7fa3; background: transparent; border: none; cursor: pointer;
+  transition: background .12s, color .12s;
+}
+.sb-icon-btn:hover { background: #F1ECF8; color: #6D28D9; }
+.sb-icon-btn .pi { font-size: 14px; }
+.sb-badge {
+  position: absolute; top: -2px; right: -2px; min-width: 15px; height: 15px;
+  display: flex; align-items: center; justify-content: center; padding: 0 3px;
+  border-radius: 999px; background: #DC2626; color: #fff; font-size: 9px; font-weight: 800;
 }
 </style>
