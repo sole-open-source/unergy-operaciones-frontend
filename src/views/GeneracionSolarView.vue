@@ -127,250 +127,269 @@
       </div>
     </div>
 
-    <!-- ══ DETAIL PANEL (encima de las cards) ═════════════════════════════════ -->
-    <!-- Loading placeholder -->
-    <Transition name="gs-panel-slide">
-      <div v-if="selectedProyId && !detailData && loadingDetail" ref="detailRef" class="gs-detail-panel">
-        <div class="gs-detail-loading">
-          <i class="pi pi-spin pi-spinner" style="font-size:24px;color:#915BD8" />
-          <span style="color:#6b5a8a">Cargando detalle del proyecto...</span>
-        </div>
-      </div>
-    </Transition>
+    <!-- ══ OVERLAY FULL-SCREEN ════════════════════════════════════════════════ -->
+    <Teleport to="body">
+      <Transition name="gs-overlay-fade">
+        <div v-if="selectedProyId" class="gs-overlay-backdrop" @click="closeDetail" />
+      </Transition>
+      <Transition name="gs-overlay-rise">
+        <div v-if="selectedProyId" class="gs-overlay-sheet">
+          <div class="gs-overlay-handle" />
 
-    <!-- Detail con datos -->
-    <Transition name="gs-panel-slide">
-      <div v-if="selectedProyId && detailData" ref="detailRef" class="gs-detail-panel">
-
-        <!-- Detail header -->
-        <div class="gs-detail-header">
-          <div class="gs-detail-header-left">
-            <h2 class="gs-detail-title">{{ detailData.nombre }}</h2>
-            <div class="gs-detail-meta">
-              <span class="gs-sol-badge">SOL #{{ detailData.sol_id }}</span>
-              <span class="gs-detail-cap">{{ detailData.capacity_kwp }} kWp instalados</span>
-              <span class="gs-detail-total">{{ detailData.total_30d_kwh?.toLocaleString('es-CO') }} kWh últimos 30d</span>
-            </div>
+          <!-- Loading inicial -->
+          <div v-if="!detailData && loadingDetail" class="gs-overlay-loading">
+            <i class="pi pi-spin pi-spinner" style="font-size:32px;color:#915BD8" />
+            <span style="color:#6b5a8a;font-size:14px">Cargando datos del proyecto...</span>
           </div>
-          <div class="gs-detail-header-right">
-            <button class="gs-card-falla-btn gs-card-falla-btn--lg"
-              @click="openFallaDialog(null)">
-              <i class="pi pi-bolt" style="font-size:11px" />
-              Crear falla
-            </button>
-            <button class="gs-close-btn" @click="closeDetail">
-              <i class="pi pi-times" />
-            </button>
-          </div>
-        </div>
 
-        <!-- Loading detail (inside panel when refreshing) -->
-        <div v-if="loadingDetail" class="gs-detail-loading">
-          <i class="pi pi-spin pi-spinner" style="font-size:24px;color:#915BD8" />
-          <span style="color:#6b5a8a">Cargando detalle...</span>
-        </div>
-
-        <template v-else>
-
-          <!-- ── Inversores ── -->
-          <div v-if="detailData.inverters?.length" class="gs-inverters-section">
-            <h3 class="gs-section-title">Inversores ({{ detailData.inverters.length }})</h3>
-            <div class="gs-inverters-grid">
-              <div v-for="inv in detailData.inverters" :key="inv.id"
-                class="gs-inv-card"
-                :style="{ borderLeftColor: STATUS_CFG[inv.inv_status]?.border || '#e5e7eb' }">
-                <div class="gs-inv-top">
-                  <span class="gs-inv-name">{{ inv.name }}</span>
-                  <span class="gs-status-dot"
-                    :style="{ background: STATUS_CFG[inv.inv_status]?.dot || '#9ca3af' }" />
-                </div>
-                <div class="gs-inv-state" :style="{ color: STATUS_CFG[inv.inv_status]?.color || '#6b7280' }">
-                  {{ inv.state }}
-                </div>
-                <div class="gs-inv-power">
-                  <span class="gs-inv-power-val"
-                    :style="{ color: inv.power_kw > 0 ? '#16a34a' : '#9ca3af' }">
-                    {{ inv.power_kw != null ? inv.power_kw.toFixed(2) : '—' }}
-                  </span>
-                  <span class="gs-inv-power-unit">kW</span>
+          <template v-else-if="detailData">
+            <!-- Header sticky -->
+            <div class="gs-overlay-header" ref="detailRef">
+              <div class="gs-detail-header-left">
+                <h2 class="gs-detail-title">{{ detailData.nombre }}</h2>
+                <div class="gs-detail-meta">
+                  <span class="gs-sol-badge">SOL #{{ detailData.sol_id }}</span>
+                  <span class="gs-detail-cap">{{ detailData.capacity_kwp }} kWp instalados</span>
+                  <span class="gs-detail-total">{{ detailData.total_30d_kwh?.toLocaleString('es-CO') }} kWh últimos 30d</span>
                 </div>
               </div>
-            </div>
-          </div>
-
-          <!-- ── Charts row ── -->
-          <div class="gs-charts-row">
-            <div class="gs-chart-card">
-              <h3 class="gs-section-title">Curva de potencia hoy</h3>
-              <div v-if="powerCurveData.labels.length > 0" class="gs-chart-container">
-                <Line :data="powerCurveData" :options="powerCurveOptions" />
-              </div>
-              <div v-else class="gs-chart-empty">
-                <i class="pi pi-chart-line" style="font-size:28px;color:#d1d5db" />
-                <p>Sin datos de potencia para hoy</p>
-              </div>
-            </div>
-            <div class="gs-chart-card">
-              <h3 class="gs-section-title">Generación últimos 30 días</h3>
-              <div v-if="generation30dData.labels.length > 0" class="gs-chart-container">
-                <Bar :data="generation30dData" :options="generation30dOptions" />
-              </div>
-              <div v-else class="gs-chart-empty">
-                <i class="pi pi-chart-bar" style="font-size:28px;color:#d1d5db" />
-                <p>Sin datos de generación en los últimos 30 días</p>
-              </div>
-            </div>
-          </div>
-
-          <!-- ── String behavior chart ── -->
-          <div v-if="detailData.has_strings && stringsChartData.labels.length" class="gs-strings-section">
-            <div class="gs-section-header">
-              <h3 class="gs-section-title">Comportamiento de strings (DC)</h3>
-              <div class="gs-toggle-pills">
-                <button class="gs-toggle-pill" :class="{ active: stringMetric === 'voltage' }" @click="stringMetric = 'voltage'">Tensión (V)</button>
-                <button class="gs-toggle-pill" :class="{ active: stringMetric === 'current' }" @click="stringMetric = 'current'">Corriente (A)</button>
-                <button class="gs-toggle-pill" :class="{ active: stringMetric === 'power' }" @click="stringMetric = 'power'">Potencia (kW)</button>
-              </div>
-            </div>
-            <div class="gs-chart-card" style="padding: 14px;">
-              <div class="gs-chart-container gs-chart-container--strings">
-                <Bar :data="stringsChartData" :options="stringsChartOptions" />
-              </div>
-            </div>
-          </div>
-
-          <!-- ── Medidor eléctrico (Gaia) ── -->
-          <div v-if="detailData.gaia_snapshot" class="gs-metrics-section">
-            <div class="gs-section-header">
-              <h3 class="gs-section-title">Medidor eléctrico — Datos en tiempo real</h3>
-              <span v-if="detailData.gaia_snapshot.last_time" class="gs-gaia-ts">
-                <i class="pi pi-clock" style="font-size:10px" />
-                {{ fmtGaiaTime(detailData.gaia_snapshot.last_time) }}
-              </span>
-            </div>
-
-            <!-- KPI strip -->
-            <div class="gs-gaia-kpis">
-              <div class="gs-gaia-kpi">
-                <div class="gs-gaia-kpi-label">Potencia activa</div>
-                <div class="gs-gaia-kpi-val" style="color:#7c3aed">{{ fmtW(detailData.gaia_snapshot.ap_total) }}</div>
-                <div class="gs-gaia-kpi-sub">kW inyectados</div>
-              </div>
-              <div class="gs-gaia-kpi">
-                <div class="gs-gaia-kpi-label">Potencia reactiva</div>
-                <div class="gs-gaia-kpi-val" style="color:#0891b2">{{ fmtVAR(detailData.gaia_snapshot.rp_total) }}</div>
-                <div class="gs-gaia-kpi-sub">kVAr</div>
-              </div>
-              <div class="gs-gaia-kpi">
-                <div class="gs-gaia-kpi-label">Potencia aparente</div>
-                <div class="gs-gaia-kpi-val" style="color:#6366f1">{{ fmtVA(detailData.gaia_snapshot.ap_total, detailData.gaia_snapshot.rp_total) }}</div>
-                <div class="gs-gaia-kpi-sub">kVA</div>
-              </div>
-              <div class="gs-gaia-kpi">
-                <div class="gs-gaia-kpi-label">Factor de potencia</div>
-                <div class="gs-gaia-kpi-val" :style="{ color: fpColor(detailData.gaia_snapshot.pf_avg) }">{{ fmtPF(detailData.gaia_snapshot.pf_avg) }}</div>
-                <div class="gs-gaia-kpi-sub">promedio</div>
-              </div>
-              <div class="gs-gaia-kpi">
-                <div class="gs-gaia-kpi-label">Energía exportada hoy</div>
-                <div class="gs-gaia-kpi-val" style="color:#059669">{{ fmtWh(detailData.gaia_snapshot.eae_wh) }}</div>
-                <div class="gs-gaia-kpi-sub">kWh medidor</div>
-              </div>
-              <div v-if="lossPct != null" class="gs-gaia-kpi">
-                <div class="gs-gaia-kpi-label">Pérdida sistema</div>
-                <div class="gs-gaia-kpi-val" :style="{ color: lossColor(lossPct) }">{{ lossPct }}%</div>
-                <div class="gs-gaia-kpi-sub">inv. → medidor</div>
+              <div class="gs-detail-header-right">
+                <button class="gs-card-falla-btn gs-card-falla-btn--lg" @click="openFallaDialog(null)">
+                  <i class="pi pi-bolt" style="font-size:11px" />
+                  Crear falla
+                </button>
+                <button class="gs-close-btn" @click="closeDetail">
+                  <i class="pi pi-times" />
+                </button>
               </div>
             </div>
 
-            <!-- Tabla completa -->
-            <div class="gs-metrics-table-wrap">
-              <table class="gs-metrics-table">
-                <thead>
-                  <tr>
-                    <th class="gs-mt-inv" style="text-align:left">Variable</th>
-                    <th>Fase 1</th>
-                    <th>Fase 2</th>
-                    <th>Fase 3</th>
-                    <th>Total / Prom</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td class="gs-mt-inv">Tensión (V)</td>
-                    <td>{{ fmtV(detailData.gaia_snapshot.vp1) }}</td>
-                    <td>{{ fmtV(detailData.gaia_snapshot.vp2) }}</td>
-                    <td>{{ fmtV(detailData.gaia_snapshot.vp3) }}</td>
-                    <td class="gs-mt-total">{{ fmtV(avgPhases(detailData.gaia_snapshot, 'vp')) }}</td>
-                  </tr>
-                  <tr>
-                    <td class="gs-mt-inv">Corriente (A)</td>
-                    <td>{{ fmtA(detailData.gaia_snapshot.cp1) }}</td>
-                    <td>{{ fmtA(detailData.gaia_snapshot.cp2) }}</td>
-                    <td>{{ fmtA(detailData.gaia_snapshot.cp3) }}</td>
-                    <td class="gs-mt-total">{{ fmtA(avgPhases(detailData.gaia_snapshot, 'cp')) }}</td>
-                  </tr>
-                  <tr>
-                    <td class="gs-mt-inv">Potencia activa (kW)</td>
-                    <td>{{ fmtW(detailData.gaia_snapshot.ap1) }}</td>
-                    <td>{{ fmtW(detailData.gaia_snapshot.ap2) }}</td>
-                    <td>{{ fmtW(detailData.gaia_snapshot.ap3) }}</td>
-                    <td class="gs-mt-total">{{ fmtW(detailData.gaia_snapshot.ap_total) }}</td>
-                  </tr>
-                  <tr>
-                    <td class="gs-mt-inv">Potencia reactiva (kVAr)</td>
-                    <td>{{ fmtVAR(detailData.gaia_snapshot.rp1) }}</td>
-                    <td>{{ fmtVAR(detailData.gaia_snapshot.rp2) }}</td>
-                    <td>{{ fmtVAR(detailData.gaia_snapshot.rp3) }}</td>
-                    <td class="gs-mt-total">{{ fmtVAR(detailData.gaia_snapshot.rp_total) }}</td>
-                  </tr>
-                  <tr>
-                    <td class="gs-mt-inv">Factor de potencia</td>
-                    <td :class="fpClass(detailData.gaia_snapshot.pf1)">{{ fmtPF(detailData.gaia_snapshot.pf1) }}</td>
-                    <td :class="fpClass(detailData.gaia_snapshot.pf2)">{{ fmtPF(detailData.gaia_snapshot.pf2) }}</td>
-                    <td :class="fpClass(detailData.gaia_snapshot.pf3)">{{ fmtPF(detailData.gaia_snapshot.pf3) }}</td>
-                    <td class="gs-mt-total" :class="fpClass(detailData.gaia_snapshot.pf_avg)">{{ fmtPF(detailData.gaia_snapshot.pf_avg) }}</td>
-                  </tr>
-                  <tr>
-                    <td class="gs-mt-inv">Desequilibrio de tensión (%)</td>
-                    <td colspan="3" style="text-align:center;color:#6b7280">—</td>
-                    <td class="gs-mt-total">{{ fmtDesequilibrio(detailData.gaia_snapshot) }}</td>
-                  </tr>
-                  <tr style="background:#f0fdf4">
-                    <td class="gs-mt-inv" style="color:#059669;font-weight:700">Energía exportada (kWh)</td>
-                    <td>{{ fmtWh(detailData.gaia_snapshot.eae1_wh) }}</td>
-                    <td>{{ fmtWh(detailData.gaia_snapshot.eae2_wh) }}</td>
-                    <td>{{ fmtWh(detailData.gaia_snapshot.eae3_wh) }}</td>
-                    <td class="gs-mt-total" style="color:#059669;font-weight:700">{{ fmtWh(detailData.gaia_snapshot.eae_wh) }}</td>
-                  </tr>
-                  <tr>
-                    <td class="gs-mt-inv">Energía importada (kWh)</td>
-                    <td>{{ fmtWh(detailData.gaia_snapshot.iae1_wh) }}</td>
-                    <td>{{ fmtWh(detailData.gaia_snapshot.iae2_wh) }}</td>
-                    <td>{{ fmtWh(detailData.gaia_snapshot.iae3_wh) }}</td>
-                    <td class="gs-mt-total">{{ fmtWh(detailData.gaia_snapshot.iae_wh) }}</td>
-                  </tr>
-                  <tr>
-                    <td class="gs-mt-inv">En. reactiva export. (kVARh)</td>
-                    <td>{{ fmtWh(detailData.gaia_snapshot.ere1_wh) }}</td>
-                    <td>{{ fmtWh(detailData.gaia_snapshot.ere2_wh) }}</td>
-                    <td>{{ fmtWh(detailData.gaia_snapshot.ere3_wh) }}</td>
-                    <td class="gs-mt-total">{{ fmtWh(detailData.gaia_snapshot.ere_wh) }}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
+            <!-- Body scrollable -->
+            <div class="gs-overlay-body">
+              <div v-if="loadingDetail" class="gs-detail-loading">
+                <i class="pi pi-spin pi-spinner" style="font-size:22px;color:#915BD8" />
+                <span style="color:#6b5a8a">Actualizando...</span>
+              </div>
 
-          <!-- Sin nodo Gaia -->
-          <div v-else-if="detailData.gaia_node_id === null && !loadingDetail" class="gs-gaia-empty">
-            <i class="pi pi-info-circle" style="font-size:16px;color:#9ca3af" />
-            <span>Medidor eléctrico no registrado en Gaia para este proyecto</span>
-          </div>
-        </template>
+              <template v-else>
 
-      </div>
-    </Transition>
+                <!-- ── Inversores ── -->
+                <div v-if="detailData.inverters?.length" class="gs-inverters-section">
+                  <h3 class="gs-section-title">Inversores ({{ detailData.inverters.length }})</h3>
+                  <div class="gs-inverters-grid">
+                    <div v-for="inv in detailData.inverters" :key="inv.id"
+                      class="gs-inv-card"
+                      :style="{ borderLeftColor: STATUS_CFG[inv.inv_status]?.border || '#e5e7eb' }">
+                      <div class="gs-inv-top">
+                        <span class="gs-inv-name">{{ inv.name }}</span>
+                        <span class="gs-status-dot" :style="{ background: STATUS_CFG[inv.inv_status]?.dot || '#9ca3af' }" />
+                      </div>
+                      <div class="gs-inv-state" :style="{ color: STATUS_CFG[inv.inv_status]?.color || '#6b7280' }">
+                        {{ inv.state }}
+                      </div>
+                      <div class="gs-inv-power">
+                        <span class="gs-inv-power-val" :style="{ color: inv.power_kw > 0 ? '#16a34a' : '#9ca3af' }">
+                          {{ inv.power_kw != null ? inv.power_kw.toFixed(2) : '—' }}
+                        </span>
+                        <span class="gs-inv-power-unit">kW</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- ── Curvas Solenium ── -->
+                <div class="gs-charts-row">
+                  <div class="gs-chart-card">
+                    <h3 class="gs-section-title">Potencia inversores — Hoy</h3>
+                    <div v-if="powerCurveData.labels.length" class="gs-chart-container">
+                      <Line :data="powerCurveData" :options="powerCurveOptions" />
+                    </div>
+                    <div v-else class="gs-chart-empty">
+                      <i class="pi pi-chart-line" style="font-size:28px;color:#d1d5db" />
+                      <p>Sin datos de potencia para hoy</p>
+                    </div>
+                  </div>
+                  <div class="gs-chart-card">
+                    <h3 class="gs-section-title">Generación últimos 30 días</h3>
+                    <div v-if="generation30dData.labels.length" class="gs-chart-container">
+                      <Bar :data="generation30dData" :options="generation30dOptions" />
+                    </div>
+                    <div v-else class="gs-chart-empty">
+                      <i class="pi pi-chart-bar" style="font-size:28px;color:#d1d5db" />
+                      <p>Sin datos de generación</p>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- ── Gráficas Gaia (medidor) ── -->
+                <div v-if="detailData.gaia_snapshot" class="gs-charts-row">
+                  <div class="gs-chart-card">
+                    <h3 class="gs-section-title">Potencia del medidor vs inversores — Hoy</h3>
+                    <div v-if="gaiaPowerChartData.labels.length" class="gs-chart-container">
+                      <Line :data="gaiaPowerChartData" :options="gaiaPowerOptions" />
+                    </div>
+                    <div v-else class="gs-chart-empty">
+                      <i class="pi pi-chart-line" style="font-size:28px;color:#d1d5db" />
+                      <p>Sin series de potencia del medidor</p>
+                    </div>
+                  </div>
+                  <div class="gs-chart-card">
+                    <h3 class="gs-section-title">Energía acumulada hoy — Medidor</h3>
+                    <div v-if="gaiaEnergyChartData.labels.length" class="gs-chart-container">
+                      <Line :data="gaiaEnergyChartData" :options="gaiaEnergyOptions" />
+                    </div>
+                    <div v-else class="gs-chart-empty">
+                      <i class="pi pi-chart-line" style="font-size:28px;color:#d1d5db" />
+                      <p>Sin series de energía del medidor</p>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- ── Strings DC ── -->
+                <div v-if="detailData.has_strings && stringsChartData.labels.length" class="gs-strings-section">
+                  <div class="gs-section-header">
+                    <h3 class="gs-section-title">Comportamiento de strings (DC)</h3>
+                    <div class="gs-toggle-pills">
+                      <button class="gs-toggle-pill" :class="{ active: stringMetric === 'voltage' }" @click="stringMetric = 'voltage'">Tensión (V)</button>
+                      <button class="gs-toggle-pill" :class="{ active: stringMetric === 'current' }" @click="stringMetric = 'current'">Corriente (A)</button>
+                      <button class="gs-toggle-pill" :class="{ active: stringMetric === 'power' }" @click="stringMetric = 'power'">Potencia (kW)</button>
+                    </div>
+                  </div>
+                  <div class="gs-chart-card" style="padding:14px">
+                    <div class="gs-chart-container gs-chart-container--strings">
+                      <Bar :data="stringsChartData" :options="stringsChartOptions" />
+                    </div>
+                  </div>
+                </div>
+
+                <!-- ── Medidor eléctrico ── -->
+                <div v-if="detailData.gaia_snapshot" class="gs-metrics-section">
+                  <div class="gs-section-header">
+                    <h3 class="gs-section-title">Medidor eléctrico — Datos en tiempo real</h3>
+                    <span v-if="detailData.gaia_snapshot.last_time" class="gs-gaia-ts">
+                      <i class="pi pi-clock" style="font-size:10px" />
+                      {{ fmtGaiaTime(detailData.gaia_snapshot.last_time) }}
+                    </span>
+                  </div>
+                  <div class="gs-gaia-kpis">
+                    <div class="gs-gaia-kpi">
+                      <div class="gs-gaia-kpi-label">Potencia activa</div>
+                      <div class="gs-gaia-kpi-val" style="color:#7c3aed">{{ fmtW(detailData.gaia_snapshot.ap_total) }}</div>
+                      <div class="gs-gaia-kpi-sub">kW inyectados</div>
+                    </div>
+                    <div class="gs-gaia-kpi">
+                      <div class="gs-gaia-kpi-label">Potencia reactiva</div>
+                      <div class="gs-gaia-kpi-val" style="color:#0891b2">{{ fmtVAR(detailData.gaia_snapshot.rp_total) }}</div>
+                      <div class="gs-gaia-kpi-sub">kVAr</div>
+                    </div>
+                    <div class="gs-gaia-kpi">
+                      <div class="gs-gaia-kpi-label">Potencia aparente</div>
+                      <div class="gs-gaia-kpi-val" style="color:#6366f1">{{ fmtVA(detailData.gaia_snapshot.ap_total, detailData.gaia_snapshot.rp_total) }}</div>
+                      <div class="gs-gaia-kpi-sub">kVA</div>
+                    </div>
+                    <div class="gs-gaia-kpi">
+                      <div class="gs-gaia-kpi-label">Factor de potencia</div>
+                      <div class="gs-gaia-kpi-val" :style="{ color: fpColor(detailData.gaia_snapshot.pf_avg) }">{{ fmtPF(detailData.gaia_snapshot.pf_avg) }}</div>
+                      <div class="gs-gaia-kpi-sub">promedio</div>
+                    </div>
+                    <div class="gs-gaia-kpi">
+                      <div class="gs-gaia-kpi-label">Energía exportada hoy</div>
+                      <div class="gs-gaia-kpi-val" style="color:#059669">{{ fmtWh(detailData.gaia_snapshot.eae_wh) }}</div>
+                      <div class="gs-gaia-kpi-sub">kWh medidor</div>
+                    </div>
+                    <div v-if="lossPct != null" class="gs-gaia-kpi">
+                      <div class="gs-gaia-kpi-label">Pérdida sistema</div>
+                      <div class="gs-gaia-kpi-val" :style="{ color: lossColor(lossPct) }">{{ lossPct }}%</div>
+                      <div class="gs-gaia-kpi-sub">inv. → medidor</div>
+                    </div>
+                  </div>
+                  <div class="gs-metrics-table-wrap">
+                    <table class="gs-metrics-table">
+                      <thead>
+                        <tr>
+                          <th class="gs-mt-inv" style="text-align:left">Variable</th>
+                          <th>Fase 1</th><th>Fase 2</th><th>Fase 3</th><th>Total / Prom</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td class="gs-mt-inv">Tensión (V)</td>
+                          <td>{{ fmtV(detailData.gaia_snapshot.vp1) }}</td>
+                          <td>{{ fmtV(detailData.gaia_snapshot.vp2) }}</td>
+                          <td>{{ fmtV(detailData.gaia_snapshot.vp3) }}</td>
+                          <td class="gs-mt-total">{{ fmtV(avgPhases(detailData.gaia_snapshot, 'vp')) }}</td>
+                        </tr>
+                        <tr>
+                          <td class="gs-mt-inv">Corriente (A)</td>
+                          <td>{{ fmtA(detailData.gaia_snapshot.cp1) }}</td>
+                          <td>{{ fmtA(detailData.gaia_snapshot.cp2) }}</td>
+                          <td>{{ fmtA(detailData.gaia_snapshot.cp3) }}</td>
+                          <td class="gs-mt-total">{{ fmtA(avgPhases(detailData.gaia_snapshot, 'cp')) }}</td>
+                        </tr>
+                        <tr>
+                          <td class="gs-mt-inv">Potencia activa (kW)</td>
+                          <td>{{ fmtW(detailData.gaia_snapshot.ap1) }}</td>
+                          <td>{{ fmtW(detailData.gaia_snapshot.ap2) }}</td>
+                          <td>{{ fmtW(detailData.gaia_snapshot.ap3) }}</td>
+                          <td class="gs-mt-total">{{ fmtW(detailData.gaia_snapshot.ap_total) }}</td>
+                        </tr>
+                        <tr>
+                          <td class="gs-mt-inv">Potencia reactiva (kVAr)</td>
+                          <td>{{ fmtVAR(detailData.gaia_snapshot.rp1) }}</td>
+                          <td>{{ fmtVAR(detailData.gaia_snapshot.rp2) }}</td>
+                          <td>{{ fmtVAR(detailData.gaia_snapshot.rp3) }}</td>
+                          <td class="gs-mt-total">{{ fmtVAR(detailData.gaia_snapshot.rp_total) }}</td>
+                        </tr>
+                        <tr>
+                          <td class="gs-mt-inv">Factor de potencia</td>
+                          <td :class="fpClass(detailData.gaia_snapshot.pf1)">{{ fmtPF(detailData.gaia_snapshot.pf1) }}</td>
+                          <td :class="fpClass(detailData.gaia_snapshot.pf2)">{{ fmtPF(detailData.gaia_snapshot.pf2) }}</td>
+                          <td :class="fpClass(detailData.gaia_snapshot.pf3)">{{ fmtPF(detailData.gaia_snapshot.pf3) }}</td>
+                          <td class="gs-mt-total" :class="fpClass(detailData.gaia_snapshot.pf_avg)">{{ fmtPF(detailData.gaia_snapshot.pf_avg) }}</td>
+                        </tr>
+                        <tr>
+                          <td class="gs-mt-inv">Desequilibrio de tensión (%)</td>
+                          <td colspan="3" style="text-align:center;color:#6b7280">—</td>
+                          <td class="gs-mt-total">{{ fmtDesequilibrio(detailData.gaia_snapshot) }}</td>
+                        </tr>
+                        <tr style="background:#f0fdf4">
+                          <td class="gs-mt-inv" style="color:#059669;font-weight:700">Energía exportada (kWh)</td>
+                          <td>{{ fmtWh(detailData.gaia_snapshot.eae1_wh) }}</td>
+                          <td>{{ fmtWh(detailData.gaia_snapshot.eae2_wh) }}</td>
+                          <td>{{ fmtWh(detailData.gaia_snapshot.eae3_wh) }}</td>
+                          <td class="gs-mt-total" style="color:#059669;font-weight:700">{{ fmtWh(detailData.gaia_snapshot.eae_wh) }}</td>
+                        </tr>
+                        <tr>
+                          <td class="gs-mt-inv">Energía importada (kWh)</td>
+                          <td>{{ fmtWh(detailData.gaia_snapshot.iae1_wh) }}</td>
+                          <td>{{ fmtWh(detailData.gaia_snapshot.iae2_wh) }}</td>
+                          <td>{{ fmtWh(detailData.gaia_snapshot.iae3_wh) }}</td>
+                          <td class="gs-mt-total">{{ fmtWh(detailData.gaia_snapshot.iae_wh) }}</td>
+                        </tr>
+                        <tr>
+                          <td class="gs-mt-inv">En. reactiva export. (kVARh)</td>
+                          <td>{{ fmtWh(detailData.gaia_snapshot.ere1_wh) }}</td>
+                          <td>{{ fmtWh(detailData.gaia_snapshot.ere2_wh) }}</td>
+                          <td>{{ fmtWh(detailData.gaia_snapshot.ere3_wh) }}</td>
+                          <td class="gs-mt-total">{{ fmtWh(detailData.gaia_snapshot.ere_wh) }}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <!-- Sin nodo Gaia -->
+                <div v-else-if="detailData.gaia_node_id === null" class="gs-gaia-empty">
+                  <i class="pi pi-info-circle" style="font-size:16px;color:#9ca3af" />
+                  <span>Medidor eléctrico no registrado en Gaia para este proyecto</span>
+                </div>
+
+              </template>
+            </div><!-- /gs-overlay-body -->
+          </template>
+        </div><!-- /gs-overlay-sheet -->
+      </Transition>
+    </Teleport>
 
     <!-- ══ PROJECT CARDS GRID ════════════════════════════════════════════════ -->
     <div v-if="monitoringData" class="gs-cards-grid">
@@ -663,6 +682,120 @@ const generation30dOptions = {
       grid: { color: 'rgba(0,0,0,0.05)' },
       title: { display: true, text: 'kWh', font: { size: 10 }, color: '#9ca3af' },
     },
+  },
+}
+
+// ── Gaia meter charts ────────────────────────────────────────────────────────
+function gaiaTimeLabel(t) {
+  // "2026-05-29T08:05:00-05:00" → "08:05"
+  if (!t) return ''
+  const idx = t.indexOf('T')
+  return idx >= 0 ? t.slice(idx + 1, idx + 6) : t.slice(0, 5)
+}
+
+const gaiaPowerChartData = computed(() => {
+  const ts = detailData.value?.gaia_snapshot?.time_series
+  const curve = detailData.value?.power_curve ?? []
+
+  const gaiaRows = (ts?.power ?? []).filter(r => r.kw != null)
+  const solRows  = curve.filter(pt => pt.kw != null)
+
+  if (!gaiaRows.length && !solRows.length) return { labels: [], datasets: [] }
+
+  // Build label union (use Gaia as master, Solenium as overlay)
+  const labels = gaiaRows.length
+    ? gaiaRows.map(r => gaiaTimeLabel(r.time))
+    : solRows.map(pt => {
+        const t = pt.time || ''
+        return t.includes(' ') ? t.split(' ')[1].slice(0, 5) : t.slice(0, 5)
+      })
+
+  const datasets = []
+  if (gaiaRows.length) {
+    datasets.push({
+      label: 'Medidor (kW)',
+      data: gaiaRows.map(r => r.kw),
+      borderColor: '#059669',
+      backgroundColor: 'rgba(5,150,105,0.12)',
+      fill: true, tension: 0.35, pointRadius: 0, borderWidth: 2,
+    })
+  }
+  if (solRows.length) {
+    // Map Solenium by time label for alignment
+    const solMap = {}
+    solRows.forEach(pt => {
+      const t = pt.time || ''
+      const lbl = t.includes(' ') ? t.split(' ')[1].slice(0, 5) : t.slice(0, 5)
+      solMap[lbl] = (solMap[lbl] ?? 0) + pt.kw
+    })
+    datasets.push({
+      label: 'Inversores (kW)',
+      data: labels.map(l => solMap[l] ?? null),
+      borderColor: BRAND_PURPLE,
+      backgroundColor: 'rgba(145,91,216,0.08)',
+      fill: false, tension: 0.35, pointRadius: 0, borderWidth: 1.5,
+      borderDash: [5, 3],
+    })
+  }
+  return { labels, datasets }
+})
+
+const gaiaPowerOptions = {
+  responsive: true, maintainAspectRatio: false,
+  interaction: { mode: 'index', intersect: false },
+  plugins: {
+    legend: { display: true, position: 'top', labels: { font: { size: 10 }, boxWidth: 12, padding: 8 } },
+    tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y?.toFixed(2)} kW` } },
+  },
+  scales: {
+    x: { ticks: { maxTicksLimit: 12, font: { size: 10 }, color: '#9ca3af' }, grid: { display: false } },
+    y: { ticks: { font: { size: 10 }, color: '#9ca3af' }, grid: { color: 'rgba(0,0,0,0.05)' },
+         title: { display: true, text: 'kW', font: { size: 10 }, color: '#9ca3af' }, beginAtZero: true },
+  },
+}
+
+const gaiaEnergyChartData = computed(() => {
+  const ts = detailData.value?.gaia_snapshot?.time_series
+  const expRows = (ts?.energy_exp ?? []).filter(r => r.kwh != null)
+  const impRows = (ts?.energy_imp ?? []).filter(r => r.kwh != null)
+  if (!expRows.length) return { labels: [], datasets: [] }
+
+  const labels = expRows.map(r => gaiaTimeLabel(r.time))
+  const impMap = {}
+  impRows.forEach(r => { impMap[gaiaTimeLabel(r.time)] = r.kwh })
+
+  return {
+    labels,
+    datasets: [
+      {
+        label: 'Energía exportada (kWh)',
+        data: expRows.map(r => r.kwh),
+        borderColor: '#059669',
+        backgroundColor: 'rgba(5,150,105,0.15)',
+        fill: true, tension: 0.35, pointRadius: 0, borderWidth: 2,
+      },
+      ...(impRows.length ? [{
+        label: 'Energía importada (kWh)',
+        data: labels.map(l => impMap[l] ?? null),
+        borderColor: '#dc2626',
+        backgroundColor: 'rgba(220,38,38,0.08)',
+        fill: true, tension: 0.35, pointRadius: 0, borderWidth: 1.5,
+      }] : []),
+    ],
+  }
+})
+
+const gaiaEnergyOptions = {
+  responsive: true, maintainAspectRatio: false,
+  interaction: { mode: 'index', intersect: false },
+  plugins: {
+    legend: { display: true, position: 'top', labels: { font: { size: 10 }, boxWidth: 12, padding: 8 } },
+    tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y?.toFixed(2)} kWh` } },
+  },
+  scales: {
+    x: { ticks: { maxTicksLimit: 12, font: { size: 10 }, color: '#9ca3af' }, grid: { display: false } },
+    y: { ticks: { font: { size: 10 }, color: '#9ca3af' }, grid: { color: 'rgba(0,0,0,0.05)' },
+         title: { display: true, text: 'kWh', font: { size: 10 }, color: '#9ca3af' }, beginAtZero: true },
   },
 }
 
@@ -1830,4 +1963,89 @@ onUnmounted(() => {
   font-size: 12px;
   color: #9ca3af;
 }
+
+/* ── Overlay full-screen ── */
+.gs-overlay-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  background: rgba(15, 8, 30, 0.55);
+}
+
+.gs-overlay-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  top: 0;
+  z-index: 901;
+  background: #f8f6fc;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+@media (min-width: 768px) {
+  .gs-overlay-sheet {
+    top: 32px;
+    left: 50%;
+    right: auto;
+    bottom: auto;
+    transform: translateX(-50%);
+    width: min(1280px, calc(100vw - 48px));
+    max-height: calc(100vh - 48px);
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -8px 40px rgba(44, 32, 57, 0.25);
+  }
+}
+
+.gs-overlay-handle {
+  width: 40px;
+  height: 4px;
+  background: #d1d5db;
+  border-radius: 999px;
+  margin: 10px auto 4px;
+  flex-shrink: 0;
+}
+
+.gs-overlay-loading {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+.gs-overlay-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 16px 20px 14px;
+  border-bottom: 1px solid #ede8f8;
+  background: white;
+  flex-shrink: 0;
+}
+
+.gs-overlay-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Overlay transitions */
+.gs-overlay-fade-enter-active,
+.gs-overlay-fade-leave-active { transition: opacity 0.25s ease; }
+.gs-overlay-fade-enter-from,
+.gs-overlay-fade-leave-to { opacity: 0; }
+
+.gs-overlay-rise-enter-active,
+.gs-overlay-rise-leave-active { transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.3s ease; }
+.gs-overlay-rise-enter-from,
+.gs-overlay-rise-leave-to { transform: translateY(60px); opacity: 0; }
 </style>
