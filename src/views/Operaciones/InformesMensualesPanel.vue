@@ -603,18 +603,53 @@ function svgCompareChart(real, p50, p90, p99) {
 // ── Chart de portafolio (ranking horizontal) ─────────────────────────
 function svgPortfolioChart(items) {
   if (!items.length) return ''
-  const W = 580, H = Math.max(170, items.length * 24 + 20), padL = 130, padR = 90, padT = 8, padB = 8
-  const maxV = Math.max(...items.map(i => i.real || 0), 1)
-  let html = ''
+  const W = 600, rowH = 26, padL = 135, padR = 150, padT = 30, padB = 8
+  const H = padT + items.length * rowH + padB
+  const barAreaW = W - padL - padR
+  // Escala incluye P90 para que el marcador/objetivo siempre quepa
+  const maxV = Math.max(...items.map(i => Math.max(i.real || 0, i.p90 || 0)), 1)
+
+  // Leyenda
+  let html =
+    `<g font-size="10" font-weight="700">` +
+    `<rect x="${padL}" y="5" width="12" height="11" fill="#6B35C0" opacity="0.82" rx="2"/>` +
+    `<text x="${padL + 17}" y="14" fill="#444">Real</text>` +
+    `<rect x="${padL + 52}" y="5" width="12" height="11" fill="#22C55E" opacity="0.85" rx="2"/>` +
+    `<text x="${padL + 69}" y="14" fill="#444">Excedente</text>` +
+    `<line x1="${padL + 142}" y1="3" x2="${padL + 142}" y2="18" stroke="#C89600" stroke-width="2" stroke-dasharray="3 2"/>` +
+    `<text x="${padL + 148}" y="14" fill="#444">P90 esperado (simulación)</text>` +
+    `</g>`
+
   items.forEach((it, i) => {
-    const y = padT + i * 22
-    const w = ((it.real || 0) / maxV) * (W - padL - padR)
-    html += `<text x="${padL - 6}" y="${y + 12}" text-anchor="end" font-size="10" fill="#444" font-weight="600">${esc(it.name.slice(0, 22))}</text>` +
-      `<rect x="${padL}" y="${y + 3}" width="${w.toFixed(1)}" height="14" fill="#6B35C0" opacity="0.82" rx="2" />` +
-      `<text x="${(padL + w + 4).toFixed(1)}" y="${y + 14}" font-size="10" fill="#333" font-weight="700">${Math.round(it.real).toLocaleString('es-CO')} kWh</text>`
-    if (it.p90 != null) {
-      const wp = (it.p90 / maxV) * (W - padL - padR)
-      html += `<line x1="${(padL + wp).toFixed(1)}" y1="${y + 1}" x2="${(padL + wp).toFixed(1)}" y2="${y + 19}" stroke="#C89600" stroke-width="1.5" stroke-dasharray="3 2" />`
+    const y = padT + i * rowH
+    const barY = y + 4, barH = 15
+    const real = it.real || 0
+    const p90 = (it.p90 != null && it.p90 > 0) ? it.p90 : null
+    const wReal = (real / maxV) * barAreaW
+    html += `<text x="${padL - 6}" y="${barY + 11}" text-anchor="end" font-size="10" fill="#444" font-weight="600">${esc(it.name.slice(0, 22))}</text>`
+
+    if (p90 != null) {
+      const wP90 = (p90 / maxV) * barAreaW
+      if (real >= p90) {
+        // Barra hasta P90 (morado) + excedente P90→Real (verde)
+        html += `<rect x="${padL}" y="${barY}" width="${wP90.toFixed(1)}" height="${barH}" fill="#6B35C0" opacity="0.82" rx="2"/>`
+        html += `<rect x="${(padL + wP90).toFixed(1)}" y="${barY}" width="${(wReal - wP90).toFixed(1)}" height="${barH}" fill="#22C55E" opacity="0.85" rx="2"/>`
+      } else {
+        // Barra Real (morado) + déficit Real→P90 (rojo translúcido)
+        html += `<rect x="${padL}" y="${barY}" width="${wReal.toFixed(1)}" height="${barH}" fill="#6B35C0" opacity="0.82" rx="2"/>`
+        html += `<rect x="${(padL + wReal).toFixed(1)}" y="${barY}" width="${(wP90 - wReal).toFixed(1)}" height="${barH}" fill="#FCA5A5" opacity="0.45" rx="2"/>`
+      }
+      // Marcador P90
+      html += `<line x1="${(padL + wP90).toFixed(1)}" y1="${barY - 2}" x2="${(padL + wP90).toFixed(1)}" y2="${barY + barH + 2}" stroke="#C89600" stroke-width="2" stroke-dasharray="3 2"/>`
+      // Etiqueta: Real + % vs P90 (coloreado)
+      const pct = (real - p90) / p90 * 100
+      const pctStr = `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`
+      const pctCol = pct >= 0 ? '#16A34A' : '#DC2626'
+      const labelX = padL + Math.max(wReal, wP90) + 5
+      html += `<text x="${labelX.toFixed(1)}" y="${barY + 11}" font-size="9.5" fill="#333" font-weight="700">${Math.round(real).toLocaleString('es-CO')} <tspan fill="${pctCol}" font-weight="800">${pctStr}</tspan></text>`
+    } else {
+      html += `<rect x="${padL}" y="${barY}" width="${wReal.toFixed(1)}" height="${barH}" fill="#6B35C0" opacity="0.82" rx="2"/>`
+      html += `<text x="${(padL + wReal + 5).toFixed(1)}" y="${barY + 11}" font-size="9.5" fill="#333" font-weight="700">${Math.round(real).toLocaleString('es-CO')} kWh</text>`
     }
   })
   return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%;height:${H}px;display:block">${html}</svg>`
@@ -869,7 +904,7 @@ function buildConsolidatedPage(portName, projsData, range, totalPages) {
     '<tfoot><tr class="rpt-total-row"><td>TOTAL PORTAFOLIO</td>' +
     `<td style="text-align:right;font-family:monospace" colspan="6">${Math.round(totalPort).toLocaleString('es-CO')} kWh</td></tr></tfoot>` +
     '</table></div>' +
-    '<div class="rpt-section"><div class="rpt-section-title">▌ 2. Generación por Proyecto — Ranking</div>' +
+    '<div class="rpt-section"><div class="rpt-section-title">▌ 2. Generación por Proyecto — Ranking vs P90</div>' +
     `<div class="rpt-chart-card"><div class="rpt-chart-box rpt-chart-box-tall">${chart}</div></div></div>` +
     '<div class="rpt-footer">' +
     '<span>UNERGY ENERGÍA DIGITAL S.A.S ESP | Medellín, Colombia | www.unergy.co</span>' +
