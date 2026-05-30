@@ -1,9 +1,10 @@
 <template>
   <div class="space-y-4">
-    <div class="flex items-center justify-between">
-      <h2 class="text-lg font-bold leading-tight" style="color:#2C2039">Gestión de Usuarios</h2>
-      <Button label="Nuevo usuario" icon="pi pi-plus" @click="openNew" />
-    </div>
+    <PageHeader title="Gestión de Usuarios">
+      <template #actions>
+        <Button label="Nuevo usuario" icon="pi pi-plus" size="small" @click="openNew" />
+      </template>
+    </PageHeader>
 
     <div class="bg-white rounded-xl shadow-sm overflow-hidden">
       <div class="p-4 border-b border-gray-100">

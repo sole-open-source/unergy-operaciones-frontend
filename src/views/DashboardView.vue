@@ -1,12 +1,7 @@
 <template>
   <div class="space-y-5">
     <!-- Page header -->
-    <div class="flex items-end justify-between gap-3">
-      <div>
-        <h1 class="text-lg font-bold leading-tight" style="color:#2C2039">Dashboard</h1>
-        <p class="text-xs" style="color:#9b8fb0">Resumen operativo de la plataforma</p>
-      </div>
-    </div>
+    <PageHeader title="Dashboard" subtitle="Resumen operativo de la plataforma" />
 
     <!-- Critical Alerts Banner -->
     <div v-if="criticalAlerts.length" class="rounded-xl overflow-hidden" style="border: 2px solid #D64455;">

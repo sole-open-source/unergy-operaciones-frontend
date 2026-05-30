@@ -1,27 +1,25 @@
 <template>
   <div class="space-y-5">
     <!-- Header -->
-    <div class="flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <div class="w-9 h-9 rounded-xl flex items-center justify-center" style="background: rgba(145,91,216,0.12);">
+    <PageHeader title="Garantías" subtitle="Gestión de garantías XM, pólizas y cuentas custodia">
+      <template #lead>
+        <div class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style="background: rgba(145,91,216,0.12);">
           <i class="pi pi-shield text-lg" style="color: #915BD8;" />
         </div>
-        <div>
-          <h1 class="text-2xl font-bold" style="color: #2C2039;">Garantías</h1>
-          <p class="text-xs" style="color: #6b5a8a;">Gestión de garantías XM, pólizas y cuentas custodia</p>
-        </div>
-      </div>
-      <Button v-if="isAdmin" label="Nueva garantía" icon="pi pi-plus" @click="openCreate" />
-    </div>
+      </template>
+      <template #actions>
+        <Button v-if="isAdmin" label="Nueva garantía" icon="pi pi-plus" size="small" @click="openCreate" />
+      </template>
+    </PageHeader>
 
     <!-- Summary Cards -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-      <div class="bg-white rounded-xl shadow-sm p-5" style="border: 1px solid #e8e0f0;">
+      <div class="bg-white rounded-xl shadow-sm p-4" style="border: 1px solid #e8e0f0;">
         <p class="text-xs uppercase tracking-wide font-semibold" style="color: #6b5a8a;">Saldo total</p>
         <p class="text-2xl font-bold mt-1" style="color: #2C2039;">{{ fmtCOP(resumen.total_valor_cop) }}</p>
         <p class="text-xs mt-0.5" style="color: #915BD8;">{{ resumen.count_vigentes }} vigentes</p>
       </div>
-      <div class="rounded-xl shadow-sm p-5" :style="resumen.expiring_30d?.length > 0
+      <div class="rounded-xl shadow-sm p-4" :style="resumen.expiring_30d?.length > 0
         ? 'background: #FEF2F2; border: 2px solid rgba(214,68,85,0.3);'
         : 'background: white; border: 1px solid #e8e0f0;'">
         <p class="text-xs uppercase tracking-wide font-semibold" style="color: #6b5a8a;">Por vencer (30d)</p>
@@ -31,7 +29,7 @@
         <p v-if="resumen.expiring_30d?.length" class="text-xs mt-0.5" style="color: #D64455;">Requiere acción inmediata</p>
         <p v-else class="text-xs mt-0.5" style="color: #10B981;">Sin vencimientos próximos</p>
       </div>
-      <div class="rounded-xl shadow-sm p-5" :style="resumen.oversold?.length > 0
+      <div class="rounded-xl shadow-sm p-4" :style="resumen.oversold?.length > 0
         ? 'background: #FFFBEB; border: 2px solid rgba(240,192,64,0.4);'
         : 'background: white; border: 1px solid #e8e0f0;'">
         <p class="text-xs uppercase tracking-wide font-semibold" style="color: #6b5a8a;">Sobrevendidos</p>
@@ -41,7 +39,7 @@
         <p v-if="resumen.oversold?.length" class="text-xs mt-0.5" style="color: #CA8A04;">Cobertura &gt;100%</p>
         <p v-else class="text-xs mt-0.5" style="color: #10B981;">Cobertura dentro de límites</p>
       </div>
-      <div class="bg-white rounded-xl shadow-sm p-5" style="border: 1px solid #e8e0f0;">
+      <div class="bg-white rounded-xl shadow-sm p-4" style="border: 1px solid #e8e0f0;">
         <p class="text-xs uppercase tracking-wide font-semibold" style="color: #6b5a8a;">Vencidas</p>
         <p class="text-2xl font-bold mt-1" :style="{ color: resumen.count_vencidas > 0 ? '#D64455' : '#6b5a8a' }">
           {{ resumen.count_vencidas || 0 }}
@@ -274,7 +272,7 @@
     <!-- Tab: By Type -->
     <div v-if="activeTab === 3" class="grid grid-cols-1 md:grid-cols-3 gap-4">
       <div v-for="(info, tipo) in resumen.por_tipo" :key="tipo"
-           class="bg-white rounded-xl shadow-sm p-5" style="border: 1px solid #e8e0f0;">
+           class="bg-white rounded-xl shadow-sm p-4" style="border: 1px solid #e8e0f0;">
         <div class="flex items-center gap-2 mb-3">
           <Tag :value="TIPO_LABELS[tipo] || tipo" :severity="tipoSeverity(tipo)" />
         </div>

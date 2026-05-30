@@ -1,16 +1,14 @@
 <template>
   <div class="space-y-5">
     <!-- Header -->
-    <div class="flex items-center gap-3">
-      <Button icon="pi pi-arrow-left" text @click="$router.back()" class="-ml-2" />
-      <div class="w-8 h-8 rounded-full flex items-center justify-center" style="background:#915BD822">
-        <i class="pi pi-chart-line text-sm" style="color:#915BD8" />
-      </div>
-      <div>
-        <h2 class="text-xl font-bold text-gray-800">Mercado de Energía</h2>
-        <p class="text-xs text-gray-400 mt-0.5">Precios de bolsa XM + Pronóstico Clima</p>
-      </div>
-    </div>
+    <PageHeader title="Mercado de Energía" subtitle="Precios de bolsa XM + Pronóstico Clima">
+      <template #lead>
+        <Button icon="pi pi-arrow-left" text @click="$router.back()" class="-ml-2" />
+        <div class="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style="background:#915BD822">
+          <i class="pi pi-chart-line text-sm" style="color:#915BD8" />
+        </div>
+      </template>
+    </PageHeader>
 
     <!-- Tabs -->
     <div class="flex gap-1 border-b border-gray-200">

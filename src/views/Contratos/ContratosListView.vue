@@ -1,18 +1,16 @@
 <template>
   <div class="space-y-5">
     <!-- Header con acción -->
-    <div class="flex items-start justify-between gap-3">
-      <div>
-        <h2 class="text-lg font-bold leading-tight" style="color:#2C2039">Servicios</h2>
-        <p class="text-xs" style="color:#9b8fb0">Gestión de contratos y servicios por tipo</p>
-      </div>
-      <Button v-if="servicioActivo === 'ppa'" label="Nuevo contrato PPA" icon="pi pi-plus" size="small"
-        class="bg-amber-500 border-amber-500 hover:bg-amber-600 shrink-0" @click="showWizard = true" />
-      <Button v-else-if="servicioActivo !== 'ppa' && servicioActivo !== 'representacion'"
-        :label="`Nuevo ${servicioInfo?.label}`" icon="pi pi-plus" size="small" class="shrink-0"
-        :style="`background:${servicioInfo?.color}; border-color:${servicioInfo?.color}`"
-        @click="showServicioWizard = true" />
-    </div>
+    <PageHeader title="Servicios" subtitle="Gestión de contratos y servicios por tipo">
+      <template #actions>
+        <Button v-if="servicioActivo === 'ppa'" label="Nuevo contrato PPA" icon="pi pi-plus" size="small"
+          class="bg-amber-500 border-amber-500 hover:bg-amber-600" @click="showWizard = true" />
+        <Button v-else-if="servicioActivo !== 'ppa' && servicioActivo !== 'representacion'"
+          :label="`Nuevo ${servicioInfo?.label}`" icon="pi pi-plus" size="small"
+          :style="`background:${servicioInfo?.color}; border-color:${servicioInfo?.color}`"
+          @click="showServicioWizard = true" />
+      </template>
+    </PageHeader>
 
     <!-- Selector de servicio (tabs compactos) -->
     <div class="flex flex-wrap gap-2">

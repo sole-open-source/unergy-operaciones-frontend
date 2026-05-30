@@ -2,12 +2,8 @@
   <div class="p-5 space-y-5 min-h-screen" style="background: #FDFAF7; color: #2C2039;">
 
     <!-- Header -->
-    <div class="flex items-start justify-between">
-      <div>
-        <h1 class="text-xl font-bold leading-tight" style="color: #2C2039;">Cumplimiento PPA</h1>
-        <p class="text-xs mt-0.5" style="color: #9b8fb0;">Generación vs. compromisos contractuales de energía</p>
-      </div>
-      <div class="flex items-center gap-2">
+    <PageHeader title="Cumplimiento PPA" subtitle="Generación vs. compromisos contractuales de energía">
+      <template #actions>
         <span v-if="cacheSize" class="text-xs font-mono px-2 py-1 rounded" style="background: rgba(145,91,216,0.08); color: #915BD8;">
           caché: {{ cacheSize }}
         </span>
@@ -18,8 +14,8 @@
           <i class="pi pi-refresh text-xs" :class="{ 'pi-spin': cacheClearing }" />
           Borrar caché y consultar energía
         </button>
-      </div>
-    </div>
+      </template>
+    </PageHeader>
 
     <!-- Tab bar -->
     <div class="flex gap-0 border-b -mt-2" style="border-color: rgba(44,32,57,0.10);">

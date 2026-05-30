@@ -1,13 +1,11 @@
 <template>
   <div class="space-y-4">
-    <div class="flex flex-wrap items-center justify-between gap-3">
-      <h2 class="text-lg font-bold leading-tight" style="color: #2C2039;">GESCON — Contratos ASIC</h2>
-      <div class="flex items-center gap-3">
-        <span class="text-sm" style="color: #9b89b5;">{{ total }} registros</span>
+    <PageHeader title="GESCON — Contratos ASIC" :subtitle="`${total} registros`">
+      <template #actions>
         <Button label="Registrar" icon="pi pi-plus" @click="abrirNuevo"
           style="background:#915BD8; border-color:#915BD8;" size="small" />
-      </div>
-    </div>
+      </template>
+    </PageHeader>
 
     <!-- Filtros -->
     <div class="bg-white rounded-xl px-4 py-3 flex flex-wrap gap-3 items-center"

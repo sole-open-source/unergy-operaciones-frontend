@@ -1,13 +1,11 @@
 <template>
   <div class="space-y-4">
     <!-- Header -->
-    <div class="flex items-center justify-between gap-3">
-      <div>
-        <h2 class="text-lg font-bold leading-tight" style="color:#2C2039">Proyectos</h2>
-        <p class="text-xs" style="color:#9b8fb0">Portafolio de plantas y servicios</p>
-      </div>
-      <Button label="Nuevo proyecto" icon="pi pi-plus" @click="openNew" />
-    </div>
+    <PageHeader title="Proyectos" subtitle="Portafolio de plantas y servicios">
+      <template #actions>
+        <Button label="Nuevo proyecto" icon="pi pi-plus" size="small" @click="openNew" />
+      </template>
+    </PageHeader>
 
     <!-- Filtros -->
     <div class="bg-white rounded-xl shadow-sm p-3 flex flex-wrap gap-3 items-end border" style="border-color:#ECE7F2">

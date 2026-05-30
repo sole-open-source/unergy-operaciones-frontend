@@ -1,16 +1,16 @@
 <template>
   <div class="space-y-5">
-    <div class="flex items-center gap-3">
-      <div class="w-9 h-9 rounded-xl flex items-center justify-center" style="background: rgba(145,91,216,0.12);">
-        <i class="pi pi-link text-lg" style="color: #915BD8;" />
-      </div>
-      <div>
-        <h1 class="text-2xl font-bold" style="color: #2C2039;">Diagnóstico de Enlaces</h1>
-        <p class="text-xs" style="color: #6b5a8a;">Mapeo Contrato → GESCON → Planta → sub_project (API Unergy)</p>
-      </div>
-      <Button icon="pi pi-refresh" severity="secondary" text :loading="loading" @click="load" class="ml-auto" />
-      <Button label="Auto-Fix Enlaces" icon="pi pi-wrench" severity="warn" :loading="fixing" @click="fixEnlaces" />
-    </div>
+    <PageHeader title="Diagnóstico de Enlaces" subtitle="Mapeo Contrato → GESCON → Planta → sub_project (API Unergy)">
+      <template #lead>
+        <div class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style="background: rgba(145,91,216,0.12);">
+          <i class="pi pi-link text-lg" style="color: #915BD8;" />
+        </div>
+      </template>
+      <template #actions>
+        <Button icon="pi pi-refresh" severity="secondary" text :loading="loading" @click="load" />
+        <Button label="Auto-Fix Enlaces" icon="pi pi-wrench" severity="warn" size="small" :loading="fixing" @click="fixEnlaces" />
+      </template>
+    </PageHeader>
 
     <!-- Fix results -->
     <div v-if="fixResult" class="bg-white rounded-xl shadow-sm p-4" style="border: 1px solid #e8e0f0;">

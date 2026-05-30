@@ -1,12 +1,7 @@
 <template>
   <div class="space-y-5">
     <!-- Header -->
-    <div class="flex items-center justify-between">
-      <div>
-        <h1 class="text-lg font-bold leading-tight" style="color: #2C2039;">Inteligencia Climática</h1>
-        <p class="text-xs" style="color: #9b8fb0;">ENSO, precipitación y correlación con precios de energía</p>
-      </div>
-    </div>
+    <PageHeader title="Inteligencia Climática" subtitle="ENSO, precipitación y correlación con precios de energía" />
 
     <!-- No data banner -->
     <div v-if="!oniData.length && !priceData.length" class="rounded-xl p-4 flex items-center gap-3"
@@ -18,7 +13,7 @@
     <!-- Current ENSO Status -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
       <div v-for="kpi in ensoKpis" :key="kpi.label"
-           class="bg-white rounded-xl shadow-sm p-5" style="border: 1px solid #e8e0f0;">
+           class="bg-white rounded-xl shadow-sm p-4" style="border: 1px solid #e8e0f0;">
         <p class="text-xs uppercase tracking-wide font-semibold" style="color: #6b5a8a;">{{ kpi.label }}</p>
         <p class="text-2xl font-bold mt-1" :style="{ color: kpi.color }">{{ kpi.value }}</p>
         <p v-if="kpi.sub" class="text-xs mt-0.5" style="color: #915BD8;">{{ kpi.sub }}</p>
@@ -37,7 +32,7 @@
     </div>
 
     <!-- Tab 0: ONI Timeline -->
-    <div v-if="activeTab === 0" class="bg-white rounded-xl shadow-sm p-5" style="border: 1px solid #e8e0f0;">
+    <div v-if="activeTab === 0" class="bg-white rounded-xl shadow-sm p-4" style="border: 1px solid #e8e0f0;">
       <h3 class="text-sm font-semibold mb-4" style="color: #2C2039;">Índice ONI (Oceanic Niño Index)</h3>
       <div class="overflow-x-auto">
         <svg viewBox="0 0 900 250" class="w-full" style="min-width: 600px;">
@@ -77,7 +72,7 @@
 
     <!-- Tab 1: Price vs ENSO -->
     <div v-if="activeTab === 1" class="space-y-4">
-      <div class="bg-white rounded-xl shadow-sm p-5" style="border: 1px solid #e8e0f0;">
+      <div class="bg-white rounded-xl shadow-sm p-4" style="border: 1px solid #e8e0f0;">
         <h3 class="text-sm font-semibold mb-4" style="color: #2C2039;">Precio Energía vs Fase ENSO (26 años)</h3>
         <div class="overflow-x-auto">
           <svg viewBox="0 0 900 280" class="w-full" style="min-width: 600px;">
@@ -107,7 +102,7 @@
       <!-- Phase stats -->
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div v-for="phase in phaseStats" :key="phase.name"
-             class="bg-white rounded-xl shadow-sm p-5" style="border: 1px solid #e8e0f0;">
+             class="bg-white rounded-xl shadow-sm p-4" style="border: 1px solid #e8e0f0;">
           <div class="flex items-center gap-2 mb-2">
             <div class="w-3 h-3 rounded-full" :style="{ backgroundColor: phase.color }" />
             <h4 class="text-sm font-semibold" style="color: #2C2039;">{{ phase.name }}</h4>
@@ -119,7 +114,7 @@
     </div>
 
     <!-- Tab 2: Precipitation -->
-    <div v-if="activeTab === 2" class="bg-white rounded-xl shadow-sm p-5" style="border: 1px solid #e8e0f0;">
+    <div v-if="activeTab === 2" class="bg-white rounded-xl shadow-sm p-4" style="border: 1px solid #e8e0f0;">
       <div class="flex items-center justify-between mb-4">
         <h3 class="text-sm font-semibold" style="color: #2C2039;">Precipitación Región Andina</h3>
         <select v-model="precipRegion" @change="loadPrecip"
@@ -168,7 +163,7 @@
     </div>
 
     <!-- Tab 3: Data Table -->
-    <div v-if="activeTab === 3" class="bg-white rounded-xl shadow-sm p-5" style="border: 1px solid #e8e0f0;">
+    <div v-if="activeTab === 3" class="bg-white rounded-xl shadow-sm p-4" style="border: 1px solid #e8e0f0;">
       <DataTable :value="oniData.slice(0, 120)" size="small" stripedRows :rowHover="true"
                  :paginator="true" :rows="24" scrollable scrollHeight="500px" class="text-sm">
         <Column header="Fecha" style="min-width:100px">

@@ -1,24 +1,20 @@
 <template>
   <div class="space-y-5">
     <!-- Header -->
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-      <div>
-        <h2 class="text-lg font-bold leading-tight" style="color: #2C2039;">Fronteras Comerciales</h2>
-        <p class="text-xs mt-0.5" style="color: #9b8fb0;">{{ filteredFronteras.length }} fronteras registradas</p>
-      </div>
-      <div class="flex flex-wrap items-center gap-3">
-        <span class="p-input-icon-left w-full sm:w-auto">
+    <PageHeader title="Fronteras Comerciales" :subtitle="`${filteredFronteras.length} fronteras registradas`">
+      <template #actions>
+        <span class="p-input-icon-left flex-1 sm:flex-none">
           <i class="pi pi-search" />
           <InputText v-model="search" placeholder="Buscar frontera..." class="w-full sm:w-64" />
         </span>
         <Dropdown v-model="estadoFilter" :options="estadoOptions" optionLabel="label" optionValue="value"
                   placeholder="Estado" class="w-40" showClear />
-        <Button icon="pi pi-chart-scatter" label="Diagrama Fasorial"
+        <Button icon="pi pi-chart-scatter" label="Diagrama Fasorial" size="small"
                 @click="showFasorial = true"
                 style="background: #915BD8; border-color: #915BD8;"
                 class="whitespace-nowrap" />
-      </div>
-    </div>
+      </template>
+    </PageHeader>
 
     <!-- Resumen Card -->
     <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">

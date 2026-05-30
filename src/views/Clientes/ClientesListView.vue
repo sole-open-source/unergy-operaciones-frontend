@@ -1,18 +1,14 @@
 <template>
   <div class="space-y-4">
-    <div class="flex items-center justify-between gap-3 flex-wrap">
-      <div>
-        <h2 class="text-lg font-bold leading-tight" style="color:#2C2039">Clientes</h2>
-        <p class="text-xs" style="color:#9b8fb0">{{ total }} cliente{{ total === 1 ? '' : 's' }} · directorio e inversionistas</p>
-      </div>
-      <div class="flex items-center gap-2">
-        <IconField>
+    <PageHeader title="Clientes" :subtitle="`${total} cliente${total === 1 ? '' : 's'} · directorio e inversionistas`">
+      <template #actions>
+        <IconField class="flex-1 sm:flex-none">
           <InputIcon class="pi pi-search" />
-          <InputText v-model="q" placeholder="Buscar..." class="w-64" @input="onSearch" />
+          <InputText v-model="q" placeholder="Buscar..." class="w-full sm:w-64" @input="onSearch" />
         </IconField>
         <Button label="Nuevo cliente" icon="pi pi-plus" size="small" @click="openNew" />
-      </div>
-    </div>
+      </template>
+    </PageHeader>
 
     <div class="bg-white rounded-xl shadow-sm overflow-hidden border" style="border-color:#ECE7F2">
       <DataTable :value="items" lazy :loading="loading" :rows="size" :totalRecords="total"

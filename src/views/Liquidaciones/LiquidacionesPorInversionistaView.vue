@@ -1,8 +1,6 @@
 <template>
   <div class="space-y-4">
-    <div class="flex items-center justify-between">
-      <h2 class="text-lg font-bold leading-tight" style="color:#2C2039">Liquidaciones por Inversionista</h2>
-    </div>
+    <PageHeader title="Liquidaciones por Inversionista" />
 
     <!-- Filtros -->
     <div class="bg-white rounded-xl shadow-sm p-3 flex flex-wrap gap-3 items-end">

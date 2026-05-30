@@ -2,10 +2,7 @@
   <div class="p-5 space-y-5 min-h-screen" style="background: #FDFAF7; color: #2C2039;">
 
     <!-- Header -->
-    <div>
-      <h1 class="text-xl font-bold leading-tight" style="color: #2C2039;">Descubrimientos en Bolsa</h1>
-      <p class="text-xs mt-0.5" style="color: #9b8fb0;">Exposición financiera por compras y excedentes de energía valorados a precio de bolsa</p>
-    </div>
+    <PageHeader title="Descubrimientos en Bolsa" subtitle="Exposición financiera por compras y excedentes de energía valorados a precio de bolsa" />
 
     <!-- Selectors -->
     <div class="flex flex-wrap gap-3 items-end">

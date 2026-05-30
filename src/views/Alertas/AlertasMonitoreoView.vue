@@ -1,16 +1,14 @@
 <template>
   <div class="space-y-5">
     <!-- Header -->
-    <div class="flex items-center gap-3">
-      <Button icon="pi pi-arrow-left" text @click="$router.back()" class="-ml-2" />
-      <div class="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center">
-        <i class="pi pi-exclamation-triangle text-red-500 text-sm" />
-      </div>
-      <div>
-        <h2 class="text-xl font-bold text-gray-800">Alertas — Monitoreo</h2>
-        <p class="text-xs text-gray-400 mt-0.5">Fallas activas + Minigranjas en tiempo real</p>
-      </div>
-    </div>
+    <PageHeader title="Alertas — Monitoreo" subtitle="Fallas activas + Minigranjas en tiempo real">
+      <template #lead>
+        <Button icon="pi pi-arrow-left" text @click="$router.back()" class="-ml-2" />
+        <div class="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+          <i class="pi pi-exclamation-triangle text-red-500 text-sm" />
+        </div>
+      </template>
+    </PageHeader>
 
     <!-- Tabs -->
     <div class="flex gap-1 border-b border-gray-200">

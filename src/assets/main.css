@@ -52,3 +52,16 @@
 /* Diálogos: header/content más ajustados */
 .p-dialog .p-dialog-header { padding: 0.85rem 1.1rem; }
 .p-dialog .p-dialog-content { padding: 0 1.1rem 1.1rem; }
+
+/* ── Responsive ───────────────────────────────────────────────────────────
+   Adaptación a pantallas pequeñas sin tocar la lógica de cada vista.
+   ────────────────────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  /* Diálogos casi a pantalla completa en móvil */
+  .p-dialog { width: 95vw !important; max-width: 95vw !important; }
+  /* Tablas con scroll horizontal en vez de romper el layout */
+  .p-datatable-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  /* Celdas un poco más ajustadas en móvil */
+  .p-datatable-tbody > tr > td { padding: 0.4rem 0.6rem !important; }
+  .p-datatable-thead > tr > th { padding: 0.45rem 0.6rem !important; }
+}

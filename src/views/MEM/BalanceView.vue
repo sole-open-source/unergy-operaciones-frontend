@@ -1,12 +1,10 @@
 <template>
   <div class="space-y-5">
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-      <div>
-        <h2 class="text-lg font-bold leading-tight" style="color: #2C2039;">Balance Energético</h2>
-        <p class="text-xs mt-0.5" style="color: #9b8fb0;">Generación, consumo y precios del mercado</p>
-      </div>
-      <Dropdown v-model="days" :options="dayOptions" optionLabel="label" optionValue="value" class="w-40" />
-    </div>
+    <PageHeader title="Balance Energético" subtitle="Generación, consumo y precios del mercado">
+      <template #actions>
+        <Dropdown v-model="days" :options="dayOptions" optionLabel="label" optionValue="value" class="w-40" />
+      </template>
+    </PageHeader>
 
     <!-- Loading -->
     <div v-if="loading" class="flex items-center justify-center py-12">

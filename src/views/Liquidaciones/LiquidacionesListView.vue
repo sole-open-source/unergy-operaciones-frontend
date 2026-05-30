@@ -1,9 +1,10 @@
 <template>
   <div class="space-y-4">
-    <div class="flex items-center justify-between">
-      <h2 class="text-lg font-bold leading-tight" style="color:#2C2039">Liquidaciones</h2>
-      <Button label="Nueva liquidación" icon="pi pi-plus" @click="dialogNueva = true" />
-    </div>
+    <PageHeader title="Liquidaciones">
+      <template #actions>
+        <Button label="Nueva liquidación" icon="pi pi-plus" size="small" @click="dialogNueva = true" />
+      </template>
+    </PageHeader>
 
     <!-- Tabs -->
     <div class="flex gap-0 border-b" style="border-color: rgba(44,32,57,0.10);">

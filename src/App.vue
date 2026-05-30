@@ -11,7 +11,7 @@
         style="color: #2C2039;" title="Menú">
         <i class="pi pi-bars" />
       </button>
-      <main :class="isSolar ? 'flex-1 overflow-hidden p-0' : 'flex-1 overflow-y-auto p-6'">
+      <main :class="isSolar ? 'flex-1 overflow-hidden p-0' : 'flex-1 overflow-y-auto p-4 pt-14 sm:p-5 sm:pt-14 lg:p-6 lg:pt-6'">
         <RouterView />
       </main>
     </div>

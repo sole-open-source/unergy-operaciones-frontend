@@ -1,14 +1,12 @@
 <template>
   <div class="space-y-5">
-    <div class="flex items-center gap-3">
-      <div class="w-8 h-8 rounded-full flex items-center justify-center" style="background: rgba(214,68,85,0.1);">
-        <i class="pi pi-exclamation-circle text-sm" style="color: #D64455;" />
-      </div>
-      <div>
-        <h2 class="text-xl font-bold" style="color: #2C2039;">Centro de Alertas</h2>
-        <p class="text-xs mt-0.5" style="color: #6b5a8a;">Estado operacional de la plataforma</p>
-      </div>
-    </div>
+    <PageHeader title="Centro de Alertas" subtitle="Estado operacional de la plataforma">
+      <template #lead>
+        <div class="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style="background: rgba(214,68,85,0.1);">
+          <i class="pi pi-exclamation-circle text-sm" style="color: #D64455;" />
+        </div>
+      </template>
+    </PageHeader>
 
     <!-- Summary cards -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">

@@ -29,6 +29,7 @@ import './assets/main.css'
 import App from './App.vue'
 import router from './router'
 import InfoField from './components/InfoField.vue'
+import PageHeader from './components/PageHeader.vue'
 
 const app = createApp(App)
 
@@ -43,5 +44,6 @@ app.use(PrimeVue, {
 app.use(ToastService)
 app.use(ConfirmationService)
 app.component('InfoField', InfoField)
+app.component('PageHeader', PageHeader)
 
 router.isReady().then(() => app.mount('#app'))
