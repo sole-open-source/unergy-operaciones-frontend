@@ -1,10 +1,10 @@
 <template>
-  <div class="p-6 space-y-6 min-h-screen" style="background: #FDFAF7; color: #2C2039;">
+  <div class="p-5 space-y-5 min-h-screen" style="background: #FDFAF7; color: #2C2039;">
 
     <!-- Header -->
     <div>
-      <h1 class="text-2xl font-bold" style="color: #2C2039;">Descubrimientos en Bolsa</h1>
-      <p class="text-sm mt-0.5" style="color: #7a6e8a;">Exposición financiera por compras y excedentes de energía valorados a precio de bolsa</p>
+      <h1 class="text-xl font-bold leading-tight" style="color: #2C2039;">Descubrimientos en Bolsa</h1>
+      <p class="text-xs mt-0.5" style="color: #9b8fb0;">Exposición financiera por compras y excedentes de energía valorados a precio de bolsa</p>
     </div>
 
     <!-- Selectors -->

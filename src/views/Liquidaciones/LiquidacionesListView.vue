@@ -1,7 +1,7 @@
 <template>
   <div class="space-y-4">
     <div class="flex items-center justify-between">
-      <h2 class="text-lg font-semibold text-gray-800">Liquidaciones</h2>
+      <h2 class="text-lg font-bold leading-tight" style="color:#2C2039">Liquidaciones</h2>
       <Button label="Nueva liquidación" icon="pi pi-plus" @click="dialogNueva = true" />
     </div>
 

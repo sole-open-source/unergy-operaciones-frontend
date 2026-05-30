@@ -1,7 +1,7 @@
 <template>
   <div class="space-y-4">
     <div class="flex flex-wrap items-center justify-between gap-3">
-      <h2 class="text-xl font-bold" style="color: #2C2039;">GESCON — Contratos ASIC</h2>
+      <h2 class="text-lg font-bold leading-tight" style="color: #2C2039;">GESCON — Contratos ASIC</h2>
       <div class="flex items-center gap-3">
         <span class="text-sm" style="color: #9b89b5;">{{ total }} registros</span>
         <Button label="Registrar" icon="pi pi-plus" @click="abrirNuevo"

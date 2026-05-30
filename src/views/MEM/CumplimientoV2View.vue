@@ -1,11 +1,11 @@
 <template>
-  <div class="p-6 space-y-6 min-h-screen" style="background: #FDFAF7; color: #2C2039;">
+  <div class="p-5 space-y-5 min-h-screen" style="background: #FDFAF7; color: #2C2039;">
 
     <!-- Header -->
     <div class="flex items-start justify-between">
       <div>
-        <h1 class="text-2xl font-bold" style="color: #2C2039;">Cumplimiento PPA</h1>
-        <p class="text-sm mt-0.5" style="color: #7a6e8a;">Generación vs. compromisos contractuales de energía</p>
+        <h1 class="text-xl font-bold leading-tight" style="color: #2C2039;">Cumplimiento PPA</h1>
+        <p class="text-xs mt-0.5" style="color: #9b8fb0;">Generación vs. compromisos contractuales de energía</p>
       </div>
       <div class="flex items-center gap-2">
         <span v-if="cacheSize" class="text-xs font-mono px-2 py-1 rounded" style="background: rgba(145,91,216,0.08); color: #915BD8;">

@@ -1,5 +1,5 @@
 <template>
-  <div class="space-y-6">
+  <div class="space-y-5">
     <div class="flex items-center gap-3">
       <div class="w-8 h-8 rounded-full flex items-center justify-center" style="background: rgba(214,68,85,0.1);">
         <i class="pi pi-exclamation-circle text-sm" style="color: #D64455;" />

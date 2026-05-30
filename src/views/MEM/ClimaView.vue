@@ -1,10 +1,10 @@
 <template>
-  <div class="space-y-6">
+  <div class="space-y-5">
     <!-- Header -->
     <div class="flex items-center justify-between">
       <div>
-        <h1 class="text-xl font-bold" style="color: #2C2039;">Inteligencia Climática</h1>
-        <p class="text-sm" style="color: #6b5a8a;">ENSO, precipitación y correlación con precios de energía</p>
+        <h1 class="text-lg font-bold leading-tight" style="color: #2C2039;">Inteligencia Climática</h1>
+        <p class="text-xs" style="color: #9b8fb0;">ENSO, precipitación y correlación con precios de energía</p>
       </div>
     </div>
 

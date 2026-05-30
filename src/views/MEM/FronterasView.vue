@@ -1,10 +1,10 @@
 <template>
-  <div class="space-y-6">
+  <div class="space-y-5">
     <!-- Header -->
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
       <div>
-        <h2 class="text-xl font-bold" style="color: #2C2039;">Fronteras Comerciales</h2>
-        <p class="text-sm mt-1" style="color: #6b5a8a;">{{ filteredFronteras.length }} fronteras registradas</p>
+        <h2 class="text-lg font-bold leading-tight" style="color: #2C2039;">Fronteras Comerciales</h2>
+        <p class="text-xs mt-0.5" style="color: #9b8fb0;">{{ filteredFronteras.length }} fronteras registradas</p>
       </div>
       <div class="flex flex-wrap items-center gap-3">
         <span class="p-input-icon-left w-full sm:w-auto">

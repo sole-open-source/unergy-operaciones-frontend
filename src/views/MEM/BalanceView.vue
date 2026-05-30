@@ -1,9 +1,9 @@
 <template>
-  <div class="space-y-6">
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+  <div class="space-y-5">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
       <div>
-        <h2 class="text-xl font-bold" style="color: #2C2039;">Balance Energético</h2>
-        <p class="text-sm mt-1" style="color: #6b5a8a;">Generación, consumo y precios del mercado</p>
+        <h2 class="text-lg font-bold leading-tight" style="color: #2C2039;">Balance Energético</h2>
+        <p class="text-xs mt-0.5" style="color: #9b8fb0;">Generación, consumo y precios del mercado</p>
       </div>
       <Dropdown v-model="days" :options="dayOptions" optionLabel="label" optionValue="value" class="w-40" />
     </div>

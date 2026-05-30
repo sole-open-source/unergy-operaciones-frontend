@@ -1,7 +1,7 @@
 <template>
   <div class="space-y-4">
     <div class="flex items-center justify-between">
-      <h2 class="text-lg font-semibold text-gray-800">Gestión de Usuarios</h2>
+      <h2 class="text-lg font-bold leading-tight" style="color:#2C2039">Gestión de Usuarios</h2>
       <Button label="Nuevo usuario" icon="pi pi-plus" @click="openNew" />
     </div>
 
