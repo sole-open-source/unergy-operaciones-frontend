@@ -1,13 +1,16 @@
 <template>
   <div class="space-y-4">
     <!-- Header -->
-    <div class="flex items-center justify-between">
-      <h2 class="text-lg font-semibold text-gray-800">Proyectos</h2>
+    <div class="flex items-center justify-between gap-3">
+      <div>
+        <h2 class="text-lg font-bold leading-tight" style="color:#2C2039">Proyectos</h2>
+        <p class="text-xs" style="color:#9b8fb0">Portafolio de plantas y servicios</p>
+      </div>
       <Button label="Nuevo proyecto" icon="pi pi-plus" @click="openNew" />
     </div>
 
     <!-- Filtros -->
-    <div class="bg-white rounded-xl shadow-sm p-4 flex flex-wrap gap-3 items-end">
+    <div class="bg-white rounded-xl shadow-sm p-4 flex flex-wrap gap-3 items-end border" style="border-color:#ECE7F2">
       <div>
         <label class="field-label">Buscar</label>
         <IconField>
@@ -38,7 +41,7 @@
       </div>
 
       <div v-for="section in sectionList" :key="section.tipo"
-           class="bg-white rounded-xl shadow-sm overflow-hidden">
+           class="bg-white rounded-xl shadow-sm overflow-hidden border" style="border-color:#ECE7F2">
 
         <!-- Section header (toggle) -->
         <button

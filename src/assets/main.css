@@ -24,3 +24,31 @@
     border-left: 3px solid #915BD8;
   }
 }
+
+/* ──────────────────────────────────────────────────────────────────────
+   Densidad global (estilo TSF) — compacta PrimeVue en toda la app.
+   Va sin @layer para ganar a los estilos unlayered de PrimeVue (cssLayer:false).
+   Solo afecta tamaño/espaciado; no cambia comportamiento.
+   ────────────────────────────────────────────────────────────────────── */
+.p-datatable { font-size: 13px; }
+.p-datatable-thead > tr > th {
+  padding: 0.5rem 0.75rem !important;
+  font-size: 11px !important;
+  letter-spacing: .02em;
+}
+.p-datatable-tbody > tr > td { padding: 0.45rem 0.75rem !important; }
+.p-datatable-header { padding: 0.6rem 0.85rem !important; }
+.p-paginator { padding: 0.3rem 0.5rem !important; }
+.p-paginator .p-paginator-page,
+.p-paginator .p-paginator-first,
+.p-paginator .p-paginator-prev,
+.p-paginator .p-paginator-next,
+.p-paginator .p-paginator-last { min-width: 2rem !important; height: 2rem !important; }
+
+/* Inputs / selects un poco más compactos y consistentes */
+.p-inputtext { padding: 0.45rem 0.65rem; }
+.p-select .p-select-label, .p-multiselect .p-multiselect-label { padding: 0.45rem 0.65rem; }
+
+/* Diálogos: header/content más ajustados */
+.p-dialog .p-dialog-header { padding: 0.85rem 1.1rem; }
+.p-dialog .p-dialog-content { padding: 0 1.1rem 1.1rem; }

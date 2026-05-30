@@ -1,9 +1,9 @@
 <template>
-  <div class="space-y-6">
+  <div class="space-y-5">
     <!-- Header -->
     <div>
-      <h2 class="text-xl font-bold text-gray-800">Servicios</h2>
-      <p class="text-xs text-gray-400 mt-0.5">Gestión de contratos y servicios por tipo</p>
+      <h2 class="text-lg font-bold leading-tight" style="color:#2C2039">Servicios</h2>
+      <p class="text-xs" style="color:#9b8fb0">Gestión de contratos y servicios por tipo</p>
     </div>
 
     <!-- Botón nuevo contrato -->
@@ -18,10 +18,10 @@
     </div>
 
     <!-- Tarjetas de servicio -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
       <div
         v-for="srv in SERVICIOS" :key="srv.key"
-        class="flex flex-col items-center gap-3 rounded-xl border-2 p-5 cursor-pointer transition-all hover:shadow-md hover:-translate-y-0.5 select-none"
+        class="flex flex-col items-center gap-2.5 rounded-xl border-2 p-4 cursor-pointer transition-all hover:shadow-md hover:-translate-y-0.5 select-none"
         :class="servicioActivo === srv.key
           ? 'shadow-sm'
           : 'border-gray-100 bg-gray-50 opacity-70 hover:opacity-90'"

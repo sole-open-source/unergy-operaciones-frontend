@@ -1,5 +1,13 @@
 <template>
-  <div class="space-y-6">
+  <div class="space-y-5">
+    <!-- Page header -->
+    <div class="flex items-end justify-between gap-3">
+      <div>
+        <h1 class="text-lg font-bold leading-tight" style="color:#2C2039">Dashboard</h1>
+        <p class="text-xs" style="color:#9b8fb0">Resumen operativo de la plataforma</p>
+      </div>
+    </div>
+
     <!-- Critical Alerts Banner -->
     <div v-if="criticalAlerts.length" class="rounded-xl overflow-hidden" style="border: 2px solid #D64455;">
       <div class="px-4 py-2.5 flex items-center gap-2" style="background-color: #D64455;">
@@ -26,13 +34,13 @@
     </div>
 
     <!-- KPI Cards Row 1 -->
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
       <div v-for="kpi in topKpis" :key="kpi.label"
-           class="bg-white rounded-xl shadow-sm p-5 flex items-center justify-between"
+           class="bg-white rounded-xl shadow-sm p-4 flex items-center justify-between"
            style="border: 1px solid #e8e0f0;">
         <div>
           <p class="text-xs uppercase tracking-wide font-semibold" style="color: #6b5a8a;">{{ kpi.label }}</p>
-          <p class="text-3xl font-bold mt-1" style="color: #2C2039;">{{ kpi.value ?? '—' }}</p>
+          <p class="text-2xl font-bold mt-1" style="color: #2C2039;">{{ kpi.value ?? '—' }}</p>
           <p v-if="kpi.sub" class="text-xs mt-0.5" :style="{ color: kpi.subColor || '#915BD8' }">{{ kpi.sub }}</p>
         </div>
         <div class="w-12 h-12 rounded-xl flex items-center justify-center" :style="{ backgroundColor: kpi.bg }">
@@ -42,14 +50,14 @@
     </div>
 
     <!-- Row 2: Fleet Power + Precio Bolsa + MGS Alarms -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-      <div class="bg-white rounded-xl shadow-sm p-5" style="border: 1px solid #e8e0f0;">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-3">
+      <div class="bg-white rounded-xl shadow-sm p-4" style="border: 1px solid #e8e0f0;">
         <div class="flex items-center justify-between mb-3">
           <h3 class="text-sm font-semibold" style="color: #2C2039;">Generación Flota</h3>
           <RouterLink to="/generacion-solar" class="text-xs font-medium" style="color: #915BD8;">Ver detalle →</RouterLink>
         </div>
         <div v-if="data.fleet_power_kw != null" class="flex items-baseline gap-2">
-          <span class="text-4xl font-bold" :style="{ color: data.fleet_power_kw > 0 ? '#10B981' : '#6b5a8a' }">
+          <span class="text-3xl font-bold" :style="{ color: data.fleet_power_kw > 0 ? '#10B981' : '#6b5a8a' }">
             {{ data.fleet_power_kw > 1000 ? (data.fleet_power_kw / 1000).toFixed(1) : data.fleet_power_kw }}
           </span>
           <span class="text-sm" style="color: #6b5a8a;">{{ data.fleet_power_kw > 1000 ? 'MW' : 'kW' }}</span>
@@ -65,25 +73,25 @@
         </div>
       </div>
 
-      <div class="bg-white rounded-xl shadow-sm p-5" style="border: 1px solid #e8e0f0;">
+      <div class="bg-white rounded-xl shadow-sm p-4" style="border: 1px solid #e8e0f0;">
         <div class="flex items-center justify-between mb-3">
           <h3 class="text-sm font-semibold" style="color: #2C2039;">Precio de Bolsa</h3>
           <RouterLink to="/mem/precio-bolsa" class="text-xs font-medium" style="color: #915BD8;">Ver detalle →</RouterLink>
         </div>
         <div v-if="data.precio_bolsa_cop_kwh != null" class="flex items-baseline gap-2">
-          <span class="text-4xl font-bold" style="color: #2C2039;">${{ data.precio_bolsa_cop_kwh }}</span>
+          <span class="text-3xl font-bold" style="color: #2C2039;">${{ data.precio_bolsa_cop_kwh }}</span>
           <span class="text-sm" style="color: #6b5a8a;">COP/kWh</span>
         </div>
         <p v-else class="text-sm" style="color: #6b5a8a;">Sin datos de precio disponibles</p>
       </div>
 
-      <div class="bg-white rounded-xl shadow-sm p-5" style="border: 1px solid #e8e0f0;">
+      <div class="bg-white rounded-xl shadow-sm p-4" style="border: 1px solid #e8e0f0;">
         <div class="flex items-center justify-between mb-3">
           <h3 class="text-sm font-semibold" style="color: #2C2039;">Alarmas MGS</h3>
           <RouterLink to="/alertas/monitoreo" class="text-xs font-medium" style="color: #915BD8;">Ver alertas →</RouterLink>
         </div>
         <div class="flex items-baseline gap-2">
-          <span class="text-4xl font-bold" :style="{ color: data.alarmas_mgs > 0 ? '#D64455' : '#10B981' }">
+          <span class="text-3xl font-bold" :style="{ color: data.alarmas_mgs > 0 ? '#D64455' : '#10B981' }">
             {{ data.alarmas_mgs ?? 0 }}
           </span>
           <span class="text-sm" style="color: #6b5a8a;">{{ data.alarmas_mgs === 1 ? 'alarma activa' : 'alarmas activas' }}</span>
@@ -97,8 +105,8 @@
     </div>
 
     <!-- Row 3: Fallas Severity Breakdown + Cumplimiento Status -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-      <div class="bg-white rounded-xl shadow-sm p-5" style="border: 1px solid #e8e0f0;">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+      <div class="bg-white rounded-xl shadow-sm p-4" style="border: 1px solid #e8e0f0;">
         <div class="flex items-center justify-between mb-4">
           <h3 class="text-sm font-semibold" style="color: #2C2039;">Fallas por Prioridad</h3>
           <RouterLink to="/fallas" class="text-xs font-medium" style="color: #915BD8;">Ver fallas →</RouterLink>
@@ -116,7 +124,7 @@
         <p v-else class="text-sm" style="color: #10B981;">Sin fallas activas</p>
       </div>
 
-      <div class="bg-white rounded-xl shadow-sm p-5" style="border: 1px solid #e8e0f0;">
+      <div class="bg-white rounded-xl shadow-sm p-4" style="border: 1px solid #e8e0f0;">
         <div class="flex items-center justify-between mb-4">
           <h3 class="text-sm font-semibold" style="color: #2C2039;">Cumplimiento PPA</h3>
           <RouterLink to="/mem/cumplimiento" class="text-xs font-medium" style="color: #915BD8;">Ver detalle →</RouterLink>
@@ -159,12 +167,12 @@
     </div>
 
     <!-- Cumplimiento PPA Summary Card -->
-    <div v-if="data.cumplimiento_ppa" class="bg-white rounded-xl shadow-sm p-5" style="border: 1px solid #e8e0f0;">
+    <div v-if="data.cumplimiento_ppa" class="bg-white rounded-xl shadow-sm p-4" style="border: 1px solid #e8e0f0;">
       <div class="flex items-center justify-between mb-4">
         <h3 class="text-sm font-semibold" style="color: #2C2039;">Cumplimiento PPA — Resumen</h3>
         <RouterLink to="/mem/cumplimiento" class="text-xs font-medium" style="color: #915BD8;">Ver detalle →</RouterLink>
       </div>
-      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <div class="rounded-lg p-3" style="background: rgba(214,68,85,0.05);">
           <p class="text-xs uppercase font-semibold" style="color: #6b5a8a;">Contratos en déficit</p>
           <p class="text-2xl font-bold mt-1" :style="{ color: data.cumplimiento_ppa.contratos_con_deficit > 0 ? '#D64455' : '#10B981' }">
@@ -202,7 +210,7 @@
     </div>
 
     <!-- Pipeline overview -->
-    <div v-if="pipeline.stages?.length" class="bg-white rounded-xl shadow-sm p-5" style="border: 1px solid #e8e0f0;">
+    <div v-if="pipeline.stages?.length" class="bg-white rounded-xl shadow-sm p-4" style="border: 1px solid #e8e0f0;">
       <div class="flex items-center justify-between mb-4">
         <h3 class="text-sm font-semibold" style="color: #2C2039;">Pipeline Originación ({{ pipeline.total_projects }} proyectos)</h3>
         <RouterLink to="/proyectos" class="text-xs font-medium" style="color: #915BD8;">Ver proyectos →</RouterLink>
@@ -218,7 +226,7 @@
     </div>
 
     <!-- Quick links -->
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
       <RouterLink v-for="link in quickLinks" :key="link.to" :to="link.to"
                   class="bg-white rounded-xl shadow-sm p-4 flex items-center gap-3 transition-all duration-150 hover:shadow-md"
                   style="border: 1px solid #e8e0f0;">

@@ -1,11 +1,14 @@
 <template>
   <div class="space-y-4">
-    <div class="flex items-center justify-between">
-      <h2 class="text-lg font-semibold text-gray-800">Clientes</h2>
+    <div class="flex items-center justify-between gap-3">
+      <div>
+        <h2 class="text-lg font-bold leading-tight" style="color:#2C2039">Clientes</h2>
+        <p class="text-xs" style="color:#9b8fb0">Directorio de clientes e inversionistas</p>
+      </div>
       <Button label="Nuevo cliente" icon="pi pi-plus" @click="openNew" />
     </div>
 
-    <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+    <div class="bg-white rounded-xl shadow-sm overflow-hidden border" style="border-color:#ECE7F2">
       <div class="p-4 border-b border-gray-100">
         <IconField>
           <InputIcon class="pi pi-search" />
