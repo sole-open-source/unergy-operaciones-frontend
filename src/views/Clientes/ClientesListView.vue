@@ -1,21 +1,20 @@
 <template>
   <div class="space-y-4">
-    <div class="flex items-center justify-between gap-3">
+    <div class="flex items-center justify-between gap-3 flex-wrap">
       <div>
         <h2 class="text-lg font-bold leading-tight" style="color:#2C2039">Clientes</h2>
-        <p class="text-xs" style="color:#9b8fb0">Directorio de clientes e inversionistas</p>
+        <p class="text-xs" style="color:#9b8fb0">{{ total }} cliente{{ total === 1 ? '' : 's' }} · directorio e inversionistas</p>
       </div>
-      <Button label="Nuevo cliente" icon="pi pi-plus" @click="openNew" />
+      <div class="flex items-center gap-2">
+        <IconField>
+          <InputIcon class="pi pi-search" />
+          <InputText v-model="q" placeholder="Buscar..." class="w-64" @input="onSearch" />
+        </IconField>
+        <Button label="Nuevo cliente" icon="pi pi-plus" size="small" @click="openNew" />
+      </div>
     </div>
 
     <div class="bg-white rounded-xl shadow-sm overflow-hidden border" style="border-color:#ECE7F2">
-      <div class="p-4 border-b border-gray-100">
-        <IconField>
-          <InputIcon class="pi pi-search" />
-          <InputText v-model="q" placeholder="Buscar por razón social..." class="w-72" @input="onSearch" />
-        </IconField>
-      </div>
-
       <DataTable :value="items" lazy :loading="loading" :rows="size" :totalRecords="total"
         paginator @page="onPage" rowHover class="text-sm">
         <Column field="razon_social_nombre" header="Razón social / Nombre" sortable />

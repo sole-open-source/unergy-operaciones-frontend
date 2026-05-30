@@ -1,50 +1,30 @@
 <template>
   <div class="space-y-5">
-    <!-- Header -->
-    <div>
-      <h2 class="text-lg font-bold leading-tight" style="color:#2C2039">Servicios</h2>
-      <p class="text-xs" style="color:#9b8fb0">Gestión de contratos y servicios por tipo</p>
-    </div>
-
-    <!-- Botón nuevo contrato -->
-    <div class="flex justify-end">
-      <Button v-if="servicioActivo === 'ppa'" label="Nuevo contrato PPA" icon="pi pi-plus"
-        class="bg-amber-500 border-amber-500 hover:bg-amber-600" @click="showWizard = true" />
+    <!-- Header con acción -->
+    <div class="flex items-start justify-between gap-3">
+      <div>
+        <h2 class="text-lg font-bold leading-tight" style="color:#2C2039">Servicios</h2>
+        <p class="text-xs" style="color:#9b8fb0">Gestión de contratos y servicios por tipo</p>
+      </div>
+      <Button v-if="servicioActivo === 'ppa'" label="Nuevo contrato PPA" icon="pi pi-plus" size="small"
+        class="bg-amber-500 border-amber-500 hover:bg-amber-600 shrink-0" @click="showWizard = true" />
       <Button v-else-if="servicioActivo !== 'ppa' && servicioActivo !== 'representacion'"
-        :label="`Nuevo contrato ${servicioInfo?.label}`"
-        icon="pi pi-plus"
+        :label="`Nuevo ${servicioInfo?.label}`" icon="pi pi-plus" size="small" class="shrink-0"
         :style="`background:${servicioInfo?.color}; border-color:${servicioInfo?.color}`"
         @click="showServicioWizard = true" />
     </div>
 
-    <!-- Tarjetas de servicio -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-      <div
-        v-for="srv in SERVICIOS" :key="srv.key"
-        class="flex flex-col items-center gap-2.5 rounded-xl border-2 p-4 cursor-pointer transition-all hover:shadow-md hover:-translate-y-0.5 select-none"
-        :class="servicioActivo === srv.key
-          ? 'shadow-sm'
-          : 'border-gray-100 bg-gray-50 opacity-70 hover:opacity-90'"
-        :style="servicioActivo === srv.key
-          ? `background:${srv.bg}; border-color:${srv.color}50`
-          : ''"
-        @click="seleccionarServicio(srv.key)"
-      >
-        <div class="w-12 h-12 rounded-full flex items-center justify-center"
-          :style="servicioActivo === srv.key ? `background:${srv.color}25` : 'background:#e5e7eb'">
-          <i :class="srv.icon" class="text-2xl"
-            :style="servicioActivo === srv.key ? `color:${srv.color}` : 'color:#9ca3af'" />
-        </div>
-        <span class="text-sm font-semibold text-center"
-          :style="servicioActivo === srv.key ? `color:${srv.color}` : 'color:#6b7280'">
-          {{ srv.label }}
-        </span>
-        <span v-if="conteoServicio(srv.key) > 0 && servicioActivo === srv.key"
-          class="text-xs font-medium px-2 py-0.5 rounded-full"
-          :style="`background:${srv.color}20; color:${srv.color}`">
-          {{ conteoServicio(srv.key) }}
-        </span>
-      </div>
+    <!-- Selector de servicio (tabs compactos) -->
+    <div class="flex flex-wrap gap-2">
+      <button v-for="srv in SERVICIOS" :key="srv.key" type="button"
+        class="svc-tab" :class="{ 'svc-tab--on': servicioActivo === srv.key }"
+        :style="servicioActivo === srv.key ? `background:${srv.bg}; border-color:${srv.color}55; color:${srv.color}` : ''"
+        @click="seleccionarServicio(srv.key)">
+        <i :class="srv.icon" :style="servicioActivo === srv.key ? `color:${srv.color}` : ''" />
+        <span>{{ srv.label }}</span>
+        <span v-if="conteoServicio(srv.key) > 0" class="svc-tab-count"
+          :style="servicioActivo === srv.key ? `background:${srv.color}22; color:${srv.color}` : ''">{{ conteoServicio(srv.key) }}</span>
+      </button>
     </div>
 
     <!-- PPA -->
@@ -534,3 +514,19 @@ async function cargarServicio(tipo) {
 
 onMounted(cargar)
 </script>
+
+<style scoped>
+.svc-tab {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 7px 14px; border: 1px solid #E5E2EC; border-radius: 9px;
+  background: #fff; font-size: 13px; font-weight: 700; color: #6b7280;
+  cursor: pointer; transition: border-color .12s, color .12s, background .12s; user-select: none;
+}
+.svc-tab:hover { border-color: #cbb8e8; color: #2C2039; }
+.svc-tab i { font-size: 14px; color: #9ca3af; }
+.svc-tab--on { box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+.svc-tab-count {
+  background: #EEF0F2; color: #6b7280; border-radius: 999px;
+  font-size: 11px; font-weight: 800; padding: 0 7px; min-width: 20px; text-align: center;
+}
+</style>

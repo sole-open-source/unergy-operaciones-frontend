@@ -10,7 +10,7 @@
     </div>
 
     <!-- Filtros -->
-    <div class="bg-white rounded-xl shadow-sm p-4 flex flex-wrap gap-3 items-end border" style="border-color:#ECE7F2">
+    <div class="bg-white rounded-xl shadow-sm p-3 flex flex-wrap gap-3 items-end border" style="border-color:#ECE7F2">
       <div>
         <label class="field-label">Buscar</label>
         <IconField>
@@ -45,7 +45,7 @@
 
         <!-- Section header (toggle) -->
         <button
-          class="w-full flex items-center gap-3 px-5 py-3.5 text-left select-none
+          class="w-full flex items-center gap-3 px-4 py-2.5 text-left select-none
                  hover:bg-gray-50 transition-colors duration-150"
           @click="toggleSection(section.tipo)">
           <!-- color dot -->
@@ -98,7 +98,7 @@
                     class="border-t border-gray-100 hover:bg-gray-50/70 transition-colors duration-100 row-hover">
 
                   <!-- Nombre + TSF (sticky) -->
-                  <td class="sticky-col px-4 py-3" style="min-width:220px">
+                  <td class="sticky-col px-4 py-2" style="min-width:220px">
                     <span class="block text-[11px] leading-tight"
                           :class="row.codigo_tsf ? 'text-gray-400' : 'text-gray-300'">
                       {{ row.codigo_tsf || '—' }}
@@ -109,7 +109,7 @@
                   </td>
 
                   <!-- Estado -->
-                  <td class="px-4 py-3 whitespace-nowrap">
+                  <td class="px-4 py-2 whitespace-nowrap">
                     <span class="estado-badge inline-flex items-center gap-1.5"
                           :class="ESTADO_CLASS[row.estado] || 'estado-default'">
                       <span v-if="row.estado === 'en_operacion'" class="pulse-dot" />
@@ -118,7 +118,7 @@
                   </td>
 
                   <!-- Tipo -->
-                  <td class="px-4 py-3 whitespace-nowrap">
+                  <td class="px-4 py-2 whitespace-nowrap">
                     <span class="tipo-badge"
                           :class="TIPO_BADGE_CLASS[row.tipo_proyecto] || 'badge-otro'">
                       {{ TIPO_LABELS[row.tipo_proyecto] || row.tipo_proyecto || '—' }}
@@ -126,12 +126,12 @@
                   </td>
 
                   <!-- kWp -->
-                  <td class="px-4 py-3 text-right font-mono text-xs text-gray-500">
+                  <td class="px-4 py-2 text-right font-mono text-xs text-gray-500">
                     {{ row.potencia_instalada_kwp ?? '—' }}
                   </td>
 
                   <!-- Potencia fleet -->
-                  <td class="px-4 py-3 text-right">
+                  <td class="px-4 py-2 text-right">
                     <span v-if="fleetMap[row.nombre_comercial] != null"
                           class="font-mono text-sm font-semibold"
                           :style="{ color: fleetMap[row.nombre_comercial] > 0 ? '#10B981' : '#9CA3AF' }">
@@ -141,7 +141,7 @@
                   </td>
 
                   <!-- Servicios -->
-                  <td class="px-4 py-3">
+                  <td class="px-4 py-2">
                     <div class="flex gap-1 flex-wrap">
                       <template v-for="srv in SERVICIOS_BADGES" :key="srv.key">
                         <span v-if="row[srv.key]"
@@ -155,7 +155,7 @@
                   </td>
 
                   <!-- Inversionistas (avatares) -->
-                  <td class="px-4 py-3">
+                  <td class="px-4 py-2">
                     <div v-if="row.inversionistas?.length"
                          class="avatar-stack"
                          :style="{ width: avatarStackWidth(Math.min(row.inversionistas.length, 4)) }">
@@ -175,7 +175,7 @@
                   </td>
 
                   <!-- Acciones -->
-                  <td class="px-4 py-3">
+                  <td class="px-4 py-2">
                     <div class="flex gap-0.5 justify-end">
                       <Button icon="pi pi-eye" text size="small"
                               @click="goDetail(row)" v-tooltip="'Ver detalle'" />
