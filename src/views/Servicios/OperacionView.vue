@@ -395,17 +395,96 @@
             </div>
           </template>
           <template v-else>
-            <div class="rounded-xl border border-dashed border-violet-200 bg-violet-50/40 p-10 text-center">
-              <div class="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3"
-                style="background:#f5f3ff">
-                <i class="pi pi-home text-xl" style="color:#8b5cf6" />
+            <!-- Datos estáticos desde JSON si existen -->
+            <template v-if="buscarArriendoEstatico(proyectoNombre)">
+              <div class="rounded-xl border bg-white p-5" style="border-color:#8b5cf640">
+                <div class="flex items-start justify-between mb-4 gap-3">
+                  <div class="flex items-center gap-2.5 flex-wrap">
+                    <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style="background:#f5f3ff">
+                      <i class="pi pi-home text-sm" style="color:#8b5cf6" />
+                    </div>
+                    <div>
+                      <p class="text-xs text-gray-400 leading-none mb-0.5">Contrato de Arriendo</p>
+                      <span class="text-sm font-semibold" style="color:#2C2039">{{ proyectoNombre }}</span>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-2 flex-shrink-0">
+                    <Tag value="Vigente" severity="success" class="text-xs" />
+                    <Button icon="pi pi-pencil" label="Editar" size="small" text severity="secondary"
+                      @click="openEditContrato('arriendo')" />
+                  </div>
+                </div>
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  <div class="rounded-lg p-3.5" style="background:#f5f3ff;border:1px solid #ddd6fe">
+                    <p class="text-xs mb-1.5 flex items-center gap-1.5" style="color:#5b21b6">
+                      <i class="pi pi-user text-xs" style="color:#8b5cf6" />Contratante
+                    </p>
+                    <p class="text-sm font-semibold leading-snug" style="color:#1c1917">
+                      {{ buscarArriendoEstatico(proyectoNombre).contratante }}
+                    </p>
+                  </div>
+                  <div class="rounded-lg p-3.5" style="background:#f5f3ff;border:1px solid #ddd6fe">
+                    <p class="text-xs mb-1.5 flex items-center gap-1.5" style="color:#5b21b6">
+                      <i class="pi pi-building text-xs" style="color:#8b5cf6" />Prestador
+                    </p>
+                    <p class="text-sm font-semibold leading-snug" style="color:#1c1917">
+                      {{ buscarArriendoEstatico(proyectoNombre).prestador }}
+                    </p>
+                  </div>
+                  <div class="rounded-lg p-3.5" style="background:#f5f3ff;border:1px solid #ddd6fe">
+                    <p class="text-xs mb-1.5 flex items-center gap-1.5" style="color:#5b21b6">
+                      <i class="pi pi-calendar text-xs" style="color:#8b5cf6" />Fecha firma contrato
+                    </p>
+                    <p class="text-sm font-semibold" style="color:#1c1917">
+                      {{ buscarArriendoEstatico(proyectoNombre).fecha_firma }}
+                    </p>
+                  </div>
+                  <div class="rounded-lg p-3.5" style="background:#f5f3ff;border:1px solid #ddd6fe">
+                    <p class="text-xs mb-1.5 flex items-center gap-1.5" style="color:#5b21b6">
+                      <i class="pi pi-dollar text-xs" style="color:#8b5cf6" />Valor anual (BASE)
+                    </p>
+                    <p class="text-base font-bold" style="color:#7c3aed">
+                      {{ formatCOP(buscarArriendoEstatico(proyectoNombre).valor_anual) }}
+                    </p>
+                  </div>
+                  <div class="rounded-lg p-3.5" style="background:#f5f3ff;border:1px solid #ddd6fe">
+                    <p class="text-xs mb-1.5 flex items-center gap-1.5" style="color:#5b21b6">
+                      <i class="pi pi-calculator text-xs" style="color:#8b5cf6" />Valor arriendo mensual
+                    </p>
+                    <p class="text-base font-bold" style="color:#7c3aed">
+                      {{ formatCOP(buscarArriendoEstatico(proyectoNombre).valor_mensual) }}
+                    </p>
+                  </div>
+                  <div class="rounded-lg p-3.5" style="background:#f5f3ff;border:1px solid #ddd6fe">
+                    <p class="text-xs mb-1.5 flex items-center gap-1.5" style="color:#5b21b6">
+                      <i class="pi pi-file-pdf text-xs" style="color:#8b5cf6" />Contrato en Drive
+                    </p>
+                    <a v-if="buscarArriendoEstatico(proyectoNombre).enlace"
+                       :href="buscarArriendoEstatico(proyectoNombre).enlace"
+                       target="_blank" rel="noopener"
+                       class="text-sm font-semibold flex items-center gap-1.5 hover:underline" style="color:#8b5cf6">
+                      <i class="pi pi-external-link text-xs" />Ver contrato
+                    </a>
+                    <span v-else class="text-sm text-gray-400">Sin enlace</span>
+                  </div>
+                </div>
               </div>
-              <p class="text-sm font-medium text-gray-600 mb-1">Sin contrato de arriendo</p>
-              <p class="text-xs text-gray-400 mb-4">Registra el contrato para iniciar el seguimiento de pagos</p>
-              <Button label="Crear contrato" icon="pi pi-plus" size="small"
-                style="background:#8b5cf6;border-color:#8b5cf6"
-                @click="openWizard('arriendo')" />
-            </div>
+            </template>
+
+            <!-- Sin datos en JSON ni en BD -->
+            <template v-else>
+              <div class="rounded-xl border border-dashed border-violet-200 bg-violet-50/40 p-10 text-center">
+                <div class="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3"
+                  style="background:#f5f3ff">
+                  <i class="pi pi-home text-xl" style="color:#8b5cf6" />
+                </div>
+                <p class="text-sm font-medium text-gray-600 mb-1">Sin contrato de arriendo registrado</p>
+                <p class="text-xs text-gray-400 mb-4">No se encontró contrato de arriendo para este proyecto</p>
+                <Button label="Crear contrato" icon="pi pi-plus" size="small"
+                  style="background:#8b5cf6;border-color:#8b5cf6"
+                  @click="openWizard('arriendo')" />
+              </div>
+            </template>
           </template>
 
           <PagosTabla
@@ -682,10 +761,31 @@ import Dialog from 'primevue/dialog'
 import { useToast } from 'primevue/usetoast'
 import api from '@/api/client'
 import ContratoServicioWizard from '@/views/Contratos/ContratoServicioWizard.vue'
+import ARRIENDOS_ESTATICOS from '@/assets/arriendos_data.js'
 
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
+
+// ── Arriendo estático (fallback desde JSON) ───────────────────────────────────
+function buscarArriendoEstatico(nombre) {
+  if (!nombre) return null
+  const nombreLower = nombre.trim().toLowerCase()
+  // 1. Coincidencia exacta
+  const exacto = ARRIENDOS_ESTATICOS.find(r => r.proyecto.toLowerCase() === nombreLower)
+  if (exacto) return exacto
+  // 2. Por palabras clave (mismo patrón que FacturasMantenimiento)
+  const STOP = new Set(['mgs', 'de', 'la', 'el', 'los', 'las', 'del', 'solar', 'minigranja', 'y', 'con'])
+  const keywords = nombreLower.split(/\s+/).filter(w => w.length >= 3 && !STOP.has(w) && !/^\d+$/.test(w))
+  if (!keywords.length) return null
+  let mejor = null; let mejorScore = 0
+  for (const r of ARRIENDOS_ESTATICOS) {
+    const pLower = r.proyecto.toLowerCase()
+    const score = keywords.filter(kw => pLower.includes(kw)).length
+    if (score > mejorScore) { mejorScore = score; mejor = r }
+  }
+  return mejorScore > 0 ? mejor : null
+}
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 const MESES_NOMBRES = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
