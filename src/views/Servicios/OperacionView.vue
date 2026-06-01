@@ -509,12 +509,21 @@
                         </tr>
                       </tbody>
                     </table>
-                    <div class="flex items-center justify-between px-4 py-2.5 border-t border-gray-100 bg-gray-50/60">
-                      <button type="button" class="flex items-center gap-1.5 text-xs font-medium hover:underline transition-colors"
-                        style="background:none;border:none;padding:0;cursor:pointer;color:#8b5cf6"
-                        @click="abrirModalIdxArriendo('anual')">
-                        <i class="pi pi-plus text-xs" />Agregar fila
-                      </button>
+                    <div class="flex items-center justify-between px-4 py-2.5 border-t border-gray-100 bg-gray-50/60 flex-wrap gap-2">
+                      <div class="flex items-center gap-3">
+                        <button type="button" class="flex items-center gap-1.5 text-xs font-medium hover:underline transition-colors"
+                          style="background:none;border:none;padding:0;cursor:pointer;color:#8b5cf6"
+                          @click="abrirModalIdxArriendo('anual')">
+                          <i class="pi pi-plus text-xs" />Agregar fila
+                        </button>
+                        <button v-if="anioIpcPendienteArriendo('anual')" type="button"
+                          class="flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-lg transition-colors"
+                          style="background:#ede9fe;color:#7c3aed;border:none;cursor:pointer"
+                          @click="aplicarIpcAnio('anual', anioIpcPendienteArriendo('anual'))">
+                          <i class="pi pi-bolt text-xs" />
+                          Aplicar IPC {{ anioIpcPendienteArriendo('anual') }} ({{ IPC_RATES[anioIpcPendienteArriendo('anual')] }}%)
+                        </button>
+                      </div>
                       <button type="button" class="flex items-center gap-1.5 text-xs font-medium hover:underline transition-colors"
                         style="background:none;border:none;padding:0;cursor:pointer;color:#8b5cf6"
                         @click="idxArriendoAnualRef?.click()">
@@ -584,12 +593,21 @@
                         </tr>
                       </tbody>
                     </table>
-                    <div class="flex items-center justify-between px-4 py-2.5 border-t border-gray-100 bg-gray-50/60">
-                      <button type="button" class="flex items-center gap-1.5 text-xs font-medium hover:underline transition-colors"
-                        style="background:none;border:none;padding:0;cursor:pointer;color:#8b5cf6"
-                        @click="abrirModalIdxArriendo('mensual')">
-                        <i class="pi pi-plus text-xs" />Agregar fila
-                      </button>
+                    <div class="flex items-center justify-between px-4 py-2.5 border-t border-gray-100 bg-gray-50/60 flex-wrap gap-2">
+                      <div class="flex items-center gap-3">
+                        <button type="button" class="flex items-center gap-1.5 text-xs font-medium hover:underline transition-colors"
+                          style="background:none;border:none;padding:0;cursor:pointer;color:#8b5cf6"
+                          @click="abrirModalIdxArriendo('mensual')">
+                          <i class="pi pi-plus text-xs" />Agregar fila
+                        </button>
+                        <button v-if="anioIpcPendienteArriendo('mensual')" type="button"
+                          class="flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-lg transition-colors"
+                          style="background:#ede9fe;color:#7c3aed;border:none;cursor:pointer"
+                          @click="aplicarIpcAnio('mensual', anioIpcPendienteArriendo('mensual'))">
+                          <i class="pi pi-bolt text-xs" />
+                          Aplicar IPC {{ anioIpcPendienteArriendo('mensual') }} ({{ IPC_RATES[anioIpcPendienteArriendo('mensual')] }}%)
+                        </button>
+                      </div>
                       <button type="button" class="flex items-center gap-1.5 text-xs font-medium hover:underline transition-colors"
                         style="background:none;border:none;padding:0;cursor:pointer;color:#8b5cf6"
                         @click="idxArriendoMensualRef?.click()">
@@ -1118,6 +1136,7 @@ import { useToast } from 'primevue/usetoast'
 import api from '@/api/client'
 import ContratoServicioWizard from '@/views/Contratos/ContratoServicioWizard.vue'
 import ARRIENDOS_ESTATICOS from '@/assets/arriendos_data.js'
+import IPC_RATES from '@/assets/ipc_rates.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -1259,6 +1278,51 @@ async function eliminarFilaIdxArriendo(tipo, idx) {
   } catch (err) {
     toast.add({ severity: 'error', summary: 'Error al eliminar', detail: err.message, life: 3000 })
   }
+}
+
+/**
+ * Aplica automáticamente el IPC del año indicado.
+ * Calcula: valor_último × (1 + IPC_año / 100) y agrega la fila.
+ */
+async function aplicarIpcAnio(tipo, anio) {
+  if (!contratos.arriendo) return
+  const tasa = IPC_RATES[anio]
+  if (!tasa) {
+    toast.add({ severity: 'warn', summary: `IPC de ${anio} no disponible`, detail: `Agrega la tasa en src/assets/ipc_rates.js`, life: 4000 })
+    return
+  }
+  const campo = tipo === 'anual' ? 'indexacion_anual' : 'indexacion_mensual'
+  const lista = contratos.arriendo[campo] || []
+  if (!lista.length) {
+    toast.add({ severity: 'warn', summary: 'Sin valor base', detail: 'Primero agrega el valor base para calcular la indexación', life: 3000 })
+    return
+  }
+  const ultimoValor = lista[lista.length - 1].valor
+  const nuevoValor = Math.round(ultimoValor * (1 + tasa / 100) * 100) / 100
+  try {
+    const nuevaLista = [...lista, { anio, ipc_aplicado: tasa, valor: nuevoValor }]
+    const { data } = await api.patch(`/contratos-servicio/${contratos.arriendo.id}`, { [campo]: nuevaLista })
+    contratos.arriendo = { ...contratos.arriendo, ...data }
+    toast.add({ severity: 'success', summary: `IPC ${anio} aplicado`, detail: `Nuevo valor: ${new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(nuevoValor)}`, life: 3000 })
+  } catch (err) {
+    toast.add({ severity: 'error', summary: 'Error al aplicar IPC', detail: err.message, life: 3000 })
+  }
+}
+
+/**
+ * Detecta si hay un año nuevo sin fila de indexación y si hay IPC disponible.
+ * Devuelve el año pendiente o null.
+ */
+function anioIpcPendienteArriendo(tipo) {
+  if (!contratos.arriendo) return null
+  const campo = tipo === 'anual' ? 'indexacion_anual' : 'indexacion_mensual'
+  const lista = contratos.arriendo[campo] || []
+  if (!lista.length) return null
+  const ultimoAnio = lista[lista.length - 1].anio
+  const anioSiguiente = ultimoAnio < ANIO_ACTUAL ? ANIO_ACTUAL : ultimoAnio + 1
+  // Solo mostrar si hay tasa disponible y el año siguiente es <= año actual
+  if (anioSiguiente <= ANIO_ACTUAL && IPC_RATES[anioSiguiente]) return anioSiguiente
+  return null
 }
 const facturasCobradas   = ref([])
 const facturasEmitidas   = ref([])
