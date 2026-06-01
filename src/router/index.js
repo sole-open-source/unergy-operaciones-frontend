@@ -28,6 +28,7 @@ const routes = [
   { path: '/fallas/lista', redirect: '/fallas' },
   { path: '/fallas/:id',   name: 'FallaDetalle', component: () => import('@/views/Fallas/FallaDetailView.vue'), meta: { roles: ['admin', 'operaciones', 'monitoreo'] } },
   { path: '/solar',        name: 'Solar',        component: () => import('@/views/Solar/SolarView.vue'),              meta: { roles: ['admin', 'operaciones', 'monitoreo'] } },
+  { path: '/solar-live',   name: 'SolarLive',   component: () => import('@/views/Solar/SolarLiveView.vue'),          meta: { roles: ['admin', 'operaciones', 'monitoreo'] } },
   { path: '/generacion-solar', name: 'GeneracionSolar', component: () => import('@/views/GeneracionSolarView.vue'),   meta: { roles: ['admin', 'operaciones', 'monitoreo'] } },
 
   // ── Alertas ──────────────────────────────────────────────────────
