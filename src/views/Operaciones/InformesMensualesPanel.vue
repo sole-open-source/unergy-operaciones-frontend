@@ -151,23 +151,6 @@
         </div>
       </section>
 
-      <!-- Panel días en rojo -->
-      <section v-if="(tipo === 'proyecto' || tipo === 'portafolio') && lastGenCache && diasDisponibles.length" class="im-red-panel im-no-print">
-        <span class="im-red-label"><i class="pi pi-palette" style="color:#DC3232" /> Días en rojo:</span>
-        <!-- Selector de proyecto (solo portafolio) -->
-        <select v-if="tipo === 'portafolio'" v-model="portProyectoActivo" class="im-red-select">
-          <option v-for="op in opcionesPortProyecto" :key="op.value" :value="op.value">{{ op.label }}</option>
-        </select>
-        <button v-for="d in diasDisponibles" :key="d.date"
-                :class="['im-day-chip', (diasRojosMap[spActivo] || new Set()).has(d.date) ? 'im-day-chip--on' : '']"
-                @click="toggleDiaRojo(d.date)">
-          {{ d.day }}
-        </button>
-        <button v-if="diasRojosMap[spActivo]?.size > 0" class="im-day-clear" @click="limpiarDiasRojos">
-          <i class="pi pi-times" /> Limpiar
-        </button>
-      </section>
-
       <!-- Reporte HTML embebido -->
       <div class="im-report-frame">
         <div ref="reportRef" class="im-report" v-html="htmlContent" />
@@ -230,41 +213,11 @@ const ultimoRange = ref(null)
 const ultimoTipo = ref('')            // 'op' | 'fmo' | 'port' del último generado
 const ultimaConsolidada = ref('')     // portafolio: HTML de la página consolidada (sin secciones)
 const ultimosMiembros = ref([])       // portafolio: [{ sub_project, nombre, orden, html }]
-const lastGenCache = ref(null)        // { tipo, cfg?, genRes?, mf?, range, results? }
-const diasRojosMap = ref({})          // { sub_project: Set<date> }
-const portProyectoActivo = ref('')    // portafolio: proyecto seleccionado para editar días
 const toastMsg = ref('')
 const toastErr = ref(false)
 let _toastTimer = null
 
 // ── Computados ─────────────────────────────────────────────────────────
-const spActivo = computed(() => {
-  if (!lastGenCache.value) return ''
-  if (lastGenCache.value.tipo === 'portafolio') return portProyectoActivo.value
-  return lastGenCache.value.cfg?.sub_project || ''
-})
-
-const diasDisponibles = computed(() => {
-  if (!lastGenCache.value) return []
-  let data = []
-  if (lastGenCache.value.tipo === 'portafolio') {
-    const pd = (lastGenCache.value.results || []).find(r => r.cfg.sub_project === portProyectoActivo.value)
-    data = pd?.genRes?.data || []
-  } else {
-    data = lastGenCache.value.genRes?.data || []
-  }
-  const dm = {}
-  data.forEach(d => { if (d.date) dm[d.date] = true })
-  return Object.keys(dm).sort().map(d => ({ date: d, day: parseInt(d.split('-')[2]) }))
-})
-
-const opcionesPortProyecto = computed(() => {
-  if (!lastGenCache.value || lastGenCache.value.tipo !== 'portafolio') return []
-  return (lastGenCache.value.results || []).map(r => ({
-    value: r.cfg.sub_project,
-    label: r.cfg.nombre_clientes || r.cfg.nombre_display || r.cfg.nombre_comercial || r.cfg.sub_project,
-  }))
-})
 
 const opcionesProyecto = computed(() => {
   const lista = tipo.value === 'fmo'
@@ -339,55 +292,6 @@ function descartar() {
   ultimoSubProject.value = ''
   ultimoRange.value = null
   error.value = null
-  lastGenCache.value = null
-  diasRojosMap.value = {}
-  portProyectoActivo.value = ''
-}
-
-function _reconstruir() {
-  if (!lastGenCache.value) return
-  const cache = lastGenCache.value
-  if (cache.tipo === 'proyecto') {
-    const sp = cache.cfg.sub_project
-    const red = diasRojosMap.value[sp] || new Set()
-    htmlContent.value = buildProjectPage(cache.cfg, cache.genRes, cache.mf, cache.range, 1, 1, null, red)
-  } else if (cache.tipo === 'portafolio') {
-    const { results, portName, range } = cache
-    const totalPages = results.length + 1
-    const consolidada = buildConsolidatedPage(portName, results, range, totalPages)
-    const miembros = results.map((pd, i) => {
-      const sp = pd.cfg.sub_project
-      const red = diasRojosMap.value[sp] || new Set()
-      const html = buildProjectPage(pd.cfg, pd.genRes, pd.mf, range, i + 2, totalPages, null, red)
-        .replace('<div class="rpt-page">', `<div class="rpt-page" data-sub-project="${sp}">`)
-      return { sub_project: sp, nombre: pd.cfg.nombre_clientes || pd.cfg.nombre_display || pd.cfg.nombre_comercial || sp, orden: i, html }
-    })
-    ultimaConsolidada.value = consolidada
-    ultimosMiembros.value = miembros
-    htmlContent.value = [consolidada, ...miembros.map(m => m.html)].join('<div class="rpt-page-sep"></div>')
-  }
-}
-
-function toggleDiaRojo(fecha) {
-  const sp = spActivo.value
-  if (!sp) return
-  const map = { ...diasRojosMap.value }
-  const s = new Set(map[sp] || [])
-  if (s.has(fecha)) s.delete(fecha)
-  else s.add(fecha)
-  map[sp] = s
-  diasRojosMap.value = map
-  _reconstruir()
-}
-
-function limpiarDiasRojos() {
-  const sp = spActivo.value
-  if (!sp) return
-  const map = { ...diasRojosMap.value }
-  delete map[sp]
-  diasRojosMap.value = map
-  _reconstruir()
-}
 
 function imprimir() {
   if (!reportRef.value) return
@@ -636,7 +540,7 @@ function rmeta(lbl, val) { return `<div class="rpt-meta-item"><div class="rpt-me
 function rkpi(ico, lbl, val, col) { return `<div class="rpt-kpi"><div class="rpt-kpi-ico">${ico}</div><div class="rpt-kpi-lbl">${esc(lbl)}</div><div class="rpt-kpi-val"${col ? ` style="color:${col}"` : ''}>${val}</div></div>` }
 
 // ── Mini chart SVG: serie diaria con línea P90 y atípicos ─────────────
-function svgDailyChart(days, values, p90d, atypDates, redDates = new Set()) {
+function svgDailyChart(days, values, p90d, atypDates) {
   if (!days.length) return '<div class="rpt-chart-empty">Sin datos para graficar</div>'
   const W = 460, H = 180, padL = 36, padR = 8, padT = 10, padB = 28
   const maxV = Math.max(...values, p90d || 0, 1)
@@ -651,9 +555,8 @@ function svgDailyChart(days, values, p90d, atypDates, redDates = new Set()) {
     const top = yTo(values[i])
     const h = (H - padB) - top
     const isAty = atypSet.has(d)
-    const isRed = redDates instanceof Set ? redDates.has(d) : false
-    const fill = isRed ? '#DC3232' : isAty ? '#DC3232' : '#6B35C0'
-    bars += `<rect x="${cx.toFixed(1)}" y="${top.toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(0, h).toFixed(1)}" fill="${fill}" opacity="0.78" rx="1.5" />`
+    const fill = isAty ? '#DC3232' : '#6B35C0'
+    bars += `<rect data-date="${d}" x="${cx.toFixed(1)}" y="${top.toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(0, h).toFixed(1)}" fill="${fill}" opacity="0.78" rx="1.5" />`
   })
 
   let p90line = ''
@@ -773,7 +676,7 @@ function svgPortfolioChart(items) {
 }
 
 // ── Página de proyecto (operacional individual) ─────────────────────
-function buildProjectPage(cfg, genRes, mf, range, pageNum, totalPages, fmoMeta, redDates = new Set()) {
+function buildProjectPage(cfg, genRes, mf, range, pageNum, totalPages, fmoMeta) {
   const data = genRes?.data || []
   const sim = genRes?.simulation || null
   const dm = {}
@@ -886,7 +789,7 @@ function buildProjectPage(cfg, genRes, mf, range, pageNum, totalPages, fmoMeta, 
   }
 
   // Gráficos SVG embebidos
-  const chart1 = svgDailyChart(days, kpd, p90d, atypical.map(a => a.date), redDates)
+  const chart1 = svgDailyChart(days, kpd, p90d, atypical.map(a => a.date))
   const chart2 = svgCompareChart(Math.round(total), p50m, p90m, p99m)
 
   return '<div class="rpt-page">' +
@@ -1324,8 +1227,6 @@ async function generar() {
         params: { action: 'getGeneration', sub_project: sp, date_from: range.from, date_to: range.to },
       })
       const mf = getFaultsForRange(cfg, range)
-      diasRojosMap.value = {}
-      lastGenCache.value = { tipo: 'proyecto', cfg, genRes: r || {}, mf, range }
       htmlContent.value = buildProjectPage(cfg, r || {}, mf, range, 1, 1)
       resultTitle.value = cfg.nombre_display || cfg.nombre_clientes || cfg.nombre_comercial || sp
       rangeLabel.value = range.label
@@ -1386,7 +1287,7 @@ async function generar() {
       const miembros = results.map((pd, i) => {
         const sp = pd.cfg.sub_project
         const html = buildProjectPage(pd.cfg, pd.genRes, pd.mf, range, i + 2, totalPages)
-          .replace('<div class="rpt-page">', `<div class="rpt-page" data-sub-project="${sp}">`)
+          .replace('<div class="rpt-page">', `<div class="rpt-page" data-sub-project="${sp}" data-nombre="${pd.cfg.nombre_clientes || pd.cfg.nombre_display || pd.cfg.nombre_comercial || sp}">`)
         return {
           sub_project: sp,
           nombre: pd.cfg.nombre_clientes || pd.cfg.nombre_display || pd.cfg.nombre_comercial || sp,
@@ -1394,9 +1295,6 @@ async function generar() {
           html,
         }
       })
-      diasRojosMap.value = {}
-      portProyectoActivo.value = results[0]?.cfg?.sub_project || ''
-      lastGenCache.value = { tipo: 'portafolio', results, portName, range }
       ultimaConsolidada.value = consolidada
       ultimosMiembros.value = miembros
       htmlContent.value = [consolidada, ...miembros.map(m => m.html)].join('<div class="rpt-page-sep"></div>')
@@ -1615,30 +1513,6 @@ watch(tipo, (t) => {
 .im-result-title { font-weight: 700; color: #1A1025; font-size: 13px; }
 .im-result-sub { color: #6B5A8A; font-size: 11px; }
 .im-result-actions { display: inline-flex; gap: 6px; flex-wrap: wrap; }
-
-/* Panel días en rojo */
-.im-red-panel {
-  display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
-  padding: 8px 16px; background: #FFF8F8; border-bottom: 1px solid #FECACA;
-}
-.im-red-label { font-size: 11px; font-weight: 700; color: #991B1B; display: inline-flex; align-items: center; gap: 5px; margin-right: 4px; }
-.im-day-chip {
-  border: 1px solid #E5E2EC; background: #fff; border-radius: 6px;
-  padding: 3px 8px; font-size: 11px; font-weight: 700; cursor: pointer;
-  color: #4B3A6B; font-family: inherit; transition: all .12s;
-}
-.im-day-chip:hover { border-color: #DC3232; color: #DC3232; }
-.im-day-chip--on { background: #DC3232; border-color: #DC3232; color: #fff; }
-.im-red-select {
-  border: 1px solid #FECACA; background: #fff; border-radius: 6px;
-  padding: 3px 8px; font-size: 11px; font-weight: 700; color: #991B1B;
-  font-family: inherit; cursor: pointer; max-width: 180px;
-}
-.im-day-clear {
-  border: 1px solid #FECACA; background: #FEE2E2; border-radius: 6px;
-  padding: 3px 8px; font-size: 11px; font-weight: 700; cursor: pointer;
-  color: #991B1B; font-family: inherit; display: inline-flex; align-items: center; gap: 4px;
-}
 
 /* Report frame */
 .im-report-frame {

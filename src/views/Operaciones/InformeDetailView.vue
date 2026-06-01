@@ -80,6 +80,20 @@
         &nbsp;·&nbsp; Al terminar haz clic en <b>💾 Guardar versión</b>
       </div>
 
+      <!-- Panel días en rojo (solo en editMode) -->
+      <div v-if="editMode && diasDisponibles.length" class="inf-red-panel">
+        <span class="inf-red-label">🎨 Días en rojo:</span>
+        <select v-if="informe.tipo === 'port'" v-model="subProjectActivo" class="inf-red-select">
+          <option v-for="p in proyectosDisponibles" :key="p.sp" :value="p.sp">{{ p.nombre }}</option>
+        </select>
+        <button v-for="d in diasDisponibles" :key="d.date"
+                :class="['inf-day-chip', diasRojosActivos.has(d.date) ? 'inf-day-chip--on' : '']"
+                @click="toggleDiaRojo(d.date)">
+          {{ d.day }}
+        </button>
+        <button v-if="diasRojosActivos.size > 0" class="inf-day-clear" @click="limpiarDiasRojos">✕ Limpiar</button>
+      </div>
+
       <!-- ══ Contenido del informe ══ -->
       <div
         ref="contentRef"
@@ -93,7 +107,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import api from '@/api/client'
 
@@ -110,6 +124,80 @@ const htmlContent = ref('')
 const toastMsg   = ref('')
 const toastError = ref(false)
 let _toastTimer  = null
+
+// ── Días en rojo ────────────────────────────────────────────────
+const subProjectActivo = ref('')
+const diasRojosMap = ref({}) // { sub_project: Set<date> }
+
+const proyectosDisponibles = computed(() => {
+  if (!contentRef.value) return []
+  return [...contentRef.value.querySelectorAll('[data-sub-project]')].map(el => ({
+    sp: el.getAttribute('data-sub-project'),
+    nombre: el.getAttribute('data-nombre') || el.getAttribute('data-sub-project'),
+  }))
+})
+
+const diasDisponibles = computed(() => {
+  if (!contentRef.value) return []
+  let container = contentRef.value
+  if (informe.value?.tipo === 'port' && subProjectActivo.value) {
+    container = contentRef.value.querySelector(`[data-sub-project="${subProjectActivo.value}"]`) || contentRef.value
+  }
+  const fechas = new Set()
+  container.querySelectorAll('rect[data-date]').forEach(r => fechas.add(r.getAttribute('data-date')))
+  return [...fechas].sort().map(d => ({ date: d, day: parseInt(d.split('-')[2]) }))
+})
+
+const diasRojosActivos = computed(() => {
+  const sp = informe.value?.tipo === 'port' ? subProjectActivo.value : (informe.value?.sub_project || '_')
+  return diasRojosMap.value[sp] || new Set()
+})
+
+function toggleDiaRojo(fecha) {
+  const sp = informe.value?.tipo === 'port' ? subProjectActivo.value : (informe.value?.sub_project || '_')
+  const map = { ...diasRojosMap.value }
+  const s = new Set(map[sp] || [])
+  // Cambiar fill en el DOM directamente
+  let container = contentRef.value
+  if (informe.value?.tipo === 'port' && subProjectActivo.value) {
+    container = contentRef.value.querySelector(`[data-sub-project="${subProjectActivo.value}"]`) || contentRef.value
+  }
+  if (s.has(fecha)) {
+    s.delete(fecha)
+    container.querySelectorAll(`rect[data-date="${fecha}"]`).forEach(r => r.setAttribute('fill', '#6B35C0'))
+  } else {
+    s.add(fecha)
+    container.querySelectorAll(`rect[data-date="${fecha}"]`).forEach(r => r.setAttribute('fill', '#DC3232'))
+  }
+  map[sp] = s
+  diasRojosMap.value = map
+}
+
+function limpiarDiasRojos() {
+  const sp = informe.value?.tipo === 'port' ? subProjectActivo.value : (informe.value?.sub_project || '_')
+  const s = diasRojosMap.value[sp] || new Set()
+  let container = contentRef.value
+  if (informe.value?.tipo === 'port' && subProjectActivo.value) {
+    container = contentRef.value.querySelector(`[data-sub-project="${subProjectActivo.value}"]`) || contentRef.value
+  }
+  s.forEach(fecha => {
+    container.querySelectorAll(`rect[data-date="${fecha}"]`).forEach(r => r.setAttribute('fill', '#6B35C0'))
+  })
+  const map = { ...diasRojosMap.value }
+  delete map[sp]
+  diasRojosMap.value = map
+}
+
+watch(editMode, (val) => {
+  if (!val) diasRojosMap.value = {}
+})
+
+watch(() => informe.value?.tipo, () => {
+  subProjectActivo.value = ''
+  nextTick(() => {
+    if (proyectosDisponibles.value.length) subProjectActivo.value = proyectosDisponibles.value[0].sp
+  })
+})
 
 // ── Cargar ───────────────────────────────────────────────────────
 async function cargar() {
@@ -129,7 +217,13 @@ async function cargar() {
 // ── Edición ──────────────────────────────────────────────────────
 function enterEdit() {
   editMode.value = true
-  nextTick(() => contentRef.value?.focus())
+  diasRojosMap.value = {}
+  nextTick(() => {
+    contentRef.value?.focus()
+    if (informe.value?.tipo === 'port' && proyectosDisponibles.value.length) {
+      subProjectActivo.value = proyectosDisponibles.value[0].sp
+    }
+  })
 }
 
 function discardEdit() {
@@ -313,6 +407,31 @@ onMounted(cargar)
 .badge-borrador { background: rgba(246,255,114,0.12); color: #B8A800; border: 1px solid rgba(246,255,114,0.25); }
 .badge-revisado { background: rgba(37,99,235,0.12);   color: #2563EB; border: 1px solid rgba(37,99,235,0.25); }
 .badge-aprobado { background: rgba(74,222,128,0.12);  color: #2D8A4E; border: 1px solid rgba(74,222,128,0.25); }
+
+/* Panel días en rojo */
+.inf-red-panel {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
+  padding: 8px 14px; margin-bottom: 12px;
+  background: rgba(220,50,50,0.06); border: 1px solid rgba(220,50,50,0.2); border-radius: 10px;
+}
+.inf-red-label { font-size: 11px; font-weight: 700; color: #FF8080; margin-right: 4px; white-space: nowrap; }
+.inf-red-select {
+  background: #2A1A3A; border: 1px solid rgba(220,50,50,0.3); border-radius: 6px;
+  padding: 3px 8px; font-size: 11px; font-weight: 700; color: #FF8080;
+  font-family: 'Sora', sans-serif; cursor: pointer; max-width: 200px;
+}
+.inf-day-chip {
+  border: 1px solid #4A3560; background: #2A1A3A; border-radius: 6px;
+  padding: 3px 9px; font-size: 11px; font-weight: 700; cursor: pointer;
+  color: #A89EC0; font-family: 'Sora', sans-serif; transition: all .12s;
+}
+.inf-day-chip:hover { border-color: #DC3232; color: #FF8080; }
+.inf-day-chip--on { background: #DC3232; border-color: #DC3232; color: #fff; }
+.inf-day-clear {
+  border: 1px solid rgba(220,50,50,0.3); background: rgba(220,50,50,0.12); border-radius: 6px;
+  padding: 3px 9px; font-size: 11px; font-weight: 700; cursor: pointer;
+  color: #FF8080; font-family: 'Sora', sans-serif;
+}
 
 /* Contenido */
 .inf-report-content { outline: none; }
