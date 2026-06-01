@@ -21,11 +21,51 @@
 
     <!-- ══ TAB 0 — MANTENIMIENTO ══════════════════════════════════════════ -->
     <div v-if="activeTab === 0" class="mon-tab-view">
-      <div class="mon-tab-empty">
-        <i class="pi pi-wrench" style="font-size:2.5rem; color:#c4b8d4;" />
-        <p class="mt-3 text-sm font-semibold" style="color:#6b5a8a;">Mantenimiento</p>
-        <p class="mt-1 text-xs" style="color:#a094b8;">Próximamente — registros de costos de mantenimiento</p>
+
+      <!-- Selector de proyecto -->
+      <div class="costos-selector-bar">
+        <i class="pi pi-bolt text-sm" style="color:#915BD8" />
+        <span class="text-sm font-semibold" style="color:#2C2039">Proyecto</span>
+        <Select
+          v-model="proyectoSeleccionado"
+          :options="proyectos"
+          optionLabel="nombre_comercial"
+          optionValue="id"
+          placeholder="Selecciona un proyecto…"
+          filter
+          showClear
+          :loading="loadingProyectos"
+          class="costos-selector-select"
+          @change="onProyectoChange"
+        />
+        <span v-if="proyectoSeleccionado && proyectoNombre"
+          class="text-xs font-medium px-2.5 py-1 rounded-full"
+          style="background:#F1EAF9; color:#6D28D9">
+          {{ proyectoNombre }}
+        </span>
       </div>
+
+      <!-- Sin proyecto seleccionado -->
+      <div v-if="!proyectoSeleccionado" class="mon-tab-empty">
+        <i class="pi pi-arrow-up" style="font-size:1.8rem; color:#c4b8d4;" />
+        <p class="mt-3 text-sm font-semibold" style="color:#6b5a8a;">Selecciona un proyecto</p>
+        <p class="mt-1 text-xs" style="color:#a094b8;">Elige un proyecto arriba para ver sus facturas de mantenimiento</p>
+      </div>
+
+      <!-- Cargando contrato -->
+      <div v-else-if="loadingContrato" class="mon-tab-empty">
+        <i class="pi pi-spin pi-spinner" style="font-size:1.8rem; color:#915BD8;" />
+        <p class="mt-3 text-xs" style="color:#a094b8;">Cargando…</p>
+      </div>
+
+      <!-- Componente de facturas -->
+      <div v-else class="space-y-4">
+        <FacturasMantenimiento
+          :contrato-id="contratoMantenimientoId"
+          :proyecto-nombre="proyectoNombre"
+        />
+      </div>
+
     </div>
 
     <!-- ══ TAB 1 — ARRIENDOS ══════════════════════════════════════════════ -->
@@ -50,15 +90,62 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
+import Select from 'primevue/select'
+import api from '@/api/client'
+import FacturasMantenimiento from '@/views/Servicios/FacturasMantenimiento.vue'
 
 const TABS = [
-  { label: 'Mantenimiento',        icon: 'pi pi-wrench' },
-  { label: 'Arriendos',            icon: 'pi pi-building' },
+  { label: 'Mantenimiento',         icon: 'pi pi-wrench' },
+  { label: 'Arriendos',             icon: 'pi pi-building' },
   { label: 'Servicios de Internet', icon: 'pi pi-wifi' },
 ]
 
 const activeTab = ref(0)
+
+// ── Proyectos ──────────────────────────────────────────────────────────────────
+const proyectos           = ref([])
+const loadingProyectos    = ref(false)
+const proyectoSeleccionado = ref(null)
+const proyectoNombre      = ref('')
+
+// ── Contrato de mantenimiento del proyecto seleccionado ────────────────────────
+const contratoMantenimientoId = ref(null)
+const loadingContrato         = ref(false)
+
+onMounted(async () => {
+  loadingProyectos.value = true
+  try {
+    const { data } = await api.get('/proyectos', { params: { limit: 500 } })
+    proyectos.value = Array.isArray(data) ? data : (data.items ?? [])
+  } catch {
+    proyectos.value = []
+  } finally {
+    loadingProyectos.value = false
+  }
+})
+
+async function onProyectoChange() {
+  contratoMantenimientoId.value = null
+  proyectoNombre.value = ''
+
+  if (!proyectoSeleccionado.value) return
+
+  const proy = proyectos.value.find(p => p.id === proyectoSeleccionado.value)
+  proyectoNombre.value = proy?.nombre_comercial ?? ''
+
+  loadingContrato.value = true
+  try {
+    const { data } = await api.get('/contratos-servicio', {
+      params: { tipo: 'mantenimiento', proyecto_id: proyectoSeleccionado.value },
+    })
+    contratoMantenimientoId.value = data.length ? data[0].id : null
+  } catch {
+    contratoMantenimientoId.value = null
+  } finally {
+    loadingContrato.value = false
+  }
+}
 </script>
 
 <style scoped>
@@ -69,7 +156,7 @@ const activeTab = ref(0)
   background: #f5f4f8;
 }
 
-/* ── Tab bar (mismo estilo que MonitoreoView) ── */
+/* ── Tab bar (idéntico a MonitoreoView) ── */
 .mon-tab-bar {
   display: flex;
   align-items: center;
@@ -117,6 +204,21 @@ const activeTab = ref(0)
 }
 .mon-tab--active:hover { color: #FDFAF7; }
 
+/* ── Selector de proyecto ── */
+.costos-selector-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  background: #fff;
+  border-bottom: 1px solid #ECE7F2;
+  flex-wrap: wrap;
+}
+.costos-selector-select {
+  min-width: 280px;
+  max-width: 400px;
+}
+
 /* ── Contenido ── */
 .mon-tab-view {
   padding: 24px 24px 40px;
@@ -126,8 +228,10 @@ const activeTab = ref(0)
   text-align: center;
   padding: 80px 20px;
 }
+.space-y-4 > * + * { margin-top: 1rem; }
 
 @media (max-width: 640px) {
   .mon-tab-view { padding: 16px; }
+  .costos-selector-select { min-width: 200px; }
 }
 </style>

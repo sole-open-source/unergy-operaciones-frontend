@@ -348,8 +348,6 @@
             :proyecto-nombre="proyectoNombre"
           />
 
-          <!-- ── Facturas Solenium + Inversionistas (CRUD completo) ───────────── -->
-          <FacturasMantenimiento :contrato-id="contratos.mantenimiento?.id ?? null" :proyecto-nombre="proyectoNombre" />
         </div>
       </TabPanel>
 
@@ -684,7 +682,6 @@ import Dialog from 'primevue/dialog'
 import { useToast } from 'primevue/usetoast'
 import api from '@/api/client'
 import ContratoServicioWizard from '@/views/Contratos/ContratoServicioWizard.vue'
-import FacturasMantenimiento from './FacturasMantenimiento.vue'
 
 const route = useRoute()
 const router = useRouter()
