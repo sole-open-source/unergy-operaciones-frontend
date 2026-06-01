@@ -693,7 +693,7 @@ function buildProjectPage(cfg, genRes, mf, range, pageNum, totalPages, fmoMeta) 
   const pctStr = pct !== null ? `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}% vs P90` : '—'
   const pctCol = pct === null ? '#A89EC0' : pct >= 0 ? '#4ADE80' : '#FF5757'
   const avail = calcAvailability(data, range)
-  const availStr = avail.pct !== null ? `${avail.pct.toFixed(1)}% [total:${avail.total} cero:${avail.cero}]` : '—'
+  const availStr = avail.pct !== null ? `${avail.pct.toFixed(1)}%` : '—'
   const availCol = avail.pct === null ? '#A89EC0' : avail.pct >= 95 ? '#4ADE80' : avail.pct >= 85 ? '#F6FF72' : '#FF5757'
 
   const atypical = []
