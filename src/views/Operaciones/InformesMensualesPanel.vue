@@ -292,6 +292,7 @@ function descartar() {
   ultimoSubProject.value = ''
   ultimoRange.value = null
   error.value = null
+}
 
 function imprimir() {
   if (!reportRef.value) return
