@@ -197,6 +197,34 @@
                   </div>
                 </div>
 
+                <!-- ── Gráficas Inversores / Medidores ── -->
+                <div class="gs-charts-row">
+                  <div class="gs-chart-card gs-chart-card--dark">
+                    <h3 class="gs-section-title gs-section-title--light">
+                      <span class="gs-chart-legend-dot" style="background:#915BD8" />
+                      Inversores — Potencia hoy (W)
+                    </h3>
+                    <div v-if="inversorPowerChartData.labels.length" class="gs-chart-container">
+                      <Line :data="inversorPowerChartData" :options="inversorPowerOptions" />
+                    </div>
+                    <div v-else class="gs-chart-empty gs-chart-empty--dark">
+                      Sin datos
+                    </div>
+                  </div>
+                  <div class="gs-chart-card gs-chart-card--dark">
+                    <h3 class="gs-section-title gs-section-title--light">
+                      <span class="gs-chart-legend-dot" style="background:#F6FF72" />
+                      Medidores — Potencia hoy (W)
+                    </h3>
+                    <div v-if="medidorPowerChartData.labels.length" class="gs-chart-container">
+                      <Line :data="medidorPowerChartData" :options="medidorPowerOptions" />
+                    </div>
+                    <div v-else class="gs-chart-empty gs-chart-empty--dark">
+                      Sin datos
+                    </div>
+                  </div>
+                </div>
+
                 <!-- ── Curvas Solenium ── -->
                 <div class="gs-charts-row">
                   <div class="gs-chart-card">
@@ -800,6 +828,120 @@ const gaiaEnergyOptions = {
          title: { display: true, text: 'kWh', font: { size: 10 }, color: '#9ca3af' }, beginAtZero: true },
   },
 }
+
+// ── Inversores / Medidores dark charts ───────────────────────────────────────
+const DARK_BG      = '#2C2039'
+const DARK_TICK    = '#a89fc0'
+const DARK_GRID    = 'rgba(255,255,255,0.07)'
+
+// Generate 0h–24h hourly label array
+const HOUR_LABELS = Array.from({ length: 25 }, (_, i) => `${i}h`)
+
+function toPowerW(kw) { return kw != null ? +(kw * 1000).toFixed(1) : null }
+
+function mapToHourBuckets(points, timeExtractor, valueExtractor) {
+  // Bucket values by hour, average per bucket
+  const buckets = {}
+  for (const pt of points) {
+    const raw = timeExtractor(pt)
+    if (!raw) continue
+    const hourMatch = raw.match(/(\d{1,2}):\d{2}/)
+    if (!hourMatch) continue
+    const h = parseInt(hourMatch[1], 10)
+    if (!buckets[h]) buckets[h] = []
+    const v = valueExtractor(pt)
+    if (v != null) buckets[h].push(v)
+  }
+  return HOUR_LABELS.map((_, i) => {
+    const arr = buckets[i]
+    if (!arr?.length) return null
+    return +(arr.reduce((s, v) => s + v, 0) / arr.length).toFixed(1)
+  })
+}
+
+const inversorPowerChartData = computed(() => {
+  const curve = detailData.value?.power_curve ?? []
+  if (!curve.length) return { labels: [], datasets: [] }
+  const data = mapToHourBuckets(
+    curve,
+    pt => { const t = pt.time || ''; return t.includes(' ') ? t.split(' ')[1] : t },
+    pt => toPowerW(pt.kw),
+  )
+  if (data.every(v => v == null)) return { labels: [], datasets: [] }
+  return {
+    labels: HOUR_LABELS,
+    datasets: [{
+      label: 'Inversores (W)',
+      data,
+      borderColor: '#915BD8',
+      backgroundColor: 'rgba(145,91,216,0.18)',
+      fill: true,
+      tension: 0.35,
+      pointRadius: 0,
+      pointHoverRadius: 4,
+      borderWidth: 2,
+      spanGaps: true,
+    }],
+  }
+})
+
+const medidorPowerChartData = computed(() => {
+  const ts = detailData.value?.gaia_snapshot?.time_series
+  const rows = (ts?.power ?? []).filter(r => r.kw != null)
+  if (!rows.length) return { labels: [], datasets: [] }
+  const data = mapToHourBuckets(
+    rows,
+    r => gaiaTimeLabel(r.time),
+    r => toPowerW(r.kw),
+  )
+  if (data.every(v => v == null)) return { labels: [], datasets: [] }
+  return {
+    labels: HOUR_LABELS,
+    datasets: [{
+      label: 'Medidores (W)',
+      data,
+      borderColor: '#F6FF72',
+      backgroundColor: 'rgba(246,255,114,0.12)',
+      fill: true,
+      tension: 0.35,
+      pointRadius: 0,
+      pointHoverRadius: 4,
+      borderWidth: 2,
+      spanGaps: true,
+    }],
+  }
+})
+
+function darkChartOptions(unitLabel) {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a1128',
+        titleColor: '#FDFAF7',
+        bodyColor: '#FDFAF7',
+        callbacks: { label: ctx => `${ctx.parsed.y?.toLocaleString('es-CO')} ${unitLabel}` },
+      },
+    },
+    scales: {
+      x: {
+        ticks: { font: { size: 10 }, color: DARK_TICK, maxTicksLimit: 13 },
+        grid: { color: DARK_GRID },
+      },
+      y: {
+        beginAtZero: true,
+        ticks: { font: { size: 10 }, color: DARK_TICK },
+        grid: { color: DARK_GRID },
+        title: { display: true, text: 'W', font: { size: 10 }, color: DARK_TICK },
+      },
+    },
+  }
+}
+
+const inversorPowerOptions = darkChartOptions('W')
+const medidorPowerOptions  = darkChartOptions('W')
 
 // ── String chart ─────────────────────────────────────────────────────────────
 const stringMetric = ref('voltage')   // 'voltage' | 'current' | 'power'
@@ -1772,6 +1914,37 @@ onUnmounted(() => {
   gap: 8px;
   color: #9ca3af;
   font-size: 12px;
+}
+
+.gs-chart-card--dark {
+  background: #2C2039;
+  border-color: #3d2f52;
+}
+
+.gs-section-title--light {
+  color: #a89fc0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.gs-chart-legend-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.gs-chart-empty--dark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 220px;
+  color: #6b5a8a;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
 }
 
 /* ── Strings section ── */
