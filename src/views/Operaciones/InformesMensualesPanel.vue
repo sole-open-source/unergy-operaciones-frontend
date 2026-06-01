@@ -151,6 +151,19 @@
         </div>
       </section>
 
+      <!-- Panel días en rojo (solo tipo proyecto) -->
+      <section v-if="tipo === 'proyecto' && diasDisponibles.length" class="im-red-panel im-no-print">
+        <span class="im-red-label"><i class="pi pi-palette" style="color:#DC3232" /> Días en rojo:</span>
+        <button v-for="d in diasDisponibles" :key="d.date"
+                :class="['im-day-chip', diasRojos.has(d.date) ? 'im-day-chip--on' : '']"
+                @click="toggleDiaRojo(d.date)">
+          {{ d.day }}
+        </button>
+        <button v-if="diasRojos.size > 0" class="im-day-clear" @click="limpiarDiasRojos">
+          <i class="pi pi-times" /> Limpiar
+        </button>
+      </section>
+
       <!-- Reporte HTML embebido -->
       <div class="im-report-frame">
         <div ref="reportRef" class="im-report" v-html="htmlContent" />
@@ -213,11 +226,21 @@ const ultimoRange = ref(null)
 const ultimoTipo = ref('')            // 'op' | 'fmo' | 'port' del último generado
 const ultimaConsolidada = ref('')     // portafolio: HTML de la página consolidada (sin secciones)
 const ultimosMiembros = ref([])       // portafolio: [{ sub_project, nombre, orden, html }]
+const lastGenCache = ref(null)        // { cfg, genRes, mf, range } para re-render sin API
+const diasRojos = ref(new Set())
 const toastMsg = ref('')
 const toastErr = ref(false)
 let _toastTimer = null
 
 // ── Computados ─────────────────────────────────────────────────────────
+const diasDisponibles = computed(() => {
+  if (!lastGenCache.value) return []
+  const data = lastGenCache.value.genRes?.data || []
+  const dm = {}
+  data.forEach(d => { if (d.date) dm[d.date] = true })
+  return Object.keys(dm).sort().map(d => ({ date: d, day: parseInt(d.split('-')[2]) }))
+})
+
 const opcionesProyecto = computed(() => {
   const lista = tipo.value === 'fmo'
     ? contratosFmo.value.map(c => ({
@@ -291,6 +314,27 @@ function descartar() {
   ultimoSubProject.value = ''
   ultimoRange.value = null
   error.value = null
+  lastGenCache.value = null
+  diasRojos.value = new Set()
+}
+
+function toggleDiaRojo(fecha) {
+  const s = new Set(diasRojos.value)
+  if (s.has(fecha)) s.delete(fecha)
+  else s.add(fecha)
+  diasRojos.value = s
+  if (lastGenCache.value) {
+    const { cfg, genRes, mf, range } = lastGenCache.value
+    htmlContent.value = buildProjectPage(cfg, genRes, mf, range, 1, 1, null, diasRojos.value)
+  }
+}
+
+function limpiarDiasRojos() {
+  diasRojos.value = new Set()
+  if (lastGenCache.value) {
+    const { cfg, genRes, mf, range } = lastGenCache.value
+    htmlContent.value = buildProjectPage(cfg, genRes, mf, range, 1, 1, null, diasRojos.value)
+  }
 }
 
 function imprimir() {
@@ -540,7 +584,7 @@ function rmeta(lbl, val) { return `<div class="rpt-meta-item"><div class="rpt-me
 function rkpi(ico, lbl, val, col) { return `<div class="rpt-kpi"><div class="rpt-kpi-ico">${ico}</div><div class="rpt-kpi-lbl">${esc(lbl)}</div><div class="rpt-kpi-val"${col ? ` style="color:${col}"` : ''}>${val}</div></div>` }
 
 // ── Mini chart SVG: serie diaria con línea P90 y atípicos ─────────────
-function svgDailyChart(days, values, p90d, atypDates) {
+function svgDailyChart(days, values, p90d, atypDates, redDates = new Set()) {
   if (!days.length) return '<div class="rpt-chart-empty">Sin datos para graficar</div>'
   const W = 460, H = 180, padL = 36, padR = 8, padT = 10, padB = 28
   const maxV = Math.max(...values, p90d || 0, 1)
@@ -555,7 +599,8 @@ function svgDailyChart(days, values, p90d, atypDates) {
     const top = yTo(values[i])
     const h = (H - padB) - top
     const isAty = atypSet.has(d)
-    const fill = isAty ? '#DC3232' : '#6B35C0'
+    const isRed = redDates instanceof Set ? redDates.has(d) : false
+    const fill = isRed ? '#DC3232' : isAty ? '#DC3232' : '#6B35C0'
     bars += `<rect x="${cx.toFixed(1)}" y="${top.toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(0, h).toFixed(1)}" fill="${fill}" opacity="0.78" rx="1.5" />`
   })
 
@@ -676,7 +721,7 @@ function svgPortfolioChart(items) {
 }
 
 // ── Página de proyecto (operacional individual) ─────────────────────
-function buildProjectPage(cfg, genRes, mf, range, pageNum, totalPages, fmoMeta) {
+function buildProjectPage(cfg, genRes, mf, range, pageNum, totalPages, fmoMeta, redDates = new Set()) {
   const data = genRes?.data || []
   const sim = genRes?.simulation || null
   const dm = {}
@@ -789,7 +834,7 @@ function buildProjectPage(cfg, genRes, mf, range, pageNum, totalPages, fmoMeta) 
   }
 
   // Gráficos SVG embebidos
-  const chart1 = svgDailyChart(days, kpd, p90d, atypical.map(a => a.date))
+  const chart1 = svgDailyChart(days, kpd, p90d, atypical.map(a => a.date), redDates)
   const chart2 = svgCompareChart(Math.round(total), p50m, p90m, p99m)
 
   return '<div class="rpt-page">' +
@@ -1227,6 +1272,8 @@ async function generar() {
         params: { action: 'getGeneration', sub_project: sp, date_from: range.from, date_to: range.to },
       })
       const mf = getFaultsForRange(cfg, range)
+      diasRojos.value = new Set()
+      lastGenCache.value = { cfg, genRes: r || {}, mf, range }
       htmlContent.value = buildProjectPage(cfg, r || {}, mf, range, 1, 1)
       resultTitle.value = cfg.nombre_display || cfg.nombre_clientes || cfg.nombre_comercial || sp
       rangeLabel.value = range.label
@@ -1513,6 +1560,25 @@ watch(tipo, (t) => {
 .im-result-title { font-weight: 700; color: #1A1025; font-size: 13px; }
 .im-result-sub { color: #6B5A8A; font-size: 11px; }
 .im-result-actions { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+
+/* Panel días en rojo */
+.im-red-panel {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
+  padding: 8px 16px; background: #FFF8F8; border-bottom: 1px solid #FECACA;
+}
+.im-red-label { font-size: 11px; font-weight: 700; color: #991B1B; display: inline-flex; align-items: center; gap: 5px; margin-right: 4px; }
+.im-day-chip {
+  border: 1px solid #E5E2EC; background: #fff; border-radius: 6px;
+  padding: 3px 8px; font-size: 11px; font-weight: 700; cursor: pointer;
+  color: #4B3A6B; font-family: inherit; transition: all .12s;
+}
+.im-day-chip:hover { border-color: #DC3232; color: #DC3232; }
+.im-day-chip--on { background: #DC3232; border-color: #DC3232; color: #fff; }
+.im-day-clear {
+  border: 1px solid #FECACA; background: #FEE2E2; border-radius: 6px;
+  padding: 3px 8px; font-size: 11px; font-weight: 700; cursor: pointer;
+  color: #991B1B; font-family: inherit; display: inline-flex; align-items: center; gap: 4px;
+}
 
 /* Report frame */
 .im-report-frame {
