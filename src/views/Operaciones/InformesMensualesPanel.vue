@@ -431,19 +431,39 @@ function getFaultsForRange(proyectoCfg, range) {
 }
 
 function calcAvailability(data, range) {
-  const HORA_INI = 6, HORA_FIN = 17
-  const horasLuz = (HORA_FIN - HORA_INI) * range.totalDays
-  let horasCero = 0
+  const HORA_INI = 7, HORA_FIN = 17
+
+  // Inferir frecuencia de muestreo a partir de intervalos consecutivos reales
+  const allTimes = []
   data.forEach(d => {
-    const t = String(d.time || '')
-    const m = t.match(/(\d{2}):(\d{2})/)
-    if (!m) return
-    const h = parseInt(m[1])
-    if (h >= HORA_INI && h < HORA_FIN && (d.kwh === 0 || d.kwh < 0.001)) horasCero++
+    const tm = String(d.time || '').match(/(\d{2}):(\d{2})/)
+    if (tm) allTimes.push(parseInt(tm[1]) * 60 + parseInt(tm[2]))
   })
-  const disponibles = horasLuz - horasCero
-  const pct = horasLuz > 0 ? Math.round((disponibles / horasLuz) * 1000) / 10 : null
-  return { pct, disponibles, total: horasLuz, cero: horasCero }
+  allTimes.sort((a, b) => a - b)
+  const diffs = []
+  for (let i = 1; i < allTimes.length; i++) {
+    const diff = allTimes[i] - allTimes[i - 1]
+    if (diff > 0 && diff <= 120) diffs.push(diff)
+  }
+  const freqMin = diffs.length > 0 ? Math.round(diffs.reduce((a, b) => a + b, 0) / diffs.length) : 60
+  const freqClamped = Math.max(freqMin, 5)
+
+  // Slots esperados por día en franja 07:00–17:00
+  const slotsPerDay = Math.round((HORA_FIN - HORA_INI) * 60 / freqClamped) + 1
+  const totalEsperado = slotsPerDay * range.totalDays
+
+  // Registros reales con generación > 0 en la franja solar
+  let conGeneracion = 0
+  data.forEach(d => {
+    const tm = String(d.time || '').match(/(\d{2}):(\d{2})/)
+    if (!tm) return
+    const h = parseInt(tm[1])
+    if (h >= HORA_INI && h <= HORA_FIN && d.kwh > 0.001) conGeneracion++
+  })
+
+  const registrosCero = Math.max(0, totalEsperado - conGeneracion)
+  const pct = totalEsperado > 0 ? Math.round((conGeneracion / totalEsperado) * 1000) / 10 : null
+  return { pct, disponibles: conGeneracion, total: totalEsperado, cero: registrosCero }
 }
 
 function buildWeeks(data, range, p90d) {
@@ -673,7 +693,7 @@ function buildProjectPage(cfg, genRes, mf, range, pageNum, totalPages, fmoMeta) 
   const pctStr = pct !== null ? `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}% vs P90` : '—'
   const pctCol = pct === null ? '#A89EC0' : pct >= 0 ? '#4ADE80' : '#FF5757'
   const avail = calcAvailability(data, range)
-  const availStr = avail.pct !== null ? `${avail.pct.toFixed(1)}%` : '—'
+  const availStr = avail.pct !== null ? `${avail.pct.toFixed(1)}% [total:${avail.total} cero:${avail.cero}]` : '—'
   const availCol = avail.pct === null ? '#A89EC0' : avail.pct >= 95 ? '#4ADE80' : avail.pct >= 85 ? '#F6FF72' : '#FF5757'
 
   const atypical = []
