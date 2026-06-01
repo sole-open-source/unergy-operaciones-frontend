@@ -83,7 +83,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, onMounted, onUnmounted } from 'vue'
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -101,8 +101,8 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, T
 
 // ── Estado ─────────────────────────────────────────────────────────────────
 const loading     = ref(false)
-const proyectos   = ref([])   // lista del endpoint de monitoring
-const detailMap   = ref({})   // { proyecto_id: detailData }
+const proyectos   = ref([])
+const detailMap   = reactive({})   // { proyecto_id: detailData } — reactive para que los charts detecten cambios
 const lastUpdated = ref('')
 let refreshTimer  = null
 
@@ -140,7 +140,7 @@ function mapHours(points, getTime, getW) {
 }
 
 function getInversorData(id) {
-  const d = detailMap.value[id]
+  const d = detailMap[id]
   const curve = d?.power_curve ?? []
   if (!curve.length) return { labels: [], datasets: [] }
   const data = mapHours(
@@ -162,7 +162,7 @@ function getInversorData(id) {
 }
 
 function getMedidorData(id) {
-  const d = detailMap.value[id]
+  const d = detailMap[id]
   const rows = (d?.gaia_snapshot?.time_series?.power ?? []).filter(r => r.kw != null)
   if (!rows.length) return { labels: [], datasets: [] }
   const data = mapHours(
@@ -228,7 +228,7 @@ async function cargar() {
 async function loadDetail(id) {
   try {
     const res = await api.get(`/generacion-solar/monitoring/${id}`)
-    detailMap.value = { ...detailMap.value, [id]: res.data }
+    detailMap[id] = res.data
   } catch { /* sin datos para este proyecto */ }
 }
 
