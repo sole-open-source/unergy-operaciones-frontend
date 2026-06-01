@@ -151,15 +151,19 @@
         </div>
       </section>
 
-      <!-- Panel días en rojo (solo tipo proyecto) -->
-      <section v-if="tipo === 'proyecto' && diasDisponibles.length" class="im-red-panel im-no-print">
+      <!-- Panel días en rojo -->
+      <section v-if="(tipo === 'proyecto' || tipo === 'portafolio') && lastGenCache && diasDisponibles.length" class="im-red-panel im-no-print">
         <span class="im-red-label"><i class="pi pi-palette" style="color:#DC3232" /> Días en rojo:</span>
+        <!-- Selector de proyecto (solo portafolio) -->
+        <select v-if="tipo === 'portafolio'" v-model="portProyectoActivo" class="im-red-select">
+          <option v-for="op in opcionesPortProyecto" :key="op.value" :value="op.value">{{ op.label }}</option>
+        </select>
         <button v-for="d in diasDisponibles" :key="d.date"
-                :class="['im-day-chip', diasRojos.has(d.date) ? 'im-day-chip--on' : '']"
+                :class="['im-day-chip', (diasRojosMap[spActivo] || new Set()).has(d.date) ? 'im-day-chip--on' : '']"
                 @click="toggleDiaRojo(d.date)">
           {{ d.day }}
         </button>
-        <button v-if="diasRojos.size > 0" class="im-day-clear" @click="limpiarDiasRojos">
+        <button v-if="diasRojosMap[spActivo]?.size > 0" class="im-day-clear" @click="limpiarDiasRojos">
           <i class="pi pi-times" /> Limpiar
         </button>
       </section>
@@ -226,19 +230,40 @@ const ultimoRange = ref(null)
 const ultimoTipo = ref('')            // 'op' | 'fmo' | 'port' del último generado
 const ultimaConsolidada = ref('')     // portafolio: HTML de la página consolidada (sin secciones)
 const ultimosMiembros = ref([])       // portafolio: [{ sub_project, nombre, orden, html }]
-const lastGenCache = ref(null)        // { cfg, genRes, mf, range } para re-render sin API
-const diasRojos = ref(new Set())
+const lastGenCache = ref(null)        // { tipo, cfg?, genRes?, mf?, range, results? }
+const diasRojosMap = ref({})          // { sub_project: Set<date> }
+const portProyectoActivo = ref('')    // portafolio: proyecto seleccionado para editar días
 const toastMsg = ref('')
 const toastErr = ref(false)
 let _toastTimer = null
 
 // ── Computados ─────────────────────────────────────────────────────────
+const spActivo = computed(() => {
+  if (!lastGenCache.value) return ''
+  if (lastGenCache.value.tipo === 'portafolio') return portProyectoActivo.value
+  return lastGenCache.value.cfg?.sub_project || ''
+})
+
 const diasDisponibles = computed(() => {
   if (!lastGenCache.value) return []
-  const data = lastGenCache.value.genRes?.data || []
+  let data = []
+  if (lastGenCache.value.tipo === 'portafolio') {
+    const pd = (lastGenCache.value.results || []).find(r => r.cfg.sub_project === portProyectoActivo.value)
+    data = pd?.genRes?.data || []
+  } else {
+    data = lastGenCache.value.genRes?.data || []
+  }
   const dm = {}
   data.forEach(d => { if (d.date) dm[d.date] = true })
   return Object.keys(dm).sort().map(d => ({ date: d, day: parseInt(d.split('-')[2]) }))
+})
+
+const opcionesPortProyecto = computed(() => {
+  if (!lastGenCache.value || lastGenCache.value.tipo !== 'portafolio') return []
+  return (lastGenCache.value.results || []).map(r => ({
+    value: r.cfg.sub_project,
+    label: r.cfg.nombre_clientes || r.cfg.nombre_display || r.cfg.nombre_comercial || r.cfg.sub_project,
+  }))
 })
 
 const opcionesProyecto = computed(() => {
@@ -315,26 +340,53 @@ function descartar() {
   ultimoRange.value = null
   error.value = null
   lastGenCache.value = null
-  diasRojos.value = new Set()
+  diasRojosMap.value = {}
+  portProyectoActivo.value = ''
+}
+
+function _reconstruir() {
+  if (!lastGenCache.value) return
+  const cache = lastGenCache.value
+  if (cache.tipo === 'proyecto') {
+    const sp = cache.cfg.sub_project
+    const red = diasRojosMap.value[sp] || new Set()
+    htmlContent.value = buildProjectPage(cache.cfg, cache.genRes, cache.mf, cache.range, 1, 1, null, red)
+  } else if (cache.tipo === 'portafolio') {
+    const { results, portName, range } = cache
+    const totalPages = results.length + 1
+    const consolidada = buildConsolidatedPage(portName, results, range, totalPages)
+    const miembros = results.map((pd, i) => {
+      const sp = pd.cfg.sub_project
+      const red = diasRojosMap.value[sp] || new Set()
+      const html = buildProjectPage(pd.cfg, pd.genRes, pd.mf, range, i + 2, totalPages, null, red)
+        .replace('<div class="rpt-page">', `<div class="rpt-page" data-sub-project="${sp}">`)
+      return { sub_project: sp, nombre: pd.cfg.nombre_clientes || pd.cfg.nombre_display || pd.cfg.nombre_comercial || sp, orden: i, html }
+    })
+    ultimaConsolidada.value = consolidada
+    ultimosMiembros.value = miembros
+    htmlContent.value = [consolidada, ...miembros.map(m => m.html)].join('<div class="rpt-page-sep"></div>')
+  }
 }
 
 function toggleDiaRojo(fecha) {
-  const s = new Set(diasRojos.value)
+  const sp = spActivo.value
+  if (!sp) return
+  const map = { ...diasRojosMap.value }
+  const s = new Set(map[sp] || [])
   if (s.has(fecha)) s.delete(fecha)
   else s.add(fecha)
-  diasRojos.value = s
-  if (lastGenCache.value) {
-    const { cfg, genRes, mf, range } = lastGenCache.value
-    htmlContent.value = buildProjectPage(cfg, genRes, mf, range, 1, 1, null, diasRojos.value)
-  }
+  map[sp] = s
+  diasRojosMap.value = map
+  _reconstruir()
 }
 
 function limpiarDiasRojos() {
-  diasRojos.value = new Set()
-  if (lastGenCache.value) {
-    const { cfg, genRes, mf, range } = lastGenCache.value
-    htmlContent.value = buildProjectPage(cfg, genRes, mf, range, 1, 1, null, diasRojos.value)
-  }
+  const sp = spActivo.value
+  if (!sp) return
+  const map = { ...diasRojosMap.value }
+  delete map[sp]
+  diasRojosMap.value = map
+  _reconstruir()
 }
 
 function imprimir() {
@@ -1272,8 +1324,8 @@ async function generar() {
         params: { action: 'getGeneration', sub_project: sp, date_from: range.from, date_to: range.to },
       })
       const mf = getFaultsForRange(cfg, range)
-      diasRojos.value = new Set()
-      lastGenCache.value = { cfg, genRes: r || {}, mf, range }
+      diasRojosMap.value = {}
+      lastGenCache.value = { tipo: 'proyecto', cfg, genRes: r || {}, mf, range }
       htmlContent.value = buildProjectPage(cfg, r || {}, mf, range, 1, 1)
       resultTitle.value = cfg.nombre_display || cfg.nombre_clientes || cfg.nombre_comercial || sp
       rangeLabel.value = range.label
@@ -1342,6 +1394,9 @@ async function generar() {
           html,
         }
       })
+      diasRojosMap.value = {}
+      portProyectoActivo.value = results[0]?.cfg?.sub_project || ''
+      lastGenCache.value = { tipo: 'portafolio', results, portName, range }
       ultimaConsolidada.value = consolidada
       ultimosMiembros.value = miembros
       htmlContent.value = [consolidada, ...miembros.map(m => m.html)].join('<div class="rpt-page-sep"></div>')
@@ -1574,6 +1629,11 @@ watch(tipo, (t) => {
 }
 .im-day-chip:hover { border-color: #DC3232; color: #DC3232; }
 .im-day-chip--on { background: #DC3232; border-color: #DC3232; color: #fff; }
+.im-red-select {
+  border: 1px solid #FECACA; background: #fff; border-radius: 6px;
+  padding: 3px 8px; font-size: 11px; font-weight: 700; color: #991B1B;
+  font-family: inherit; cursor: pointer; max-width: 180px;
+}
 .im-day-clear {
   border: 1px solid #FECACA; background: #FEE2E2; border-radius: 6px;
   padding: 3px 8px; font-size: 11px; font-weight: 700; cursor: pointer;
