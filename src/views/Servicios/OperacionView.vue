@@ -398,6 +398,7 @@
             <!-- Datos estáticos desde JSON si existen -->
             <template v-if="buscarArriendoEstatico(proyectoNombre)">
               <div class="rounded-xl border bg-white p-5" style="border-color:#8b5cf640">
+                <!-- Header -->
                 <div class="flex items-start justify-between mb-4 gap-3">
                   <div class="flex items-center gap-2.5 flex-wrap">
                     <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style="background:#f5f3ff">
@@ -414,7 +415,9 @@
                       @click="openEditContrato('arriendo')" />
                   </div>
                 </div>
+                <!-- Mini-cards -->
                 <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  <!-- Contratante -->
                   <div class="rounded-lg p-3.5" style="background:#f5f3ff;border:1px solid #ddd6fe">
                     <p class="text-xs mb-1.5 flex items-center gap-1.5" style="color:#5b21b6">
                       <i class="pi pi-user text-xs" style="color:#8b5cf6" />Contratante
@@ -423,6 +426,7 @@
                       {{ buscarArriendoEstatico(proyectoNombre).contratante }}
                     </p>
                   </div>
+                  <!-- Prestador -->
                   <div class="rounded-lg p-3.5" style="background:#f5f3ff;border:1px solid #ddd6fe">
                     <p class="text-xs mb-1.5 flex items-center gap-1.5" style="color:#5b21b6">
                       <i class="pi pi-building text-xs" style="color:#8b5cf6" />Prestador
@@ -431,6 +435,7 @@
                       {{ buscarArriendoEstatico(proyectoNombre).prestador }}
                     </p>
                   </div>
+                  <!-- Fecha firma -->
                   <div class="rounded-lg p-3.5" style="background:#f5f3ff;border:1px solid #ddd6fe">
                     <p class="text-xs mb-1.5 flex items-center gap-1.5" style="color:#5b21b6">
                       <i class="pi pi-calendar text-xs" style="color:#8b5cf6" />Fecha firma contrato
@@ -439,22 +444,38 @@
                       {{ buscarArriendoEstatico(proyectoNombre).fecha_firma }}
                     </p>
                   </div>
+                  <!-- Valor anual vigente -->
                   <div class="rounded-lg p-3.5" style="background:#f5f3ff;border:1px solid #ddd6fe">
                     <p class="text-xs mb-1.5 flex items-center gap-1.5" style="color:#5b21b6">
-                      <i class="pi pi-dollar text-xs" style="color:#8b5cf6" />Valor anual (BASE)
+                      <i class="pi pi-dollar text-xs" style="color:#8b5cf6" />Valor anual ({{ ANIO_ACTUAL }})
                     </p>
                     <p class="text-base font-bold" style="color:#7c3aed">
-                      {{ formatCOP(buscarArriendoEstatico(proyectoNombre).valor_anual) }}
+                      {{ formatCOP(getValorVigente(buscarArriendoEstatico(proyectoNombre).indexacion_anual)?.valor ?? buscarArriendoEstatico(proyectoNombre).valor_anual) }}
                     </p>
+                    <!-- Aviso IPC pendiente -->
+                    <p v-if="(buscarArriendoEstatico(proyectoNombre).indexacion_anual?.slice(-1)[0]?.anio ?? 0) < ANIO_ACTUAL"
+                      class="text-[10px] mt-1 font-medium" style="color:#dc2626">
+                      IPC de {{ ANIO_ACTUAL }} pendiente de actualizar
+                    </p>
+                    <button type="button"
+                      class="mt-2 flex items-center gap-1 text-xs font-medium hover:opacity-75 transition-opacity"
+                      style="background:none;border:none;padding:0;cursor:pointer;color:#8b5cf6"
+                      @click="showIndexacionArriendo.anual = !showIndexacionArriendo.anual">
+                      <i class="pi pi-chevron-down text-xs transition-transform duration-200"
+                        :style="showIndexacionArriendo.anual ? 'transform:rotate(180deg)' : ''" />
+                      {{ showIndexacionArriendo.anual ? 'Ocultar' : 'Ver indexación' }}
+                    </button>
                   </div>
+                  <!-- Valor mensual vigente -->
                   <div class="rounded-lg p-3.5" style="background:#f5f3ff;border:1px solid #ddd6fe">
                     <p class="text-xs mb-1.5 flex items-center gap-1.5" style="color:#5b21b6">
-                      <i class="pi pi-calculator text-xs" style="color:#8b5cf6" />Valor arriendo mensual
+                      <i class="pi pi-calculator text-xs" style="color:#8b5cf6" />Valor mensual ({{ ANIO_ACTUAL }})
                     </p>
                     <p class="text-base font-bold" style="color:#7c3aed">
-                      {{ formatCOP(buscarArriendoEstatico(proyectoNombre).valor_mensual) }}
+                      {{ formatCOP(getValorVigente(buscarArriendoEstatico(proyectoNombre).indexacion_mensual)?.valor ?? buscarArriendoEstatico(proyectoNombre).valor_mensual) }}
                     </p>
                   </div>
+                  <!-- Contrato en Drive -->
                   <div class="rounded-lg p-3.5" style="background:#f5f3ff;border:1px solid #ddd6fe">
                     <p class="text-xs mb-1.5 flex items-center gap-1.5" style="color:#5b21b6">
                       <i class="pi pi-file-pdf text-xs" style="color:#8b5cf6" />Contrato en Drive
@@ -468,6 +489,81 @@
                     <span v-else class="text-sm text-gray-400">Sin enlace</span>
                   </div>
                 </div>
+
+                <!-- Panel indexación anual -->
+                <div :style="{ overflow: 'hidden', transition: 'max-height 0.35s ease', maxHeight: showIndexacionArriendo.anual ? '800px' : '0px' }">
+                  <div class="pt-3">
+                    <div class="rounded-xl border overflow-hidden" style="border-color:#ddd6fe">
+                      <div class="flex items-center justify-between px-4 py-2.5" style="background:#f5f3ff">
+                        <span class="text-xs font-semibold" style="color:#5b21b6">
+                          <i class="pi pi-dollar text-xs mr-1.5" style="color:#8b5cf6" />Indexación anual de arriendo
+                        </span>
+                        <span class="text-xs text-gray-400">Año vigente: {{ ANIO_ACTUAL }}</span>
+                      </div>
+                      <table class="w-full text-sm border-collapse">
+                        <thead>
+                          <tr class="bg-gray-50 border-b border-gray-100">
+                            <th class="px-4 py-2 text-left text-xs font-semibold text-gray-500">Año</th>
+                            <th class="px-4 py-2 text-left text-xs font-semibold text-gray-500">IPC aplicado</th>
+                            <th class="px-4 py-2 text-right text-xs font-semibold text-gray-500">Valor anual</th>
+                            <th class="px-4 py-2 text-center text-xs font-semibold text-gray-500">Estado</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr v-if="!buscarArriendoEstatico(proyectoNombre).indexacion_anual?.length">
+                            <td colspan="4" class="px-4 py-6 text-center text-xs text-gray-400">
+                              Sin indexación registrada
+                            </td>
+                          </tr>
+                          <tr v-for="(fila, idx) in (buscarArriendoEstatico(proyectoNombre).indexacion_anual || [])"
+                            :key="idx"
+                            class="border-b border-gray-50 transition-colors"
+                            :class="fila.anio === ANIO_ACTUAL && idx === buscarArriendoEstatico(proyectoNombre).indexacion_anual.length - 1 ? 'bg-violet-50/40' : ''">
+                            <td class="px-4 py-2.5">
+                              <div class="flex items-center gap-1.5">
+                                <span class="font-mono font-semibold"
+                                  :style="fila.anio === ANIO_ACTUAL && idx === buscarArriendoEstatico(proyectoNombre).indexacion_anual.length - 1 ? 'color:#7c3aed' : 'color:#2C2039'">
+                                  {{ fila.anio }}
+                                </span>
+                                <span v-if="fila.anio === ANIO_ACTUAL && idx === buscarArriendoEstatico(proyectoNombre).indexacion_anual.length - 1"
+                                  class="text-xs px-1.5 py-0.5 rounded font-bold leading-none"
+                                  style="background:#ede9fe;color:#7c3aed">actual</span>
+                                <i v-if="fila.anio === ANIO_ACTUAL && idx === buscarArriendoEstatico(proyectoNombre).indexacion_anual.length - 1"
+                                  class="pi pi-arrow-left text-xs" style="color:#7c3aed" />
+                              </div>
+                            </td>
+                            <td class="px-4 py-2.5">
+                              <span v-if="fila.ipc_aplicado == null" class="text-gray-400 text-xs">— (base)</span>
+                              <span v-else class="font-mono tabular-nums" style="color:#374151">{{ fila.ipc_aplicado }}%</span>
+                            </td>
+                            <td class="px-4 py-2.5 text-right font-semibold tabular-nums"
+                              :style="fila.anio === ANIO_ACTUAL && idx === buscarArriendoEstatico(proyectoNombre).indexacion_anual.length - 1 ? 'color:#7c3aed' : 'color:#2C2039'">
+                              {{ formatCOP(fila.valor) }}
+                            </td>
+                            <td class="px-4 py-2.5 text-center">
+                              <span v-if="fila.ipc_aplicado == null || fila.anio < ANIO_ACTUAL"
+                                class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full"
+                                style="background:#dcfce7;color:#166534">
+                                <i class="pi pi-check text-xs" />Pagado
+                              </span>
+                              <span v-else-if="fila.anio === ANIO_ACTUAL && idx === buscarArriendoEstatico(proyectoNombre).indexacion_anual.length - 1"
+                                class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full"
+                                style="background:#ede9fe;color:#7c3aed">
+                                Vigente
+                              </span>
+                              <span v-else
+                                class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full"
+                                style="background:#f3f4f6;color:#9ca3af">
+                                Pendiente
+                              </span>
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+
               </div>
             </template>
 
@@ -826,7 +922,8 @@ const excelInputRef      = ref(null)
 const idxInputAnualRef   = ref(null)
 const idxInputMensualRef = ref(null)
 const ANIO_ACTUAL        = new Date().getFullYear()
-const showIndexacion     = reactive({ anual: false, mensual: false })
+const showIndexacion          = reactive({ anual: false, mensual: false })
+const showIndexacionArriendo  = reactive({ anual: false })
 const facturasCobradas   = ref([])
 const facturasEmitidas   = ref([])
 
