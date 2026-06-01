@@ -222,7 +222,7 @@
                 </div>
 
                 <!-- ── Gráficas Gaia (medidor) ── -->
-                <div v-if="detailData.gaia_snapshot" class="gs-charts-row">
+                <div class="gs-charts-row">
                   <div class="gs-chart-card">
                     <h3 class="gs-section-title">Potencia del medidor vs inversores — Hoy</h3>
                     <div v-if="gaiaPowerChartData.labels.length" class="gs-chart-container">
@@ -230,7 +230,8 @@
                     </div>
                     <div v-else class="gs-chart-empty">
                       <i class="pi pi-chart-line" style="font-size:28px;color:#d1d5db" />
-                      <p>Sin series de potencia del medidor</p>
+                      <p v-if="detailData.gaia_node_id === null">Medidor no registrado en Gaia para este proyecto</p>
+                      <p v-else>Sin datos de potencia del medidor para hoy</p>
                     </div>
                   </div>
                   <div class="gs-chart-card">
@@ -240,7 +241,8 @@
                     </div>
                     <div v-else class="gs-chart-empty">
                       <i class="pi pi-chart-line" style="font-size:28px;color:#d1d5db" />
-                      <p>Sin series de energía del medidor</p>
+                      <p v-if="detailData.gaia_node_id === null">Medidor no registrado en Gaia para este proyecto</p>
+                      <p v-else>Sin datos de energía del medidor para hoy</p>
                     </div>
                   </div>
                 </div>
