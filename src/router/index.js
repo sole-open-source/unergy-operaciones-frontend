@@ -38,6 +38,7 @@ const routes = [
   // ── Finanzas ─────────────────────────────────────────────────────
   { path: '/liquidaciones',               name: 'Liquidaciones',              component: () => import('@/views/Liquidaciones/LiquidacionesListView.vue'),           meta: { roles: ['admin', 'liquidaciones'] } },
   { path: '/liquidaciones/inversionista', name: 'LiquidacionesPorInversionista', component: () => import('@/views/Liquidaciones/LiquidacionesPorInversionistaView.vue'), meta: { roles: ['admin', 'liquidaciones'] } },
+  { path: '/finanzas/costos',             name: 'Costos',                     component: () => import('@/views/Finanzas/CostosView.vue'),                                meta: { roles: ['admin', 'liquidaciones'] } },
   { path: '/liquidaciones/minigranjas',   redirect: '/liquidaciones' },
   { path: '/liquidaciones/:id',           name: 'LiquidacionDetalle',         component: () => import('@/views/Liquidaciones/LiquidacionDetailView.vue'),           meta: { roles: ['admin', 'liquidaciones'] } },
   { path: '/garantias',                   name: 'Garantias',                  component: () => import('@/views/Garantias/GarantiasView.vue'),                       meta: { roles: ['admin', 'liquidaciones'] } },
