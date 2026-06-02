@@ -141,9 +141,9 @@
               </Column>
 
               <!-- Código -->
-              <Column field="codigo_interno" header="Código" style="width:110px" sortable>
+              <Column field="codigo_interno" header="Código" style="width:100px" sortable>
                 <template #body="{ data }">
-                  <code class="font-mono text-xs text-gray-700 bg-gray-50 px-1.5 py-0.5 rounded">{{ data.codigo_interno }}</code>
+                  <span class="font-mono text-[10px] text-gray-400">{{ data.codigo_interno }}</span>
                 </template>
               </Column>
 
@@ -177,19 +177,14 @@
                 </template>
               </Column>
 
-              <!-- Prioridad -->
-              <Column header="Prioridad" style="width:100px">
-                <template #body="{ data }">
-                  <span class="prio-pill" :style="prioPillStyle(data.prioridad?.codigo)">
-                    {{ data.prioridad?.etiqueta || '—' }}
-                  </span>
-                </template>
-              </Column>
-
               <!-- Estado -->
               <Column header="Estado" style="width:130px">
                 <template #body="{ data }">
-                  <Tag :value="data.estado?.etiqueta || '—'" :style="estadoPillStyle(data.estado?.color_hex)" />
+                  <div class="flex items-center gap-1.5">
+                    <span class="w-1.5 h-1.5 rounded-full shrink-0"
+                      :style="{ background: data.estado?.color_hex || '#9ca3af' }"></span>
+                    <span class="text-[11px] text-gray-600">{{ data.estado?.etiqueta || '—' }}</span>
+                  </div>
                 </template>
               </Column>
 
@@ -2380,14 +2375,6 @@ watch(bucket, (newBucket) => {
 .prio-stripe {
   width: 4px; height: 32px; border-radius: 2px; margin: 0 auto;
 }
-.prio-pill {
-  display: inline-block;
-  padding: 1px 6px;
-  border-radius: 4px;
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0;
-}
 .cat-dot {
   display: inline-block;
   width: 8px; height: 8px; border-radius: 50%;
@@ -2398,21 +2385,22 @@ watch(bucket, (newBucket) => {
 .dias-badge {
   display: inline-block;
   font-size: 10px;
-  font-weight: 500;
-  padding: 1px 6px;
-  border-radius: 4px;
+  font-weight: 400;
   white-space: nowrap;
 }
-.dias-green   { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
-.dias-yellow  { background: #fefce8; color: #a16207; border: 1px solid #fde68a; }
-.dias-red     { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
-.dias-cerrada { background: #f3f4f6; color: #9ca3af; border: 1px solid #e5e7eb; }
+.dias-green   { color: #16a34a; }
+.dias-yellow  { color: #a16207; }
+.dias-red     { color: #dc2626; }
+.dias-cerrada { color: #9ca3af; }
 
 /* ══ Row actions ══════════════════════════════════════════════════════════ */
 .row-actions {
   display: flex; gap: 2px; opacity: 0.4; transition: opacity 0.15s;
 }
 :deep(tr:hover) .row-actions { opacity: 1; }
+
+:deep(.p-datatable-tbody > tr > td) { padding: 6px 10px; }
+:deep(.p-datatable-thead > tr > th) { padding: 6px 10px; }
 
 /* ══ Line clamp ══════════════════════════════════════════════════════════ */
 .line-clamp-1 {
