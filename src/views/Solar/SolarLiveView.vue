@@ -1,5 +1,20 @@
 <template>
-  <div class="sl-page">
+  <div class="sl-root">
+
+    <!-- ══ TAB BAR ══ -->
+    <div class="sl-tabbar">
+      <div class="sl-tabs">
+        <button :class="['sl-tab', tab === 'live' && 'sl-tab--active']" @click="tab = 'live'">
+          <i class="pi pi-bolt" /> Tiempo Real
+        </button>
+        <button :class="['sl-tab', tab === 'hist' && 'sl-tab--active']" @click="tab = 'hist'">
+          <i class="pi pi-chart-line" /> Histórico
+        </button>
+      </div>
+    </div>
+
+    <!-- ══ LIVE TAB ══ -->
+    <div v-if="tab === 'live'" class="sl-page">
 
     <!-- ══ HEADER ══ -->
     <div class="sl-header">
@@ -137,7 +152,14 @@
       </template>
     </draggable>
 
-  </div>
+    </div><!-- /sl-page live -->
+
+    <!-- ══ HISTORIC TAB ══ -->
+    <div v-else class="sl-hist">
+      <GeneracionView />
+    </div>
+
+  </div><!-- /sl-root -->
 </template>
 
 <script setup>
@@ -149,10 +171,14 @@ import {
 import { Line } from 'vue-chartjs'
 import draggable from 'vuedraggable'
 import api from '@/api/client'
+import GeneracionView from '@/views/Operaciones/GeneracionView.vue'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Filler)
 
 const STORAGE_KEY = 'solar_project_order'
+
+// ── Tab ────────────────────────────────────────────────────────────────────
+const tab = ref('live')
 
 // ── Estado ─────────────────────────────────────────────────────────────────
 const loading     = ref(false)
@@ -387,11 +413,39 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* ── Root (full height shell) ── */
+.sl-root {
+  display: flex; flex-direction: column; height: 100%; overflow: hidden;
+  font-family: 'Sora', system-ui, sans-serif; background: #2C2039;
+}
+
+/* ── Tab bar ── */
+.sl-tabbar {
+  display: flex; align-items: center; padding: 10px 20px 0;
+  background: #2C2039; border-bottom: 1px solid #3d2f52; flex-shrink: 0;
+}
+.sl-tabs { display: flex; gap: 2px; }
+.sl-tab {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 16px 9px; border: none; background: transparent; cursor: pointer;
+  font-size: 13px; font-weight: 600; color: #6b5a8a; border-radius: 6px 6px 0 0;
+  font-family: inherit; transition: color 0.15s; border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.sl-tab:hover { color: #c4b3df; }
+.sl-tab--active { color: #FDFAF7; border-bottom-color: #915BD8; }
+.sl-tab i { font-size: 12px; }
+
+/* ── Live tab content ── */
 .sl-page {
-  display: flex; flex-direction: column; gap: 20px;
-  font-family: 'Sora', system-ui, sans-serif;
-  background: #2C2039; min-height: 100%; height: 100%;
+  flex: 1; display: flex; flex-direction: column; gap: 20px;
   overflow-y: auto; padding: 24px; box-sizing: border-box;
+}
+
+/* ── Historic tab content ── */
+.sl-hist {
+  flex: 1; overflow-y: auto; background: #f3f4f6;
+  padding: 0 24px 24px; box-sizing: border-box;
 }
 
 /* ── Header ── */
