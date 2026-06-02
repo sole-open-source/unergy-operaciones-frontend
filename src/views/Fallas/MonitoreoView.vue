@@ -1942,18 +1942,18 @@ watch(bucket, (newBucket) => {
   white-space: nowrap;
 }
 .bucket-pill:hover {
-  background: rgba(145, 91, 216, 0.07);
-  border-color: rgba(145, 91, 216, 0.2);
-  color: #5b3fa6;
+  background: #f5f4f8;
+  border-color: #e0d9ef;
+  color: #4b3a6e;
 }
 .bucket-pill--active {
-  background: #7c3aed;
-  border-color: #7c3aed;
-  color: #fff;
+  background: #f0eaf8;
+  border-color: #c4aee8;
+  color: #2C2039;
   font-weight: 600;
 }
 .bucket-pill--active .bucket-pill-count {
-  color: rgba(255,255,255,0.85);
+  color: #4b3a6e;
 }
 .bucket-pill-dot {
   width: 7px;
@@ -1962,7 +1962,7 @@ watch(bucket, (newBucket) => {
   flex-shrink: 0;
 }
 .bucket-pill--active .bucket-pill-dot {
-  box-shadow: 0 0 0 1.5px rgba(255,255,255,0.5);
+  box-shadow: none;
 }
 .bucket-pill-label { color: inherit; }
 .bucket-pill-count {
