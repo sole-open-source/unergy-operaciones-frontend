@@ -203,7 +203,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import Select from 'primevue/select'
 import MultiSelect from 'primevue/multiselect'
 import Button from 'primevue/button'
@@ -287,6 +287,21 @@ const form = ref({
   equipo_afectado:      props.initial?.equipo_afectado ?? '',
   energia_perdida_kwh:  props.initial?.energia_perdida_kwh ?? null,
   nota_inicial:         '',
+})
+
+// Auto-populate description when tipo changes (only if description is empty or matches a previous auto-fill)
+let lastAutoDesc = ''
+watch(() => form.value.tipo_id, (newId) => {
+  if (!newId) return
+  const allTipos = props.catalogos.tipos ?? []
+  const tipo = allTipos.find(t => t.id === newId)
+  if (!tipo?.descripcion) return
+  // Only auto-fill if description is empty or was previously auto-filled
+  const current = form.value.descripcion?.trim() ?? ''
+  if (!current || current === lastAutoDesc) {
+    form.value.descripcion = tipo.descripcion
+    lastAutoDesc = tipo.descripcion
+  }
 })
 
 const tiposAgrupados = computed(() => {
