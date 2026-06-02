@@ -99,15 +99,15 @@
           </div>
 
           <template v-else>
-            <!-- % diferencia inversores vs medidores -->
+            <!-- % diferencia inversores vs medidores (mejor nodo) -->
             <div v-if="getDiffPct(proy.proyecto_id) !== null" class="sl-diff-row">
-              <span class="sl-diff-label">Inversores vs Medidores</span>
+              <span class="sl-diff-label">Inversores vs Medidor</span>
               <span :class="['sl-diff-badge', Math.abs(getDiffPct(proy.proyecto_id)) > 5 ? 'sl-diff-warn' : 'sl-diff-ok']">
                 {{ getDiffPct(proy.proyecto_id) > 0 ? '+' : '' }}{{ getDiffPct(proy.proyecto_id) }}%
               </span>
             </div>
 
-            <!-- Dos gráficas -->
+            <!-- Gráficas -->
             <div class="sl-charts-row">
 
               <!-- Inversores -->
@@ -128,12 +128,15 @@
                 <div v-else class="sl-no-data">Sin datos</div>
               </div>
 
-              <!-- Medidores -->
+              <!-- Medidores (mejor nodo: principal o respaldo) -->
               <div class="sl-chart-card">
                 <div class="sl-chart-header">
                   <div class="sl-chart-title">
                     <span class="sl-dot" style="background:#F6FF72" />
                     Medidores
+                    <span v-if="getBestMedidorTipo(proy.proyecto_id)" class="sl-med-tipo">
+                      {{ getBestMedidorTipo(proy.proyecto_id) }}
+                    </span>
                   </div>
                   <span v-if="getMedidorAcum(proy.proyecto_id) !== null" class="sl-acum med">
                     {{ getMedidorAcum(proy.proyecto_id).toFixed(1) }} kWh
@@ -302,7 +305,8 @@ function getInversorData(id) {
 }
 
 function getMedidorData(id) {
-  const rows = (detailMap[id]?.gaia_snapshot?.time_series?.power ?? []).filter(r => r.kw != null)
+  const snap = _bestMedidorSnap(id).snap
+  const rows = (snap?.time_series?.power ?? []).filter(r => r.kw != null)
   if (!rows.length) return { labels: [], datasets: [] }
   const data = mapHours(rows, r => gaiaTime(r.time), r => +Math.abs(r.kw))
   if (data.every(v => v == null)) return { labels: [], datasets: [] }
@@ -315,7 +319,14 @@ function getMedidorData(id) {
 }
 
 // ── Acumulados ────────────────────────────────────────────────────────────
+const _todayStr = new Date().toISOString().slice(0, 10)
+
 function getInversorAcum(id) {
+  // Fuente primaria: generación real del día desde Solenium
+  const gen30 = detailMap[id]?.generation_30d ?? []
+  const hoy = gen30.find(d => d.date === _todayStr)
+  if (hoy?.kwh > 0) return hoy.kwh
+  // Fallback: integración trapezoidal de la curva de potencia
   const curve = detailMap[id]?.power_curve ?? []
   if (curve.length < 2) return null
   let kwh = 0
@@ -327,9 +338,29 @@ function getInversorAcum(id) {
   return kwh > 0 ? kwh : null
 }
 
+// ── Selección del mejor snapshot de medidor ───────────────────────────────
+function _bestMedidorSnap(id) {
+  const d = detailMap[id]
+  if (!d) return { snap: null, tipo: null }
+  const sp = d.gaia_snapshot_principal
+  const sr = d.gaia_snapshot_respaldo
+  const ep = sp?.eae_wh ?? 0
+  const er = sr?.eae_wh ?? 0
+  if (!sp && !sr) return { snap: null, tipo: null }
+  if (!sp) return { snap: sr, tipo: 'R' }
+  if (!sr) return { snap: sp, tipo: 'P' }
+  return ep >= er ? { snap: sp, tipo: 'P' } : { snap: sr, tipo: 'R' }
+}
+
+function getBestMedidorTipo(id) {
+  const d = detailMap[id]
+  if (!d?.gaia_snapshot_respaldo) return null   // solo hay uno, no hace falta etiqueta
+  return _bestMedidorSnap(id).tipo
+}
+
 function getMedidorAcum(id) {
-  const eae = detailMap[id]?.gaia_snapshot?.eae_wh
-  return (eae != null && eae > 0) ? eae : null  // ya en kWh
+  const eae = _bestMedidorSnap(id).snap?.eae_wh
+  return (eae != null && eae > 0) ? eae : null
 }
 
 function _timeDiffH(t1, t2) {
@@ -523,6 +554,7 @@ onUnmounted(() => {
 .sl-acum { font-size: 12px; font-weight: 700; padding: 1px 9px; border-radius: 999px; }
 .sl-acum.inv { background: rgba(145,91,216,0.18); color: #c4a1f7; }
 .sl-acum.med { background: rgba(246,255,114,0.12); color: #e8f060; }
+.sl-med-tipo { font-size: 9px; font-weight: 700; color: #6b5a8a; background: #3d2f52; border-radius: 4px; padding: 1px 5px; margin-left: 4px; }
 
 /* ── Wrap gráfica ── */
 .sl-chart-wrap { height: 180px; position: relative; }
