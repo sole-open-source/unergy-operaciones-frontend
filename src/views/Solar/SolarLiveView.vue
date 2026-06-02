@@ -259,7 +259,7 @@ function getInversorAcum(id) {
 
 function getMedidorAcum(id) {
   const eae = detailMap[id]?.gaia_snapshot?.eae_wh
-  return (eae != null && eae > 0) ? eae / 1000 : null
+  return (eae != null && eae > 0) ? eae : null  // eae_wh ya está en kWh (Quoia retorna kWh)
 }
 
 function _timeDiffH(t1, t2) {
