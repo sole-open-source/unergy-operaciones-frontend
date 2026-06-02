@@ -319,7 +319,8 @@ function getMedidorData(id) {
 }
 
 // ── Acumulados ────────────────────────────────────────────────────────────
-const _todayStr = new Date().toISOString().slice(0, 10)
+// Fecha de hoy en hora Colombia (UTC-5) para coincidir con el backend
+const _todayStr = new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString().slice(0, 10)
 
 function getInversorAcum(id) {
   // Fuente primaria: generación real del día desde Solenium
