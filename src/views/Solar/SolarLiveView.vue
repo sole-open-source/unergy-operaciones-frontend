@@ -258,8 +258,12 @@ const crosshairPlugin = {
   },
 }
 
-// ── Labels 0h–24h ─────────────────────────────────────────────────────────
-const HOUR_LABELS = Array.from({ length: 25 }, (_, i) => `${i}h`)
+// ── Labels cada 5 min (00:00–23:55) ──────────────────────────────────────
+const TIME_LABELS = Array.from({ length: 288 }, (_, i) => {
+  const h = Math.floor(i * 5 / 60)
+  const m = (i * 5) % 60
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+})
 
 function gaiaTime(t) {
   if (!t) return ''
@@ -267,19 +271,19 @@ function gaiaTime(t) {
   return idx >= 0 ? t.slice(idx + 1, idx + 6) : t.slice(0, 5)
 }
 
-function mapHours(points, getTime, getKw) {
+function mapMinutes(points, getTime, getKw) {
   const buckets = {}
   for (const pt of points) {
     const raw = getTime(pt)
     if (!raw) continue
-    const m = raw.match(/(\d{1,2}):\d{2}/)
+    const m = raw.match(/(\d{1,2}):(\d{2})/)
     if (!m) continue
-    const h = parseInt(m[1], 10)
-    if (!buckets[h]) buckets[h] = []
+    const slot = parseInt(m[1], 10) * 12 + Math.floor(parseInt(m[2], 10) / 5)
+    if (!buckets[slot]) buckets[slot] = []
     const v = getKw(pt)
-    if (v != null) buckets[h].push(v)
+    if (v != null) buckets[slot].push(v)
   }
-  return HOUR_LABELS.map((_, i) => {
+  return TIME_LABELS.map((_, i) => {
     const arr = buckets[i]
     if (!arr?.length) return null
     return +(arr.reduce((s, v) => s + v, 0) / arr.length).toFixed(3)
@@ -290,14 +294,14 @@ function mapHours(points, getTime, getKw) {
 function getInversorData(id) {
   const curve = detailMap[id]?.power_curve ?? []
   if (!curve.length) return { labels: [], datasets: [] }
-  const data = mapHours(
+  const data = mapMinutes(
     curve,
     pt => { const t = pt.time || ''; return t.includes(' ') ? t.split(' ')[1] : t },
     pt => pt.kw != null ? +pt.kw : null,
   )
   if (data.every(v => v == null)) return { labels: [], datasets: [] }
   return {
-    labels: HOUR_LABELS,
+    labels: TIME_LABELS,
     datasets: [{ label: 'Inversores (kW)', data, borderColor: '#915BD8',
       backgroundColor: 'rgba(145,91,216,0.18)', fill: true, tension: 0.35,
       pointRadius: 0, borderWidth: 2, spanGaps: true }],
@@ -308,10 +312,10 @@ function getMedidorData(id) {
   const snap = _bestMedidorSnap(id).snap
   const rows = (snap?.time_series?.power ?? []).filter(r => r.kw != null)
   if (!rows.length) return { labels: [], datasets: [] }
-  const data = mapHours(rows, r => gaiaTime(r.time), r => +Math.abs(r.kw))
+  const data = mapMinutes(rows, r => gaiaTime(r.time), r => +Math.abs(r.kw))
   if (data.every(v => v == null)) return { labels: [], datasets: [] }
   return {
-    labels: HOUR_LABELS,
+    labels: TIME_LABELS,
     datasets: [{ label: 'Medidores (kW)', data, borderColor: '#F6FF72',
       backgroundColor: 'rgba(246,255,114,0.12)', fill: true, tension: 0.35,
       pointRadius: 0, borderWidth: 2, spanGaps: true }],
@@ -398,7 +402,7 @@ function makeOptions(color) {
       },
     },
     scales: {
-      x: { ticks: { font: { size: 9 }, color: '#a89fc0', maxTicksLimit: 13 }, grid: { color: 'rgba(255,255,255,0.06)' } },
+      x: { ticks: { font: { size: 9 }, color: '#a89fc0', maxTicksLimit: 9 }, grid: { color: 'rgba(255,255,255,0.06)' } },
       y: { beginAtZero: true, ticks: { font: { size: 9 }, color: '#a89fc0' }, grid: { color: 'rgba(255,255,255,0.06)' }, title: { display: true, text: 'kW', font: { size: 9 }, color: '#a89fc0' } },
     },
   }
@@ -417,7 +421,12 @@ async function cargar() {
   } catch { /* silencioso */ } finally {
     loading.value = false
   }
-  proyectos.value.forEach(p => loadDetail(p.proyecto_id))
+  // Cargar detalles en lotes de 4 para que las primeras gráficas aparezcan rápido
+  const ids = proyectos.value.map(p => p.proyecto_id)
+  const BATCH = 4
+  for (let i = 0; i < ids.length; i += BATCH) {
+    await Promise.all(ids.slice(i, i + BATCH).map(id => loadDetail(id)))
+  }
 }
 
 async function loadDetail(id) {
