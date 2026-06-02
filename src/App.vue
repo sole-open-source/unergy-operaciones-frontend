@@ -34,7 +34,7 @@ const toast = useToast()
 const { mobileOpen, toggle } = useSidebar()
 const routeReady = computed(() => !!route.name)
 const isLoginPage = computed(() => ['Login', 'ForgotPassword', 'ResetPassword'].includes(route.name))
-const isSolar     = computed(() => route.name === 'Solar' || route.name === 'SolarLive')
+const isSolar     = computed(() => route.name === 'SolarLive')
 
 onMounted(() => {
   window.__primeToast = (opts) => toast.add(opts)
