@@ -151,17 +151,20 @@
           <div v-if="adjuntos.length" class="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div v-for="(url, idx) in adjuntos" :key="idx"
               class="relative group rounded-lg overflow-hidden border border-gray-100 bg-gray-50 aspect-square">
-              <img v-if="isImage(url)" :src="resolveUrl(url)" :alt="filename(url)"
+              <img v-if="isImage(url)" :src="thumbUrl(url)" :alt="filename(url)"
                 class="w-full h-full object-cover" />
               <div v-else class="w-full h-full flex flex-col items-center justify-center gap-2 p-3 text-gray-500">
-                <i class="pi pi-file text-3xl" />
-                <span class="text-[10px] text-center truncate w-full">{{ filename(url) }}</span>
+                <i :class="filename(url).match(/\.pdf$/i) ? 'pi pi-file-pdf text-red-400'
+                         : filename(url).match(/\.(xls|xlsx|csv)$/i) ? 'pi pi-file-excel text-green-500'
+                         : filename(url).match(/\.(doc|docx)$/i) ? 'pi pi-file-word text-blue-500'
+                         : 'pi pi-file text-gray-400'" style="font-size:2rem" />
+                <span class="text-[10px] text-center line-clamp-2 w-full px-1">{{ filename(url) }}</span>
               </div>
               <div class="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
                 <a :href="resolveUrl(url)" target="_blank" rel="noopener"
                   class="w-8 h-8 rounded-full bg-white text-gray-700 flex items-center justify-center hover:bg-purple-100 hover:text-purple-700 transition-colors"
-                  v-tooltip.top="'Ver'">
-                  <i class="pi pi-eye text-xs" />
+                  v-tooltip.top="'Abrir en Drive'">
+                  <i class="pi pi-external-link text-xs" />
                 </a>
                 <button class="w-8 h-8 rounded-full bg-white text-red-600 flex items-center justify-center hover:bg-red-50 transition-colors"
                   v-tooltip.top="'Eliminar'" @click="deleteFoto(url)">
@@ -425,16 +428,30 @@ function fmtDatetime(d) {
   return new Date(d).toLocaleString('es-CO',
     { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
-function isImage(url) { return /\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/i.test(url || '') }
-function resolveUrl(url) {
-  if (!url) return ''
-  if (url.startsWith('http://') || url.startsWith('https://')) return url
-  // Backend retorna `/static/uploads/fallas/...`. En producción Vercel proxía /static/* a Railway.
-  return url
+function driveFileId(url) {
+  const m = (url || '').match(/\/file\/d\/([^/?#]+)/)
+  return m ? m[1] : null
 }
 function filename(url) {
   if (!url) return 'archivo'
-  return decodeURIComponent(url.split('/').pop() || 'archivo')
+  // Fragment after # contains original filename for Drive URLs
+  const hash = url.includes('#') ? url.split('#').pop() : null
+  if (hash) return decodeURIComponent(hash)
+  return decodeURIComponent(url.split('/').pop()?.split('?')[0] || 'archivo')
+}
+function isImage(url) {
+  const name = filename(url)
+  return /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(name)
+}
+function resolveUrl(url) {
+  if (!url) return ''
+  // Strip fragment for the actual link
+  return url.split('#')[0]
+}
+function thumbUrl(url) {
+  const id = driveFileId(url)
+  if (id) return `https://drive.google.com/thumbnail?id=${id}&sz=w400`
+  return resolveUrl(url)
 }
 
 // ── Carga ───────────────────────────────────────────────────────────────
