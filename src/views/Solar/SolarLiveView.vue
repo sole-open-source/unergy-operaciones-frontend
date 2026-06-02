@@ -89,7 +89,6 @@
             <i class="pi pi-bars sl-drag-handle" title="Arrastrar para reorganizar" />
             <span class="sl-status-dot" :style="{ background: STATUS_COLORS[proy.status] || '#9ca3af' }" />
             {{ proy.nombre }}
-            <span v-if="proy.power_kw" class="sl-power-badge">{{ fmtKw(proy.power_kw) }}</span>
           </div>
 
           <!-- Cargando detalle -->
