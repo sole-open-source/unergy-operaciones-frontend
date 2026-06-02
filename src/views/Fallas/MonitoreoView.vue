@@ -1996,33 +1996,45 @@ watch(bucket, (newBucket) => {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 10px 5px 8px;
+  padding: 5px 11px 5px 8px;
   background: transparent;
-  border: 1px solid transparent;
+  border: 1.5px solid transparent;
   border-radius: 999px;
   cursor: pointer;
   font-family: inherit;
   font-size: 12px;
-  font-weight: 600;
-  color: #6b5a8a;
+  font-weight: 500;
+  color: #7c6a9a;
   transition: all 0.12s;
   white-space: nowrap;
 }
-.bucket-pill:hover { background: #faf7ff; }
+.bucket-pill:hover {
+  background: rgba(145, 91, 216, 0.07);
+  border-color: rgba(145, 91, 216, 0.2);
+  color: #5b3fa6;
+}
 .bucket-pill--active {
-  background: #faf5ff;
-  border-color: rgba(145, 91, 216, 0.25);
+  background: #7c3aed;
+  border-color: #7c3aed;
+  color: #fff;
+  font-weight: 600;
+}
+.bucket-pill--active .bucket-pill-count {
+  color: rgba(255,255,255,0.85);
 }
 .bucket-pill-dot {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   flex-shrink: 0;
+}
+.bucket-pill--active .bucket-pill-dot {
+  box-shadow: 0 0 0 1.5px rgba(255,255,255,0.5);
 }
 .bucket-pill-label { color: inherit; }
 .bucket-pill-count {
   font-weight: 700;
-  font-size: 12px;
+  font-size: 11px;
 }
 
 /* ══ Toolbar ═════════════════════════════════════════════════════════════ */
