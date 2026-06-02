@@ -1996,6 +1996,19 @@ watch(bucket, (newBucket) => {
   padding-bottom: 5px !important;
 }
 
+/* Selects con valor activo → borde y texto morado */
+.gf-toolbar :deep(.p-select:not(.p-select-empty)) {
+  border-color: #7c3aed;
+  box-shadow: 0 0 0 1px #7c3aed22;
+}
+.gf-toolbar :deep(.p-select:not(.p-select-empty) .p-select-label) {
+  color: #7c3aed;
+  font-weight: 600;
+}
+.gf-toolbar :deep(.p-select:not(.p-select-empty) .p-select-dropdown) {
+  color: #7c3aed;
+}
+
 /* ══ Layout ══════════════════════════════════════════════════════════════ */
 .gf-layout { display: block; }
 .gf-main { min-width: 0; }
