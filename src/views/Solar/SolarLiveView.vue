@@ -144,7 +144,7 @@ const loading     = ref(false)
 const proyectos   = ref([])
 const detailMap   = reactive({})
 const lastUpdated = ref('')
-const cols        = ref(2)
+const cols        = ref(1)
 let refreshTimer  = null
 
 const STATUS_COLORS = {
