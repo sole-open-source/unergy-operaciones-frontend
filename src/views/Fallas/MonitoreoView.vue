@@ -722,7 +722,6 @@
     </div><!-- /TAB 1 -->
 
     <!-- ══ TAB 2 — MAPA ══════════════════════════════════════════════════ -->
-    <FallasMapView v-if="activeTab === 2" :fallas="allFallas" />
 
   </div><!-- /gf-page -->
 </template>
@@ -764,7 +763,6 @@ const confirmService = useConfirm()
 const TABS = [
   { label: 'Fallas',   icon: 'pi pi-bolt' },
   { label: 'Gráficos', icon: 'pi pi-chart-bar' },
-  { label: 'Mapa',     icon: 'pi pi-map' },
 ]
 const activeTab = ref(0)
 
