@@ -488,6 +488,69 @@
       <div v-for="i in 8" :key="i" class="gs-card gs-card--skeleton" />
     </div>
 
+    <!-- ══ GENERACIÓN DE HOY ════════════════════════════════════════════════ -->
+    <div class="gs-genhoy-card">
+      <div class="gs-genhoy-head">
+        <div class="gs-genhoy-title">
+          <i class="pi pi-sun" style="color:#f59e0b;font-size:13px" />
+          <span>Generación de hoy</span>
+          <span class="gs-genhoy-sub">· Real vs P90 por proyecto · {{ hoyLabel }}</span>
+        </div>
+        <div v-if="!genHoyLoading && genHoyRows.length" class="gs-genhoy-legend">
+          <span class="gs-genhoy-leg-item"><span class="gs-genhoy-dot" style="background:#16a34a"></span> Real</span>
+          <span class="gs-genhoy-leg-item"><span class="gs-genhoy-dot" style="background:#f59e0b"></span> P90</span>
+          <span class="gs-genhoy-fuente" v-tooltip.top="'Datos de inversores'">INV</span>
+          <span class="gs-genhoy-fuente gs-genhoy-fuente--med" v-tooltip.top="'Datos de medidor de frontera'">MED</span>
+          <span class="gs-genhoy-kpi"
+            :style="{ color: genHoyKpi.ratio >= 100 ? '#16a34a' : genHoyKpi.ratio >= 80 ? '#d97706' : '#dc2626' }">
+            {{ genHoyKpi.ratio }}% vs P90
+          </span>
+        </div>
+        <button class="gs-genhoy-reload" @click="cargarGenHoy" :disabled="genHoyLoading">
+          <i :class="genHoyLoading ? 'pi pi-spin pi-spinner' : 'pi pi-refresh'" />
+        </button>
+      </div>
+
+      <div v-if="genHoyLoading" class="gs-genhoy-state">
+        <i class="pi pi-spin pi-spinner" style="color:#915BD8;font-size:22px" />
+      </div>
+      <div v-else-if="!genHoyRows.length" class="gs-genhoy-state">
+        <i class="pi pi-sun" style="color:#f59e0b;font-size:24px" />
+        <span>P90 no configurado para estos proyectos.</span>
+        <small style="color:#bbb">Agrega p90_mensual_kwh en los proyectos para ver la meta diaria.</small>
+      </div>
+      <div v-else class="gs-genhoy-rows">
+        <div v-for="r in genHoyRows" :key="r.nombre" class="gs-genhoy-item">
+          <div class="gs-genhoy-item-header">
+            <span class="gs-genhoy-item-name">{{ r.nombre }}</span>
+            <div class="gs-genhoy-item-vals">
+              <span :style="{ color: r.p90 > 0 && r.real >= r.p90 ? '#16a34a' : r.real > 0 ? '#d97706' : '#9ca3af', fontWeight: 600 }">
+                {{ r.real.toLocaleString('es-CO') }} kWh
+              </span>
+              <span v-if="r.fuente === 'inversor'" class="gs-genhoy-fuente" v-tooltip.top="'Dato de inversores'">INV</span>
+              <span v-else-if="r.fuente === 'medidor'" class="gs-genhoy-fuente gs-genhoy-fuente--med" v-tooltip.top="'Dato de medidor de frontera'">MED</span>
+              <span v-else-if="r.fuente === 'sin_dato'" class="gs-genhoy-fuente gs-genhoy-fuente--nd" v-tooltip.top="'Sin dato disponible en Solenium'">S/D</span>
+              <span style="color:#d1d5db;margin:0 4px">/</span>
+              <span style="color:#f59e0b">{{ r.p90.toLocaleString('es-CO') }} kWh P90</span>
+              <span class="gs-genhoy-pct"
+                :style="{ color: r.p90 > 0 && r.real >= r.p90 ? '#16a34a' : r.real >= r.p90 * 0.75 ? '#d97706' : '#dc2626' }">
+                {{ r.p90 > 0 ? Math.round(r.real / r.p90 * 100) + '%' : '—' }}
+              </span>
+            </div>
+          </div>
+          <div class="gs-genhoy-track">
+            <div class="gs-genhoy-fill" :style="{
+              width: r.p90 > 0 ? Math.min(100, r.real / r.p90 * 100) + '%' : '0%',
+              background: r.p90 > 0 && r.real >= r.p90 ? '#16a34a'
+                : r.real >= r.p90 * 0.75 ? '#d97706'
+                : r.real > 0 ? '#dc2626'
+                : '#e5e7eb'
+            }" />
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- ══ FALLA DIALOG ══════════════════════════════════════════════════════ -->
     <Dialog v-model:visible="fallaDialogVisible" modal
       header="Nueva falla"
@@ -1270,11 +1333,75 @@ function stopTimers() {
   if (refreshTimer)   clearInterval(refreshTimer)
 }
 
+// ── Generación de hoy ─────────────────────────────────────────────────────────
+const genHoyLoading = ref(false)
+const genHoyRows    = ref([])
+const hoyLabel      = new Date().toLocaleDateString('es-CO', { weekday: 'long', day: '2-digit', month: 'long' })
+const proyectosP90  = ref([])   // proyectos con p90_mensual_kwh
+
+function dailyP90Gs(proyectoId, fecha) {
+  const p   = proyectosP90.value.find(x => x.id === proyectoId)
+  const arr = p?.p90_mensual_kwh
+  if (!arr || !arr.length) return 0
+  const dt = new Date(fecha + 'T00:00:00')
+  const daysInMonth = new Date(dt.getFullYear(), dt.getMonth() + 1, 0).getDate()
+  return (Number(arr[dt.getMonth()]) || 0) / daysInMonth
+}
+
+const genHoyKpi = computed(() => {
+  const totalReal = genHoyRows.value.reduce((s, r) => s + r.real, 0)
+  const totalP90  = genHoyRows.value.reduce((s, r) => s + r.p90,  0)
+  return {
+    totalReal: +totalReal.toFixed(1),
+    totalP90:  +totalP90.toFixed(1),
+    ratio: totalP90 > 0 ? Math.round(totalReal / totalP90 * 100) : 0,
+  }
+})
+
+async function cargarGenHoy() {
+  genHoyLoading.value = true
+  genHoyRows.value    = []
+  try {
+    // Fetch proyectos with p90 if not yet loaded
+    if (!proyectosP90.value.length) {
+      const { data } = await api.get('/proyectos', { params: { size: 500 } })
+      proyectosP90.value = (data.items ?? []).filter(p =>
+        p.srv_operacion === true && ['minigranja', 'gd'].includes(p.tipo_proyecto)
+      )
+      if (!proyectosP90.value.length) proyectosP90.value = data.items ?? []
+    }
+
+    const hoy       = new Date().toISOString().split('T')[0]
+    const byProy    = {}
+    for (const p of proyectosP90.value) {
+      const p90 = dailyP90Gs(p.id, hoy)
+      if (p90 > 0) byProy[p.id] = { nombre: p.nombre_comercial, real: 0, p90, fuente: 'sin_dato' }
+    }
+
+    try {
+      const { data } = await api.get('/generacion-solar/generacion-hoy')
+      for (const row of data.proyectos ?? []) {
+        if (byProy[row.proyecto_id] !== undefined) {
+          byProy[row.proyecto_id].real   = Number(row.kwh_real || 0)
+          byProy[row.proyecto_id].fuente = row.fuente || 'sin_dato'
+        }
+      }
+    } catch { /* Solenium no disponible */ }
+
+    genHoyRows.value = Object.values(byProy)
+      .map(r => ({ ...r, real: +r.real.toFixed(1), p90: +r.p90.toFixed(1) }))
+      .sort((a, b) => b.p90 - a.p90)
+  } finally {
+    genHoyLoading.value = false
+  }
+}
+
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
 onMounted(() => {
   cargar()
   loadCatalogos()
   startTimers()
+  cargarGenHoy()
 })
 
 onUnmounted(() => {
@@ -2211,6 +2338,116 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+
+/* ── Generación de hoy ──────────────────────────────────────────────────── */
+.gs-genhoy-card {
+  background: #fff;
+  border-radius: 14px;
+  border: 1px solid #ede9f6;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.gs-genhoy-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.gs-genhoy-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #2C2039;
+}
+.gs-genhoy-sub { font-size: 11px; font-weight: 400; color: #9ca3af; }
+.gs-genhoy-legend {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+.gs-genhoy-leg-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: #6b7280;
+}
+.gs-genhoy-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.gs-genhoy-kpi { font-size: 12px; font-weight: 700; }
+.gs-genhoy-fuente {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(145,91,216,.12);
+  color: #7c3aed;
+}
+.gs-genhoy-fuente--med { background: rgba(22,163,74,.1); color: #16a34a; }
+.gs-genhoy-fuente--nd  { background: #f3f4f6; color: #9ca3af; }
+.gs-genhoy-reload {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #9ca3af;
+  font-size: 13px;
+  padding: 4px;
+  border-radius: 6px;
+  transition: color 0.15s;
+}
+.gs-genhoy-reload:hover { color: #7c3aed; }
+.gs-genhoy-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 28px 0;
+  color: #9ca3af;
+  font-size: 13px;
+}
+.gs-genhoy-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.gs-genhoy-item { display: flex; flex-direction: column; gap: 4px; }
+.gs-genhoy-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.gs-genhoy-item-name { font-size: 12px; font-weight: 600; color: #374151; }
+.gs-genhoy-item-vals {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  flex-wrap: wrap;
+}
+.gs-genhoy-pct { font-size: 11px; font-weight: 700; }
+.gs-genhoy-track {
+  height: 5px;
+  background: #f3f4f6;
+  border-radius: 99px;
+  overflow: hidden;
+}
+.gs-genhoy-fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.4s ease;
 }
 
 /* Overlay transitions */
