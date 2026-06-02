@@ -35,6 +35,13 @@
           </template>
         </Column>
 
+        <!-- Status -->
+        <Column header="Estado" style="min-width: 170px;">
+          <template #body="{ data }">
+            <Select v-model="data.status" :options="STATUS_OPTIONS" class="w-full" />
+          </template>
+        </Column>
+
         <!-- Energization date -->
         <Column header="Energización" style="min-width: 150px;">
           <template #body="{ data }">
@@ -99,10 +106,12 @@ import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import DatePicker from 'primevue/datepicker'
 import AutoComplete from 'primevue/autocomplete'
+import Select from 'primevue/select'
 import { useEnergizationProjects } from '@/composables/useEnergizationProjects'
 
 const { projects, addProject, removeProject } = useEnergizationProjects()
 
+const STATUS_OPTIONS = ['En construcción', 'Pruebas', 'Próximo a energizar', 'Energizado']
 const MESES_CORTOS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 
 // Next 12 months starting from the current month.
