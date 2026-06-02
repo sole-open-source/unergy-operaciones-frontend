@@ -646,6 +646,9 @@
 
       </template>
 
+      <!-- Proyectos próximos a energizarse -->
+      <ProyectosProximosEnergizar class="mt-4" />
+
     </div>
 
     <!-- ═══════════════ PROYECTOS TAB ═══════════════ -->
@@ -854,6 +857,7 @@ import Column from 'primevue/column'
 import Message from 'primevue/message'
 import ProgressSpinner from 'primevue/progressspinner'
 import client from '@/api/client'
+import ProyectosProximosEnergizar from '@/components/ProyectosProximosEnergizar.vue'
 
 // ── LocalStorage cache ───────────────────────────────────────────────────────
 const CACHE_PREFIX = 'cumpl_'
