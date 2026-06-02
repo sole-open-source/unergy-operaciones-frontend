@@ -32,7 +32,7 @@
     <!-- Tabla -->
     <div class="bg-white rounded-xl shadow-sm overflow-hidden" style="border: 1px solid #e8e0f0;">
       <DataTable :value="items" lazy :loading="loading" :rows="size" :totalRecords="total"
-        paginator @page="onPage" rowHover class="text-sm" :rowsPerPageOptions="[10, 20, 50]"
+        paginator @page="onPage" rowHover size="small" class="text-xs" :rowsPerPageOptions="[10, 20, 50]"
         @row-click="goToDetail">
         <template #empty>
           <div class="py-10 text-center text-sm" style="color: #9b89b5;">
@@ -44,41 +44,41 @@
 
         <Column header="Proyecto" style="min-width: 160px;">
           <template #body="{ data }">
-            <span class="font-medium" style="color: #2C2039;">{{ data.proyecto?.nombre_comercial }}</span>
+            <span class="text-[11px] font-medium" style="color: #2C2039;">{{ data.proyecto?.nombre_comercial }}</span>
           </template>
         </Column>
 
         <Column header="Tipo" style="min-width: 150px;">
           <template #body="{ data }">
             <div>
-              <span class="text-xs px-2 py-0.5 rounded-full font-medium"
-                :style="{ background: data.tipo?.categoria?.color_hex + '22', color: data.tipo?.categoria?.color_hex }">
+              <span class="text-[10px] px-1.5 py-0.5 rounded font-medium"
+                :style="{ background: data.tipo?.categoria?.color_hex + '18', color: data.tipo?.categoria?.color_hex }">
                 {{ data.tipo?.categoria?.etiqueta }}
               </span>
-              <p class="text-xs mt-0.5" style="color: #6b5a8a;">{{ data.tipo?.etiqueta }}</p>
+              <p class="text-[11px] mt-0.5" style="color: #9b89b5;">{{ data.tipo?.etiqueta }}</p>
             </div>
           </template>
         </Column>
 
-        <Column header="Estado" style="width: 130px;">
+        <Column header="Estado" style="width: 120px;">
           <template #body="{ data }">
-            <span class="text-xs px-2.5 py-1 rounded-full font-semibold"
+            <span class="text-[11px] px-1.5 py-0.5 rounded font-medium"
               :style="estadoStyle(data.estado)">
               {{ data.estado?.etiqueta }}
             </span>
           </template>
         </Column>
 
-        <Column header="Prioridad" style="width: 110px;">
+        <Column header="Prioridad" style="width: 100px;">
           <template #body="{ data }">
             <Tag :value="data.prioridad?.etiqueta" :severity="prioSeverity(data.prioridad?.nivel)"
-              class="text-xs" />
+              class="text-[11px]" />
           </template>
         </Column>
 
-        <Column header="Fecha" style="width: 110px;">
+        <Column header="Fecha" style="width: 100px;">
           <template #body="{ data }">
-            <span class="text-xs" style="color: #6b5a8a;">{{ formatDate(data.fecha_identificacion) }}</span>
+            <span class="text-[11px] font-normal" style="color: #9b89b5;">{{ formatDate(data.fecha_identificacion) }}</span>
           </template>
         </Column>
 
@@ -105,10 +105,10 @@
 
         <Column header="Asignado a" style="min-width: 120px;">
           <template #body="{ data }">
-            <span v-if="data.asignado_a" class="text-xs" style="color: #2C2039;">
+            <span v-if="data.asignado_a" class="text-[11px]" style="color: #6b5a8a;">
               {{ data.asignado_a.nombre }}
             </span>
-            <span v-else class="text-xs italic" style="color: #c5b9db;">Sin asignar</span>
+            <span v-else class="text-[11px] italic" style="color: #c5b9db;">Sin asignar</span>
           </template>
         </Column>
 

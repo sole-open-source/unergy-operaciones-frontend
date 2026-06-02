@@ -215,17 +215,6 @@
                 </template>
               </Column>
 
-              <!-- Energía perdida -->
-              <Column header="Energía" style="width:90px" field="energia_perdida_kwh" sortable>
-                <template #body="{ data }">
-                  <span v-if="data.energia_perdida_kwh != null"
-                    class="text-xs font-semibold"
-                    style="color:#dc2626">
-                    {{ Number(data.energia_perdida_kwh).toLocaleString('es-CO') }} kWh
-                  </span>
-                  <span v-else class="text-gray-400 text-xs">—</span>
-                </template>
-              </Column>
 
               <!-- Acciones -->
               <Column header="" style="width:120px">
