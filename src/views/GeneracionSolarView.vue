@@ -516,9 +516,14 @@
       </div>
       <div v-else-if="!genHoyRows.length" class="gs-genhoy-state">
         <i class="pi pi-sun" style="color:#f59e0b;font-size:24px" />
-        <span>Sin datos de generación disponibles para hoy.</span>
+        <span>Sin proyectos en operación configurados.</span>
       </div>
-      <div v-else class="gs-genhoy-rows">
+      <div v-else>
+        <div v-if="genHoyError" class="gs-genhoy-warn">
+          <i class="pi pi-exclamation-triangle" style="color:#d97706" />
+          {{ genHoyError }}
+        </div>
+        <div class="gs-genhoy-rows">
         <div v-for="r in genHoyRows" :key="r.nombre" class="gs-genhoy-item">
           <div class="gs-genhoy-item-header">
             <span class="gs-genhoy-item-name">{{ r.nombre }}</span>
@@ -546,6 +551,7 @@
                 : '#e5e7eb'
             }" />
           </div>
+        </div>
         </div>
       </div>
     </div>
@@ -1335,6 +1341,7 @@ function stopTimers() {
 // ── Generación de hoy ─────────────────────────────────────────────────────────
 const genHoyLoading = ref(false)
 const genHoyRows    = ref([])
+const genHoyError   = ref(null)
 const hoyLabel      = new Date().toLocaleDateString('es-CO', { weekday: 'long', day: '2-digit', month: 'long' })
 const proyectosP90  = ref([])   // proyectos con p90_mensual_kwh
 
@@ -1360,6 +1367,7 @@ const genHoyKpi = computed(() => {
 async function cargarGenHoy() {
   genHoyLoading.value = true
   genHoyRows.value    = []
+  genHoyError.value   = null
   try {
     // Fetch proyectos if not yet loaded
     if (!proyectosP90.value.length) {
@@ -1370,7 +1378,7 @@ async function cargarGenHoy() {
     const hoy    = new Date().toISOString().split('T')[0]
     const byProy = {}
 
-    // Seed all projects with their P90 (0 if not configured)
+    // Seed all projects in operation
     for (const p of proyectosP90.value) {
       byProy[p.id] = {
         nombre: p.nombre_comercial,
@@ -1389,11 +1397,12 @@ async function cargarGenHoy() {
           byProy[row.proyecto_id].fuente = row.fuente || 'sin_dato'
         }
       }
-    } catch { /* Solenium no disponible */ }
+    } catch (e) {
+      genHoyError.value = 'No se pudo obtener datos de Solenium. Mostrando solo P90.'
+    }
 
-    // Only show projects that have either real data or p90
+    // Show all projects (with or without data)
     genHoyRows.value = Object.values(byProy)
-      .filter(r => r.real > 0 || r.p90 > 0)
       .sort((a, b) => b.p90 - a.p90 || b.real - a.real)
   } finally {
     genHoyLoading.value = false
@@ -2419,6 +2428,17 @@ onUnmounted(() => {
   padding: 28px 0;
   color: #9ca3af;
   font-size: 13px;
+}
+.gs-genhoy-warn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  margin-bottom: 8px;
+  background: #fef3c7;
+  border-radius: 6px;
+  color: #92400e;
+  font-size: 12px;
 }
 .gs-genhoy-rows {
   display: flex;
