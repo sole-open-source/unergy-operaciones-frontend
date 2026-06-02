@@ -135,7 +135,8 @@
         <div class="ff-field">
           <label class="ff-label">Fecha de solución</label>
           <DatePicker v-model="form.fecha_resolucion" dateFormat="yy-mm-dd"
-            placeholder="AAAA-MM-DD" class="w-full" showButtonBar showIcon />
+            placeholder="AAAA-MM-DD HH:mm" class="w-full" showButtonBar showIcon
+            showTime hourFormat="24" />
         </div>
 
         <div class="ff-field">
@@ -333,7 +334,7 @@ async function submit() {
     }
     if (form.value.sla_limite_horas)              base.sla_limite_horas     = form.value.sla_limite_horas
     if (form.value.fecha_ocurrencia)              base.fecha_ocurrencia     = form.value.fecha_ocurrencia.toISOString()
-    if (form.value.fecha_resolucion)              base.fecha_resolucion     = formatDate(form.value.fecha_resolucion)
+    if (form.value.fecha_resolucion)              base.fecha_resolucion     = form.value.fecha_resolucion instanceof Date ? form.value.fecha_resolucion.toISOString() : form.value.fecha_resolucion
     if (form.value.tipo_solucion)                 base.tipo_solucion        = form.value.tipo_solucion
     if (form.value.causa_raiz?.trim())            base.causa_raiz           = form.value.causa_raiz.trim()
     if (form.value.acciones_correctivas?.trim())  base.acciones_correctivas = form.value.acciones_correctivas.trim()
