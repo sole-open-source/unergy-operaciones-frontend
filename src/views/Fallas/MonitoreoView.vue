@@ -4,7 +4,7 @@
     <!-- ══ TAB BAR (fuera del sticky) ═══════════════════════════════════ -->
     <div class="mon-tab-bar">
       <i class="pi pi-bolt text-sm" style="color:#915BD8" />
-      <span class="text-base font-bold text-gray-800 whitespace-nowrap mr-2">Monitoreo de Fallas</span>
+      <span class="text-base font-bold text-gray-800 whitespace-nowrap mr-2">Gestión de Fallas</span>
       <div class="mon-tab-group">
         <button v-for="(tab, i) in TABS" :key="i"
           class="mon-tab"
