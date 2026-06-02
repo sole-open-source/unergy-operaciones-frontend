@@ -101,11 +101,6 @@
             class="w-full" />
         </div>
 
-        <div class="ff-field">
-          <label class="ff-label">Energía perdida (kWh)</label>
-          <InputNumber v-model="form.energia_perdida_kwh" placeholder="Ej: 150.5"
-            class="w-full" :min="0" :maxFractionDigits="2" />
-        </div>
 
       </div>
     </div>
