@@ -516,8 +516,7 @@
       </div>
       <div v-else-if="!genHoyRows.length" class="gs-genhoy-state">
         <i class="pi pi-sun" style="color:#f59e0b;font-size:24px" />
-        <span>P90 no configurado para estos proyectos.</span>
-        <small style="color:#bbb">Agrega p90_mensual_kwh en los proyectos para ver la meta diaria.</small>
+        <span>Sin datos de generación disponibles para hoy.</span>
       </div>
       <div v-else class="gs-genhoy-rows">
         <div v-for="r in genHoyRows" :key="r.nombre" class="gs-genhoy-item">
@@ -1362,35 +1361,40 @@ async function cargarGenHoy() {
   genHoyLoading.value = true
   genHoyRows.value    = []
   try {
-    // Fetch proyectos with p90 if not yet loaded
+    // Fetch proyectos if not yet loaded
     if (!proyectosP90.value.length) {
       const { data } = await api.get('/proyectos', { params: { size: 500 } })
-      proyectosP90.value = (data.items ?? []).filter(p =>
-        p.srv_operacion === true && ['minigranja', 'gd'].includes(p.tipo_proyecto)
-      )
-      if (!proyectosP90.value.length) proyectosP90.value = data.items ?? []
+      proyectosP90.value = data.items ?? []
     }
 
-    const hoy       = new Date().toISOString().split('T')[0]
-    const byProy    = {}
+    const hoy    = new Date().toISOString().split('T')[0]
+    const byProy = {}
+
+    // Seed all projects with their P90 (0 if not configured)
     for (const p of proyectosP90.value) {
-      const p90 = dailyP90Gs(p.id, hoy)
-      if (p90 > 0) byProy[p.id] = { nombre: p.nombre_comercial, real: 0, p90, fuente: 'sin_dato' }
+      byProy[p.id] = {
+        nombre: p.nombre_comercial,
+        real: 0,
+        p90: +dailyP90Gs(p.id, hoy).toFixed(1),
+        fuente: 'sin_dato',
+      }
     }
 
+    // Fill real data from Solenium
     try {
       const { data } = await api.get('/generacion-solar/generacion-hoy')
       for (const row of data.proyectos ?? []) {
         if (byProy[row.proyecto_id] !== undefined) {
-          byProy[row.proyecto_id].real   = Number(row.kwh_real || 0)
+          byProy[row.proyecto_id].real   = +Number(row.kwh_real || 0).toFixed(1)
           byProy[row.proyecto_id].fuente = row.fuente || 'sin_dato'
         }
       }
     } catch { /* Solenium no disponible */ }
 
+    // Only show projects that have either real data or p90
     genHoyRows.value = Object.values(byProy)
-      .map(r => ({ ...r, real: +r.real.toFixed(1), p90: +r.p90.toFixed(1) }))
-      .sort((a, b) => b.p90 - a.p90)
+      .filter(r => r.real > 0 || r.p90 > 0)
+      .sort((a, b) => b.p90 - a.p90 || b.real - a.real)
   } finally {
     genHoyLoading.value = false
   }
