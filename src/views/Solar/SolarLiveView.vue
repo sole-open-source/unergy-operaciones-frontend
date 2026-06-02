@@ -236,7 +236,7 @@ function getInversorData(id) {
 function getMedidorData(id) {
   const rows = (detailMap[id]?.gaia_snapshot?.time_series?.power ?? []).filter(r => r.kw != null)
   if (!rows.length) return { labels: [], datasets: [] }
-  const data = mapHours(rows, r => gaiaTime(r.time), r => +Math.abs(r.kw * 1000))
+  const data = mapHours(rows, r => gaiaTime(r.time), r => +Math.abs(r.kw))
   if (data.every(v => v == null)) return { labels: [], datasets: [] }
   return {
     labels: HOUR_LABELS,
