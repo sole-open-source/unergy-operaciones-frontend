@@ -168,7 +168,7 @@ function getMedidorData(id) {
   const data = mapHours(
     rows,
     r => gaiaTime(r.time),
-    r => +(r.kw * 1000).toFixed(1),
+    r => +Math.abs(r.kw * 1000).toFixed(1),
   )
   if (data.every(v => v == null)) return { labels: [], datasets: [] }
   return {
