@@ -31,7 +31,7 @@
           <h2 class="text-xl font-bold text-gray-800 flex items-center gap-2 flex-wrap">
             <code class="text-base font-mono text-purple-700 bg-purple-50 px-2 py-0.5 rounded">{{ falla.codigo_interno }}</code>
             <span class="text-gray-400 text-sm">·</span>
-            <span class="text-base font-medium text-gray-700">{{ falla.tipo?.etiqueta || '—' }}</span>
+            <span class="text-base font-medium text-gray-700">{{ falla.tipo?.etiqueta || falla.tipo_libre || '—' }}</span>
           </h2>
           <p class="text-sm text-gray-600 mt-1 max-w-2xl">{{ falla.descripcion }}</p>
           <div class="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-xs text-gray-500">
@@ -80,7 +80,7 @@
           </div>
           <div class="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
             <InfoField label="Proyecto" :value="falla.proyecto?.nombre_comercial" highlight />
-            <InfoField label="Tipo de falla" :value="falla.tipo?.etiqueta" />
+            <InfoField label="Tipo de falla" :value="falla.tipo?.etiqueta || falla.tipo_libre" />
             <InfoField label="Registrado por" :value="falla.registrado_por?.nombre" />
             <InfoField label="Asignado a" :value="falla.asignado_a?.nombre || 'Sin asignar'" />
             <InfoField label="Fecha ocurrencia" :value="fmtDatetime(falla.fecha_ocurrencia)" />

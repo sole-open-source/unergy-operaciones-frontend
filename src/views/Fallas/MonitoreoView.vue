@@ -100,7 +100,7 @@
                       :style="{ background: f.estado?.color_hex || '#915BD8' }"
                       v-tooltip.right="f.estado?.etiqueta" />
                   </div>
-                  <div class="gf-compact-line2">{{ f.tipo?.etiqueta || f.descripcion || 'Sin descripción' }}</div>
+                  <div class="gf-compact-line2">{{ f.tipo?.etiqueta || f.tipo_libre || f.descripcion || 'Sin descripción' }}</div>
                 </div>
               </button>
             </div>
@@ -156,7 +156,7 @@
                       v-tooltip.top="data.tipo?.categoria?.etiqueta || ''" />
                     <div class="min-w-0 flex-1">
                       <div class="text-xs font-medium text-gray-700 flex items-center gap-1.5 flex-wrap">
-                        <span class="truncate">{{ data.tipo?.etiqueta || 'Sin tipo' }}</span>
+                        <span class="truncate">{{ data.tipo?.etiqueta || data.tipo_libre || 'Sin tipo' }}</span>
                         <span v-if="recurrencias(data) > 1"
                           class="inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0"
                           style="background: rgba(234,88,12,0.12); color: #ea580c;"
@@ -245,7 +245,7 @@
                 <div class="flex items-center gap-2 flex-wrap">
                   <code class="font-mono text-sm text-purple-700 bg-purple-50 px-2 py-0.5 rounded">{{ drawerFalla.codigo_interno }}</code>
                   <span class="text-xs text-gray-400">·</span>
-                  <span class="text-sm font-medium text-gray-700 truncate">{{ drawerFalla.tipo?.etiqueta }}</span>
+                  <span class="text-sm font-medium text-gray-700 truncate">{{ drawerFalla.tipo?.etiqueta || drawerFalla.tipo_libre }}</span>
                   <span v-if="navIndex >= 0" class="text-[10px] text-gray-400 ml-auto whitespace-nowrap hidden sm:inline-block">
                     {{ navIndex + 1 }} / {{ filtradas.length }}
                   </span>
@@ -939,7 +939,7 @@ const filtradas = computed(() => {
       (f.codigo_interno || '').toLowerCase().includes(q) ||
       (f.descripcion || '').toLowerCase().includes(q) ||
       (f.proyecto?.nombre_comercial || '').toLowerCase().includes(q) ||
-      (f.tipo?.etiqueta || '').toLowerCase().includes(q) ||
+      (f.tipo?.etiqueta || f.tipo_libre || '').toLowerCase().includes(q) ||
       (f.tipo?.categoria?.etiqueta || '').toLowerCase().includes(q)
     )
   }

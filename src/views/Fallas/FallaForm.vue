@@ -35,7 +35,12 @@
             optionLabel="etiqueta" optionValue="id"
             optionGroupLabel="categoria" optionGroupChildren="items"
             placeholder="Seleccionar tipo" filter filterPlaceholder="Buscar tipo..."
-            class="w-full" :class="{ 'p-invalid': errors.tipo_id }" />
+            showClear class="w-full" :class="{ 'p-invalid': errors.tipo_id }"
+            @clear="form.tipo_libre = ''" />
+          <div v-if="!form.tipo_id" class="mt-1">
+            <InputText v-model="form.tipo_libre" placeholder="O escribe el tipo aquí si no está en la lista..."
+              class="w-full" style="font-size:12px" />
+          </div>
           <small v-if="errors.tipo_id" class="ff-error">{{ errors.tipo_id }}</small>
         </div>
 
@@ -274,6 +279,7 @@ const form = ref({
   proyecto_id:          props.initial?.proyecto?.id ?? props.initial?.proyecto_id ?? null,
   proyecto_ids:         [...(props.prefillProyectoIds ?? [])],  // pre-seleccionados al crear
   tipo_id:              props.initial?.tipo?.id ?? null,
+  tipo_libre:           props.initial?.tipo_libre ?? '',
   estado_id:            props.initial?.estado?.id ?? null,
   prioridad_id:         props.initial?.prioridad?.id ?? null,
   descripcion:          props.initial?.descripcion ?? '',
@@ -321,7 +327,7 @@ function validate() {
   } else {
     if (!form.value.proyecto_ids?.length) e.proyecto_ids = 'Selecciona al menos un proyecto'
   }
-  if (!form.value.tipo_id)              e.tipo_id = 'Requerido'
+  if (!form.value.tipo_id && !form.value.tipo_libre?.trim()) e.tipo_id = 'Requerido'
   if (!form.value.estado_id)            e.estado_id = 'Requerido'
   if (!form.value.prioridad_id)         e.prioridad_id = 'Requerido'
   if (!form.value.descripcion?.trim())  e.descripcion = 'Requerido'
@@ -347,6 +353,7 @@ async function submit() {
       descripcion:          form.value.descripcion,
       fecha_identificacion: formatDate(form.value.fecha_identificacion),
     }
+    if (form.value.tipo_libre?.trim())             base.tipo_libre           = form.value.tipo_libre.trim()
     if (form.value.sla_limite_horas)              base.sla_limite_horas     = form.value.sla_limite_horas
     if (form.value.fecha_ocurrencia)              base.fecha_ocurrencia     = form.value.fecha_ocurrencia.toISOString()
     if (form.value.fecha_resolucion)              base.fecha_resolucion     = form.value.fecha_resolucion instanceof Date ? form.value.fecha_resolucion.toISOString() : form.value.fecha_resolucion
