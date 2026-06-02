@@ -117,7 +117,7 @@
               <Button label="Reintentar" icon="pi pi-refresh" outlined size="small" @click="cargar" />
             </div>
             <DataTable v-else :value="filtradas" :loading="loading" rowHover stripedRows
-              class="gf-table text-sm" :rows="25" paginator
+              size="small" class="gf-table text-xs" :rows="25" paginator
               :rowsPerPageOptions="[15, 25, 50, 100]" :alwaysShowPaginator="false"
               @row-click="(e) => abrirDrawer(e.data)" selectionMode="single"
               :rowClass="rowClass" scrollable>
@@ -155,7 +155,7 @@
                       :style="{ background: data.tipo?.categoria?.color_hex || '#915BD8' }"
                       v-tooltip.top="data.tipo?.categoria?.etiqueta || ''" />
                     <div class="min-w-0 flex-1">
-                      <div class="text-sm font-medium text-gray-800 flex items-center gap-1.5 flex-wrap">
+                      <div class="text-xs font-medium text-gray-700 flex items-center gap-1.5 flex-wrap">
                         <span class="truncate">{{ data.tipo?.etiqueta || 'Sin tipo' }}</span>
                         <span v-if="recurrencias(data) > 1"
                           class="inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0"
@@ -173,7 +173,7 @@
               <!-- Proyecto -->
               <Column header="Proyecto" style="min-width:130px">
                 <template #body="{ data }">
-                  <span class="text-sm text-gray-700">{{ data.proyecto?.nombre_comercial || '—' }}</span>
+                  <span class="text-xs text-gray-600">{{ data.proyecto?.nombre_comercial || '—' }}</span>
                 </template>
               </Column>
 
@@ -1453,12 +1453,12 @@ function prioColor(codigo) { return PRIO_COLORS[codigo] || '#9ca3af' }
 
 function prioPillStyle(codigo) {
   const c = prioColor(codigo)
-  return { background: c + '18', color: c, border: `1px solid ${c}40` }
+  return { background: c + '12', color: c }
 }
 
 function estadoPillStyle(hex) {
   const c = hex || '#915BD8'
-  return { background: c + '1a', color: c, border: `1px solid ${c}40` }
+  return { background: c + '12', color: c }
 }
 
 function catTagStyle(hex) {
@@ -2382,12 +2382,11 @@ watch(bucket, (newBucket) => {
 }
 .prio-pill {
   display: inline-block;
-  padding: 2px 8px;
-  border-radius: 6px;
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.2px;
-  text-transform: uppercase;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0;
 }
 .cat-dot {
   display: inline-block;
@@ -2399,9 +2398,9 @@ watch(bucket, (newBucket) => {
 .dias-badge {
   display: inline-block;
   font-size: 10px;
-  font-weight: 800;
-  padding: 3px 8px;
-  border-radius: 20px;
+  font-weight: 500;
+  padding: 1px 6px;
+  border-radius: 4px;
   white-space: nowrap;
 }
 .dias-green   { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
