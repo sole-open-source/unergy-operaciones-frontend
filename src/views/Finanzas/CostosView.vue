@@ -116,8 +116,19 @@ const loadingContrato         = ref(false)
 onMounted(async () => {
   loadingProyectos.value = true
   try {
-    const { data } = await api.get('/proyectos', { params: { limit: 500 } })
-    proyectos.value = Array.isArray(data) ? data : (data.items ?? [])
+    const [r1, r2] = await Promise.allSettled([
+      api.get('/proyectos', { params: { limit: 500 } }),
+      api.get('/proyectos', { params: { limit: 500, tipo_proyecto: 'minigranja' } }),
+    ])
+    const lista1 = r1.status === 'fulfilled' ? (Array.isArray(r1.value.data) ? r1.value.data : (r1.value.data.items ?? [])) : []
+    const lista2 = r2.status === 'fulfilled' ? (Array.isArray(r2.value.data) ? r2.value.data : (r2.value.data.items ?? [])) : []
+    const ids = new Set()
+    const todos = [...lista1, ...lista2].filter(p => {
+      if (ids.has(p.id)) return false
+      ids.add(p.id)
+      return true
+    })
+    proyectos.value = todos.sort((a, b) => a.nombre_comercial.localeCompare(b.nombre_comercial))
   } catch {
     proyectos.value = []
   } finally {

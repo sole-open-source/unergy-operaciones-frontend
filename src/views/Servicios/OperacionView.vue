@@ -363,49 +363,452 @@
 
           <template v-if="contratos.arriendo">
             <div class="rounded-xl border bg-white p-5" style="border-color:#8b5cf640">
-              <div class="flex items-center justify-between mb-5">
-                <div class="flex items-center gap-2.5">
-                  <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background:#f5f3ff">
+              <!-- Header -->
+              <div class="flex items-start justify-between mb-4 gap-3">
+                <div class="flex items-center gap-2.5 flex-wrap">
+                  <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style="background:#f5f3ff">
                     <i class="pi pi-home text-sm" style="color:#8b5cf6" />
                   </div>
-                  <span class="text-sm font-semibold" style="color:#2C2039">Contrato de Arriendo</span>
+                  <div>
+                    <p class="text-xs text-gray-400 leading-none mb-0.5">Contrato de Arriendo</p>
+                    <span class="text-sm font-semibold" style="color:#2C2039">{{ proyectoNombre }}</span>
+                  </div>
+                </div>
+                <div class="flex items-center gap-2 flex-shrink-0">
                   <Tag :value="CONTRATO_LABELS[contratos.arriendo.estado]"
                        :severity="CONTRATO_SEVERITY[contratos.arriendo.estado]" class="text-xs" />
+                  <Button icon="pi pi-pencil" label="Editar" size="small" text severity="secondary"
+                    @click="openEditContrato('arriendo')" />
                 </div>
-                <Button icon="pi pi-pencil" label="Editar" size="small" text severity="secondary"
-                  @click="openEditContrato('arriendo')" />
-                <Button icon="pi pi-plus" label="Nuevo contrato" size="small" outlined
-                  style="border-color:#8b5cf6;color:#8b5cf6"
-                  @click="openWizard('arriendo')" />
               </div>
-              <div class="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-5">
-                <InfoIcon icon="pi pi-user" color="#8b5cf6" label="Contratante"
-                  :value="contratos.arriendo.contratante_nombre" />
-                <InfoIcon icon="pi pi-briefcase" color="#8b5cf6" label="Prestador"
-                  :value="contratos.arriendo.prestador_nombre" />
-                <InfoIcon icon="pi pi-calendar-plus" color="#8b5cf6" label="Fecha firma contrato"
-                  :value="formatFecha(contratos.arriendo.fecha_firma_contrato)" />
-                <InfoIcon icon="pi pi-dollar" color="#8b5cf6" label="Valor anual (BASE)"
-                  :value="formatCOP(contratos.arriendo.tarifa_base)" />
-                <InfoIcon icon="pi pi-calculator" color="#8b5cf6" label="Valor arriendo mensual"
-                  :value="formatCOP(contratos.arriendo.tarifa_base != null ? contratos.arriendo.tarifa_base / 12 : null)" />
-                <InfoLink color="#8b5cf6" label="Enlace del contrato en Drive"
-                  :href="contratos.arriendo.enlace_drive" />
+              <!-- Mini-cards -->
+              <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+                <div class="rounded-lg p-3.5" style="background:#f5f3ff;border:1px solid #ddd6fe">
+                  <p class="text-xs mb-1.5 flex items-center gap-1.5" style="color:#5b21b6">
+                    <i class="pi pi-user text-xs" style="color:#8b5cf6" />Contratante
+                  </p>
+                  <p class="text-sm font-semibold leading-snug" style="color:#1c1917">{{ contratos.arriendo.contratante_nombre || '—' }}</p>
+                </div>
+                <div class="rounded-lg p-3.5" style="background:#f5f3ff;border:1px solid #ddd6fe">
+                  <p class="text-xs mb-1.5 flex items-center gap-1.5" style="color:#5b21b6">
+                    <i class="pi pi-building text-xs" style="color:#8b5cf6" />Prestador
+                  </p>
+                  <p class="text-sm font-semibold leading-snug" style="color:#1c1917">{{ contratos.arriendo.prestador_nombre || '—' }}</p>
+                </div>
+                <div class="rounded-lg p-3.5" style="background:#f5f3ff;border:1px solid #ddd6fe">
+                  <p class="text-xs mb-1.5 flex items-center gap-1.5" style="color:#5b21b6">
+                    <i class="pi pi-calendar text-xs" style="color:#8b5cf6" />Fecha firma contrato
+                  </p>
+                  <p class="text-sm font-semibold" style="color:#1c1917">{{ formatFecha(contratos.arriendo.fecha_firma_contrato) || '—' }}</p>
+                </div>
+                <!-- Valor anual con indexación -->
+                <div class="rounded-lg p-3.5" style="background:#f5f3ff;border:1px solid #ddd6fe">
+                  <p class="text-xs mb-1.5 flex items-center gap-1.5" style="color:#5b21b6">
+                    <i class="pi pi-dollar text-xs" style="color:#8b5cf6" />Valor anual ({{ ANIO_ACTUAL }})
+                  </p>
+                  <p class="text-base font-bold" style="color:#7c3aed">
+                    {{ formatCOP(getValorVigente(buscarArriendoEstatico(proyectoNombre)?.indexacion_anual)?.valor ?? contratos.arriendo.tarifa_base) }}
+                  </p>
+                  <p v-if="(buscarArriendoEstatico(proyectoNombre)?.indexacion_anual?.slice(-1)[0]?.anio ?? 0) < ANIO_ACTUAL"
+                    class="text-[10px] mt-1 font-medium" style="color:#dc2626">
+                    IPC de {{ ANIO_ACTUAL }} pendiente de actualizar
+                  </p>
+                  <button type="button"
+                    class="mt-2 flex items-center gap-1 text-xs font-medium hover:opacity-75 transition-opacity"
+                    style="background:none;border:none;padding:0;cursor:pointer;color:#8b5cf6"
+                    @click="showIndexacionArriendo.anual = !showIndexacionArriendo.anual">
+                    <i class="pi pi-chevron-down text-xs transition-transform duration-200"
+                      :style="showIndexacionArriendo.anual ? 'transform:rotate(180deg)' : ''" />
+                    {{ showIndexacionArriendo.anual ? 'Ocultar' : 'Ver indexación' }}
+                  </button>
+                </div>
+                <!-- Valor mensual -->
+                <div class="rounded-lg p-3.5" style="background:#f5f3ff;border:1px solid #ddd6fe">
+                  <p class="text-xs mb-1.5 flex items-center gap-1.5" style="color:#5b21b6">
+                    <i class="pi pi-calculator text-xs" style="color:#8b5cf6" />Valor mensual ({{ ANIO_ACTUAL }})
+                  </p>
+                  <p class="text-base font-bold" style="color:#7c3aed">
+                    {{ formatCOP(getValorVigente(contratos.arriendo.indexacion_mensual?.length ? contratos.arriendo.indexacion_mensual : buscarArriendoEstatico(proyectoNombre)?.indexacion_mensual)?.valor ?? contratos.arriendo.tarifa_mensual ?? (contratos.arriendo.tarifa_base != null ? Math.round(contratos.arriendo.tarifa_base / 12) : null)) }}
+                  </p>
+                  <button type="button"
+                    class="mt-2 flex items-center gap-1 text-xs font-medium hover:opacity-75 transition-opacity"
+                    style="background:none;border:none;padding:0;cursor:pointer;color:#8b5cf6"
+                    @click="showIndexacionArriendo.mensual = !showIndexacionArriendo.mensual">
+                    <i class="pi pi-chevron-down text-xs transition-transform duration-200"
+                      :style="showIndexacionArriendo.mensual ? 'transform:rotate(180deg)' : ''" />
+                    {{ showIndexacionArriendo.mensual ? 'Ocultar' : 'Ver indexación' }}
+                  </button>
+                </div>
+                <!-- Contrato en Drive -->
+                <div class="rounded-lg p-3.5" style="background:#f5f3ff;border:1px solid #ddd6fe">
+                  <p class="text-xs mb-1.5 flex items-center gap-1.5" style="color:#5b21b6">
+                    <i class="pi pi-file-pdf text-xs" style="color:#8b5cf6" />Contrato en Drive
+                  </p>
+                  <a v-if="contratos.arriendo.enlace_drive?.startsWith('http')"
+                     :href="contratos.arriendo.enlace_drive" target="_blank" rel="noopener"
+                     class="text-sm font-semibold flex items-center gap-1.5 hover:underline" style="color:#8b5cf6">
+                    <i class="pi pi-external-link text-xs" />Ver contrato
+                  </a>
+                  <span v-else class="text-sm text-gray-400">Sin enlace</span>
+                </div>
               </div>
+              <!-- Panel indexación ANUAL -->
+              <div :style="{ overflow: 'hidden', transition: 'max-height 0.35s ease', maxHeight: showIndexacionArriendo.anual ? '800px' : '0px' }">
+                <div class="pt-3">
+                  <div class="rounded-xl border overflow-hidden" style="border-color:#ddd6fe">
+                    <div class="flex items-center justify-between px-4 py-2.5" style="background:#f5f3ff">
+                      <span class="text-xs font-semibold" style="color:#5b21b6">
+                        <i class="pi pi-dollar text-xs mr-1.5" style="color:#8b5cf6" />Indexación anual de arriendo
+                      </span>
+                      <span class="text-xs text-gray-400">Año vigente: {{ ANIO_ACTUAL }}</span>
+                    </div>
+                    <table class="w-full text-sm border-collapse">
+                      <thead>
+                        <tr class="bg-gray-50 border-b border-gray-100">
+                          <th class="px-4 py-2 text-left text-xs font-semibold text-gray-500">Año</th>
+                          <th class="px-4 py-2 text-left text-xs font-semibold text-gray-500">IPC aplicado</th>
+                          <th class="px-4 py-2 text-right text-xs font-semibold text-gray-500">Valor anual</th>
+                          <th class="px-4 py-2 text-center text-xs font-semibold text-gray-500">Estado</th>
+                          <th style="width:40px"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-if="!(contratos.arriendo?.indexacion_anual?.length || buscarArriendoEstatico(proyectoNombre)?.indexacion_anual?.length)">
+                          <td colspan="5" class="px-4 py-6 text-center text-xs text-gray-400">Sin indexación registrada</td>
+                        </tr>
+                        <tr v-for="(fila, idx) in (contratos.arriendo?.indexacion_anual?.length ? contratos.arriendo.indexacion_anual : (buscarArriendoEstatico(proyectoNombre)?.indexacion_anual || []))"
+                          :key="idx" class="border-b border-gray-50 transition-colors"
+                          :class="fila.anio === ANIO_ACTUAL && idx === (contratos.arriendo?.indexacion_anual?.length ? contratos.arriendo.indexacion_anual : buscarArriendoEstatico(proyectoNombre)?.indexacion_anual || []).length - 1 ? 'bg-violet-50/40' : ''">
+                          <td class="px-4 py-2.5">
+                            <div class="flex items-center gap-1.5">
+                              <span class="font-mono font-semibold" style="color:#2C2039">{{ fila.anio }}</span>
+                              <span v-if="fila.anio === ANIO_ACTUAL && idx === (contratos.arriendo?.indexacion_anual?.length ? contratos.arriendo.indexacion_anual : buscarArriendoEstatico(proyectoNombre)?.indexacion_anual || []).length - 1"
+                                class="text-xs px-1.5 py-0.5 rounded font-bold leading-none" style="background:#ede9fe;color:#7c3aed">actual</span>
+                              <i v-if="fila.anio === ANIO_ACTUAL && idx === (contratos.arriendo?.indexacion_anual?.length ? contratos.arriendo.indexacion_anual : buscarArriendoEstatico(proyectoNombre)?.indexacion_anual || []).length - 1"
+                                class="pi pi-arrow-left text-xs" style="color:#7c3aed" />
+                            </div>
+                          </td>
+                          <td class="px-4 py-2.5">
+                            <span v-if="fila.ipc_aplicado == null" class="text-gray-400 text-xs">— (base)</span>
+                            <span v-else class="font-mono tabular-nums" style="color:#374151">{{ fila.ipc_aplicado }}%</span>
+                          </td>
+                          <td class="px-4 py-2.5 text-right font-semibold tabular-nums" style="color:#2C2039">{{ formatCOP(fila.valor) }}</td>
+                          <td class="px-4 py-2.5 text-center">
+                            <span v-if="fila.ipc_aplicado == null || fila.anio < ANIO_ACTUAL" class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full" style="background:#dcfce7;color:#166534"><i class="pi pi-check text-xs" />Pagado</span>
+                            <span v-else-if="fila.anio === ANIO_ACTUAL && idx === (contratos.arriendo?.indexacion_anual?.length ? contratos.arriendo.indexacion_anual : buscarArriendoEstatico(proyectoNombre)?.indexacion_anual || []).length - 1" class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full" style="background:#ede9fe;color:#7c3aed">Vigente</span>
+                            <span v-else class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full" style="background:#f3f4f6;color:#9ca3af">Pendiente</span>
+                          </td>
+                          <td class="px-2 py-2.5 text-center">
+                            <button v-if="contratos.arriendo?.indexacion_anual?.length" type="button"
+                              class="w-7 h-7 rounded-lg inline-flex items-center justify-center text-red-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+                              style="background:none;border:none;cursor:pointer"
+                              @click="eliminarFilaIdxArriendo('anual', idx)">
+                              <i class="pi pi-trash text-xs" />
+                            </button>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                    <div class="flex items-center justify-between px-4 py-2.5 border-t border-gray-100 bg-gray-50/60 flex-wrap gap-2">
+                      <div class="flex items-center gap-3">
+                        <button type="button" class="flex items-center gap-1.5 text-xs font-medium hover:underline transition-colors"
+                          style="background:none;border:none;padding:0;cursor:pointer;color:#8b5cf6"
+                          @click="abrirModalIdxArriendo('anual')">
+                          <i class="pi pi-plus text-xs" />Agregar fila
+                        </button>
+                        <button v-if="anioIpcPendienteArriendo('anual')" type="button"
+                          class="flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-lg transition-colors"
+                          style="background:#ede9fe;color:#7c3aed;border:none;cursor:pointer"
+                          @click="aplicarIpcAnio('anual', anioIpcPendienteArriendo('anual'))">
+                          <i class="pi pi-bolt text-xs" />
+                          Aplicar IPC {{ anioIpcPendienteArriendo('anual') }} ({{ IPC_RATES[anioIpcPendienteArriendo('anual')] }}%)
+                        </button>
+                      </div>
+                      <button type="button" class="flex items-center gap-1.5 text-xs font-medium hover:underline transition-colors"
+                        style="background:none;border:none;padding:0;cursor:pointer;color:#8b5cf6"
+                        @click="idxArriendoAnualRef?.click()">
+                        <i class="pi pi-upload text-xs" />Cargar desde JSON
+                      </button>
+                      <input ref="idxArriendoAnualRef" type="file" accept=".json" class="hidden"
+                        @change="e => importarIndexacionArriendo(e, 'anual')" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Panel indexación MENSUAL -->
+              <div :style="{ overflow: 'hidden', transition: 'max-height 0.35s ease', maxHeight: showIndexacionArriendo.mensual ? '800px' : '0px' }">
+                <div class="pt-3">
+                  <div class="rounded-xl border overflow-hidden" style="border-color:#ddd6fe">
+                    <div class="flex items-center justify-between px-4 py-2.5" style="background:#f5f3ff">
+                      <span class="text-xs font-semibold" style="color:#5b21b6">
+                        <i class="pi pi-calculator text-xs mr-1.5" style="color:#8b5cf6" />Indexación mensual de arriendo
+                      </span>
+                      <span class="text-xs text-gray-400">Año vigente: {{ ANIO_ACTUAL }}</span>
+                    </div>
+                    <table class="w-full text-sm border-collapse">
+                      <thead>
+                        <tr class="bg-gray-50 border-b border-gray-100">
+                          <th class="px-4 py-2 text-left text-xs font-semibold text-gray-500">Año</th>
+                          <th class="px-4 py-2 text-left text-xs font-semibold text-gray-500">IPC aplicado</th>
+                          <th class="px-4 py-2 text-right text-xs font-semibold text-gray-500">Valor mensual</th>
+                          <th class="px-4 py-2 text-center text-xs font-semibold text-gray-500">Estado</th>
+                          <th style="width:40px"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-if="!(contratos.arriendo?.indexacion_mensual?.length || buscarArriendoEstatico(proyectoNombre)?.indexacion_mensual?.length)">
+                          <td colspan="5" class="px-4 py-6 text-center text-xs text-gray-400">Sin indexación registrada</td>
+                        </tr>
+                        <tr v-for="(fila, idx) in (contratos.arriendo?.indexacion_mensual?.length ? contratos.arriendo.indexacion_mensual : (buscarArriendoEstatico(proyectoNombre)?.indexacion_mensual || []))"
+                          :key="idx" class="border-b border-gray-50 transition-colors"
+                          :class="fila.anio === ANIO_ACTUAL && idx === (contratos.arriendo?.indexacion_mensual?.length ? contratos.arriendo.indexacion_mensual : buscarArriendoEstatico(proyectoNombre)?.indexacion_mensual || []).length - 1 ? 'bg-violet-50/40' : ''">
+                          <td class="px-4 py-2.5">
+                            <div class="flex items-center gap-1.5">
+                              <span class="font-mono font-semibold" style="color:#2C2039">{{ fila.anio }}</span>
+                              <span v-if="fila.anio === ANIO_ACTUAL && idx === (contratos.arriendo?.indexacion_mensual?.length ? contratos.arriendo.indexacion_mensual : buscarArriendoEstatico(proyectoNombre)?.indexacion_mensual || []).length - 1"
+                                class="text-xs px-1.5 py-0.5 rounded font-bold leading-none" style="background:#ede9fe;color:#7c3aed">actual</span>
+                              <i v-if="fila.anio === ANIO_ACTUAL && idx === (contratos.arriendo?.indexacion_mensual?.length ? contratos.arriendo.indexacion_mensual : buscarArriendoEstatico(proyectoNombre)?.indexacion_mensual || []).length - 1"
+                                class="pi pi-arrow-left text-xs" style="color:#7c3aed" />
+                            </div>
+                          </td>
+                          <td class="px-4 py-2.5">
+                            <span v-if="fila.ipc_aplicado == null" class="text-gray-400 text-xs">— (base)</span>
+                            <span v-else class="font-mono tabular-nums" style="color:#374151">{{ fila.ipc_aplicado }}%</span>
+                          </td>
+                          <td class="px-4 py-2.5 text-right font-semibold tabular-nums" style="color:#2C2039">{{ formatCOP(fila.valor) }}</td>
+                          <td class="px-4 py-2.5 text-center">
+                            <span v-if="fila.ipc_aplicado == null || fila.anio < ANIO_ACTUAL" class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full" style="background:#dcfce7;color:#166534"><i class="pi pi-check text-xs" />Pagado</span>
+                            <span v-else-if="fila.anio === ANIO_ACTUAL && idx === (contratos.arriendo?.indexacion_mensual?.length ? contratos.arriendo.indexacion_mensual : buscarArriendoEstatico(proyectoNombre)?.indexacion_mensual || []).length - 1" class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full" style="background:#ede9fe;color:#7c3aed">Vigente</span>
+                            <span v-else class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full" style="background:#f3f4f6;color:#9ca3af">Pendiente</span>
+                          </td>
+                          <td class="px-2 py-2.5 text-center">
+                            <button v-if="contratos.arriendo?.indexacion_mensual?.length" type="button"
+                              class="w-7 h-7 rounded-lg inline-flex items-center justify-center text-red-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+                              style="background:none;border:none;cursor:pointer"
+                              @click="eliminarFilaIdxArriendo('mensual', idx)">
+                              <i class="pi pi-trash text-xs" />
+                            </button>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                    <div class="flex items-center justify-between px-4 py-2.5 border-t border-gray-100 bg-gray-50/60 flex-wrap gap-2">
+                      <div class="flex items-center gap-3">
+                        <button type="button" class="flex items-center gap-1.5 text-xs font-medium hover:underline transition-colors"
+                          style="background:none;border:none;padding:0;cursor:pointer;color:#8b5cf6"
+                          @click="abrirModalIdxArriendo('mensual')">
+                          <i class="pi pi-plus text-xs" />Agregar fila
+                        </button>
+                        <button v-if="anioIpcPendienteArriendo('mensual')" type="button"
+                          class="flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-lg transition-colors"
+                          style="background:#ede9fe;color:#7c3aed;border:none;cursor:pointer"
+                          @click="aplicarIpcAnio('mensual', anioIpcPendienteArriendo('mensual'))">
+                          <i class="pi pi-bolt text-xs" />
+                          Aplicar IPC {{ anioIpcPendienteArriendo('mensual') }} ({{ IPC_RATES[anioIpcPendienteArriendo('mensual')] }}%)
+                        </button>
+                      </div>
+                      <button type="button" class="flex items-center gap-1.5 text-xs font-medium hover:underline transition-colors"
+                        style="background:none;border:none;padding:0;cursor:pointer;color:#8b5cf6"
+                        @click="idxArriendoMensualRef?.click()">
+                        <i class="pi pi-upload text-xs" />Cargar desde JSON
+                      </button>
+                      <input ref="idxArriendoMensualRef" type="file" accept=".json" class="hidden"
+                        @change="e => importarIndexacionArriendo(e, 'mensual')" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
             </div>
           </template>
           <template v-else>
-            <div class="rounded-xl border border-dashed border-violet-200 bg-violet-50/40 p-10 text-center">
-              <div class="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3"
-                style="background:#f5f3ff">
-                <i class="pi pi-home text-xl" style="color:#8b5cf6" />
+            <!-- Datos estáticos desde JSON si existen -->
+            <template v-if="buscarArriendoEstatico(proyectoNombre)">
+              <div class="rounded-xl border bg-white p-5" style="border-color:#8b5cf640">
+                <!-- Header -->
+                <div class="flex items-start justify-between mb-4 gap-3">
+                  <div class="flex items-center gap-2.5 flex-wrap">
+                    <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style="background:#f5f3ff">
+                      <i class="pi pi-home text-sm" style="color:#8b5cf6" />
+                    </div>
+                    <div>
+                      <p class="text-xs text-gray-400 leading-none mb-0.5">Contrato de Arriendo</p>
+                      <span class="text-sm font-semibold" style="color:#2C2039">{{ proyectoNombre }}</span>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-2 flex-shrink-0">
+                    <Tag value="Vigente" severity="success" class="text-xs" />
+                    <Button icon="pi pi-pencil" label="Editar" size="small" text severity="secondary"
+                      @click="openEditContrato('arriendo')" />
+                  </div>
+                </div>
+                <!-- Mini-cards -->
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  <!-- Contratante -->
+                  <div class="rounded-lg p-3.5" style="background:#f5f3ff;border:1px solid #ddd6fe">
+                    <p class="text-xs mb-1.5 flex items-center gap-1.5" style="color:#5b21b6">
+                      <i class="pi pi-user text-xs" style="color:#8b5cf6" />Contratante
+                    </p>
+                    <p class="text-sm font-semibold leading-snug" style="color:#1c1917">
+                      {{ buscarArriendoEstatico(proyectoNombre).contratante }}
+                    </p>
+                  </div>
+                  <!-- Prestador -->
+                  <div class="rounded-lg p-3.5" style="background:#f5f3ff;border:1px solid #ddd6fe">
+                    <p class="text-xs mb-1.5 flex items-center gap-1.5" style="color:#5b21b6">
+                      <i class="pi pi-building text-xs" style="color:#8b5cf6" />Prestador
+                    </p>
+                    <p class="text-sm font-semibold leading-snug" style="color:#1c1917">
+                      {{ buscarArriendoEstatico(proyectoNombre).prestador }}
+                    </p>
+                  </div>
+                  <!-- Fecha firma -->
+                  <div class="rounded-lg p-3.5" style="background:#f5f3ff;border:1px solid #ddd6fe">
+                    <p class="text-xs mb-1.5 flex items-center gap-1.5" style="color:#5b21b6">
+                      <i class="pi pi-calendar text-xs" style="color:#8b5cf6" />Fecha firma contrato
+                    </p>
+                    <p class="text-sm font-semibold" style="color:#1c1917">
+                      {{ buscarArriendoEstatico(proyectoNombre).fecha_firma }}
+                    </p>
+                  </div>
+                  <!-- Valor anual vigente -->
+                  <div class="rounded-lg p-3.5" style="background:#f5f3ff;border:1px solid #ddd6fe">
+                    <p class="text-xs mb-1.5 flex items-center gap-1.5" style="color:#5b21b6">
+                      <i class="pi pi-dollar text-xs" style="color:#8b5cf6" />Valor anual ({{ ANIO_ACTUAL }})
+                    </p>
+                    <p class="text-base font-bold" style="color:#7c3aed">
+                      {{ formatCOP(getValorVigente(buscarArriendoEstatico(proyectoNombre).indexacion_anual)?.valor ?? buscarArriendoEstatico(proyectoNombre).valor_anual) }}
+                    </p>
+                    <!-- Aviso IPC pendiente -->
+                    <p v-if="(buscarArriendoEstatico(proyectoNombre).indexacion_anual?.slice(-1)[0]?.anio ?? 0) < ANIO_ACTUAL"
+                      class="text-[10px] mt-1 font-medium" style="color:#dc2626">
+                      IPC de {{ ANIO_ACTUAL }} pendiente de actualizar
+                    </p>
+                    <button type="button"
+                      class="mt-2 flex items-center gap-1 text-xs font-medium hover:opacity-75 transition-opacity"
+                      style="background:none;border:none;padding:0;cursor:pointer;color:#8b5cf6"
+                      @click="showIndexacionArriendo.anual = !showIndexacionArriendo.anual">
+                      <i class="pi pi-chevron-down text-xs transition-transform duration-200"
+                        :style="showIndexacionArriendo.anual ? 'transform:rotate(180deg)' : ''" />
+                      {{ showIndexacionArriendo.anual ? 'Ocultar' : 'Ver indexación' }}
+                    </button>
+                  </div>
+                  <!-- Valor mensual vigente -->
+                  <div class="rounded-lg p-3.5" style="background:#f5f3ff;border:1px solid #ddd6fe">
+                    <p class="text-xs mb-1.5 flex items-center gap-1.5" style="color:#5b21b6">
+                      <i class="pi pi-calculator text-xs" style="color:#8b5cf6" />Valor mensual ({{ ANIO_ACTUAL }})
+                    </p>
+                    <p class="text-base font-bold" style="color:#7c3aed">
+                      {{ formatCOP(getValorVigente(buscarArriendoEstatico(proyectoNombre).indexacion_mensual)?.valor ?? buscarArriendoEstatico(proyectoNombre).valor_mensual) }}
+                    </p>
+                  </div>
+                  <!-- Contrato en Drive -->
+                  <div class="rounded-lg p-3.5" style="background:#f5f3ff;border:1px solid #ddd6fe">
+                    <p class="text-xs mb-1.5 flex items-center gap-1.5" style="color:#5b21b6">
+                      <i class="pi pi-file-pdf text-xs" style="color:#8b5cf6" />Contrato en Drive
+                    </p>
+                    <a v-if="buscarArriendoEstatico(proyectoNombre).enlace"
+                       :href="buscarArriendoEstatico(proyectoNombre).enlace"
+                       target="_blank" rel="noopener"
+                       class="text-sm font-semibold flex items-center gap-1.5 hover:underline" style="color:#8b5cf6">
+                      <i class="pi pi-external-link text-xs" />Ver contrato
+                    </a>
+                    <span v-else class="text-sm text-gray-400">Sin enlace</span>
+                  </div>
+                </div>
+
+                <!-- Panel indexación anual -->
+                <div :style="{ overflow: 'hidden', transition: 'max-height 0.35s ease', maxHeight: showIndexacionArriendo.anual ? '800px' : '0px' }">
+                  <div class="pt-3">
+                    <div class="rounded-xl border overflow-hidden" style="border-color:#ddd6fe">
+                      <div class="flex items-center justify-between px-4 py-2.5" style="background:#f5f3ff">
+                        <span class="text-xs font-semibold" style="color:#5b21b6">
+                          <i class="pi pi-dollar text-xs mr-1.5" style="color:#8b5cf6" />Indexación anual de arriendo
+                        </span>
+                        <span class="text-xs text-gray-400">Año vigente: {{ ANIO_ACTUAL }}</span>
+                      </div>
+                      <table class="w-full text-sm border-collapse">
+                        <thead>
+                          <tr class="bg-gray-50 border-b border-gray-100">
+                            <th class="px-4 py-2 text-left text-xs font-semibold text-gray-500">Año</th>
+                            <th class="px-4 py-2 text-left text-xs font-semibold text-gray-500">IPC aplicado</th>
+                            <th class="px-4 py-2 text-right text-xs font-semibold text-gray-500">Valor anual</th>
+                            <th class="px-4 py-2 text-center text-xs font-semibold text-gray-500">Estado</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr v-if="!buscarArriendoEstatico(proyectoNombre).indexacion_anual?.length">
+                            <td colspan="4" class="px-4 py-6 text-center text-xs text-gray-400">
+                              Sin indexación registrada
+                            </td>
+                          </tr>
+                          <tr v-for="(fila, idx) in (buscarArriendoEstatico(proyectoNombre).indexacion_anual || [])"
+                            :key="idx"
+                            class="border-b border-gray-50 transition-colors"
+                            :class="fila.anio === ANIO_ACTUAL && idx === buscarArriendoEstatico(proyectoNombre).indexacion_anual.length - 1 ? 'bg-violet-50/40' : ''">
+                            <td class="px-4 py-2.5">
+                              <div class="flex items-center gap-1.5">
+                                <span class="font-mono font-semibold"
+                                  :style="fila.anio === ANIO_ACTUAL && idx === buscarArriendoEstatico(proyectoNombre).indexacion_anual.length - 1 ? 'color:#7c3aed' : 'color:#2C2039'">
+                                  {{ fila.anio }}
+                                </span>
+                                <span v-if="fila.anio === ANIO_ACTUAL && idx === buscarArriendoEstatico(proyectoNombre).indexacion_anual.length - 1"
+                                  class="text-xs px-1.5 py-0.5 rounded font-bold leading-none"
+                                  style="background:#ede9fe;color:#7c3aed">actual</span>
+                                <i v-if="fila.anio === ANIO_ACTUAL && idx === buscarArriendoEstatico(proyectoNombre).indexacion_anual.length - 1"
+                                  class="pi pi-arrow-left text-xs" style="color:#7c3aed" />
+                              </div>
+                            </td>
+                            <td class="px-4 py-2.5">
+                              <span v-if="fila.ipc_aplicado == null" class="text-gray-400 text-xs">— (base)</span>
+                              <span v-else class="font-mono tabular-nums" style="color:#374151">{{ fila.ipc_aplicado }}%</span>
+                            </td>
+                            <td class="px-4 py-2.5 text-right font-semibold tabular-nums"
+                              :style="fila.anio === ANIO_ACTUAL && idx === buscarArriendoEstatico(proyectoNombre).indexacion_anual.length - 1 ? 'color:#7c3aed' : 'color:#2C2039'">
+                              {{ formatCOP(fila.valor) }}
+                            </td>
+                            <td class="px-4 py-2.5 text-center">
+                              <span v-if="fila.ipc_aplicado == null || fila.anio < ANIO_ACTUAL"
+                                class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full"
+                                style="background:#dcfce7;color:#166534">
+                                <i class="pi pi-check text-xs" />Pagado
+                              </span>
+                              <span v-else-if="fila.anio === ANIO_ACTUAL && idx === buscarArriendoEstatico(proyectoNombre).indexacion_anual.length - 1"
+                                class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full"
+                                style="background:#ede9fe;color:#7c3aed">
+                                Vigente
+                              </span>
+                              <span v-else
+                                class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full"
+                                style="background:#f3f4f6;color:#9ca3af">
+                                Pendiente
+                              </span>
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+
               </div>
-              <p class="text-sm font-medium text-gray-600 mb-1">Sin contrato de arriendo</p>
-              <p class="text-xs text-gray-400 mb-4">Registra el contrato para iniciar el seguimiento de pagos</p>
-              <Button label="Crear contrato" icon="pi pi-plus" size="small"
-                style="background:#8b5cf6;border-color:#8b5cf6"
-                @click="openWizard('arriendo')" />
-            </div>
+            </template>
+
+            <!-- Sin datos en JSON ni en BD -->
+            <template v-else>
+              <div class="rounded-xl border border-dashed border-violet-200 bg-violet-50/40 p-10 text-center">
+                <div class="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3"
+                  style="background:#f5f3ff">
+                  <i class="pi pi-home text-xl" style="color:#8b5cf6" />
+                </div>
+                <p class="text-sm font-medium text-gray-600 mb-1">Sin contrato de arriendo registrado</p>
+                <p class="text-xs text-gray-400 mb-4">No se encontró contrato de arriendo para este proyecto</p>
+                <Button label="Crear contrato" icon="pi pi-plus" size="small"
+                  style="background:#8b5cf6;border-color:#8b5cf6"
+                  @click="openWizard('arriendo')" />
+              </div>
+            </template>
           </template>
 
           <PagosTabla
@@ -418,6 +821,56 @@
             @open-pago="openNuevoPago('arriendo')"
             @eliminar="(id) => eliminarPago('arriendo', id)"
           />
+
+          <!-- Modal: agregar fila de indexación -->
+          <Dialog v-model:visible="modalIdxArriendo.visible" modal :style="{ width: '400px' }"
+            :breakpoints="{ '440px': '95vw' }">
+            <template #header>
+              <div class="flex items-center gap-2.5">
+                <div class="w-7 h-7 rounded-lg flex items-center justify-center" style="background:#f5f3ff">
+                  <i class="pi pi-plus text-xs" style="color:#8b5cf6" />
+                </div>
+                <span class="font-semibold text-sm" style="color:#2C2039">
+                  Agregar fila — Indexación {{ modalIdxArriendo.tipo === 'anual' ? 'anual' : 'mensual' }}
+                </span>
+              </div>
+            </template>
+            <div class="space-y-4 pt-1">
+              <div class="grid grid-cols-2 gap-4">
+                <div class="flex flex-col gap-1">
+                  <label class="text-xs font-medium text-gray-600">Año <span class="text-red-400">*</span></label>
+                  <InputNumber v-model="modalIdxArriendo.form.anio" :useGrouping="false"
+                    :min="2020" :max="2099" class="w-full"
+                    :class="{ 'p-invalid': modalIdxArriendo.errores.anio }" />
+                  <p v-if="modalIdxArriendo.errores.anio" class="text-xs text-red-400">{{ modalIdxArriendo.errores.anio }}</p>
+                </div>
+                <div class="flex flex-col gap-1">
+                  <label class="text-xs font-medium text-gray-600">IPC aplicado (%)</label>
+                  <InputNumber v-model="modalIdxArriendo.form.ipc_aplicado"
+                    :minFractionDigits="2" :maxFractionDigits="4"
+                    placeholder="Ej: 5.10" class="w-full" />
+                  <p class="text-xs text-gray-400">Dejar vacío si es el valor base</p>
+                </div>
+              </div>
+              <div class="flex flex-col gap-1">
+                <label class="text-xs font-medium text-gray-600">
+                  Valor {{ modalIdxArriendo.tipo === 'anual' ? 'anual' : 'mensual' }} (COP) <span class="text-red-400">*</span>
+                </label>
+                <InputNumber v-model="modalIdxArriendo.form.valor"
+                  mode="currency" currency="COP" locale="es-CO" :maxFractionDigits="2"
+                  class="w-full" placeholder="$ 0"
+                  :class="{ 'p-invalid': modalIdxArriendo.errores.valor }" />
+                <p v-if="modalIdxArriendo.errores.valor" class="text-xs text-red-400">{{ modalIdxArriendo.errores.valor }}</p>
+              </div>
+            </div>
+            <template #footer>
+              <Button label="Cancelar" severity="secondary" text @click="modalIdxArriendo.visible = false" />
+              <Button label="Agregar" icon="pi pi-check" :loading="modalIdxArriendo.saving"
+                style="background:#8b5cf6;border-color:#8b5cf6"
+                @click="guardarFilaIdxArriendo" />
+            </template>
+          </Dialog>
+
         </div>
       </TabPanel>
 
@@ -682,10 +1135,51 @@ import Dialog from 'primevue/dialog'
 import { useToast } from 'primevue/usetoast'
 import api from '@/api/client'
 import ContratoServicioWizard from '@/views/Contratos/ContratoServicioWizard.vue'
+import ARRIENDOS_ESTATICOS from '@/assets/arriendos_data.js'
+import IPC_RATES from '@/assets/ipc_rates.js'
 
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
+
+// ── Indexación arriendo desde JSON (igual que Mantenimiento) ─────────────────
+async function importarIndexacionArriendo(event, tipo) {
+  if (!contratos.arriendo) return
+  const file = event.target.files?.[0]
+  if (!file) return
+  event.target.value = ''
+  try {
+    const text = await file.text()
+    const data = JSON.parse(text)
+    const { data: result } = await api.post('/contratos-servicio/importar-indexacion', data, { params: { tipo } })
+    const { data: contratoData } = await api.get('/contratos-servicio', { params: { tipo: 'arriendo', proyecto_id: route.params.id } })
+    contratos.arriendo = contratoData.length ? contratoData[0] : null
+    const total = result.actualizados?.length ?? 0
+    toast.add({ severity: 'success', summary: `✓ ${total} proyecto${total !== 1 ? 's' : ''} actualizado${total !== 1 ? 's' : ''}`, life: 4000 })
+  } catch (e) {
+    toast.add({ severity: 'error', summary: 'Error al importar indexación', detail: e.message, life: 4000 })
+  }
+}
+
+// ── Arriendo estático (fallback desde JSON) ───────────────────────────────────
+function buscarArriendoEstatico(nombre) {
+  if (!nombre) return null
+  const nombreLower = nombre.trim().toLowerCase()
+  // 1. Coincidencia exacta
+  const exacto = ARRIENDOS_ESTATICOS.find(r => r.proyecto.toLowerCase() === nombreLower)
+  if (exacto) return exacto
+  // 2. Por palabras clave (mismo patrón que FacturasMantenimiento)
+  const STOP = new Set(['mgs', 'de', 'la', 'el', 'los', 'las', 'del', 'solar', 'minigranja', 'y', 'con'])
+  const keywords = nombreLower.split(/\s+/).filter(w => w.length >= 3 && !STOP.has(w) && !/^\d+$/.test(w))
+  if (!keywords.length) return null
+  let mejor = null; let mejorScore = 0
+  for (const r of ARRIENDOS_ESTATICOS) {
+    const pLower = r.proyecto.toLowerCase()
+    const score = keywords.filter(kw => pLower.includes(kw)).length
+    if (score > mejorScore) { mejorScore = score; mejor = r }
+  }
+  return mejorScore > 0 ? mejor : null
+}
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 const MESES_NOMBRES = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -726,7 +1220,110 @@ const excelInputRef      = ref(null)
 const idxInputAnualRef   = ref(null)
 const idxInputMensualRef = ref(null)
 const ANIO_ACTUAL        = new Date().getFullYear()
-const showIndexacion     = reactive({ anual: false, mensual: false })
+const showIndexacion          = reactive({ anual: false, mensual: false })
+const showIndexacionArriendo  = reactive({ anual: false, mensual: false })
+const idxArriendoAnualRef     = ref(null)
+const idxArriendoMensualRef   = ref(null)
+
+const modalIdxArriendo = reactive({
+  visible: false,
+  tipo: 'anual', // 'anual' | 'mensual'
+  form: { anio: new Date().getFullYear(), ipc_aplicado: null, valor: null },
+  errores: {},
+  saving: false,
+})
+
+function abrirModalIdxArriendo(tipo) {
+  modalIdxArriendo.tipo = tipo
+  modalIdxArriendo.form = { anio: new Date().getFullYear(), ipc_aplicado: null, valor: null }
+  modalIdxArriendo.errores = {}
+  modalIdxArriendo.visible = true
+}
+
+async function guardarFilaIdxArriendo() {
+  const e = {}
+  if (!modalIdxArriendo.form.anio) e.anio = 'Campo requerido'
+  if (modalIdxArriendo.form.valor == null) e.valor = 'Campo requerido'
+  modalIdxArriendo.errores = e
+  if (Object.keys(e).length) return
+
+  modalIdxArriendo.saving = true
+  try {
+    const tipo = modalIdxArriendo.tipo
+    const campo = tipo === 'anual' ? 'indexacion_anual' : 'indexacion_mensual'
+    const lista = [...(contratos.arriendo[campo] || []), {
+      anio: modalIdxArriendo.form.anio,
+      ipc_aplicado: modalIdxArriendo.form.ipc_aplicado ?? null,
+      valor: modalIdxArriendo.form.valor,
+    }]
+    const { data } = await api.patch(`/contratos-servicio/${contratos.arriendo.id}`, { [campo]: lista })
+    contratos.arriendo = { ...contratos.arriendo, ...data }
+    modalIdxArriendo.visible = false
+    toast.add({ severity: 'success', summary: 'Fila agregada', life: 2000 })
+  } catch (err) {
+    toast.add({ severity: 'error', summary: 'Error al guardar', detail: err.message, life: 3000 })
+  } finally {
+    modalIdxArriendo.saving = false
+  }
+}
+
+async function eliminarFilaIdxArriendo(tipo, idx) {
+  if (!confirm('¿Eliminar esta fila de indexación?')) return
+  try {
+    const campo = tipo === 'anual' ? 'indexacion_anual' : 'indexacion_mensual'
+    const lista = (contratos.arriendo[campo] || []).filter((_, i) => i !== idx)
+    const { data } = await api.patch(`/contratos-servicio/${contratos.arriendo.id}`, { [campo]: lista })
+    contratos.arriendo = { ...contratos.arriendo, ...data }
+    toast.add({ severity: 'success', summary: 'Fila eliminada', life: 2000 })
+  } catch (err) {
+    toast.add({ severity: 'error', summary: 'Error al eliminar', detail: err.message, life: 3000 })
+  }
+}
+
+/**
+ * Aplica automáticamente el IPC del año indicado.
+ * Calcula: valor_último × (1 + IPC_año / 100) y agrega la fila.
+ */
+async function aplicarIpcAnio(tipo, anio) {
+  if (!contratos.arriendo) return
+  const tasa = IPC_RATES[anio]
+  if (!tasa) {
+    toast.add({ severity: 'warn', summary: `IPC de ${anio} no disponible`, detail: `Agrega la tasa en src/assets/ipc_rates.js`, life: 4000 })
+    return
+  }
+  const campo = tipo === 'anual' ? 'indexacion_anual' : 'indexacion_mensual'
+  const lista = contratos.arriendo[campo] || []
+  if (!lista.length) {
+    toast.add({ severity: 'warn', summary: 'Sin valor base', detail: 'Primero agrega el valor base para calcular la indexación', life: 3000 })
+    return
+  }
+  const ultimoValor = lista[lista.length - 1].valor
+  const nuevoValor = Math.round(ultimoValor * (1 + tasa / 100) * 100) / 100
+  try {
+    const nuevaLista = [...lista, { anio, ipc_aplicado: tasa, valor: nuevoValor }]
+    const { data } = await api.patch(`/contratos-servicio/${contratos.arriendo.id}`, { [campo]: nuevaLista })
+    contratos.arriendo = { ...contratos.arriendo, ...data }
+    toast.add({ severity: 'success', summary: `IPC ${anio} aplicado`, detail: `Nuevo valor: ${new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(nuevoValor)}`, life: 3000 })
+  } catch (err) {
+    toast.add({ severity: 'error', summary: 'Error al aplicar IPC', detail: err.message, life: 3000 })
+  }
+}
+
+/**
+ * Detecta si hay un año nuevo sin fila de indexación y si hay IPC disponible.
+ * Devuelve el año pendiente o null.
+ */
+function anioIpcPendienteArriendo(tipo) {
+  if (!contratos.arriendo) return null
+  const campo = tipo === 'anual' ? 'indexacion_anual' : 'indexacion_mensual'
+  const lista = contratos.arriendo[campo] || []
+  if (!lista.length) return null
+  const ultimoAnio = lista[lista.length - 1].anio
+  const anioSiguiente = ultimoAnio < ANIO_ACTUAL ? ANIO_ACTUAL : ultimoAnio + 1
+  // Solo mostrar si hay tasa disponible y el año siguiente es <= año actual
+  if (anioSiguiente <= ANIO_ACTUAL && IPC_RATES[anioSiguiente]) return anioSiguiente
+  return null
+}
 const facturasCobradas   = ref([])
 const facturasEmitidas   = ref([])
 
