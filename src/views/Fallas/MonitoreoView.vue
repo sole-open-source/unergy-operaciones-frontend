@@ -1254,9 +1254,18 @@ async function onSaveForm(payload) {
     if (editingFalla.value) {
       // ── Edición (un solo proyecto) ──────────────────────────────────────
       const notaInicial = payload.nota_inicial
+      const archivosEdit = payload._archivos ?? []
       delete payload.nota_inicial
+      delete payload._archivos
       await api.patch(`/fallas/${editingFalla.value.id}`, payload)
       if (notaInicial) await api.post(`/fallas/${editingFalla.value.id}/seguimientos`, { nota: notaInicial })
+      if (archivosEdit.length) {
+        await Promise.all(archivosEdit.map(file => {
+          const fd = new FormData()
+          fd.append('archivo', file)
+          return api.post(`/fallas/${editingFalla.value.id}/archivos`, fd)
+        }))
+      }
       toast.add({ severity: 'success', summary: 'Falla actualizada', life: 2500 })
     } else {
       // ── Creación (uno o más proyectos) ──────────────────────────────────

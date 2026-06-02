@@ -163,8 +163,8 @@
       </div>
     </div>
 
-    <!-- ── SECCIÓN: Archivos adjuntos (solo al crear) ─────── -->
-    <div v-if="!initial" class="ff-section">
+    <!-- ── SECCIÓN: Archivos adjuntos ─────── -->
+    <div class="ff-section">
       <div class="ff-section-title"><i class="pi pi-paperclip" /> Archivos adjuntos</div>
       <!-- Dropzone -->
       <div class="ff-dropzone"
@@ -342,10 +342,8 @@ async function submit() {
     if (form.value.nota_inicial?.trim())          base.nota_inicial         = form.value.nota_inicial.trim()
 
     if (props.initial) {
-      // Edición: un solo proyecto
-      emit('save', { ...base, proyecto_id: form.value.proyecto_id })
+      emit('save', { ...base, proyecto_id: form.value.proyecto_id, _archivos: archivosStaged.value })
     } else {
-      // Creación: uno o más proyectos + archivos staged
       emit('save', { ...base, proyecto_ids: form.value.proyecto_ids, _archivos: archivosStaged.value })
     }
   } finally {
