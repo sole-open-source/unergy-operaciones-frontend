@@ -520,14 +520,11 @@ onUnmounted(() => {
 .sl-diff-ok  { background: rgba(22,163,74,0.18);  color: #4ade80; }
 .sl-diff-warn { background: rgba(217,119,6,0.18);  color: #fbbf24; }
 
-/* ── Fila de gráficas ── */
+/* ── Fila de gráficas — se adapta al espacio disponible ── */
 .sl-charts-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 14px;
-}
-@media (max-width: 600px) {
-  .sl-charts-row { grid-template-columns: 1fr; }
 }
 
 /* ── Tarjeta de gráfica ── */
