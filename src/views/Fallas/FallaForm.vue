@@ -34,8 +34,8 @@
           <Select v-model="form.tipo_id" :options="tiposAgrupados"
             optionLabel="etiqueta" optionValue="id"
             optionGroupLabel="categoria" optionGroupChildren="items"
-            placeholder="Seleccionar tipo" class="w-full"
-            :class="{ 'p-invalid': errors.tipo_id }" />
+            placeholder="Seleccionar tipo" filter filterPlaceholder="Buscar tipo..."
+            class="w-full" :class="{ 'p-invalid': errors.tipo_id }" />
           <small v-if="errors.tipo_id" class="ff-error">{{ errors.tipo_id }}</small>
         </div>
 
