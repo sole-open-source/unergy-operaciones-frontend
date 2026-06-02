@@ -21,10 +21,26 @@
             </span>
           </button>
         </div>
-        <button class="sl-refresh-btn" @click="cargar" :disabled="loading">
-          <i :class="loading ? 'pi pi-spin pi-spinner' : 'pi pi-refresh'" />
-          Actualizar
-        </button>
+        <!-- Botón actualizar + auto-refresh -->
+        <div class="sl-refresh-wrap">
+          <button class="sl-refresh-btn" @click="cargar" :disabled="loading">
+            <i :class="loading ? 'pi pi-spin pi-spinner' : 'pi pi-refresh'" />
+            Actualizar
+          </button>
+          <div class="sl-auto-wrap">
+            <button class="sl-auto-btn" :class="autoInterval && 'sl-auto-btn--on'" @click="toggleAutoMenu" :title="autoInterval ? `Auto: ${autoLabel}` : 'Auto-actualizar'">
+              <i class="pi pi-clock" />
+              <span v-if="autoInterval" class="sl-auto-label">{{ autoLabel }}</span>
+              <i class="pi pi-chevron-down sl-auto-caret" />
+            </button>
+            <div v-if="autoMenuOpen" class="sl-auto-menu">
+              <button class="sl-auto-option" :class="!autoInterval && 'sl-auto-option--active'" @click="setAuto(0)">Desactivado</button>
+              <button v-for="opt in autoOptions" :key="opt.ms" class="sl-auto-option" :class="autoInterval === opt.ms && 'sl-auto-option--active'" @click="setAuto(opt.ms)">
+                Cada {{ opt.label }}
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -125,7 +141,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import {
   Chart as ChartJS, CategoryScale, LinearScale,
   PointElement, LineElement, Title, Tooltip, Filler,
@@ -145,6 +161,32 @@ const detailMap   = reactive({})
 const lastUpdated = ref('')
 const cols        = ref(1)
 let refreshTimer  = null
+
+// ── Auto-refresh ───────────────────────────────────────────────────────────
+const AUTO_KEY = 'solar_auto_refresh'
+const autoOptions = [
+  { ms: 60000,  label: '1 min' },
+  { ms: 300000, label: '5 min' },
+  { ms: 900000, label: '15 min' },
+  { ms: 1800000,label: '30 min' },
+]
+const autoInterval = ref(parseInt(localStorage.getItem(AUTO_KEY) || '0'))
+const autoMenuOpen = ref(false)
+const autoLabel    = computed(() => autoOptions.find(o => o.ms === autoInterval.value)?.label ?? '')
+
+function setAuto(ms) {
+  autoMenuOpen.value = false
+  autoInterval.value = ms
+  localStorage.setItem(AUTO_KEY, String(ms))
+  if (refreshTimer) clearInterval(refreshTimer)
+  refreshTimer = ms ? setInterval(cargar, ms) : null
+}
+
+function toggleAutoMenu() { autoMenuOpen.value = !autoMenuOpen.value }
+
+function onClickOutside(e) {
+  if (!e.target.closest('.sl-auto-wrap')) autoMenuOpen.value = false
+}
 
 const STATUS_COLORS = {
   online: '#16a34a', degradado: '#d97706', caido: '#dc2626',
@@ -333,8 +375,15 @@ function fmtKw(kw) {
   return kw.toFixed(1) + ' kW'
 }
 
-onMounted(() => { cargar(); refreshTimer = setInterval(cargar, 300000) })
-onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer) })
+onMounted(() => {
+  cargar()
+  if (autoInterval.value) refreshTimer = setInterval(cargar, autoInterval.value)
+  document.addEventListener('click', onClickOutside)
+})
+onUnmounted(() => {
+  if (refreshTimer) clearInterval(refreshTimer)
+  document.removeEventListener('click', onClickOutside)
+})
 </script>
 
 <style scoped>
@@ -362,9 +411,22 @@ onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer) })
 .sl-col-btn--active .sl-col-bar { background: #fff; }
 
 /* ── Refresh ── */
+.sl-refresh-wrap { display: flex; align-items: center; gap: 6px; }
 .sl-refresh-btn { display: flex; align-items: center; gap: 6px; padding: 7px 16px; border-radius: 8px; background: #915BD8; color: #FDFAF7; border: none; cursor: pointer; font-size: 13px; font-weight: 600; transition: background 0.2s; }
 .sl-refresh-btn:hover:not(:disabled) { background: #7a3fc0; }
 .sl-refresh-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── Auto-refresh dropdown ── */
+.sl-auto-wrap { position: relative; }
+.sl-auto-btn { display: flex; align-items: center; gap: 5px; padding: 7px 10px; border-radius: 8px; background: #3d2f52; color: #c4b3df; border: 1px solid #4e3a6a; cursor: pointer; font-size: 12px; font-weight: 600; transition: background 0.2s; white-space: nowrap; }
+.sl-auto-btn:hover { background: #4e3a6a; }
+.sl-auto-btn--on { background: #4e3a6a; color: #d4a8ff; border-color: #915BD8; }
+.sl-auto-label { font-size: 11px; }
+.sl-auto-caret { font-size: 10px; }
+.sl-auto-menu { position: absolute; right: 0; top: calc(100% + 6px); background: #2C2039; border: 1px solid #4e3a6a; border-radius: 10px; min-width: 140px; overflow: hidden; z-index: 50; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+.sl-auto-option { display: block; width: 100%; padding: 9px 14px; background: none; border: none; color: #c4b3df; font-size: 13px; text-align: left; cursor: pointer; transition: background 0.15s; }
+.sl-auto-option:hover { background: #3d2f52; }
+.sl-auto-option--active { background: #4e3a6a; color: #d4a8ff; font-weight: 600; }
 
 /* ── Estados ── */
 .sl-loading, .sl-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 60px 0; color: #6b5a8a; font-size: 14px; }
