@@ -74,11 +74,6 @@
             showTime hourFormat="24" class="w-full" showIcon />
         </div>
 
-        <div class="ff-field">
-          <label class="ff-label">SLA límite (horas)</label>
-          <InputNumber v-model="form.sla_limite_horas" placeholder="Ej: 24"
-            class="w-full" :min="1" />
-        </div>
 
       </div>
     </div>
