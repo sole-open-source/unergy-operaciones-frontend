@@ -15,7 +15,8 @@ const routes = [
   { path: '/proyectos',    name: 'Proyectos',    component: () => import('@/views/Proyectos/ProyectosListView.vue') },
   { path: '/proyectos/:id',          name: 'ProyectoDetalle', component: () => import('@/views/Proyectos/ProyectoDetailView.vue') },
   { path: '/proyectos/:id/ppa',      name: 'ProyectoPPA',     component: () => import('@/views/Servicios/PPAView.vue') },
-  { path: '/proyectos/:id/operacion',name: 'ProyectoOperacion',component: () => import('@/views/Servicios/OperacionView.vue') },
+  { path: '/proyectos/:id/operacion',       name: 'ProyectoOperacion',       component: () => import('@/views/Servicios/OperacionView.vue') },
+  { path: '/proyectos/:id/representacion',  name: 'ProyectoRepresentacion',  component: () => import('@/views/Servicios/RepresentacionView.vue') },
   { path: '/servicios',    name: 'Servicios',    component: () => import('@/views/Contratos/ContratosListView.vue') },
   { path: '/contratos/:id',name: 'ContratoDetalle', component: () => import('@/views/Contratos/ContratoDetailView.vue') },
 

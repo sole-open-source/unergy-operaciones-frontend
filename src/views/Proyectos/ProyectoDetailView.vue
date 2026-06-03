@@ -754,6 +754,10 @@ function clickServicio(srv) {
     router.push(`/proyectos/${route.params.id}/operacion`)
     return
   }
+  if (srv.key === 'srv_representacion') {
+    router.push(`/proyectos/${route.params.id}/representacion`)
+    return
+  }
   if (!srv.tipo) return
   if (srvExpanded.value === srv.key) {
     srvExpanded.value = null
