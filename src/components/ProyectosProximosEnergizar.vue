@@ -13,10 +13,23 @@
       <Button icon="pi pi-plus" label="Agregar Proyecto" size="small" @click="addProject" />
     </div>
 
+    <!-- API degradation notice: the composable falls back to the last local copy when
+         the /proximos-energizar endpoint is unreachable. Surface it so the user knows
+         the table may be stale instead of silently showing cached data. -->
+    <div
+      v-if="error"
+      class="px-5 py-2 flex items-center gap-2 text-xs"
+      style="background: rgba(240,192,64,0.14); color: #9a6700; border-bottom: 1px solid rgba(240,192,64,0.3);"
+    >
+      <i class="pi pi-exclamation-triangle" />
+      <span>No se pudo cargar desde el servidor — mostrando la última copia local en caché.</span>
+    </div>
+
     <!-- Table -->
     <div class="p-3 overflow-x-auto">
       <DataTable
         :value="projects"
+        :loading="loading"
         dataKey="id"
         size="small"
         stripedRows
@@ -119,7 +132,7 @@ import AutoComplete from 'primevue/autocomplete'
 import Select from 'primevue/select'
 import { useEnergizationProjects } from '@/composables/useEnergizationProjects'
 
-const { projects, addProject, removeProject } = useEnergizationProjects()
+const { projects, loading, error, addProject, removeProject } = useEnergizationProjects()
 
 const STATUS_OPTIONS = ['En construcción', 'Pruebas', 'Próximo a energizar', 'Energizado']
 const MESES_CORTOS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
