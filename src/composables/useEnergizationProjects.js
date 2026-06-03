@@ -38,6 +38,10 @@ export function useEnergizationProjects() {
   const projects = ref([])
   const loading = ref(false)
   const error = ref(null)
+  // Partial-data notice from the API (e.g. Sun Factory creds missing → fechas
+  // estimadas; generación Unergy no disponible → proyección teórica). Distinct from
+  // `error` (full load failure): with `warning` the data loaded but is degraded.
+  const warning = ref(null)
 
   function loadFromLocalStorage() {
     try {
@@ -56,11 +60,13 @@ export function useEnergizationProjects() {
   async function loadProjects() {
     loading.value = true
     error.value = null
+    warning.value = null
     try {
       const { data } = await api.get('/proximos-energizar')
       const list = Array.isArray(data?.projects) ? data.projects : []
       projects.value = list.map(rehydrate)
-      if (data?.warning) console.warn('proximos-energizar:', data.warning)
+      warning.value = data?.warning || null
+      if (warning.value) console.warn('proximos-energizar:', warning.value)
       return true
     } catch (e) {
       console.error('Error loading proyectos próximos a energizar from API', e)
@@ -101,5 +107,5 @@ export function useEnergizationProjects() {
   // Persist any change (add / remove / inline edit) as a local override/cache.
   watch(projects, saveProjects, { deep: true })
 
-  return { projects, loading, error, addProject, removeProject, updateProject, loadProjects, saveProjects }
+  return { projects, loading, error, warning, addProject, removeProject, updateProject, loadProjects, saveProjects }
 }

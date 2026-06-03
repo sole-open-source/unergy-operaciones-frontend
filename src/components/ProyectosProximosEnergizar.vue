@@ -25,6 +25,18 @@
       <span>No se pudo cargar desde el servidor — mostrando la última copia local en caché.</span>
     </div>
 
+    <!-- Partial-data notice: the API loaded, but some cross-source is unavailable
+         (Sun Factory creds missing → fechas estimadas; generación Unergy down →
+         proyección teórica). Surface it so the user knows which numbers are soft. -->
+    <div
+      v-if="warning && !error"
+      class="px-5 py-2 flex items-center gap-2 text-xs"
+      style="background: rgba(59,130,246,0.10); color: #1d4ed8; border-bottom: 1px solid rgba(59,130,246,0.25);"
+    >
+      <i class="pi pi-info-circle" />
+      <span>{{ warning }}</span>
+    </div>
+
     <!-- Table -->
     <div class="p-3 overflow-x-auto">
       <DataTable
@@ -55,10 +67,22 @@
           </template>
         </Column>
 
-        <!-- Energization date -->
-        <Column header="Energización" style="min-width: 150px;">
+        <!-- Energization date + source provenance (real Sun Factory vs estimated) -->
+        <Column header="Energización" style="min-width: 170px;">
           <template #body="{ data }">
             <DatePicker v-model="data.energizationDate" dateFormat="yy-mm-dd" showIcon class="w-full" />
+            <span
+              v-if="data.energizationSource"
+              class="inline-block mt-1 px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide"
+              :style="data.energizationSource === 'sunfactory'
+                ? 'background: rgba(34,197,94,0.15); color: #15803d;'
+                : 'background: rgba(240,192,64,0.18); color: #9a6700;'"
+              v-tooltip="data.energizationSource === 'sunfactory'
+                ? 'Fecha real del cronograma Sun Factory'
+                : 'Fecha estimada (sin cronograma Sun Factory confirmado)'"
+            >
+              {{ data.energizationSource === 'sunfactory' ? 'Sun Factory' : 'Estimada' }}
+            </span>
           </template>
         </Column>
 
@@ -132,7 +156,7 @@ import AutoComplete from 'primevue/autocomplete'
 import Select from 'primevue/select'
 import { useEnergizationProjects } from '@/composables/useEnergizationProjects'
 
-const { projects, loading, error, addProject, removeProject } = useEnergizationProjects()
+const { projects, loading, error, warning, addProject, removeProject } = useEnergizationProjects()
 
 const STATUS_OPTIONS = ['En construcción', 'Pruebas', 'Próximo a energizar', 'Energizado']
 const MESES_CORTOS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
