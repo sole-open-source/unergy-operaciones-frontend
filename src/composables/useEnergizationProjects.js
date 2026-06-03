@@ -1,23 +1,27 @@
 import { ref, watch, onMounted } from 'vue'
+import api from '@/api/client'
 
 const LOCAL_STORAGE_KEY = 'unergy_energization_projects'
 
-// ── TODO: Solenium API integration ────────────────────────────────────────────
-// This composable currently persists the "Proyectos próximos a energizarse" data
-// in localStorage as an MVP. The upcoming-projects information actually lives in
-// Solenium (project pipeline / construction tracker), which is not directly
-// reachable from the browser.
+// ── Fuente de datos ─────────────────────────────────────────────────────────
+// El pipeline real de "Proyectos próximos a energizarse" vive en originabotdb
+// (minifarm_project). El backend lo expone normalizado en
+// `GET /api/v1/proximos-energizar`, cruzándolo con la generación de Unergy para
+// detectar plantas ya energizadas. Este composable carga desde ahí; si la API
+// falla, cae a la última copia en localStorage y, en último caso, a mocks.
 //
-// To productionize this:
-//   1. Build a backend proxy endpoint (e.g. `/proyectos/proximos-energizar`) that
-//      authenticates against Solenium and normalizes its payload into the project
-//      shape used here ({ id, name, status, energizationDate, contracts, monthlyMwh }).
-//   2. Replace the body of `loadProjects` below with a call to that proxy
-//      (via `@/api/client`) that populates the `projects` ref from the response.
-//   3. Decide on the write path: either keep edits local, or `PUT`/`PATCH` changes
-//      back through the proxy in `saveProjects` instead of writing to localStorage.
-// Until that proxy exists, localStorage keeps this feature fully functional.
+// Las ediciones manuales (agregar/borrar/editar inline) se siguen persistiendo
+// en localStorage como override local hasta que exista un write-path en el backend.
 // ──────────────────────────────────────────────────────────────────────────────
+
+function rehydrate(p) {
+  return {
+    ...p,
+    energizationDate: p.energizationDate ? new Date(p.energizationDate) : new Date(),
+    contracts: Array.isArray(p.contracts) ? p.contracts : [],
+    monthlyMwh: Number(p.monthlyMwh) || 0,
+  }
+}
 
 function defaultProject() {
   return {
@@ -30,47 +34,42 @@ function defaultProject() {
   }
 }
 
-function mockProjects() {
-  const now = new Date()
-  return [
-    {
-      id: Date.now(),
-      name: 'Granja Solar La Esperanza',
-      status: 'En construcción',
-      energizationDate: new Date(now.getFullYear(), now.getMonth() + 1, 16),
-      contracts: ['Terpel'],
-      monthlyMwh: 320,
-    },
-    {
-      id: Date.now() + 1,
-      name: 'Parque FV El Mirador',
-      status: 'Pruebas',
-      energizationDate: new Date(now.getFullYear(), now.getMonth() + 2, 1),
-      contracts: ['Klik', 'Consolidado'],
-      monthlyMwh: 180,
-    },
-  ]
-}
-
 export function useEnergizationProjects() {
   const projects = ref([])
+  const loading = ref(false)
+  const error = ref(null)
 
-  function loadProjects() {
+  function loadFromLocalStorage() {
     try {
       const raw = localStorage.getItem(LOCAL_STORAGE_KEY)
       if (!raw) return false
       const parsed = JSON.parse(raw)
-      if (!Array.isArray(parsed)) return false
-      // energizationDate is serialized as a string — rehydrate it into a Date.
-      projects.value = parsed.map(p => ({
-        ...p,
-        energizationDate: p.energizationDate ? new Date(p.energizationDate) : new Date(),
-        contracts: Array.isArray(p.contracts) ? p.contracts : [],
-      }))
+      if (!Array.isArray(parsed) || parsed.length === 0) return false
+      projects.value = parsed.map(rehydrate)
       return true
     } catch (e) {
       console.error('Error parsing energization projects from localStorage', e)
       return false
+    }
+  }
+
+  async function loadProjects() {
+    loading.value = true
+    error.value = null
+    try {
+      const { data } = await api.get('/proximos-energizar')
+      const list = Array.isArray(data?.projects) ? data.projects : []
+      projects.value = list.map(rehydrate)
+      if (data?.warning) console.warn('proximos-energizar:', data.warning)
+      return true
+    } catch (e) {
+      console.error('Error loading proyectos próximos a energizar from API', e)
+      error.value = e
+      // Degradación: última copia local; si no hay, deja lo que haya.
+      loadFromLocalStorage()
+      return false
+    } finally {
+      loading.value = false
     }
   }
 
@@ -97,15 +96,10 @@ export function useEnergizationProjects() {
     }
   }
 
-  onMounted(() => {
-    const loaded = loadProjects()
-    if (!loaded) {
-      projects.value = mockProjects()
-    }
-  })
+  onMounted(loadProjects)
 
-  // Persist any change (add / remove / inline edit) automatically.
+  // Persist any change (add / remove / inline edit) as a local override/cache.
   watch(projects, saveProjects, { deep: true })
 
-  return { projects, addProject, removeProject, updateProject, loadProjects, saveProjects }
+  return { projects, loading, error, addProject, removeProject, updateProject, loadProjects, saveProjects }
 }
