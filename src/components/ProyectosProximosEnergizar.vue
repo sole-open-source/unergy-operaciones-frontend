@@ -49,6 +49,16 @@
           </template>
         </Column>
 
+        <!-- Construction progress (Sun Factory) -->
+        <Column header="% Obra" style="min-width: 110px;">
+          <template #body="{ data }">
+            <span v-if="data.avancePct != null" class="text-sm font-mono tabular-nums" style="color: #2C2039;">
+              {{ Number(data.avancePct).toFixed(1) }}%
+            </span>
+            <span v-else class="text-sm" style="color: rgba(44,32,57,0.3);">—</span>
+          </template>
+        </Column>
+
         <!-- Assigned contracts -->
         <Column header="Contratos" style="min-width: 200px;">
           <template #body="{ data }">
