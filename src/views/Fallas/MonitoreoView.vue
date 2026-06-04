@@ -508,150 +508,12 @@
 
     </template><!-- /TAB 0 -->
 
-    <!-- ══ TAB 1 — GRÁFICOS ══════════════════════════════════════════════ -->
-    <div v-if="activeTab === 1" class="mon-tab-view">
-
-      <!-- ── Sección: Generación ───────────────────────────────────────────── -->
-      <div class="charts-container">
-
-        <!-- ── Gráfico 1: Últimos 7 días (todos los proyectos) ── -->
-        <div class="chart-card chart-card--wide">
-          <div class="gen-card-head">
-            <div class="gen-card-title">
-              <i class="pi pi-chart-line" style="color:#16a34a;font-size:13px" />
-              <span>Resumen últimos 7 días</span>
-              <span class="p90-section-sub">· Todos los proyectos · Real vs P90</span>
-            </div>
-            <div class="gen-legend" v-if="!gen7Loading && gen7HasData">
-              <span class="p90-legend-item"><span class="p90-legend-dot" style="background:#16a34a"></span> Real</span>
-              <span v-if="gen7HasP90" class="p90-legend-item"><span class="p90-legend-dot" style="background:#f59e0b"></span> P90</span>
-              <span class="gen-kpi" style="color:#16a34a">{{ gen7TotalReal.toLocaleString('es-CO') }} kWh</span>
-              <span v-if="gen7HasP90" class="gen-kpi" style="color:#f59e0b">P90: {{ gen7TotalP90.toLocaleString('es-CO') }} kWh</span>
-            </div>
-            <button class="p90-reload-btn" @click="cargarGen7" :disabled="gen7Loading">
-              <i :class="gen7Loading ? 'pi pi-spin pi-spinner' : 'pi pi-refresh'" />
-            </button>
-          </div>
-          <div v-if="gen7Loading" class="p90-state" style="padding:40px">
-            <i class="pi pi-spin pi-spinner" style="color:#915BD8;font-size:22px" />
-            <span>Cargando generación…</span>
-          </div>
-          <div v-else-if="!gen7HasData" class="p90-state" style="padding:40px">
-            <i class="pi pi-database" style="color:#9ca3af;font-size:26px" />
-            <span>Sin datos de generación en los últimos 7 días.</span>
-          </div>
-          <div v-else class="chart-canvas-wrap" style="height:280px">
-            <Line :data="lineGen7Data" :options="lineGen7Opts" />
-          </div>
-        </div>
-
-        <!-- ── Gráfico: Generación por proyecto ── -->
-        <div class="chart-card chart-card--wide">
-          <div class="gen-card-head">
-            <div class="gen-card-title">
-              <i class="pi pi-chart-bar" style="color:#7c3aed;font-size:13px" />
-              <span>Generación por proyecto</span>
-              <span class="p90-section-sub">· kWh desde Solenium + fallas asociadas</span>
-            </div>
-          </div>
-
-          <!-- Fila 1: proyecto + filtros rápidos -->
-          <div class="genproj-controls">
-            <Select v-model="genProjSel" :options="proyectosGenOp" optionLabel="nombre_comercial" optionValue="id"
-              placeholder="Seleccionar proyecto…" filter showClear class="genproj-select"
-              @change="genProjCargado = false; genProjPuntos = []" />
-            <div class="genproj-quick-btns">
-              <button v-for="f in GENPROJ_FILTROS" :key="f.key"
-                class="genproj-quick-btn"
-                :class="{ 'genproj-quick-btn--active': genProjFiltro === f.key }"
-                @click="aplicarFiltroGenProj(f.key)">{{ f.label }}</button>
-            </div>
-            <!-- Fechas personalizadas (solo si filtro='custom') -->
-            <template v-if="genProjFiltro === 'custom'">
-              <DatePicker v-model="genProjFechaInicio" dateFormat="yy-mm-dd" placeholder="Desde"
-                showButtonBar class="p90-dp" size="small" />
-              <DatePicker v-model="genProjFechaFin" dateFormat="yy-mm-dd" placeholder="Hasta"
-                showButtonBar class="p90-dp" size="small" />
-            </template>
-          </div>
-
-          <!-- Fila 2: toggle granularidad + botón Ver -->
-          <div class="genproj-controls genproj-controls--row2">
-            <div class="genproj-gran-toggle">
-              <button class="genproj-gran-btn"
-                :class="{ 'genproj-gran-btn--active': genProjGran === 'day' }"
-                @click="genProjGran = 'day'; if (genProjSel && genProjCargado) cargarGenProj()">
-                <i class="pi pi-calendar" /> Por día
-              </button>
-              <button class="genproj-gran-btn"
-                :class="{ 'genproj-gran-btn--active': genProjGran === 'hour' }"
-                @click="setGranHour">
-                <i class="pi pi-clock" /> Por hora
-              </button>
-            </div>
-            <Button label="Ver generación" icon="pi pi-chart-bar" size="small"
-              @click="cargarGenProj" :loading="genProjLoading" :disabled="!genProjSel" />
-          </div>
-
-          <!-- Estados -->
-          <div v-if="!genProjSel" class="p90-state" style="padding:40px">
-            <i class="pi pi-hand-pointer" style="color:#a094b8;font-size:26px" />
-            <span>Selecciona un proyecto para ver su generación y fallas.</span>
-          </div>
-          <div v-else-if="genProjLoading" class="p90-state" style="padding:40px">
-            <i class="pi pi-spin pi-spinner" style="color:#915BD8;font-size:22px" />
-            <span>Cargando datos…</span>
-          </div>
-          <div v-else-if="genProjPuntos.length === 0 && genProjCargado" class="p90-state" style="padding:40px">
-            <i class="pi pi-database" style="color:#9ca3af;font-size:26px" />
-            <span>Sin datos de generación para este período en Solenium.</span>
-          </div>
-
-          <!-- Gráfico + tabla de fallas -->
-          <template v-else-if="genProjPuntos.length">
-            <!-- KPI total -->
-            <div class="genproj-kpi">
-              <span class="genproj-kpi-val">{{ genProjTotalKwh.toLocaleString('es-CO', { maximumFractionDigits: 0 }) }} kWh</span>
-              <span class="genproj-kpi-lbl">total del período</span>
-              <span class="genproj-kpi-sep">·</span>
-              <span class="genproj-kpi-lbl">{{ genProjPuntos.length }} {{ genProjGran === 'hour' ? 'horas' : 'días' }}</span>
-            </div>
-            <div class="chart-canvas-wrap" :style="{ height: genProjGran === 'hour' ? '240px' : '240px' }">
-              <Bar :data="barGenProjData" :options="barGenProjOpts" />
-            </div>
-            <div class="genproj-leyenda">
-              <span><span class="genproj-dot" style="background:#7c3aedcc"></span>Generación</span>
-              <span v-if="genProjGran === 'day'"><span class="genproj-dot" style="background:#dc2626cc;border:1.5px solid #b91c1c"></span>Día con falla</span>
-            </div>
-
-            <!-- Tabla de fallas del período -->
-            <div v-if="genProjFallas.length" class="genproj-fallas">
-              <div class="genproj-fallas-header">
-                <i class="pi pi-bolt" style="color:#dc2626;font-size:11px" />
-                <span>{{ genProjFallas.length }} falla{{ genProjFallas.length !== 1 ? 's' : '' }} en este período</span>
-              </div>
-              <div class="genproj-falla-row" v-for="f in genProjFallas" :key="f.id">
-                <code class="genproj-codigo">{{ f.codigo_interno }}</code>
-                <span class="genproj-fecha">{{ (f.fecha_identificacion || '').split('T')[0] }}</span>
-                <span class="genproj-estado"
-                  :style="{ background: (f.estado?.color_hex || '#9ca3af') + '22', color: f.estado?.color_hex || '#6b7280', border: `1px solid ${(f.estado?.color_hex || '#9ca3af')}44` }">
-                  {{ f.estado?.etiqueta || '—' }}
-                </span>
-                <span class="genproj-prio" :style="{ color: prioColor(f.prioridad?.codigo) }">
-                  {{ f.prioridad?.etiqueta || '—' }}
-                </span>
-                <span class="genproj-desc">{{ f.descripcion || '—' }}</span>
-              </div>
-            </div>
-            <div v-else-if="genProjCargado" class="genproj-sin-fallas">
-              <i class="pi pi-check-circle" style="color:#16a34a;font-size:13px" />
-              Sin fallas registradas en este período
-            </div>
-          </template>
-        </div>
-
-      </div><!-- /Generación section -->
-
+    <!-- ══ TAB 1 — CALENDARIO ══════════════════════════════════════════════ -->
+    <div v-if="activeTab === 1" class="mon-tab-calendario">
+      <CalendarioFallas
+        @editar="abrirEditar"
+        @ver-falla="irAFallaDesdeCalendario"
+      />
     </div><!-- /TAB 1 -->
 
     <!-- ══ TAB 2 — MAPA ══════════════════════════════════════════════════ -->
@@ -678,6 +540,7 @@ import Textarea from 'primevue/textarea'
 import MultiSelect from 'primevue/multiselect'
 import FallaForm from './FallaForm.vue'
 import FallaArchivos from './FallaArchivos.vue'
+import CalendarioFallas from './CalendarioFallas.vue'
 const FallasMapView = defineAsyncComponent(() => import('./FallasMapView.vue'))
 import { Bar, Line } from 'vue-chartjs'
 import {
@@ -694,8 +557,8 @@ const confirmService = useConfirm()
 
 // ── Tabs ─────────────────────────────────────────────────────────────────
 const TABS = [
-  { label: 'Fallas',   icon: 'pi pi-bolt' },
-  { label: 'Gráficos', icon: 'pi pi-chart-bar' },
+  { label: 'Fallas',     icon: 'pi pi-bolt' },
+  { label: 'Calendario', icon: 'pi pi-calendar' },
 ]
 const activeTab = ref(0)
 
@@ -1173,6 +1036,12 @@ function abrirCrear() {
 function abrirEditar(falla) {
   editingFalla.value    = falla
   formDialogVisible.value = true
+}
+
+function irAFallaDesdeCalendario(falla) {
+  // Cambia al tab Fallas y abre el drawer con la falla seleccionada
+  activeTab.value = 0
+  nextTick(() => abrirDrawer(falla))
 }
 
 function editarDesdeDrawer() {
@@ -2456,6 +2325,7 @@ watch(bucket, (newBucket) => {
 
 /* ══ TAB 1 — GRÁFICOS ════════════════════════════════════════════════════ */
 .mon-tab-view { padding: 24px 24px 40px; background: #f5f4f8; }
+.mon-tab-calendario { flex: 1; display: flex; flex-direction: column; min-height: 0; background: #f5f4f8; overflow-y: auto; }
 .mon-tab-loading { display:flex; flex-direction:column; align-items:center; gap:14px; padding:80px 20px; color:#a094b8; font-size:13px; }
 .mon-spinner { width:32px; height:32px; border:3px solid #ece8f4; border-top-color:#915BD8; border-radius:50%; animation:spin .75s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }

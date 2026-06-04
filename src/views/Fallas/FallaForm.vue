@@ -79,6 +79,18 @@
             showTime hourFormat="24" class="w-full" showIcon />
         </div>
 
+        <!-- Fecha programada — solo visible cuando el estado es "programado" -->
+        <div v-if="esEstadoProgramado" class="ff-field ff-highlight">
+          <label class="ff-label">
+            <i class="pi pi-calendar" style="color:#3B82F6" />
+            Fecha programada *
+            <span class="ff-hint">(fecha de intervención planificada)</span>
+          </label>
+          <DatePicker v-model="form.fecha_programada" dateFormat="yy-mm-dd"
+            placeholder="AAAA-MM-DD" class="w-full"
+            :class="{ 'p-invalid': errors.fecha_programada }" />
+          <small v-if="errors.fecha_programada" class="ff-error">{{ errors.fecha_programada }}</small>
+        </div>
 
       </div>
     </div>
@@ -293,6 +305,14 @@ const form = ref({
   equipo_afectado:      props.initial?.equipo_afectado ?? '',
   energia_perdida_kwh:  props.initial?.energia_perdida_kwh ?? null,
   nota_inicial:         '',
+  fecha_programada:     props.initial?.fecha_programada ? new Date(props.initial.fecha_programada) : null,
+})
+
+// Detectar si el estado seleccionado es "programado"
+const esEstadoProgramado = computed(() => {
+  if (!form.value.estado_id) return false
+  const estado = props.catalogos.estados?.find(e => e.id === form.value.estado_id)
+  return estado?.codigo === 'programado'
 })
 
 // Auto-populate description when tipo changes (only if description is empty or matches a previous auto-fill)
@@ -332,6 +352,7 @@ function validate() {
   if (!form.value.prioridad_id)         e.prioridad_id = 'Requerido'
   if (!form.value.descripcion?.trim())  e.descripcion = 'Requerido'
   if (!form.value.fecha_identificacion) e.fecha_identificacion = 'Requerido'
+  if (esEstadoProgramado.value && !form.value.fecha_programada) e.fecha_programada = 'Requerido cuando el estado es Programado'
   errors.value = e
   return Object.keys(e).length === 0
 }
@@ -363,6 +384,7 @@ async function submit() {
     if (form.value.equipo_afectado?.trim())       base.equipo_afectado      = form.value.equipo_afectado.trim()
     if (form.value.energia_perdida_kwh != null)   base.energia_perdida_kwh  = form.value.energia_perdida_kwh
     if (form.value.nota_inicial?.trim())          base.nota_inicial         = form.value.nota_inicial.trim()
+    if (form.value.fecha_programada)             base.fecha_programada     = formatDate(form.value.fecha_programada)
 
     if (props.initial) {
       emit('save', { ...base, proyecto_id: form.value.proyecto_id, _archivos: archivosStaged.value })
@@ -443,6 +465,12 @@ onMounted(async () => {
 .ff-error {
   color: #dc2626;
   font-size: 11px;
+}
+.ff-highlight {
+  background: #eff6ff;
+  border: 1.5px solid #bfdbfe;
+  border-radius: 8px;
+  padding: 10px 12px;
 }
 
 /* ── Dropzone ── */
