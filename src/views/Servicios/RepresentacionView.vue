@@ -125,13 +125,13 @@
               {{ valorVigente(contratoActivo.indexacion_cgm, contratoActivo.tarifa_cgm) }}
               <span class="text-xs font-normal text-gray-400 ml-0.5">$/kWh</span>
             </p>
-            <button v-if="contratoActivo.indexacion_cgm?.length" type="button"
+            <button v-if="(contratoActivo.indexacion_cgm || []).length > 0" type="button"
               class="mt-2 flex items-center gap-1 text-xs font-medium hover:opacity-75 transition-opacity"
               style="background:none;border:none;padding:0;cursor:pointer;color:#3b82f6"
-              @click="openCgm = !openCgm">
+              @click="togglePanel('cgm')">
               <i class="pi pi-chevron-down text-xs transition-transform duration-200"
-                :style="openCgm ? 'transform:rotate(180deg)' : ''" />
-              {{ openCgm ? 'Ocultar' : 'Ver indexación' }}
+                :style="paneles.cgm ? 'transform:rotate(180deg)' : ''" />
+              {{ paneles.cgm ? 'Ocultar' : 'Ver indexación' }}
             </button>
           </div>
 
@@ -144,20 +144,23 @@
               {{ valorVigente(contratoActivo.indexacion_rep, contratoActivo.tarifa_rep) }}
               <span class="text-xs font-normal text-gray-400 ml-0.5">$/kWh</span>
             </p>
-            <button v-if="contratoActivo.indexacion_rep?.length" type="button"
+            <button v-if="(contratoActivo.indexacion_rep || []).length > 0" type="button"
               class="mt-2 flex items-center gap-1 text-xs font-medium hover:opacity-75 transition-opacity"
               style="background:none;border:none;padding:0;cursor:pointer;color:#3b82f6"
-              @click="openRep = !openRep">
+              @click="togglePanel('rep')">
               <i class="pi pi-chevron-down text-xs transition-transform duration-200"
-                :style="openRep ? 'transform:rotate(180deg)' : ''" />
-              {{ openRep ? 'Ocultar' : 'Ver indexación' }}
+                :style="paneles.rep ? 'transform:rotate(180deg)' : ''" />
+              {{ paneles.rep ? 'Ocultar' : 'Ver indexación' }}
             </button>
           </div>
         </div>
 
-        <!-- Tabla indexación CGM -->
-        <div :style="{ overflow:'hidden', transition:'max-height 0.35s ease',
-            maxHeight: openCgm ? '600px' : '0px' }">
+        <!-- Tabla indexación CGM (mismo patrón que OperacionView: maxHeight animado) -->
+        <div :style="{
+          overflow: 'hidden',
+          transition: 'max-height 0.35s ease',
+          maxHeight: paneles.cgm ? '600px' : '0px'
+        }">
           <div class="pt-3">
             <TablaAniversarios
               titulo="Indexación CGM"
@@ -168,8 +171,11 @@
         </div>
 
         <!-- Tabla indexación Representación -->
-        <div :style="{ overflow:'hidden', transition:'max-height 0.35s ease',
-            maxHeight: openRep ? '600px' : '0px' }">
+        <div :style="{
+          overflow: 'hidden',
+          transition: 'max-height 0.35s ease',
+          maxHeight: paneles.rep ? '600px' : '0px'
+        }">
           <div class="pt-3">
             <TablaAniversarios
               titulo="Indexación Representación"
@@ -273,12 +279,16 @@ const proyectoNombre = ref('')
 const codigoTSF      = ref('')
 const contratos      = ref([])   // lista de contratos del proyecto (uno por inversionista)
 const loading        = ref(true)
-const guardando      = ref(false)
-const dialogVisible  = ref(false)
-const openCgm        = ref(false)
-const openRep        = ref(false)
+const guardando       = ref(false)
+const dialogVisible   = ref(false)
 const invSeleccionado = ref('')
-const hoy = new Date().toISOString().split('T')[0]  // "2026-06-03"
+const hoy = new Date().toISOString().split('T')[0]
+
+// Paneles expandibles — reactive object igual que OperacionView
+const paneles = reactive({ cgm: false, rep: false })
+function togglePanel(tipo) {
+  paneles[tipo] = !paneles[tipo]
+}
 
 const contratoActivo = computed(() =>
   contratos.value.find(c => c.inversionista === invSeleccionado.value)
@@ -287,7 +297,7 @@ const contratoActivo = computed(() =>
 )
 
 // Reset paneles al cambiar inversionista
-watch(invSeleccionado, () => { openCgm.value = false; openRep.value = false })
+watch(invSeleccionado, () => { paneles.cgm = false; paneles.rep = false })
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function normalizarAniversarios(raw) {
