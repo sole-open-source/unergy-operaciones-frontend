@@ -46,7 +46,7 @@
       </div>
 
       <!-- Tarjetas resumen financiero -->
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
         <div class="bg-white rounded-xl shadow-sm p-4 text-center border-t-4" style="border-color:#22c55e">
           <div class="text-xs text-gray-500 mb-1">Ingresos brutos</div>
           <div class="text-base font-semibold text-green-700">{{ fmt(resumenCalculado.ingresos_brutos) }}</div>
@@ -58,6 +58,10 @@
         <div class="bg-white rounded-xl shadow-sm p-4 text-center border-t-4" style="border-color:#ef4444">
           <div class="text-xs text-gray-500 mb-1">Costos operativos</div>
           <div class="text-base font-semibold text-red-600">{{ fmt(resumenCalculado.costos_op) }}</div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm p-4 text-center border-t-4 border-red-200">
+          <div class="text-xs text-gray-500 mb-1">Facturas servicio</div>
+          <div class="text-base font-semibold text-red-600">{{ fmt(resumenCalculado.facturas) }}</div>
         </div>
         <div class="bg-white rounded-xl shadow-sm p-4 text-center border-t-4" style="border-color:#915BD8">
           <div class="text-xs text-gray-500 mb-1">Ingreso neto</div>
@@ -1000,7 +1004,7 @@ const resumenCalculado = computed(() => {
       .flatMap(m => m.lineas || [])
       .filter(l => ['retencion_fuente', 'ica_opex'].includes(normTipo(l.tipo_linea)))
       .reduce((acc, l) => acc + Math.abs(l.valor_cop), 0)
-    return { ingresos_brutos, comercializacion: 0, costos_op, neto: ingresos_brutos - retenciones - facturas }
+    return { ingresos_brutos, comercializacion: 0, costos_op, facturas, neto: ingresos_brutos - retenciones - facturas }
   }
 
   // Si no hay datos en mandatos, caer al campo almacenado manualmente
@@ -1009,12 +1013,13 @@ const resumenCalculado = computed(() => {
       ingresos_brutos: liq.value?.ingresos_energia_cop,
       comercializacion: liq.value?.costos_comercializacion_xm_cop,
       costos_op: costos_op || liq.value?.costos_operativos_cop,
+      facturas,
       neto: liq.value?.ingreso_neto_cop,
     }
   }
 
   neto = ingresos_brutos - comercializacion - costos_op - facturas
-  return { ingresos_brutos, comercializacion, costos_op, neto }
+  return { ingresos_brutos, comercializacion, costos_op, facturas, neto }
 })
 
 const mandatosTotal = computed(() =>
