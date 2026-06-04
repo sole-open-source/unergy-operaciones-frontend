@@ -155,14 +155,11 @@
           </div>
         </div>
 
-        <!-- Tabla indexación CGM (mismo patrón que OperacionView: maxHeight animado) -->
-        <div :style="{
-          overflow: 'hidden',
-          transition: 'max-height 0.35s ease',
-          maxHeight: paneles.cgm ? '600px' : '0px'
-        }">
+        <!-- Tabla indexación CGM — renderizada inline, sin sub-componente -->
+        <div :style="{ overflow:'hidden', transition:'max-height 0.35s ease',
+            maxHeight: paneles.cgm ? '800px' : '0px' }">
           <div class="pt-3">
-            <TablaAniversarios
+            <TablaCgm
               titulo="Indexación CGM"
               :filas="normalizarAniversarios(contratoActivo.indexacion_cgm)"
               :hoy="hoy"
@@ -170,14 +167,11 @@
           </div>
         </div>
 
-        <!-- Tabla indexación Representación -->
-        <div :style="{
-          overflow: 'hidden',
-          transition: 'max-height 0.35s ease',
-          maxHeight: paneles.rep ? '600px' : '0px'
-        }">
+        <!-- Tabla indexación Representación — renderizada inline, sin sub-componente -->
+        <div :style="{ overflow:'hidden', transition:'max-height 0.35s ease',
+            maxHeight: paneles.rep ? '800px' : '0px' }">
           <div class="pt-3">
-            <TablaAniversarios
+            <TablaCgm
               titulo="Indexación Representación"
               :filas="normalizarAniversarios(contratoActivo.indexacion_rep)"
               :hoy="hoy"
@@ -410,79 +404,69 @@ onMounted(async () => {
 })
 </script>
 
-<!-- ════════════════════════════════════════════════════════════════════════════
-     Componentes locales
-═══════════════════════════════════════════════════════════════════════════════ -->
+<!-- Componentes locales registrados en el segundo bloque <script> (Options API)      -->
+<!-- InfoMini: mini-card de meta-info                                                 -->
+<!-- TablaCgm: tabla de indexación con aniversarios, IPC y estado                     -->
 <script>
-// ── InfoMini — mini-card de meta-info ────────────────────────────────────────
+import { defineComponent, computed, h } from 'vue'
+
+const TOOLTIP = 'La indexación se aplica en la fecha de renovación anual del contrato, usando el IPC del año inmediatamente anterior certificado por el DANE.'
+
+// ── InfoMini ─────────────────────────────────────────────────────────────────
 const InfoMini = {
   props: { icon: String, label: String, value: [String, Number] },
   template: `
     <div class="rounded-lg p-3" style="background:#eff6ff;border:1px solid #bfdbfe">
       <p class="text-xs mb-1 flex items-center gap-1" style="color:#1e40af">
-        <i :class="icon" class="text-xs" style="color:#3b82f6"/>
-        {{ label }}
+        <i :class="icon" class="text-xs" style="color:#3b82f6"/>{{ label }}
       </p>
       <slot>
-        <p class="text-sm font-semibold leading-snug" style="color:#1c1917">
-          {{ value || '—' }}
-        </p>
+        <p class="text-sm font-semibold leading-snug" style="color:#1c1917">{{ value || '—' }}</p>
       </slot>
-    </div>
-  `,
+    </div>`,
 }
 
-// ── TablaAniversarios ─────────────────────────────────────────────────────────
-const TablaAniversarios = {
+// ── TablaCgm — tabla de aniversarios con IPC y estado ────────────────────────
+const TablaCgm = defineComponent({
+  name: 'TablaCgm',
   props: {
     titulo: { type: String, required: true },
     filas:  { type: Array,  default: () => [] },
     hoy:    { type: String, required: true },
   },
-  computed: {
-    iVigente() {
-      /**
-       * Índice del aniversario vigente = último cuya fecha ≤ hoy.
-       * Si todos son futuros, usamos el primero (base).
-       */
-      const hoyDate = new Date(this.hoy)
+  setup(props) {
+    const iVigente = computed(() => {
+      const hoyDate = new Date(props.hoy)
       let idx = -1
-      for (let i = 0; i < this.filas.length; i++) {
-        const f = this.filas[i]
+      for (let i = 0; i < props.filas.length; i++) {
+        const f = props.filas[i]
         if (f.fecha && new Date(f.fecha) <= hoyDate) idx = i
       }
       return idx >= 0 ? idx : 0
-    },
-    tooltipText() {
-      return 'La indexación se aplica en la fecha de renovación anual del contrato, usando el IPC del año inmediatamente anterior certificado por el DANE.'
-    },
-  },
-  methods: {
-    esVigente(i) { return i === this.iVigente },
-    estadoFila(f, i) {
-      if (this.esVigente(i)) return 'vigente'
-      const hoyDate = new Date(this.hoy)
-      if (f.fecha && new Date(f.fecha) < hoyDate) return 'pagado'
+    })
+
+    function esVigente(i)      { return i === iVigente.value }
+    function fmtFecha(fecha) {
+      if (!fecha) return '—'
+      const parts = fecha.split('-')
+      return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : fecha
+    }
+    function fmtVal(v) { return v != null ? Number(v).toFixed(3) : '—' }
+    function estadoFila(f, i) {
+      if (esVigente(i)) return 'vigente'
+      if (f.fecha && new Date(f.fecha) < new Date(props.hoy)) return 'pagado'
       return 'pendiente'
-    },
-    fmt(v) { return v != null ? Number(v).toFixed(3) : '—' },
-    fmtFecha(f) {
-      if (!f) return '—'
-      try {
-        const [y, m, d] = f.split('-')
-        return `${d}/${m}/${y}`
-      } catch { return f }
-    },
+    }
+
+    return { iVigente, esVigente, fmtFecha, fmtVal, estadoFila, TOOLTIP }
   },
   template: `
     <div class="rounded-xl overflow-hidden" style="border:1px solid #bfdbfe">
       <div class="flex items-center justify-between px-4 py-2.5" style="background:#eff6ff">
         <div class="flex items-center gap-1.5">
           <span class="text-xs font-semibold" style="color:#1e40af">{{ titulo }}</span>
-          <span
-            class="inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] cursor-help"
-            style="background:#bfdbfe;color:#1e40af"
-            :title="tooltipText">ⓘ</span>
+          <span class="inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] cursor-help select-none"
+            style="background:#bfdbfe;color:#1e40af" :title="TOOLTIP">ⓘ</span>
         </div>
         <span class="text-xs text-gray-400">Hoy: {{ hoy }}</span>
       </div>
@@ -497,64 +481,48 @@ const TablaAniversarios = {
         </thead>
         <tbody>
           <tr v-if="!filas.length">
-            <td colspan="4" class="px-4 py-6 text-center text-xs text-gray-400">
-              Sin datos de indexación.
-            </td>
+            <td colspan="4" class="px-4 py-6 text-center text-xs text-gray-400">Sin datos de indexación.</td>
           </tr>
           <tr v-for="(f, i) in filas" :key="i"
-            class="border-b border-gray-50 transition-colors"
+            class="border-b border-gray-50"
             :style="esVigente(i) ? 'background:#fff7ed' : ''">
-            <!-- Fecha aniversario -->
             <td class="px-4 py-2.5">
               <div class="flex items-center gap-1.5">
                 <span class="font-mono font-semibold"
                   :style="esVigente(i) ? 'color:#d97706' : 'color:#2C2039'">
                   {{ fmtFecha(f.fecha) }}
                 </span>
-                <span v-if="f.es_base"
-                  class="text-[10px] px-1.5 py-0.5 rounded font-bold leading-none"
+                <span v-if="f.es_base" class="text-[10px] px-1.5 py-0.5 rounded font-bold"
                   style="background:#e0f2fe;color:#0369a1">base</span>
-                <span v-if="esVigente(i) && !f.es_base"
-                  class="text-[10px] px-1.5 py-0.5 rounded font-bold leading-none"
+                <span v-if="esVigente(i) && !f.es_base" class="text-[10px] px-1.5 py-0.5 rounded font-bold"
                   style="background:#fef3c7;color:#d97706">actual</span>
-                <i v-if="esVigente(i)" class="pi pi-arrow-left text-xs"
-                  style="color:#d97706" />
+                <i v-if="esVigente(i)" class="pi pi-arrow-left text-xs" style="color:#d97706" />
               </div>
             </td>
-            <!-- IPC -->
             <td class="px-4 py-2.5">
               <span v-if="f.ipc == null" class="text-gray-400 text-xs">— (base)</span>
               <span v-else class="font-mono tabular-nums" style="color:#374151">{{ f.ipc }}%</span>
             </td>
-            <!-- Valor -->
             <td class="px-4 py-2.5 text-right font-semibold tabular-nums"
               :style="esVigente(i) ? 'color:#d97706' : 'color:#2C2039'">
-              {{ fmt(f.valor) }}
+              {{ fmtVal(f.valor) }}
             </td>
-            <!-- Estado -->
             <td class="px-4 py-2.5 text-center">
-              <span v-if="estadoFila(f,i) === 'pagado'"
+              <span v-if="estadoFila(f,i)==='pagado'"
                 class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full"
-                style="background:#dcfce7;color:#166534">
-                <i class="pi pi-check text-xs" />Pagado
-              </span>
-              <span v-else-if="estadoFila(f,i) === 'vigente'"
+                style="background:#dcfce7;color:#166534"><i class="pi pi-check text-xs"/>Pagado</span>
+              <span v-else-if="estadoFila(f,i)==='vigente'"
                 class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full"
-                style="background:#fef3c7;color:#d97706">
-                Vigente
-              </span>
+                style="background:#fef3c7;color:#d97706">Vigente</span>
               <span v-else
                 class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full"
-                style="background:#f3f4f6;color:#9ca3af">
-                Pendiente
-              </span>
+                style="background:#f3f4f6;color:#9ca3af">Pendiente</span>
             </td>
           </tr>
         </tbody>
       </table>
-    </div>
-  `,
-}
+    </div>`,
+})
 
-export default { components: { InfoMini, TablaAniversarios } }
+export default { components: { InfoMini, TablaCgm } }
 </script>
