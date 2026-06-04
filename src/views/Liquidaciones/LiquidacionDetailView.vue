@@ -138,8 +138,13 @@
                     <td colspan="4" />
                     <td class="px-3 py-1.5 text-sm text-gray-700">{{ etiqueta(l.tipo_linea) }}</td>
                     <td class="px-3 py-1.5 text-right font-mono text-sm">{{ fmt(l.valor_cop) }}</td>
-                    <td class="px-3 py-1.5 text-xs text-gray-400 truncate max-w-[180px]">
-                      {{ l.referencia_factura || '' }}
+                    <td class="px-3 py-1.5 text-xs">
+                      <a v-if="l.soporte_url"
+                        :href="l.soporte_url" target="_blank" rel="noopener"
+                        style="color:#915BD8" class="hover:underline">
+                        {{ l.referencia_factura || 'Ver soporte' }}
+                      </a>
+                      <span v-else>{{ l.referencia_factura || '' }}</span>
                     </td>
                     <td class="px-3 py-1.5" />
                   </tr>
@@ -354,8 +359,13 @@
                       <td colspan="4" />
                       <td class="px-3 py-1.5 text-sm text-gray-700">{{ etiqueta(l.tipo_linea) }}</td>
                       <td class="px-3 py-1.5 text-right font-mono text-sm">{{ fmt(l.valor_cop) }}</td>
-                      <td class="px-3 py-1.5 text-xs text-gray-400 truncate max-w-[180px]">
-                        {{ l.referencia_factura || '' }}
+                      <td class="px-3 py-1.5 text-xs">
+                        <a v-if="l.soporte_url"
+                          :href="l.soporte_url" target="_blank" rel="noopener"
+                          style="color:#915BD8" class="hover:underline">
+                          {{ l.referencia_factura || 'Ver soporte' }}
+                        </a>
+                        <span v-else>{{ l.referencia_factura || '' }}</span>
                       </td>
                       <td class="px-3 py-1.5" />
                     </tr>
@@ -1024,12 +1034,16 @@ const resumenCalculado = computed(() => {
 
 const mandatosTotal = computed(() =>
   (liq.value?.mandatos || []).filter(m =>
-    m.inversionista_id == null && m.tipo === 'ingresos')
+    m.inversionista_id == null && m.tipo === 'ingresos'
+    && !m.beneficiario_nombre
+  )
 )
 
 const mandatosTotalCostos = computed(() =>
   (liq.value?.mandatos || []).filter(m =>
-    m.inversionista_id == null && m.tipo === 'costos')
+    m.inversionista_id == null && m.tipo === 'costos'
+    && !m.beneficiario_nombre
+  )
 )
 
 const inversionistasConDetalle = computed(() => {
