@@ -81,12 +81,12 @@
 
       <!-- ══ INGRESOS ══ -->
       <div class="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div class="text-white px-4 py-2.5 flex items-center gap-3 cursor-pointer select-none"
-          style="background:#1e5c2e"
+        <div class="px-4 py-2.5 flex items-center gap-3 cursor-pointer select-none"
+          style="background:#f0fdf4; color:#166534; border-left:3px solid #22c55e"
           @click="toggleSeccion('ingresos')">
           <i :class="seccionesAbiertas.has('ingresos') ? 'pi pi-chevron-down' : 'pi pi-chevron-right'" class="text-xs" />
           <span class="font-semibold">Ingresos</span>
-          <span class="text-green-300 text-xs ml-auto">
+          <span class="text-green-600 text-xs ml-auto">
             {{ inversionistasConDetalle.length }} inversionista(s)
           </span>
         </div>
@@ -117,6 +117,39 @@
                 <td class="px-3 py-1.5" />
               </tr>
 
+              <!-- Mandatos del Total (inversionista_id = null) -->
+              <template v-if="!invFiltroId">
+                <template v-for="m in mandatosTotal" :key="m.id">
+                  <tr style="background:rgba(145,91,216,0.04)">
+                    <td colspan="2" class="px-3 py-1 text-xs text-gray-400 italic">
+                      {{ m.tipo === 'ingresos' ? 'Mandato' : 'Costos' }}
+                      <span v-if="m.beneficiario_nombre"> — {{ m.beneficiario_nombre }}</span>
+                      <span v-else> — Total proyecto</span>
+                    </td>
+                    <td class="px-3 py-1 text-xs text-gray-400 font-mono">{{ m.consecutivo || '—' }}</td>
+                    <td colspan="5" />
+                  </tr>
+                  <tr v-for="l in (m.lineas || [])" :key="l.id"
+                    class="border-b border-gray-50 hover:bg-gray-50">
+                    <td colspan="4" />
+                    <td class="px-3 py-1.5 text-sm text-gray-700">{{ etiqueta(l.tipo_linea) }}</td>
+                    <td class="px-3 py-1.5 text-right font-mono text-sm">{{ fmt(l.valor_cop) }}</td>
+                    <td class="px-3 py-1.5 text-xs text-gray-400 truncate max-w-[180px]">
+                      {{ l.referencia_factura || '' }}
+                    </td>
+                    <td class="px-3 py-1.5" />
+                  </tr>
+                  <tr v-if="m.valor_neto_cop" style="background:rgba(145,91,216,0.06)">
+                    <td colspan="4" />
+                    <td class="px-3 py-1.5 font-semibold text-sm" style="color:#915BD8">Valor a Pagar</td>
+                    <td class="px-3 py-1.5 text-right font-mono font-semibold" style="color:#915BD8">
+                      {{ fmt(m.valor_neto_cop) }}
+                    </td>
+                    <td colspan="2" />
+                  </tr>
+                </template>
+              </template>
+
               <!-- Por inversionista -->
               <template v-for="inv in inversionistasConDetalle" :key="inv.id">
                 <!-- Header inversionista -->
@@ -130,7 +163,7 @@
                   <td class="px-3 py-1.5 text-right font-semibold">{{ pct(inv.porcentaje) }}</td>
                   <td class="px-3 py-1.5" />
                   <td class="px-3 py-1.5 text-center">
-                    <Button icon="pi pi-plus" text size="small" class="!text-green-300"
+                    <Button icon="pi pi-plus" text size="small" class="!text-green-400"
                       title="Agregar mandato de ingresos"
                       @click="abrirDialogMandato('ingresos', inv.id, inv.nombre)" />
                   </td>
@@ -264,14 +297,14 @@
 
       <!-- ══ COSTOS ══ -->
       <div class="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div class="text-white px-4 py-2.5 flex items-center gap-3 cursor-pointer select-none"
-          style="background:#7f1d1d"
+        <div class="px-4 py-2.5 flex items-center gap-3 cursor-pointer select-none"
+          style="background:#fff1f2; color:#991b1b; border-left:3px solid #ef4444"
           @click="toggleSeccion('costos')">
           <i :class="seccionesAbiertas.has('costos') ? 'pi pi-chevron-down' : 'pi pi-chevron-right'" class="text-xs" />
           <span class="font-semibold">Costos</span>
           <div class="ml-auto flex items-center gap-2">
             <Button icon="pi pi-plus" label="Agregar costo" text size="small"
-              class="!text-red-200 hover:!text-white"
+              class="!text-red-600 hover:!text-red-800"
               @click.stop="abrirDialogCosto()" />
           </div>
         </div>
@@ -345,7 +378,7 @@
                     <td class="px-3 py-1.5" colspan="4" />
                     <td class="px-3 py-1.5" />
                     <td class="px-3 py-1.5 text-center">
-                      <Button icon="pi pi-plus" text size="small" class="!text-red-300"
+                      <Button icon="pi pi-plus" text size="small" class="!text-red-400"
                         title="Agregar mandato de costos"
                         @click="abrirDialogMandato('costos', inv.id, inv.nombre)" />
                     </td>
@@ -418,13 +451,13 @@
 
       <!-- ══ SERVICIOS ══ -->
       <div class="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div class="text-white px-4 py-2.5 flex items-center gap-3 cursor-pointer select-none"
-          style="background:#78350f"
+        <div class="px-4 py-2.5 flex items-center gap-3 cursor-pointer select-none"
+          style="background:#fffbeb; color:#92400e; border-left:3px solid #f59e0b"
           @click="toggleSeccion('servicios')">
           <i :class="seccionesAbiertas.has('servicios') ? 'pi pi-chevron-down' : 'pi pi-chevron-right'" class="text-xs" />
           <span class="font-semibold">Servicios (Facturas)</span>
           <Button icon="pi pi-plus" label="Agregar" text size="small"
-            class="ml-auto !text-yellow-200 hover:!text-white"
+            class="ml-auto !text-yellow-700 hover:!text-yellow-900"
             @click.stop="abrirDialogFactura()" />
         </div>
 
@@ -986,6 +1019,10 @@ const resumenCalculado = computed(() => {
   return { ingresos_brutos, comercializacion, costos_op, neto }
 })
 
+const mandatosTotal = computed(() =>
+  (liq.value?.mandatos || []).filter(m => m.inversionista == null && m.inversionista_id == null)
+)
+
 const inversionistasConDetalle = computed(() => {
   if (!proyectoInversionistas.value.length) return []
   const mandatos = liq.value?.mandatos || []
@@ -1002,6 +1039,8 @@ const inversionistasConDetalle = computed(() => {
 })
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+const etiqueta = t => ETIQUETAS[normTipo(t)] || ETIQUETAS[t] || t
+
 function fmt(v) {
   if (v == null) return '—'
   return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 2 }).format(v)
