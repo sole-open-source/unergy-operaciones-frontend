@@ -212,7 +212,7 @@
                 <span class="w-20 shrink-0 text-gray-600">{{ formatPeriodo(liq.periodo) }}</span>
                 <Tag :value="liq.estado" :severity="estadoSeverity(liq.estado)" class="text-[10px] shrink-0" />
                 <span class="flex-1 text-right font-mono text-gray-800">
-                  {{ fmt((liq.ingreso_neto_cop || 0) * (proy.porcentaje_participacion > 1 ? proy.porcentaje_participacion / 100 : proy.porcentaje_participacion || 1)) }}
+                  {{ fmt((liq.ingreso_neto_cop || 0) * normPct(proy.porcentaje_participacion)) }}
                 </span>
                 <button
                   class="inline-flex items-center justify-center w-6 h-6 rounded hover:bg-gray-200 transition-colors shrink-0"
@@ -319,6 +319,11 @@ function limpiarFiltros() {
   loadVista()
 }
 
+function normPct(v) {
+  if (!v) return 1
+  return v > 1 ? v / 100 : v
+}
+
 function fmt(v) {
   if (v == null) return '—'
   return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 2 }).format(v)
@@ -376,8 +381,7 @@ const resumenMap = computed(() => {
     const mesSet   = new Set()
 
     for (const proy of cliente.proyectos) {
-      const raw = proy.porcentaje_participacion
-      const ptj = raw > 1 ? raw / 100 : (raw || 1)
+      const ptj = normPct(proy.porcentaje_participacion)
       for (const liq of proy.liquidaciones) {
         const mes = liq.periodo?.substring(0, 7)
         if (!mes) continue
