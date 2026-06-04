@@ -133,7 +133,7 @@
               <div class="flex items-center gap-1.5">
                 <span class="text-xs font-semibold" style="color:#1e40af">Indexación CGM</span>
                 <span
-                  v-tooltip.top="'La indexación se aplica en la fecha de renovación anual del contrato, usando el IPC del año inmediatamente anterior certificado por el DANE.'"
+                  v-tooltip.top="TOOLTIP_IDX"
                   class="inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] cursor-help select-none"
                   style="background:#bfdbfe;color:#1e40af">ⓘ</span>
               </div>
@@ -201,7 +201,7 @@
               <div class="flex items-center gap-1.5">
                 <span class="text-xs font-semibold" style="color:#1e40af">Indexación Representación</span>
                 <span
-                  v-tooltip.top="'La indexación se aplica en la fecha de renovación anual del contrato, usando el IPC del año inmediatamente anterior certificado por el DANE.'"
+                  v-tooltip.top="TOOLTIP_IDX"
                   class="inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] cursor-help select-none"
                   style="background:#bfdbfe;color:#1e40af">ⓘ</span>
               </div>
@@ -348,6 +348,7 @@ const ESTADOS_OPCIONES = [
   { label:'En renovación', value:'en_renovacion' },
 ]
 const hoy = new Date().toISOString().split('T')[0]
+const TOOLTIP_IDX = 'La indexación se aplica en la fecha de renovación anual del contrato, usando el IPC del año inmediatamente anterior certificado por el DANE.'
 
 // ── Estado ────────────────────────────────────────────────────────────────────
 const proyectoNombre  = ref('')
