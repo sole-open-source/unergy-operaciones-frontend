@@ -1,7 +1,7 @@
 <template>
-  <div class="space-y-6">
+  <div class="space-y-5">
 
-    <!-- ── Header ────────────────────────────────────────────────────────────── -->
+    <!-- ── Breadcrumb + título ──────────────────────────────────────────────── -->
     <div class="flex items-center gap-2">
       <Button icon="pi pi-arrow-left" text severity="secondary" @click="$router.back()" class="-ml-1" />
       <div>
@@ -14,7 +14,7 @@
           <span class="mx-1.5">›</span>
           <span class="font-medium" style="color:#2C2039">Representación</span>
         </p>
-        <h2 class="text-lg font-bold" style="color:#2C2039">Representación</h2>
+        <h2 class="text-lg font-bold" style="color:#2C2039">Representación CGM</h2>
       </div>
     </div>
 
@@ -23,36 +23,33 @@
     <template v-else>
 
       <!-- ══════════════════════════════════════════════════════════════════════
-           SECCIÓN 1 — lo que había antes (contratos del sistema)
+           SECCIÓN 1 — tabla de contratos (vista anterior / gestión)
       ═══════════════════════════════════════════════════════════════════════ -->
       <div class="rounded-xl border border-gray-100 bg-white overflow-hidden">
         <div class="flex items-center justify-between px-4 py-3 border-b border-gray-100">
           <div class="flex items-center gap-2">
             <i class="pi pi-file-edit text-sm" style="color:#3b82f6" />
-            <p class="text-sm font-semibold text-gray-700">Contratos · Representación</p>
+            <p class="text-sm font-semibold" style="color:#2C2039">
+              Contratos · Representación
+            </p>
           </div>
           <Button label="Nuevo contrato" icon="pi pi-plus" size="small"
             style="background:#3b82f6;border-color:#3b82f6"
             @click="abrirDialog()" />
         </div>
-
-        <DataTable :value="contratos" :loading="loading" stripedRows class="text-sm" rowHover
+        <DataTable :value="contratos" stripedRows class="text-sm" rowHover
           emptyMessage="Sin contratos registrados para este proyecto.">
-          <Column field="numero_contrato" header="N° contrato" style="width:130px">
+          <Column header="Inversionista">
             <template #body="{ data }">
-              <span class="font-mono text-xs text-gray-500">{{ data.numero_contrato || '—' }}</span>
+              <span class="font-medium" style="color:#2C2039">
+                {{ data.inversionista_nombre || '—' }}
+              </span>
             </template>
           </Column>
-          <Column header="Contratante">
-            <template #body="{ data }">{{ data.contratante_nombre || '—' }}</template>
+          <Column header="Portafolio" class="hidden md:table-cell">
+            <template #body="{ data }">{{ data.portafolio || '—' }}</template>
           </Column>
-          <Column header="Inversionista">
-            <template #body="{ data }">{{ data.inversionista_nombre || '—' }}</template>
-          </Column>
-          <Column header="Prestador">
-            <template #body="{ data }">{{ data.prestador_nombre || '—' }}</template>
-          </Column>
-          <Column field="fecha_firma_contrato" header="Firma" style="width:95px">
+          <Column field="fecha_firma_contrato" header="Firma" style="width:100px">
             <template #body="{ data }">{{ data.fecha_firma_contrato || '—' }}</template>
           </Column>
           <Column header="Estado" style="width:120px">
@@ -65,9 +62,9 @@
             <template #body="{ data }">
               <div class="flex gap-1">
                 <Button icon="pi pi-pencil" text size="small" severity="secondary"
-                  @click="abrirDialog(data)" />
+                  v-tooltip="'Editar'" @click="abrirDialog(data)" />
                 <Button icon="pi pi-trash" text size="small" severity="danger"
-                  @click="eliminar(data.id)" />
+                  v-tooltip="'Eliminar'" @click="eliminar(data.id)" />
               </div>
             </template>
           </Column>
@@ -75,10 +72,24 @@
       </div>
 
       <!-- ══════════════════════════════════════════════════════════════════════
-           SECCIÓN 2 — vista nueva con tarifas CGM / Representación
+           SECCIÓN 2 — tarjetas de tarifas CGM / Representación
       ═══════════════════════════════════════════════════════════════════════ -->
-      <div>
-        <div class="flex items-center gap-3 mb-4">
+      <div v-if="!contratosConTarifas.length"
+        class="rounded-xl border border-dashed p-10 text-center"
+        style="border-color:#3b82f640">
+        <div class="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3"
+          style="background:#eff6ff">
+          <i class="pi pi-file-edit text-xl" style="color:#3b82f6" />
+        </div>
+        <p class="text-sm font-medium text-gray-600 mb-1">Sin datos de tarifas</p>
+        <p class="text-xs text-gray-400">
+          Crea un contrato con tarifas CGM/Representación para verlo aquí.
+        </p>
+      </div>
+
+      <template v-else>
+        <!-- Separador de sección -->
+        <div class="flex items-center gap-3">
           <div class="h-px flex-1" style="background:#dbeafe" />
           <span class="text-xs font-semibold px-3 py-1 rounded-full"
             style="background:#eff6ff;color:#1d4ed8">
@@ -87,77 +98,84 @@
           <div class="h-px flex-1" style="background:#dbeafe" />
         </div>
 
-        <!-- Sin contratos con tarifas -->
-        <div v-if="!contratosConTarifas.length"
-          class="rounded-xl border border-dashed p-8 text-center" style="border-color:#3b82f640">
-          <i class="pi pi-chart-bar text-2xl mb-2 block" style="color:#93c5fd" />
-          <p class="text-sm text-gray-500">Ningún contrato tiene tarifas CGM/Representación aún.</p>
-          <p class="text-xs text-gray-400 mt-1">Crea un contrato arriba y completa los campos de tarifa.</p>
-        </div>
+        <!-- Una tarjeta por inversionista -->
+        <div v-for="c in contratosConTarifas" :key="c.id">
 
-        <!-- Tarjetas -->
-        <div v-for="c in contratosConTarifas" :key="c.id" class="space-y-0 mb-4">
-          <!-- Separador inversionista -->
-          <div class="flex items-center gap-3 py-1">
-            <div class="h-px flex-1" style="background:#dbeafe" />
+          <!-- Encabezado de sección: nombre del inversionista -->
+          <div class="flex items-center gap-3 mb-2">
+            <div class="h-px flex-1" style="background:#e0effe" />
             <span class="text-xs font-semibold px-2 py-0.5 rounded-full"
-              style="background:#eff6ff;color:#1d4ed8">
+              style="background:#eff6ff;color:#3b82f6">
               {{ c.inversionista_nombre }}
             </span>
-            <div class="h-px flex-1" style="background:#dbeafe" />
+            <div class="h-px flex-1" style="background:#e0effe" />
           </div>
 
-          <!-- Tarjeta -->
-          <div class="rounded-xl border bg-white p-5" style="border-color:#3b82f640">
-            <!-- Mini-cards encabezado -->
-            <div class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-5">
-              <div class="rounded-lg p-3" style="background:#eff6ff;border:1px solid #bfdbfe">
-                <p class="text-xs mb-1 flex items-center gap-1" style="color:#1e40af">
-                  <i class="pi pi-user text-xs" style="color:#3b82f6" />Contratante
-                </p>
-                <p class="text-sm font-semibold leading-snug" style="color:#1c1917">
-                  {{ c.contratante_nombre || 'Unergy Energía Digital S.A.S. E.S.P.' }}
-                </p>
+          <!-- Tarjeta (misma estructura que Mantenimiento O&M) -->
+          <div class="rounded-xl border bg-white p-5 mb-4"
+            style="border-color:#3b82f640">
+
+            <!-- Header de la tarjeta -->
+            <div class="flex items-start justify-between mb-4 gap-3">
+              <div class="flex items-center gap-2.5 flex-wrap">
+                <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                  style="background:#eff6ff">
+                  <i class="pi pi-file-edit text-sm" style="color:#3b82f6" />
+                </div>
+                <div>
+                  <p class="text-xs text-gray-400 leading-none mb-0.5">
+                    Contrato de Representación CGM
+                  </p>
+                  <span class="text-sm font-semibold" style="color:#2C2039">
+                    {{ proyectoNombre }}
+                  </span>
+                </div>
               </div>
-              <div class="rounded-lg p-3" style="background:#eff6ff;border:1px solid #bfdbfe">
-                <p class="text-xs mb-1 flex items-center gap-1" style="color:#1e40af">
+              <div class="flex items-center gap-2 flex-shrink-0">
+                <Tag :value="ESTADO_LABELS[c.estado] || c.estado"
+                     :severity="ESTADO_SEVERITY[c.estado]" class="text-xs" />
+                <Button icon="pi pi-pencil" label="Editar" size="small"
+                  text severity="secondary" @click="abrirDialog(c)" />
+              </div>
+            </div>
+
+            <!-- Mini-cards: meta-info del contrato -->
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+              <!-- Inversionista -->
+              <div class="rounded-lg p-3.5" style="background:#eff6ff;border:1px solid #bfdbfe">
+                <p class="text-xs mb-1.5 flex items-center gap-1.5" style="color:#1e40af">
                   <i class="pi pi-briefcase text-xs" style="color:#3b82f6" />Inversionista
                 </p>
                 <p class="text-sm font-semibold leading-snug" style="color:#1c1917">
                   {{ c.inversionista_nombre || '—' }}
                 </p>
               </div>
-              <div class="rounded-lg p-3" style="background:#eff6ff;border:1px solid #bfdbfe">
-                <p class="text-xs mb-1 flex items-center gap-1" style="color:#1e40af">
-                  <i class="pi pi-building text-xs" style="color:#3b82f6" />Prestador
-                </p>
-                <p class="text-sm font-semibold leading-snug" style="color:#1c1917">
-                  {{ c.prestador_nombre || 'Unergy Energía Digital S.A.S. E.S.P.' }}
-                </p>
-              </div>
-              <div class="rounded-lg p-3" style="background:#eff6ff;border:1px solid #bfdbfe">
-                <p class="text-xs mb-1 flex items-center gap-1" style="color:#1e40af">
-                  <i class="pi pi-calendar text-xs" style="color:#3b82f6" />Fecha firma
-                </p>
-                <p class="text-sm font-semibold" style="color:#1c1917">
-                  {{ c.fecha_firma_contrato || '—' }}
-                </p>
-              </div>
-              <div class="rounded-lg p-3" style="background:#eff6ff;border:1px solid #bfdbfe">
-                <p class="text-xs mb-1 flex items-center gap-1" style="color:#1e40af">
+              <!-- Portafolio -->
+              <div class="rounded-lg p-3.5" style="background:#eff6ff;border:1px solid #bfdbfe">
+                <p class="text-xs mb-1.5 flex items-center gap-1.5" style="color:#1e40af">
                   <i class="pi pi-folder text-xs" style="color:#3b82f6" />Portafolio
                 </p>
                 <p class="text-sm font-semibold leading-snug" style="color:#1c1917">
                   {{ c.portafolio || '—' }}
                 </p>
               </div>
-              <div class="rounded-lg p-3" style="background:#eff6ff;border:1px solid #bfdbfe">
-                <p class="text-xs mb-1 flex items-center gap-1" style="color:#1e40af">
-                  <i class="pi pi-file-pdf text-xs" style="color:#3b82f6" />Contrato Drive
+              <!-- Fecha firma -->
+              <div class="rounded-lg p-3.5" style="background:#eff6ff;border:1px solid #bfdbfe">
+                <p class="text-xs mb-1.5 flex items-center gap-1.5" style="color:#1e40af">
+                  <i class="pi pi-calendar text-xs" style="color:#3b82f6" />Fecha firma
+                </p>
+                <p class="text-sm font-semibold" style="color:#1c1917">
+                  {{ c.fecha_firma_contrato || '—' }}
+                </p>
+              </div>
+              <!-- Link al contrato (solo si existe) -->
+              <div class="rounded-lg p-3.5" style="background:#eff6ff;border:1px solid #bfdbfe">
+                <p class="text-xs mb-1.5 flex items-center gap-1.5" style="color:#1e40af">
+                  <i class="pi pi-file-pdf text-xs" style="color:#3b82f6" />Contrato
                 </p>
                 <a v-if="c.enlace_drive?.startsWith('http')"
                    :href="c.enlace_drive" target="_blank" rel="noopener"
-                   class="text-sm font-semibold flex items-center gap-1 hover:underline"
+                   class="text-sm font-semibold flex items-center gap-1.5 hover:underline"
                    style="color:#3b82f6">
                   <i class="pi pi-external-link text-xs" />Ver contrato
                 </a>
@@ -165,134 +183,164 @@
               </div>
             </div>
 
-            <!-- Bloques de tarifa -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <!-- Admin -->
-              <div class="rounded-xl p-4" style="background:#f0f9ff;border:1px solid #bae6fd">
-                <p class="text-xs font-semibold mb-2 flex items-center gap-1.5" style="color:#0369a1">
+            <!-- Bloques de valor: Admin | CGM | Representación -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+
+              <!-- Tarifa Admin — sin indexación -->
+              <div class="rounded-lg p-3.5" style="background:#f0f9ff;border:1px solid #bae6fd">
+                <p class="text-xs mb-1.5 flex items-center gap-1.5" style="color:#0369a1">
                   <i class="pi pi-percentage text-xs" style="color:#0ea5e9" />Tarifa Admin
                 </p>
-                <p class="text-2xl font-bold tabular-nums" style="color:#0369a1">
-                  {{ c.tarifa_admin != null ? (c.tarifa_admin * 100).toFixed(1) + '%' : '—' }}
+                <p class="text-base font-bold tabular-nums" style="color:#0284c7">
+                  {{ c.tarifa_admin != null
+                      ? (c.tarifa_admin * 100).toFixed(1) + '%'
+                      : '—' }}
                 </p>
-                <p class="text-xs mt-1" style="color:#7dd3fc">Porcentaje fijo</p>
+                <p class="text-xs text-gray-400 mt-0.5">Porcentaje fijo</p>
               </div>
-              <!-- CGM -->
-              <div class="rounded-xl p-4" style="background:#eff6ff;border:1px solid #bfdbfe">
-                <p class="text-xs font-semibold mb-2 flex items-center gap-1.5" style="color:#1e40af">
+
+              <!-- Tarifa CGM — con indexación expandible -->
+              <div class="rounded-lg p-3.5" style="background:#eff6ff;border:1px solid #bfdbfe">
+                <p class="text-xs mb-1.5 flex items-center gap-1.5" style="color:#1e40af">
                   <i class="pi pi-chart-bar text-xs" style="color:#3b82f6" />Tarifa CGM
                 </p>
-                <p class="text-2xl font-bold tabular-nums" style="color:#1d4ed8">
-                  {{ valorVigente(c.indexacion_cgm, c.tarifa_cgm) }} $/kWh
+                <p class="text-base font-bold tabular-nums" style="color:#1d4ed8">
+                  {{ valorVigente(c.indexacion_cgm, c.tarifa_cgm) }}
+                  <span class="text-xs font-normal text-gray-400 ml-0.5">$/kWh</span>
                 </p>
-                <button v-if="c.indexacion_cgm?.length" type="button"
-                  class="mt-2 flex items-center gap-1 text-xs font-medium hover:opacity-75"
+                <button v-if="idxLen(c.indexacion_cgm)" type="button"
+                  class="mt-2 flex items-center gap-1 text-xs font-medium hover:opacity-75 transition-opacity"
                   style="background:none;border:none;padding:0;cursor:pointer;color:#3b82f6"
-                  @click="toggle(c.id,'cgm')">
-                  <i class="pi pi-chevron-down text-xs"
+                  @click="toggleIdx(c.id, 'cgm')">
+                  <i class="pi pi-chevron-down text-xs transition-transform duration-200"
                     :style="isOpen(c.id,'cgm') ? 'transform:rotate(180deg)' : ''" />
                   {{ isOpen(c.id,'cgm') ? 'Ocultar' : 'Ver indexación' }}
                 </button>
               </div>
-              <!-- Representación -->
-              <div class="rounded-xl p-4" style="background:#eff6ff;border:1px solid #bfdbfe">
-                <p class="text-xs font-semibold mb-2 flex items-center gap-1.5" style="color:#1e40af">
+
+              <!-- Tarifa Representación — con indexación expandible -->
+              <div class="rounded-lg p-3.5" style="background:#eff6ff;border:1px solid #bfdbfe">
+                <p class="text-xs mb-1.5 flex items-center gap-1.5" style="color:#1e40af">
                   <i class="pi pi-file-edit text-xs" style="color:#3b82f6" />Tarifa Representación
                 </p>
-                <p class="text-2xl font-bold tabular-nums" style="color:#1d4ed8">
-                  {{ valorVigente(c.indexacion_representacion, c.tarifa_representacion) }} $/kWh
+                <p class="text-base font-bold tabular-nums" style="color:#1d4ed8">
+                  {{ valorVigente(c.indexacion_representacion, c.tarifa_representacion) }}
+                  <span class="text-xs font-normal text-gray-400 ml-0.5">$/kWh</span>
                 </p>
-                <button v-if="c.indexacion_representacion?.length" type="button"
-                  class="mt-2 flex items-center gap-1 text-xs font-medium hover:opacity-75"
+                <button v-if="idxLen(c.indexacion_representacion)" type="button"
+                  class="mt-2 flex items-center gap-1 text-xs font-medium hover:opacity-75 transition-opacity"
                   style="background:none;border:none;padding:0;cursor:pointer;color:#3b82f6"
-                  @click="toggle(c.id,'rep')">
-                  <i class="pi pi-chevron-down text-xs"
+                  @click="toggleIdx(c.id, 'rep')">
+                  <i class="pi pi-chevron-down text-xs transition-transform duration-200"
                     :style="isOpen(c.id,'rep') ? 'transform:rotate(180deg)' : ''" />
                   {{ isOpen(c.id,'rep') ? 'Ocultar' : 'Ver indexación' }}
                 </button>
               </div>
             </div>
 
-            <!-- Tabla indexación CGM -->
-            <div :style="{overflow:'hidden',transition:'max-height .35s ease',
-              maxHeight:isOpen(c.id,'cgm')?'500px':'0px'}">
-              <div class="pt-4">
-                <TablaIdx titulo="Indexación CGM" :filas="c.indexacion_cgm||[]" />
+            <!-- Tabla indexación CGM (animada con max-height igual que OperacionView) -->
+            <div :style="{ overflow:'hidden', transition:'max-height 0.35s ease',
+                maxHeight: isOpen(c.id,'cgm') ? '600px' : '0px' }">
+              <div class="pt-3">
+                <TablaIndexacion
+                  titulo="Indexación CGM"
+                  :filas="normalizarIdx(c.indexacion_cgm)"
+                  :anio-vigente="ANIO_ACTUAL"
+                />
               </div>
             </div>
+
             <!-- Tabla indexación Representación -->
-            <div :style="{overflow:'hidden',transition:'max-height .35s ease',
-              maxHeight:isOpen(c.id,'rep')?'500px':'0px'}">
-              <div class="pt-4">
-                <TablaIdx titulo="Indexación Representación" :filas="c.indexacion_representacion||[]" />
+            <div :style="{ overflow:'hidden', transition:'max-height 0.35s ease',
+                maxHeight: isOpen(c.id,'rep') ? '600px' : '0px' }">
+              <div class="pt-3">
+                <TablaIndexacion
+                  titulo="Indexación Representación"
+                  :filas="normalizarIdx(c.indexacion_representacion)"
+                  :anio-vigente="ANIO_ACTUAL"
+                />
               </div>
             </div>
 
           </div>
         </div>
-      </div>
-
+      </template>
     </template>
 
-    <!-- ── Dialog crear / editar ──────────────────────────────────────────────── -->
-    <Dialog v-model:visible="dialog.visible" modal :style="{ width: '560px' }"
-      :breakpoints="{ '600px': '95vw' }">
+    <!-- ── Dialog crear / editar ─────────────────────────────────────────────── -->
+    <Dialog v-model:visible="dialog.visible" modal :style="{ width: '520px' }"
+      :breakpoints="{ '560px': '95vw' }">
       <template #header>
         <div class="flex items-center gap-2">
-          <i class="pi pi-file-edit text-sm" style="color:#3b82f6" />
+          <div class="w-7 h-7 rounded-lg flex items-center justify-center"
+            style="background:#eff6ff">
+            <i class="pi pi-file-edit text-xs" style="color:#3b82f6" />
+          </div>
           <span class="font-semibold text-sm" style="color:#2C2039">
-            {{ dialog.modo === 'crear' ? 'Nuevo contrato CGM / Representación' : 'Editar contrato' }}
+            {{ dialog.modo === 'crear'
+                ? 'Nuevo contrato Representación CGM'
+                : 'Editar contrato' }}
           </span>
         </div>
       </template>
       <div class="space-y-4 pt-1">
         <div class="grid grid-cols-2 gap-4">
           <div class="col-span-2 flex flex-col gap-1">
-            <label class="text-xs font-medium text-gray-600">Inversionista <span class="text-red-400">*</span></label>
-            <InputText v-model="dialog.form.inversionista_nombre" class="w-full" placeholder="Nombre del inversionista" />
+            <label class="text-xs font-medium text-gray-600">
+              Inversionista <span class="text-red-400">*</span>
+            </label>
+            <InputText v-model="dialog.form.inversionista_nombre" class="w-full"
+              placeholder="Nombre del inversionista" />
           </div>
           <div class="flex flex-col gap-1">
             <label class="text-xs font-medium text-gray-600">Portafolio</label>
-            <InputText v-model="dialog.form.portafolio" class="w-full" placeholder="Ej: Ayurá 1, Cox…" />
+            <InputText v-model="dialog.form.portafolio" class="w-full"
+              placeholder="Ej: Ayurá 1" />
           </div>
           <div class="flex flex-col gap-1">
             <label class="text-xs font-medium text-gray-600">Código Sun Factory</label>
-            <InputText v-model="dialog.form.codigo_sun_factory" class="w-full" placeholder="COLCEST…" />
+            <InputText v-model="dialog.form.codigo_sun_factory" class="w-full"
+              placeholder="COLCEST…" />
           </div>
           <div class="flex flex-col gap-1">
             <label class="text-xs font-medium text-gray-600">Estado</label>
             <Select v-model="dialog.form.estado"
-              :options="[{label:'Vigente',value:'vigente'},{label:'Vencido',value:'vencido'},{label:'Terminado',value:'terminado'}]"
+              :options="ESTADOS_OPCIONES"
               optionLabel="label" optionValue="value" class="w-full" />
           </div>
           <div class="flex flex-col gap-1">
             <label class="text-xs font-medium text-gray-600">Fecha firma</label>
-            <InputText v-model="dialog.form.fecha_firma_contrato" class="w-full" placeholder="YYYY-MM-DD" />
+            <InputText v-model="dialog.form.fecha_firma_contrato" class="w-full"
+              placeholder="YYYY-MM-DD" />
           </div>
           <div class="flex flex-col gap-1">
             <label class="text-xs font-medium text-gray-600">Tarifa Admin (%)</label>
             <InputNumber v-model="dialog.form.tarifa_admin_pct"
-              :minFractionDigits="1" :maxFractionDigits="2" suffix="%" class="w-full" placeholder="3.8" />
+              :minFractionDigits="1" :maxFractionDigits="2" suffix="%" class="w-full"
+              placeholder="3.8" />
           </div>
-          <div class="flex flex-col gap-1">
+          <div class="col-span-2 flex flex-col gap-1">
             <label class="text-xs font-medium text-gray-600">Contrato en Drive</label>
-            <InputText v-model="dialog.form.enlace_drive" class="w-full" placeholder="https://drive.google.com/…" />
+            <InputText v-model="dialog.form.enlace_drive" class="w-full"
+              placeholder="https://drive.google.com/…" />
           </div>
           <div class="flex flex-col gap-1">
             <label class="text-xs font-medium text-gray-600">Tarifa CGM base ($/kWh)</label>
             <InputNumber v-model="dialog.form.tarifa_cgm"
-              :minFractionDigits="2" :maxFractionDigits="4" class="w-full" placeholder="6.0" />
+              :minFractionDigits="2" :maxFractionDigits="4" class="w-full"
+              placeholder="6.0" />
           </div>
           <div class="flex flex-col gap-1">
             <label class="text-xs font-medium text-gray-600">Tarifa Representación base ($/kWh)</label>
             <InputNumber v-model="dialog.form.tarifa_representacion"
-              :minFractionDigits="2" :maxFractionDigits="4" class="w-full" placeholder="6.0" />
+              :minFractionDigits="2" :maxFractionDigits="4" class="w-full"
+              placeholder="6.0" />
           </div>
         </div>
       </div>
       <template #footer>
         <Button label="Cancelar" severity="secondary" text @click="dialog.visible = false" />
-        <Button :label="dialog.modo === 'crear' ? 'Crear' : 'Guardar'"
+        <Button :label="dialog.modo === 'crear' ? 'Crear contrato' : 'Guardar cambios'"
           icon="pi pi-check" :loading="guardando"
           style="background:#3b82f6;border-color:#3b82f6"
           @click="guardar" />
@@ -305,79 +353,130 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import Button from 'primevue/button'
-import Tag from 'primevue/tag'
+import Button      from 'primevue/button'
+import Tag         from 'primevue/tag'
 import ProgressSpinner from 'primevue/progressspinner'
-import DataTable from 'primevue/datatable'
-import Column from 'primevue/column'
-import Dialog from 'primevue/dialog'
-import InputText from 'primevue/inputtext'
+import DataTable   from 'primevue/datatable'
+import Column      from 'primevue/column'
+import Dialog      from 'primevue/dialog'
+import InputText   from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
-import Select from 'primevue/select'
+import Select      from 'primevue/select'
 import { useToast } from 'primevue/usetoast'
 import api from '@/api/client'
 
 const route = useRoute()
 const toast = useToast()
 
+// ── Constantes ───────────────────────────────────────────────────────────────
 const ANIO_ACTUAL = 2026
-const ESTADO_LABELS  = { vigente: 'Vigente', vencido: 'Vencido', terminado: 'Terminado', en_renovacion: 'En renovación' }
-const ESTADO_SEVERITY = { vigente: 'success', vencido: 'danger', terminado: 'secondary', en_renovacion: 'warn' }
 
+const ESTADO_LABELS   = {
+  vigente: 'Vigente', vencido: 'Vencido',
+  terminado: 'Terminado', en_renovacion: 'En renovación',
+}
+const ESTADO_SEVERITY = {
+  vigente: 'success', vencido: 'danger',
+  terminado: 'secondary', en_renovacion: 'warn',
+}
+const ESTADOS_OPCIONES = [
+  { label: 'Vigente',     value: 'vigente' },
+  { label: 'Vencido',     value: 'vencido' },
+  { label: 'Terminado',   value: 'terminado' },
+  { label: 'En renovación', value: 'en_renovacion' },
+]
+
+// ── Estado ───────────────────────────────────────────────────────────────────
 const proyectoNombre = ref('')
-const contratos = ref([])
-const loading = ref(true)
-const guardando = ref(false)
+const codigoTSF      = ref('')
+const contratos      = ref([])
+const loading        = ref(true)
+const guardando      = ref(false)
 
-// Solo muestra la sección de tarifas para contratos que ya tienen inversionista
+// Paneles de indexación: { "id:tipo": bool }
+const paneles = ref({})
+const isOpen  = (id, tipo) => !!paneles.value[`${id}:${tipo}`]
+function toggleIdx(id, tipo) {
+  const k = `${id}:${tipo}`
+  paneles.value = { ...paneles.value, [k]: !paneles.value[k] }
+}
+
+// Solo contratos que tienen inversionista (los que muestran tarjeta)
 const contratosConTarifas = computed(() =>
   contratos.value.filter(c => c.inversionista_nombre)
 )
 
-// Paneles expandibles de indexación
-const paneles = ref({})
-const isOpen = (id, tipo) => !!paneles.value[`${id}:${tipo}`]
-const toggle = (id, tipo) => {
-  const k = `${id}:${tipo}`
-  paneles.value[k] = !paneles.value[k]
+// ── Helpers de indexación ────────────────────────────────────────────────────
+
+/**
+ * Normaliza un array JSONB de indexación.
+ * El JSONB usa la clave "año" (con ñ). JavaScript accede a ella con f['año'].
+ * Devuelve siempre { anio, ipc, valor, esBase } para uso seguro en el componente.
+ */
+function normalizarIdx(raw) {
+  if (!Array.isArray(raw)) return []
+  return raw.map(f => ({
+    anio:   f['año'] ?? null,   // clave canónica del JSONB
+    ipc:    f.ipc   ?? null,
+    valor:  f.valor ?? null,
+    esBase: f.esBase ?? false,
+  }))
 }
 
-function valorVigente(indexaciones, base) {
-  if (!indexaciones?.length) return base != null ? base.toFixed(3) : '—'
-  const v = indexaciones.find(f => f.año === ANIO_ACTUAL) ?? indexaciones[indexaciones.length - 1]
-  return v?.valor != null ? v.valor.toFixed(3) : (base != null ? base.toFixed(3) : '—')
+/** Longitud segura del array de indexación (null → 0) */
+function idxLen(raw) {
+  return Array.isArray(raw) ? raw.length : 0
 }
 
-// ── Dialog ────────────────────────────────────────────────────────────────────
+/** Devuelve el valor del año vigente (o el último disponible) como string */
+function valorVigente(raw, base) {
+  const idx = normalizarIdx(raw)
+  if (!idx.length) return base != null ? Number(base).toFixed(3) : '—'
+  const v = idx.find(f => f.anio === ANIO_ACTUAL) ?? idx[idx.length - 1]
+  return v?.valor != null
+    ? Number(v.valor).toFixed(3)
+    : (base != null ? Number(base).toFixed(3) : '—')
+}
+
+// ── Dialog ───────────────────────────────────────────────────────────────────
 const dialog = reactive({
-  visible: false, modo: 'crear', id: null,
+  visible: false,
+  modo: 'crear',
+  id: null,
   form: {
-    inversionista_nombre: '', portafolio: '', codigo_sun_factory: '',
-    estado: 'vigente', fecha_firma_contrato: '', enlace_drive: '',
-    tarifa_admin_pct: null, tarifa_cgm: null, tarifa_representacion: null,
+    inversionista_nombre: '',
+    portafolio: '',
+    codigo_sun_factory: '',
+    estado: 'vigente',
+    fecha_firma_contrato: '',
+    enlace_drive: '',
+    tarifa_admin_pct: null,
+    tarifa_cgm: null,
+    tarifa_representacion: null,
   },
 })
 
-function abrirDialog(contrato = null) {
-  if (contrato) {
+function abrirDialog(c = null) {
+  if (c) {
     dialog.modo = 'editar'
-    dialog.id = contrato.id
+    dialog.id   = c.id
     Object.assign(dialog.form, {
-      inversionista_nombre: contrato.inversionista_nombre || '',
-      portafolio: contrato.portafolio || '',
-      codigo_sun_factory: contrato.codigo_sun_factory || '',
-      estado: contrato.estado || 'vigente',
-      fecha_firma_contrato: contrato.fecha_firma_contrato || '',
-      enlace_drive: contrato.enlace_drive || '',
-      tarifa_admin_pct: contrato.tarifa_admin != null ? contrato.tarifa_admin * 100 : null,
-      tarifa_cgm: contrato.tarifa_cgm ?? null,
-      tarifa_representacion: contrato.tarifa_representacion ?? null,
+      inversionista_nombre: c.inversionista_nombre || '',
+      portafolio:           c.portafolio           || '',
+      codigo_sun_factory:   c.codigo_sun_factory   || '',
+      estado:               c.estado               || 'vigente',
+      fecha_firma_contrato: c.fecha_firma_contrato  || '',
+      enlace_drive:         c.enlace_drive          || '',
+      tarifa_admin_pct:     c.tarifa_admin != null ? c.tarifa_admin * 100 : null,
+      tarifa_cgm:           c.tarifa_cgm            ?? null,
+      tarifa_representacion:c.tarifa_representacion ?? null,
     })
   } else {
     dialog.modo = 'crear'
-    dialog.id = null
+    dialog.id   = null
     Object.assign(dialog.form, {
-      inversionista_nombre: '', portafolio: '', codigo_sun_factory: '',
+      inversionista_nombre: '',
+      portafolio: '', codigo_sun_factory: '',
       estado: 'vigente', fecha_firma_contrato: '', enlace_drive: '',
       tarifa_admin_pct: null, tarifa_cgm: null, tarifa_representacion: null,
     })
@@ -393,19 +492,18 @@ async function guardar() {
   guardando.value = true
   try {
     const payload = {
-      servicio_aplica: 'representacion',
-      proyecto_id: Number(route.params.id),
+      servicio_aplica:      'representacion',
+      proyecto_id:          Number(route.params.id),
       inversionista_nombre: dialog.form.inversionista_nombre,
-      portafolio: dialog.form.portafolio || null,
-      codigo_sun_factory: dialog.form.codigo_sun_factory || null,
-      estado: dialog.form.estado,
+      portafolio:           dialog.form.portafolio           || null,
+      codigo_sun_factory:   dialog.form.codigo_sun_factory   || null,
+      estado:               dialog.form.estado,
       fecha_firma_contrato: dialog.form.fecha_firma_contrato || null,
-      enlace_drive: dialog.form.enlace_drive || null,
-      tarifa_admin: dialog.form.tarifa_admin_pct != null ? dialog.form.tarifa_admin_pct / 100 : null,
-      tarifa_cgm: dialog.form.tarifa_cgm ?? null,
-      tarifa_representacion: dialog.form.tarifa_representacion ?? null,
-      contratante_nombre: 'Unergy Energía Digital S.A.S. E.S.P.',
-      prestador_nombre: 'Unergy Energía Digital S.A.S. E.S.P.',
+      enlace_drive:         dialog.form.enlace_drive         || null,
+      tarifa_admin:         dialog.form.tarifa_admin_pct != null
+                              ? dialog.form.tarifa_admin_pct / 100 : null,
+      tarifa_cgm:           dialog.form.tarifa_cgm           ?? null,
+      tarifa_representacion:dialog.form.tarifa_representacion ?? null,
     }
     if (dialog.modo === 'crear') {
       await api.post('/contratos-servicio', payload)
@@ -413,7 +511,11 @@ async function guardar() {
       await api.patch(`/contratos-servicio/${dialog.id}`, payload)
     }
     dialog.visible = false
-    toast.add({ severity: 'success', summary: dialog.modo === 'crear' ? 'Contrato creado' : 'Actualizado', life: 2500 })
+    toast.add({
+      severity: 'success',
+      summary: dialog.modo === 'crear' ? 'Contrato creado' : 'Cambios guardados',
+      life: 2500,
+    })
     await cargar()
   } catch (e) {
     toast.add({ severity: 'error', summary: 'Error', detail: e.response?.data?.detail, life: 4000 })
@@ -423,21 +525,22 @@ async function guardar() {
 }
 
 async function eliminar(id) {
-  if (!confirm('¿Eliminar este contrato?')) return
+  if (!confirm('¿Eliminar este contrato? Esta acción no se puede deshacer.')) return
   try {
     await api.delete(`/contratos-servicio/${id}`)
-    toast.add({ severity: 'success', summary: 'Eliminado', life: 2000 })
+    toast.add({ severity: 'success', summary: 'Contrato eliminado', life: 2000 })
     await cargar()
   } catch {
     toast.add({ severity: 'error', summary: 'Error al eliminar', life: 3000 })
   }
 }
 
+// ── Carga de datos ────────────────────────────────────────────────────────────
 async function cargar() {
   try {
-    const { data } = await api.get('/contratos-servicio', {
-      params: { tipo: 'representacion', proyecto_id: route.params.id },
-    })
+    const params = { tipo: 'representacion', proyecto_id: route.params.id }
+    if (codigoTSF.value) params.codigo_tsf = codigoTSF.value
+    const { data } = await api.get('/contratos-servicio', { params })
     contratos.value = data
   } catch {
     toast.add({ severity: 'error', summary: 'Error al cargar contratos', life: 3000 })
@@ -448,37 +551,59 @@ onMounted(async () => {
   try {
     const { data } = await api.get(`/proyectos/${route.params.id}`)
     proyectoNombre.value = data.nombre_comercial || ''
+    codigoTSF.value      = data.codigo_tsf       || ''
   } catch { /* graceful degrade */ }
   await cargar()
   loading.value = false
 })
 </script>
 
-<!-- ── TablaIdx ────────────────────────────────────────────────────────────── -->
+<!-- ══════════════════════════════════════════════════════════════════════════
+     TablaIndexacion — componente local (mismo estilo que OperacionView)
+═══════════════════════════════════════════════════════════════════════════ -->
 <script>
-const ANIO = 2026
-const TablaIdx = {
-  props: { titulo: String, filas: { type: Array, default: () => [] } },
+const TablaIndexacion = {
+  props: {
+    titulo:      { type: String,  required: true },
+    filas:       { type: Array,   default: () => [] },
+    anioVigente: { type: Number,  default: 2026 },
+  },
   computed: {
-    vigente() {
-      return this.filas.find(f => f.año === ANIO) ?? this.filas[this.filas.length - 1]
+    /** Índice de la fila vigente (año = anioVigente) o la última fila */
+    iVigente() {
+      const i = this.filas.findIndex(f => f.anio === this.anioVigente)
+      return i >= 0 ? i : this.filas.length - 1
     },
   },
   methods: {
-    esV(f) { return f === this.vigente },
-    est(f) {
-      if (f.esBase || f.año < ANIO) return 'pagado'
-      if (this.esV(f)) return 'vigente'
+    esVigente(i) { return i === this.iVigente },
+
+    /**
+     * Estado de cada fila:
+     * - 'vigente':  es la fila del año vigente
+     * - 'pagado':   año anterior al vigente (ya liquidado)
+     * - 'pendiente': año posterior al vigente (futuro)
+     *
+     * CORRECCIÓN: el año base puede coincidir con el año vigente (2026),
+     * en ese caso prima 'vigente' sobre 'pagado'.
+     */
+    estadoFila(f, i) {
+      if (this.esVigente(i)) return 'vigente'
+      if (f.anio < this.anioVigente) return 'pagado'
       return 'pendiente'
+    },
+
+    fmt(v) {
+      return v != null ? Number(v).toFixed(3) : '—'
     },
   },
   template: `
-    <div class="rounded-xl overflow-hidden" style="border:1px solid #bfdbfe">
-      <div class="flex items-center justify-between px-4 py-2.5" style="background:#eff6ff">
+    <div class="rounded-xl border border-blue-200 overflow-hidden">
+      <div class="flex items-center justify-between px-4 py-2.5 bg-blue-50">
         <span class="text-xs font-semibold" style="color:#1e40af">
-          <i class="pi pi-chart-line text-xs mr-1" style="color:#3b82f6"/>{{ titulo }}
+          <i class="pi pi-chart-line text-xs mr-1.5" style="color:#3b82f6" />{{ titulo }}
         </span>
-        <span class="text-xs text-gray-400">Año vigente: ${ANIO}</span>
+        <span class="text-xs text-gray-400">Año vigente: {{ anioVigente }}</span>
       </div>
       <table class="w-full text-sm border-collapse">
         <thead>
@@ -491,34 +616,55 @@ const TablaIdx = {
         </thead>
         <tbody>
           <tr v-if="!filas.length">
-            <td colspan="4" class="px-4 py-6 text-center text-xs text-gray-400">Sin datos de indexación.</td>
+            <td colspan="4" class="px-4 py-6 text-center text-xs text-gray-400">
+              Sin datos de indexación registrados.
+            </td>
           </tr>
-          <tr v-for="f in filas" :key="f.año"
-            class="border-b border-gray-50 hover:bg-blue-50/20"
-            :style="esV(f)?'background:#eff6ff40':''">
+          <tr v-for="(f, i) in filas" :key="i"
+            class="border-b border-gray-50 hover:bg-blue-50/20 transition-colors"
+            :class="esVigente(i) ? 'bg-blue-50/50' : ''">
+            <!-- Año -->
             <td class="px-4 py-2.5">
               <div class="flex items-center gap-1.5">
-                <span class="font-mono font-semibold" :style="esV(f)?'color:#1d4ed8':'color:#2C2039'">{{ f.año }}</span>
-                <span v-if="esV(f)" class="text-xs px-1.5 py-0.5 rounded font-bold" style="background:#dbeafe;color:#1d4ed8">actual</span>
-                <i v-if="esV(f)" class="pi pi-arrow-left text-xs" style="color:#1d4ed8"/>
+                <span class="font-mono font-semibold"
+                  :style="esVigente(i) ? 'color:#1d4ed8' : 'color:#2C2039'">
+                  {{ f.anio }}
+                </span>
+                <span v-if="esVigente(i)"
+                  class="text-xs px-1.5 py-0.5 rounded font-bold leading-none"
+                  style="background:#dbeafe;color:#1d4ed8">actual</span>
+                <i v-if="esVigente(i)" class="pi pi-arrow-left text-xs" style="color:#1d4ed8" />
               </div>
             </td>
+            <!-- IPC -->
             <td class="px-4 py-2.5">
-              <span v-if="f.ipc==null" class="text-gray-400 text-xs">— (base)</span>
-              <span v-else class="font-mono tabular-nums" style="color:#374151">{{ f.ipc }}%</span>
+              <span v-if="f.ipc == null" class="text-gray-400 text-xs">— (base)</span>
+              <span v-else class="font-mono tabular-nums" style="color:#374151">
+                {{ f.ipc }}%
+              </span>
             </td>
+            <!-- Valor -->
             <td class="px-4 py-2.5 text-right font-semibold tabular-nums"
-              :style="esV(f)?'color:#1d4ed8':'color:#2C2039'">{{ f.valor?.toFixed(3) ?? '—' }}</td>
+              :style="esVigente(i) ? 'color:#1d4ed8' : 'color:#2C2039'">
+              {{ fmt(f.valor) }}
+            </td>
+            <!-- Estado -->
             <td class="px-4 py-2.5 text-center">
-              <span v-if="est(f)==='pagado'"
+              <span v-if="estadoFila(f,i) === 'pagado'"
                 class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full"
-                style="background:#dcfce7;color:#166534"><i class="pi pi-check text-xs"/>Pagado</span>
-              <span v-else-if="est(f)==='vigente'"
+                style="background:#dcfce7;color:#166534">
+                <i class="pi pi-check text-xs" />Pagado
+              </span>
+              <span v-else-if="estadoFila(f,i) === 'vigente'"
                 class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full"
-                style="background:#dbeafe;color:#1d4ed8">Vigente</span>
+                style="background:#dbeafe;color:#1d4ed8">
+                Vigente
+              </span>
               <span v-else
                 class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full"
-                style="background:#f3f4f6;color:#9ca3af">Pendiente</span>
+                style="background:#f3f4f6;color:#9ca3af">
+                Pendiente
+              </span>
             </td>
           </tr>
         </tbody>
@@ -526,5 +672,5 @@ const TablaIdx = {
     </div>
   `,
 }
-export default { components: { TablaIdx } }
+export default { components: { TablaIndexacion } }
 </script>
