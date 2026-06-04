@@ -43,97 +43,82 @@
       <!-- Tarjeta -->
       <div v-if="contratoActivo" class="rounded-xl border bg-white p-5" style="border-color:#3b82f640">
 
-        <!-- Header -->
-        <div class="flex items-start justify-between mb-4 gap-3">
-          <div class="flex items-center gap-2.5">
-            <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style="background:#eff6ff">
-              <i class="pi pi-file-edit text-sm" style="color:#3b82f6" />
-            </div>
-            <div>
-              <p class="text-xs text-gray-400 leading-none mb-0.5">Contrato de Representación CGM</p>
-              <span class="text-sm font-semibold" style="color:#2C2039">{{ proyectoNombre }}</span>
-            </div>
+        <!-- Header compacto: nombre + badge + botón -->
+        <div class="flex items-center justify-between mb-2 gap-2">
+          <div class="flex items-center gap-1.5 min-w-0">
+            <i class="pi pi-file-edit text-xs flex-shrink-0" style="color:#3b82f6"/>
+            <span class="text-sm font-semibold truncate" style="color:#2C2039">{{ proyectoNombre }}</span>
           </div>
-          <div class="flex items-center gap-2 flex-shrink-0">
+          <div class="flex items-center gap-1.5 flex-shrink-0">
             <Tag v-if="contratoActivo.estado"
               :value="ESTADO_LABELS[contratoActivo.estado] || contratoActivo.estado"
-              :severity="ESTADO_SEVERITY[contratoActivo.estado] || 'secondary'" class="text-xs" />
-            <Button icon="pi pi-pencil" label="Editar" size="small" text severity="secondary" @click="abrirDialog" />
+              :severity="ESTADO_SEVERITY[contratoActivo.estado] || 'secondary'"
+              class="text-[11px] !py-0 !px-1.5" />
+            <button type="button"
+              class="flex items-center gap-1 text-xs text-gray-400 hover:text-blue-500 transition-colors"
+              style="background:none;border:none;padding:0;cursor:pointer"
+              @click="abrirDialog">
+              <i class="pi pi-pencil text-[11px]"/>Editar
+            </button>
           </div>
         </div>
 
-        <!-- Meta-info -->
-        <div class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
-          <div class="rounded-lg p-3" style="background:#eff6ff;border:1px solid #bfdbfe">
-            <p class="text-xs mb-1 flex items-center gap-1" style="color:#1e40af">
-              <i class="pi pi-briefcase text-xs" style="color:#3b82f6"/>Inversionista</p>
-            <p class="text-sm font-semibold leading-snug" style="color:#1c1917">{{ contratoActivo.inversionista || '—' }}</p>
-          </div>
-          <div class="rounded-lg p-3" style="background:#eff6ff;border:1px solid #bfdbfe">
-            <p class="text-xs mb-1 flex items-center gap-1" style="color:#1e40af">
-              <i class="pi pi-folder text-xs" style="color:#3b82f6"/>Portafolio</p>
-            <p class="text-sm font-semibold leading-snug" style="color:#1c1917">{{ contratoActivo.portafolio || '—' }}</p>
-          </div>
-          <div class="rounded-lg p-3" style="background:#eff6ff;border:1px solid #bfdbfe">
-            <p class="text-xs mb-1 flex items-center gap-1" style="color:#1e40af">
-              <i class="pi pi-calendar text-xs" style="color:#3b82f6"/>Fecha firma</p>
-            <p class="text-sm font-semibold" style="color:#1c1917">{{ contratoActivo.fecha_firma || '—' }}</p>
-          </div>
-          <div class="rounded-lg p-3" style="background:#eff6ff;border:1px solid #bfdbfe">
-            <p class="text-xs mb-1 flex items-center gap-1" style="color:#1e40af">
-              <i class="pi pi-file-pdf text-xs" style="color:#3b82f6"/>Contrato</p>
-            <a v-if="contratoActivo.soporte_url"
-               :href="contratoActivo.soporte_url" target="_blank" rel="noopener"
-               class="text-sm font-semibold flex items-center gap-1.5 hover:underline" style="color:#3b82f6">
-              <i class="pi pi-external-link text-xs"/>Ver contrato
-            </a>
-            <span v-else class="text-sm text-gray-400">Sin enlace</span>
-          </div>
+        <!-- Meta-info: una línea con pipes -->
+        <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 mb-3 text-xs text-gray-500">
+          <span><span class="font-medium" style="color:#1e40af">Inv:</span> {{ contratoActivo.inversionista || '—' }}</span>
+          <span class="text-gray-300">|</span>
+          <span><span class="font-medium" style="color:#1e40af">Portafolio:</span> {{ contratoActivo.portafolio || '—' }}</span>
+          <span class="text-gray-300">|</span>
+          <span><span class="font-medium" style="color:#1e40af">Firma:</span> {{ contratoActivo.fecha_firma || '—' }}</span>
+          <span class="text-gray-300">|</span>
+          <a v-if="contratoActivo.soporte_url"
+             :href="contratoActivo.soporte_url" target="_blank" rel="noopener"
+             class="flex items-center gap-0.5 font-medium hover:underline" style="color:#3b82f6">
+            <i class="pi pi-external-link text-[10px]"/>Ver contrato
+          </a>
+          <span v-else class="text-gray-400">Sin contrato</span>
         </div>
 
-        <!-- Bloques de valor -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <!-- Bloques de valor compactos en fila -->
+        <div class="grid grid-cols-3 gap-2 mb-0">
           <!-- Tarifa Admin -->
-          <div class="rounded-lg p-3.5" style="background:#f0f9ff;border:1px solid #bae6fd">
-            <p class="text-xs mb-1.5 flex items-center gap-1.5" style="color:#0369a1">
-              <i class="pi pi-percentage text-xs" style="color:#0ea5e9"/>Tarifa Admin</p>
-            <p class="text-base font-bold tabular-nums" style="color:#0284c7">
+          <div class="rounded-lg px-3 py-2" style="background:#f0f9ff;border:1px solid #bae6fd">
+            <p class="text-[11px] font-medium mb-0.5" style="color:#0369a1">Tarifa Admin</p>
+            <p class="text-sm font-bold tabular-nums" style="color:#0284c7">
               {{ contratoActivo.tarifa_admin != null ? (contratoActivo.tarifa_admin * 100).toFixed(1) + '%' : '—' }}
             </p>
-            <p class="text-xs text-gray-400 mt-0.5">Porcentaje fijo</p>
+            <p class="text-[10px] text-gray-400">Fijo</p>
           </div>
 
           <!-- Tarifa CGM -->
-          <div class="rounded-lg p-3.5" style="background:#eff6ff;border:1px solid #bfdbfe">
-            <p class="text-xs mb-1.5 flex items-center gap-1.5" style="color:#1e40af">
-              <i class="pi pi-chart-bar text-xs" style="color:#3b82f6"/>Tarifa CGM</p>
-            <p class="text-base font-bold tabular-nums" style="color:#1d4ed8">
+          <div class="rounded-lg px-3 py-2" style="background:#eff6ff;border:1px solid #bfdbfe">
+            <p class="text-[11px] font-medium mb-0.5" style="color:#1e40af">Tarifa CGM</p>
+            <p class="text-sm font-bold tabular-nums" style="color:#1d4ed8">
               {{ valorVigente(idxCgm) }}
-              <span class="text-xs font-normal text-gray-400 ml-0.5">$/kWh</span>
+              <span class="text-[10px] font-normal text-gray-400">$/kWh</span>
             </p>
             <button v-if="idxCgm.length" type="button"
-              class="mt-2 flex items-center gap-1 text-xs font-medium hover:opacity-75 transition-opacity"
+              class="flex items-center gap-0.5 text-[11px] font-medium hover:opacity-75 transition-opacity mt-0.5"
               style="background:none;border:none;padding:0;cursor:pointer;color:#3b82f6"
               @click="paneles.cgm = !paneles.cgm">
-              <i class="pi pi-chevron-down text-xs transition-transform duration-200"
+              <i class="pi pi-chevron-down text-[10px] transition-transform duration-200"
                 :style="paneles.cgm ? 'transform:rotate(180deg)' : ''"/>
               {{ paneles.cgm ? 'Ocultar' : 'Ver indexación' }}
             </button>
           </div>
 
           <!-- Tarifa Representación -->
-          <div class="rounded-lg p-3.5" style="background:#eff6ff;border:1px solid #bfdbfe">
-            <p class="text-xs mb-1.5 flex items-center gap-1.5" style="color:#1e40af">
-              <i class="pi pi-file-edit text-xs" style="color:#3b82f6"/>Tarifa Representación</p>
-            <p class="text-base font-bold tabular-nums" style="color:#1d4ed8">
+          <div class="rounded-lg px-3 py-2" style="background:#eff6ff;border:1px solid #bfdbfe">
+            <p class="text-[11px] font-medium mb-0.5" style="color:#1e40af">Tarifa Rep.</p>
+            <p class="text-sm font-bold tabular-nums" style="color:#1d4ed8">
               {{ valorVigente(idxRep) }}
-              <span class="text-xs font-normal text-gray-400 ml-0.5">$/kWh</span>
+              <span class="text-[10px] font-normal text-gray-400">$/kWh</span>
             </p>
             <button v-if="idxRep.length" type="button"
-              class="mt-2 flex items-center gap-1 text-xs font-medium hover:opacity-75 transition-opacity"
+              class="flex items-center gap-0.5 text-[11px] font-medium hover:opacity-75 transition-opacity mt-0.5"
               style="background:none;border:none;padding:0;cursor:pointer;color:#3b82f6"
               @click="paneles.rep = !paneles.rep">
-              <i class="pi pi-chevron-down text-xs transition-transform duration-200"
+              <i class="pi pi-chevron-down text-[10px] transition-transform duration-200"
                 :style="paneles.rep ? 'transform:rotate(180deg)' : ''"/>
               {{ paneles.rep ? 'Ocultar' : 'Ver indexación' }}
             </button>
@@ -147,9 +132,10 @@
             <div class="flex items-center justify-between px-4 py-2.5" style="background:#eff6ff">
               <div class="flex items-center gap-1.5">
                 <span class="text-xs font-semibold" style="color:#1e40af">Indexación CGM</span>
-                <span class="inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] cursor-help"
-                  style="background:#bfdbfe;color:#1e40af"
-                  title="La indexación se aplica en la fecha de renovación anual del contrato, usando el IPC del año inmediatamente anterior certificado por el DANE.">ⓘ</span>
+                <span
+                  v-tooltip.top="'La indexación se aplica en la fecha de renovación anual del contrato, usando el IPC del año inmediatamente anterior certificado por el DANE.'"
+                  class="inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] cursor-help select-none"
+                  style="background:#bfdbfe;color:#1e40af">ⓘ</span>
               </div>
               <span class="text-xs text-gray-400">Hoy: {{ hoy }}</span>
             </div>
@@ -214,9 +200,10 @@
             <div class="flex items-center justify-between px-4 py-2.5" style="background:#eff6ff">
               <div class="flex items-center gap-1.5">
                 <span class="text-xs font-semibold" style="color:#1e40af">Indexación Representación</span>
-                <span class="inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] cursor-help"
-                  style="background:#bfdbfe;color:#1e40af"
-                  title="La indexación se aplica en la fecha de renovación anual del contrato, usando el IPC del año inmediatamente anterior certificado por el DANE.">ⓘ</span>
+                <span
+                  v-tooltip.top="'La indexación se aplica en la fecha de renovación anual del contrato, usando el IPC del año inmediatamente anterior certificado por el DANE.'"
+                  class="inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] cursor-help select-none"
+                  style="background:#bfdbfe;color:#1e40af">ⓘ</span>
               </div>
               <span class="text-xs text-gray-400">Hoy: {{ hoy }}</span>
             </div>
