@@ -511,6 +511,7 @@
     <!-- ══ TAB 1 — CALENDARIO ══════════════════════════════════════════════ -->
     <div v-if="activeTab === 1" class="mon-tab-calendario">
       <CalendarioFallas
+        :refresh-key="calRefreshKey"
         @editar="abrirEditar"
         @ver-falla="irAFallaDesdeCalendario"
       />
@@ -554,6 +555,9 @@ import api from '@/api/client'
 const router         = useRouter()
 const toast          = useToast()
 const confirmService = useConfirm()
+
+// ── Calendario: refresh automático al guardar fallas ─────────────────────
+const calRefreshKey = ref(0)
 
 // ── Tabs ─────────────────────────────────────────────────────────────────
 const TABS = [
@@ -1106,6 +1110,7 @@ async function onSaveForm(payload) {
       })
     }
     formDialogVisible.value = false
+    calRefreshKey.value++     // ← dispara recarga del calendario
     await cargar()
     if (drawerFalla.value && editingFalla.value) {
       const refreshed = allFallas.value.find(f => f.id === editingFalla.value.id)
@@ -1179,6 +1184,7 @@ async function confirmarResolve() {
     if (idx >= 0) allFallas.value[idx] = data
     if (drawerFalla.value?.id === data.id) drawerFalla.value = data
     resolveDialogVisible.value = false
+    calRefreshKey.value++
     toast.add({ severity: 'success', summary: 'Falla resuelta', life: 2500 })
   } catch (err) {
     toast.add({ severity: 'error', summary: 'Error', detail: err?.response?.data?.detail, life: 3000 })
@@ -1224,6 +1230,7 @@ async function agregarSeguimiento() {
     const idx = allFallas.value.findIndex(f => f.id === data.id)
     if (idx >= 0) allFallas.value[idx] = data
     quickEdit.estado_id = data.estado?.id ?? null
+    if (payload.estado_nuevo_id) calRefreshKey.value++
     toast.add({ severity: 'success', summary: 'Seguimiento agregado', life: 2000 })
   } catch (err) {
     toast.add({ severity: 'error', summary: 'Error', detail: err?.response?.data?.detail, life: 3000 })

@@ -24,14 +24,42 @@
 
       <div class="cal-kpis">
         <span class="cal-kpi">
-          <span class="cal-kpi-num">{{ eventosFiltrados.length }}</span>
-          <span class="cal-kpi-lbl">fallas</span>
+          <span class="cal-kpi-num" style="color:#9CA3AF">{{ kpiMes.pendientes }}</span>
+          <span class="cal-kpi-lbl">pendientes</span>
         </span>
         <span class="cal-kpi">
-          <span class="cal-kpi-num" style="color:#3B82F6">{{ eventosMes.length }}</span>
+          <span class="cal-kpi-num" style="color:#915BD8">{{ kpiMes.ejecutadas }}</span>
+          <span class="cal-kpi-lbl">ejecutadas</span>
+        </span>
+        <span class="cal-kpi">
+          <span class="cal-kpi-num">{{ kpiMes.total }}</span>
           <span class="cal-kpi-lbl">este mes</span>
         </span>
       </div>
+    </div>
+
+    <!-- ── Leyenda ─────────────────────────────────────────────────────────── -->
+    <div class="cal-leyenda">
+      <span class="cal-ley-item">
+        <span class="cal-ley-dot" style="background:#9CA3AF" />
+        Programada (pendiente)
+      </span>
+      <span class="cal-ley-item">
+        <span class="cal-ley-dot" style="background:#915BD8" />
+        Ejecutada / Cerrada
+      </span>
+      <span class="cal-ley-item">
+        <span class="cal-ley-dot" style="background:#EF4444" />
+        Abierta
+      </span>
+      <span class="cal-ley-item">
+        <span class="cal-ley-dot" style="background:#F97316" />
+        En gestión
+      </span>
+      <span class="cal-ley-item">
+        <span class="cal-ley-dot" style="background:#EAB308" />
+        En espera
+      </span>
     </div>
 
     <!-- ── Loading ─────────────────────────────────────────────────────── -->
@@ -62,12 +90,13 @@
           <div class="cal-eventos-list">
             <div
               v-for="ev in cell.eventos.slice(0, 3)" :key="ev.id"
-              class="cal-evento"
-              :style="{ background: estadoColor(ev.estado?.codigo) + '22', borderLeft: `3px solid ${estadoColor(ev.estado?.codigo)}` }"
+              :class="['cal-evento', esFinal(ev) && 'cal-evento--final']"
+              :style="{ background: estadoColor(ev.estado?.codigo) + '18', borderLeft: `3px solid ${estadoColor(ev.estado?.codigo)}` }"
               @click="abrirDetalle(ev)"
-              :title="ev.descripcion"
+              :title="`[${ev.estado?.etiqueta}] ${ev.proyecto?.nombre_comercial} — ${ev.descripcion}`"
             >
-              <span class="cal-evento-dot" :style="{ background: prioColor(ev.prioridad?.codigo) }" />
+              <i v-if="esFinal(ev)" class="pi pi-check-circle cal-evento-icon" style="color:#915BD8" />
+              <i v-else class="pi pi-clock cal-evento-icon" style="color:#9CA3AF" />
               <span class="cal-evento-nombre">{{ ev.proyecto?.nombre_comercial }}</span>
             </div>
             <div v-if="cell.eventos.length > 3" class="cal-evento-mas"
@@ -183,6 +212,11 @@ import { ref, computed, onMounted, watch } from 'vue'
 import Select from 'primevue/select'
 import api from '@/api/client'
 
+// ── Props / Emits ─────────────────────────────────────────────────────────────
+const props = defineProps({
+  // Incrementado por el padre cada vez que se guarda una falla → recarga automática
+  refreshKey: { type: Number, default: 0 },
+})
 const emit = defineEmits(['editar', 'ver-falla'])
 
 // ── Estado ───────────────────────────────────────────────────────────────────
@@ -203,13 +237,17 @@ const filtroEstado   = ref(null)
 
 const DIAS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
 
+// ── Colores ───────────────────────────────────────────────────────────────────
+// Fallas EJECUTADAS (estado final) → morado plataforma #915BD8
+// Fallas PENDIENTES (programado)   → gris #9CA3AF
+// Otros estados activos            → colores propios
 const ESTADO_COLORES = {
-  programado:   '#3B82F6',
+  cerrada:      '#915BD8',   // morado plataforma = ejecutada
+  sin_solucion: '#915BD8',   // también final, mismo color
+  programado:   '#9CA3AF',   // gris = pendiente / por ejecutar
   abierta:      '#EF4444',
   en_gestion:   '#F97316',
   en_espera:    '#EAB308',
-  cerrada:      '#22C55E',
-  sin_solucion: '#6B7280',
 }
 const PRIO_COLORES = {
   critica: '#DC2626',
@@ -218,8 +256,15 @@ const PRIO_COLORES = {
   leve:    '#16A34A',
 }
 
-function estadoColor(codigo) { return ESTADO_COLORES[codigo] ?? '#915BD8' }
-function prioColor(codigo)   { return PRIO_COLORES[codigo]   ?? '#915BD8' }
+function estadoColor(codigo) {
+  // Si el estado viene del servidor con es_estado_final=true pero no está mapeado,
+  // también usamos el morado para indicar "ejecutada"
+  return ESTADO_COLORES[codigo] ?? '#915BD8'
+}
+function esFinal(falla) {
+  return falla?.estado?.es_estado_final === true
+}
+function prioColor(codigo) { return PRIO_COLORES[codigo] ?? '#915BD8' }
 
 // ── Computed ─────────────────────────────────────────────────────────────────
 const mesLabel = computed(() => {
@@ -249,31 +294,35 @@ const eventosMes = computed(() => {
   })
 })
 
+// KPIs del mes visible
+const kpiMes = computed(() => ({
+  pendientes: eventosMes.value.filter(f => !esFinal(f)).length,
+  ejecutadas: eventosMes.value.filter(f =>  esFinal(f)).length,
+  total:      eventosMes.value.length,
+}))
+
 const celdas = computed(() => {
   const año  = mesActual.value.getFullYear()
   const mes  = mesActual.value.getMonth()
   const primer = new Date(año, mes, 1)
-  // Lunes=0 ... Domingo=6
   const offsetLun = (primer.getDay() + 6) % 7
   const ultimoDia = new Date(año, mes + 1, 0).getDate()
   const hoyStr = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2,'0')}-${String(hoy.getDate()).padStart(2,'0')}`
 
   const cells = []
-  // Días del mes anterior
   for (let i = offsetLun - 1; i >= 0; i--) {
     const d = new Date(año, mes, -i)
     cells.push({ key: `prev-${i}`, dia: d.getDate(), esDelMes: false, esHoy: false, eventos: [], label: '' })
   }
-  // Días del mes actual
   for (let d = 1; d <= ultimoDia; d++) {
     const dStr = `${año}-${String(mes + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`
     const eventos = eventosMes.value.filter(f => f.fecha_programada === dStr)
     cells.push({
       key: dStr, dia: d, esDelMes: true, esHoy: dStr === hoyStr,
-      eventos, label: new Date(dStr + 'T00:00:00').toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' }),
+      eventos,
+      label: new Date(dStr + 'T00:00:00').toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' }),
     })
   }
-  // Completar hasta múltiplo de 7
   const resto = (7 - cells.length % 7) % 7
   for (let i = 1; i <= resto; i++) {
     cells.push({ key: `next-${i}`, dia: i, esDelMes: false, esHoy: false, eventos: [], label: '' })
@@ -282,43 +331,24 @@ const celdas = computed(() => {
 })
 
 // ── Navegación ────────────────────────────────────────────────────────────────
-function mesAnterior() {
-  const m = mesActual.value
-  mesActual.value = new Date(m.getFullYear(), m.getMonth() - 1, 1)
-}
-function mesSiguiente() {
-  const m = mesActual.value
-  mesActual.value = new Date(m.getFullYear(), m.getMonth() + 1, 1)
-}
-function irAHoy() {
-  mesActual.value = new Date(hoy.getFullYear(), hoy.getMonth(), 1)
-}
-function limpiarFiltros() {
-  filtroProyecto.value = null
-  filtroAsignado.value = null
-  filtroEstado.value   = null
-}
+function mesAnterior()  { const m = mesActual.value; mesActual.value = new Date(m.getFullYear(), m.getMonth() - 1, 1) }
+function mesSiguiente() { const m = mesActual.value; mesActual.value = new Date(m.getFullYear(), m.getMonth() + 1, 1) }
+function irAHoy()       { mesActual.value = new Date(hoy.getFullYear(), hoy.getMonth(), 1) }
+function limpiarFiltros() { filtroProyecto.value = null; filtroAsignado.value = null; filtroEstado.value = null }
 
 // ── Acciones ──────────────────────────────────────────────────────────────────
 function abrirDetalle(falla) { detalle.value = falla }
-function abrirListaDia(cell) {
-  diaModal.value = { label: cell.label, eventos: cell.eventos }
-}
-function irAFalla(falla) {
-  emit('ver-falla', falla)
-  detalle.value = null
-}
-function emitEditar(falla) {
-  emit('editar', falla)
-  detalle.value = null
-}
+function abrirListaDia(cell) { diaModal.value = { label: cell.label, eventos: cell.eventos } }
+function irAFalla(falla)     { emit('ver-falla', falla); detalle.value = null }
+function emitEditar(falla)   { emit('editar', falla);    detalle.value = null }
 
 // ── Carga de datos ────────────────────────────────────────────────────────────
 async function cargar() {
   loading.value = true
   try {
     const [resFallas, resProy, resCatalogos] = await Promise.all([
-      api.get('/fallas', { params: { size: 1000, estado_codigo: 'programado' } }),
+      // Traer TODAS las fallas con fecha_programada (programadas + ejecutadas = historial completo)
+      api.get('/fallas', { params: { size: 2000, con_fecha_programada: true } }),
       api.get('/proyectos', { params: { size: 500 } }),
       api.get('/fallas/catalogos'),
     ])
@@ -326,7 +356,6 @@ async function cargar() {
     proyectos.value = resProy.data.items ?? []
     estados.value   = resCatalogos.data.estados ?? []
 
-    // Extraer usuarios únicos de asignado_a
     const mapa = {}
     for (const f of fallas.value) {
       if (f.asignado_a) mapa[f.asignado_a.id] = f.asignado_a
@@ -336,6 +365,11 @@ async function cargar() {
     loading.value = false
   }
 }
+
+// Recarga automática cuando el padre guarda una falla
+watch(() => props.refreshKey, (newVal, oldVal) => {
+  if (newVal !== oldVal) cargar()
+})
 
 onMounted(cargar)
 </script>
@@ -425,6 +459,15 @@ onMounted(cargar)
   line-height: 1; margin-bottom: 2px; align-self: flex-start;
 }
 
+/* ── Leyenda ── */
+.cal-leyenda {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  background: #fff; border: 1px solid #e9e6f5; border-radius: 10px;
+  padding: 8px 16px;
+}
+.cal-ley-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #6b7280; font-weight: 500; }
+.cal-ley-dot  { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
 /* ── Eventos ── */
 .cal-eventos-list { display: flex; flex-direction: column; gap: 2px; flex: 1; overflow: hidden; }
 .cal-evento {
@@ -433,12 +476,14 @@ onMounted(cargar)
   cursor: pointer; transition: opacity 0.15s;
   overflow: hidden;
 }
-.cal-evento:hover { opacity: 0.85; }
-.cal-evento-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.cal-evento:hover { opacity: 0.82; }
+.cal-evento--final { opacity: 0.9; }
+.cal-evento-icon { font-size: 9px; flex-shrink: 0; }
 .cal-evento-nombre {
   font-size: 10px; font-weight: 600; color: #374151;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;
 }
+.cal-evento--final .cal-evento-nombre { color: #6b7280; text-decoration: line-through; text-decoration-color: #c4b5e0; }
 .cal-evento-mas {
   font-size: 10px; font-weight: 700; color: #915BD8;
   cursor: pointer; padding: 1px 4px; border-radius: 3px;
