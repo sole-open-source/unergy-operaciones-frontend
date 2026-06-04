@@ -211,6 +211,18 @@
       </div>
     </div>
 
+    <!-- ── Notificación por correo ── -->
+    <div class="ff-notif-wrap">
+      <label class="ff-notif-label">
+        <input type="checkbox" v-model="form.notificacion" class="ff-notif-check" />
+        <i class="pi pi-send" style="color:#915BD8;font-size:13px" />
+        <span>Enviar notificación por correo a los correos operacionales del cliente</span>
+      </label>
+      <span v-if="form.notificacion" class="ff-notif-hint">
+        Se enviará un correo a los destinatarios configurados en Clientes → Correos Operacionales.
+      </span>
+    </div>
+
     <div class="ff-footer">
       <Button label="Cancelar" severity="secondary" type="button" @click="$emit('cancel')" />
       <Button :label="initial ? 'Guardar cambios' : 'Registrar falla'"
@@ -306,6 +318,7 @@ const form = ref({
   energia_perdida_kwh:  props.initial?.energia_perdida_kwh ?? null,
   nota_inicial:         '',
   fecha_programada:     props.initial?.fecha_programada ? new Date(props.initial.fecha_programada) : null,
+  notificacion:         false,   // siempre OFF por defecto — el usuario lo activa explícitamente
 })
 
 // Detectar si el estado seleccionado es "programado"
@@ -385,6 +398,7 @@ async function submit() {
     if (form.value.energia_perdida_kwh != null)   base.energia_perdida_kwh  = form.value.energia_perdida_kwh
     if (form.value.nota_inicial?.trim())          base.nota_inicial         = form.value.nota_inicial.trim()
     if (form.value.fecha_programada)             base.fecha_programada     = formatDate(form.value.fecha_programada)
+    base.notificacion = !!form.value.notificacion
 
     if (props.initial) {
       emit('save', { ...base, proyecto_id: form.value.proyecto_id, _archivos: archivosStaged.value })
@@ -538,5 +552,22 @@ onMounted(async () => {
   padding-top: 12px;
   border-top: 1px solid #f0eaf8;
   margin-top: 4px;
+}
+
+/* ── Notificación por correo ── */
+.ff-notif-wrap {
+  display: flex; flex-direction: column; gap: 4px;
+  background: #faf8ff; border: 1.5px solid #e8e0f0; border-radius: 10px;
+  padding: 10px 14px;
+}
+.ff-notif-label {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; font-weight: 600; color: #2C2039; cursor: pointer;
+}
+.ff-notif-check {
+  width: 16px; height: 16px; accent-color: #915BD8; cursor: pointer; flex-shrink: 0;
+}
+.ff-notif-hint {
+  font-size: 11px; color: #915BD8; margin-left: 24px; line-height: 1.4;
 }
 </style>
