@@ -348,7 +348,7 @@ async function cargar() {
   try {
     const [resFallas, resProy, resCatalogos] = await Promise.all([
       // Traer TODAS las fallas con fecha_programada (programadas + ejecutadas = historial completo)
-      api.get('/fallas', { params: { size: 2000, con_fecha_programada: true } }),
+      api.get('/fallas', { params: { size: 5000, con_fecha_programada: true } }),
       api.get('/proyectos', { params: { size: 500 } }),
       api.get('/fallas/catalogos'),
     ])
