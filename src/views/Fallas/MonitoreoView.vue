@@ -1042,6 +1042,50 @@ function abrirEditar(falla) {
   formDialogVisible.value = true
 }
 
+async function _mostrarResultadoNotificacion(fallaIds) {
+  // Envía notificación para cada falla y muestra un toast con el resultado.
+  // Si alguna falla, muestra advertencia pero NO bloquea el flujo.
+  const resultados = await Promise.all(
+    fallaIds.map(id =>
+      api.post(`/fallas/${id}/notificar`)
+        .then(r => r.data)
+        .catch(err => ({ ok: false, enviados: [], errores: [err.response?.data?.detail || err.message || 'Error desconocido'], sin_correos: false }))
+    )
+  )
+
+  const todosOk     = resultados.every(r => r.ok)
+  const sinCorreos  = resultados.some(r => r.sin_correos)
+  const enviados    = [...new Set(resultados.flatMap(r => r.enviados || []))]
+  const errores     = resultados.flatMap(r => r.errores || []).filter(Boolean)
+
+  if (todosOk) {
+    toast.add({
+      severity: 'success',
+      summary: '✉️ Notificación enviada',
+      detail: `Correo enviado a: ${enviados.join(', ')}`,
+      life: 5000,
+    })
+  } else if (sinCorreos) {
+    toast.add({
+      severity: 'warn',
+      summary: '⚠️ Sin correos configurados',
+      detail: 'La falla fue guardada pero el cliente no tiene correos operacionales configurados. Agrégalos en Clientes → Correos Operacionales.',
+      life: 8000,
+    })
+  } else {
+    // Obtener el error SMTP más descriptivo
+    const errorSmtp = errores.find(e => e.includes('534') || e.includes('Application-specific') || e.includes('password'))
+    toast.add({
+      severity: 'error',
+      summary: '✉️ Error al enviar notificación',
+      detail: errorSmtp
+        ? 'Error de autenticación SMTP: Gmail requiere una App Password (contraseña de aplicación). Configúrala en las variables de Railway.'
+        : `Error: ${errores[0] || 'Error desconocido'}`,
+      life: 10000,
+    })
+  }
+}
+
 function irAFallaDesdeCalendario(falla) {
   // Cambia al tab Fallas y abre el drawer con la falla seleccionada
   activeTab.value = 0
@@ -1057,6 +1101,8 @@ function editarDesdeDrawer() {
 async function onSaveForm(payload) {
   savingForm.value = true
   try {
+    const notificar = !!payload.notificacion
+
     if (editingFalla.value) {
       // ── Edición (un solo proyecto) ──────────────────────────────────────
       const notaInicial = payload.nota_inicial
@@ -1073,6 +1119,13 @@ async function onSaveForm(payload) {
         }))
       }
       toast.add({ severity: 'success', summary: 'Falla actualizada', life: 2500 })
+
+      // Notificación tras edición
+      if (notificar) {
+        await _mostrarResultadoNotificacion(
+          [editingFalla.value.id]
+        )
+      }
     } else {
       // ── Creación (uno o más proyectos) ──────────────────────────────────
       const { proyecto_ids, nota_inicial, _archivos, ...base } = payload
@@ -1108,6 +1161,11 @@ async function onSaveForm(payload) {
         detail: n > 1 ? `Se creó una falla independiente por cada proyecto seleccionado` : undefined,
         life: 3000,
       })
+
+      // Notificación tras creación
+      if (notificar && nuevas.length) {
+        await _mostrarResultadoNotificacion(nuevas.map(f => f.id))
+      }
     }
     formDialogVisible.value = false
     calRefreshKey.value++     // ← dispara recarga del calendario
