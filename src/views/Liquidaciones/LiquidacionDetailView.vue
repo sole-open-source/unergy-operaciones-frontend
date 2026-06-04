@@ -118,7 +118,7 @@
               </tr>
 
               <!-- Mandatos del Total (inversionista_id = null) -->
-              <template v-if="!invFiltroId">
+              <template v-if="!invFiltroId && inversionistasConDetalle.length > 1">
                 <template v-for="m in mandatosTotal" :key="m.id">
                   <tr style="background:rgba(145,91,216,0.04)">
                     <td colspan="2" class="px-3 py-1 text-xs text-gray-400 italic">
@@ -334,7 +334,7 @@
                 </tr>
 
                 <!-- Mandatos del Total Costos (inversionista_id = null) -->
-                <template v-if="!invFiltroId">
+                <template v-if="!invFiltroId && inversionistasConDetalle.length > 1">
                   <template v-for="m in mandatosTotalCostos" :key="m.id">
                     <tr style="background:rgba(145,91,216,0.04)">
                       <td colspan="2" class="px-3 py-1 text-xs text-gray-400 italic">
