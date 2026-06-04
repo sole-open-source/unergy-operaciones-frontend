@@ -1,15 +1,13 @@
 <template>
   <div class="space-y-5">
 
-    <!-- ── Breadcrumb + título ──────────────────────────────────────────────── -->
+    <!-- Breadcrumb -->
     <div class="flex items-center gap-2">
       <Button icon="pi pi-arrow-left" text severity="secondary" @click="$router.back()" class="-ml-1" />
       <div>
         <p class="text-xs leading-none mb-0.5" style="color:#9b89b5">
           <span class="cursor-pointer hover:underline"
-            @click="$router.push(`/proyectos/${route.params.id}`)">
-            {{ proyectoNombre || '…' }}
-          </span>
+            @click="$router.push(`/proyectos/${route.params.id}`)">{{ proyectoNombre || '…' }}</span>
           <span class="mx-1.5">›</span><span>Servicios</span>
           <span class="mx-1.5">›</span>
           <span class="font-medium" style="color:#2C2039">Representación</span>
@@ -20,48 +18,35 @@
 
     <div v-if="loading" class="flex justify-center py-20"><ProgressSpinner /></div>
 
-    <!-- Sin datos -->
     <div v-else-if="!contratos.length"
       class="rounded-xl border border-dashed p-10 text-center" style="border-color:#3b82f640">
-      <div class="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3"
-        style="background:#eff6ff">
+      <div class="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3" style="background:#eff6ff">
         <i class="pi pi-file-edit text-xl" style="color:#3b82f6" />
       </div>
       <p class="text-sm font-medium text-gray-600 mb-1">Sin contratos de representación</p>
-      <p class="text-xs text-gray-400">
-        No se encontraron contratos CGM/Representación para este proyecto.
-      </p>
+      <p class="text-xs text-gray-400">No se encontraron contratos CGM/Representación para este proyecto.</p>
     </div>
 
-    <!-- ── Tarjetas con selector de inversionista ─────────────────────────────── -->
     <template v-else>
-      <!-- Selector de inversionista (tabs pequeños) si hay más de uno -->
+      <!-- Selector de inversionista -->
       <div v-if="contratos.length > 1" class="flex items-center gap-2 flex-wrap">
         <span class="text-xs font-semibold text-gray-500">Inversionista:</span>
-        <button
-          v-for="c in contratos" :key="c.inversionista"
-          type="button"
+        <button v-for="c in contratos" :key="c.inversionista" type="button"
           class="text-xs px-3 py-1.5 rounded-full font-medium transition-all border"
-          :class="invSeleccionado === c.inversionista
-            ? 'text-white border-transparent'
-            : 'bg-white text-gray-500 border-gray-200 hover:border-blue-300'"
-          :style="invSeleccionado === c.inversionista
-            ? 'background:#3b82f6;border-color:#3b82f6'
-            : ''"
-          @click="invSeleccionado = c.inversionista">
+          :class="invSeleccionado === c.inversionista ? 'text-white border-transparent' : 'bg-white text-gray-500 border-gray-200 hover:border-blue-300'"
+          :style="invSeleccionado === c.inversionista ? 'background:#3b82f6' : ''"
+          @click="seleccionarInv(c.inversionista)">
           {{ c.inversionista }}
         </button>
       </div>
 
-      <!-- Tarjeta del inversionista seleccionado -->
-      <div v-if="contratoActivo" class="rounded-xl border bg-white p-5"
-        style="border-color:#3b82f640">
+      <!-- Tarjeta -->
+      <div v-if="contratoActivo" class="rounded-xl border bg-white p-5" style="border-color:#3b82f640">
 
-        <!-- Header tarjeta -->
+        <!-- Header -->
         <div class="flex items-start justify-between mb-4 gap-3">
           <div class="flex items-center gap-2.5">
-            <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-              style="background:#eff6ff">
+            <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style="background:#eff6ff">
               <i class="pi pi-file-edit text-sm" style="color:#3b82f6" />
             </div>
             <div>
@@ -72,46 +57,48 @@
           <div class="flex items-center gap-2 flex-shrink-0">
             <Tag v-if="contratoActivo.estado"
               :value="ESTADO_LABELS[contratoActivo.estado] || contratoActivo.estado"
-              :severity="ESTADO_SEVERITY[contratoActivo.estado] || 'secondary'"
-              class="text-xs" />
-            <Button icon="pi pi-pencil" label="Editar" size="small" text severity="secondary"
-              @click="abrirDialog" />
+              :severity="ESTADO_SEVERITY[contratoActivo.estado] || 'secondary'" class="text-xs" />
+            <Button icon="pi pi-pencil" label="Editar" size="small" text severity="secondary" @click="abrirDialog" />
           </div>
         </div>
 
-        <!-- Mini-cards de meta-info -->
+        <!-- Meta-info -->
         <div class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
-          <InfoMini icon="pi pi-briefcase" label="Inversionista"
-            :value="contratoActivo.inversionista" />
-          <InfoMini icon="pi pi-folder" label="Portafolio"
-            :value="contratoActivo.portafolio" />
-          <InfoMini icon="pi pi-calendar" label="Fecha firma"
-            :value="contratoActivo.fecha_firma" />
-          <InfoMini icon="pi pi-file-pdf" label="Contrato">
-            <template #default>
-              <a v-if="contratoActivo.soporte_url"
-                 :href="contratoActivo.soporte_url" target="_blank" rel="noopener"
-                 class="text-sm font-semibold flex items-center gap-1.5 hover:underline"
-                 style="color:#3b82f6">
-                <i class="pi pi-external-link text-xs" />Ver contrato
-              </a>
-              <span v-else class="text-sm text-gray-400">Sin enlace</span>
-            </template>
-          </InfoMini>
+          <div class="rounded-lg p-3" style="background:#eff6ff;border:1px solid #bfdbfe">
+            <p class="text-xs mb-1 flex items-center gap-1" style="color:#1e40af">
+              <i class="pi pi-briefcase text-xs" style="color:#3b82f6"/>Inversionista</p>
+            <p class="text-sm font-semibold leading-snug" style="color:#1c1917">{{ contratoActivo.inversionista || '—' }}</p>
+          </div>
+          <div class="rounded-lg p-3" style="background:#eff6ff;border:1px solid #bfdbfe">
+            <p class="text-xs mb-1 flex items-center gap-1" style="color:#1e40af">
+              <i class="pi pi-folder text-xs" style="color:#3b82f6"/>Portafolio</p>
+            <p class="text-sm font-semibold leading-snug" style="color:#1c1917">{{ contratoActivo.portafolio || '—' }}</p>
+          </div>
+          <div class="rounded-lg p-3" style="background:#eff6ff;border:1px solid #bfdbfe">
+            <p class="text-xs mb-1 flex items-center gap-1" style="color:#1e40af">
+              <i class="pi pi-calendar text-xs" style="color:#3b82f6"/>Fecha firma</p>
+            <p class="text-sm font-semibold" style="color:#1c1917">{{ contratoActivo.fecha_firma || '—' }}</p>
+          </div>
+          <div class="rounded-lg p-3" style="background:#eff6ff;border:1px solid #bfdbfe">
+            <p class="text-xs mb-1 flex items-center gap-1" style="color:#1e40af">
+              <i class="pi pi-file-pdf text-xs" style="color:#3b82f6"/>Contrato</p>
+            <a v-if="contratoActivo.soporte_url"
+               :href="contratoActivo.soporte_url" target="_blank" rel="noopener"
+               class="text-sm font-semibold flex items-center gap-1.5 hover:underline" style="color:#3b82f6">
+              <i class="pi pi-external-link text-xs"/>Ver contrato
+            </a>
+            <span v-else class="text-sm text-gray-400">Sin enlace</span>
+          </div>
         </div>
 
         <!-- Bloques de valor -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-
-          <!-- Tarifa Admin — porcentaje fijo, sin expandible -->
+          <!-- Tarifa Admin -->
           <div class="rounded-lg p-3.5" style="background:#f0f9ff;border:1px solid #bae6fd">
             <p class="text-xs mb-1.5 flex items-center gap-1.5" style="color:#0369a1">
-              <i class="pi pi-percentage text-xs" style="color:#0ea5e9" />Tarifa Admin
-            </p>
+              <i class="pi pi-percentage text-xs" style="color:#0ea5e9"/>Tarifa Admin</p>
             <p class="text-base font-bold tabular-nums" style="color:#0284c7">
-              {{ contratoActivo.tarifa_admin != null
-                  ? (contratoActivo.tarifa_admin * 100).toFixed(1) + '%'
-                  : '—' }}
+              {{ contratoActivo.tarifa_admin != null ? (contratoActivo.tarifa_admin * 100).toFixed(1) + '%' : '—' }}
             </p>
             <p class="text-xs text-gray-400 mt-0.5">Porcentaje fijo</p>
           </div>
@@ -119,18 +106,17 @@
           <!-- Tarifa CGM -->
           <div class="rounded-lg p-3.5" style="background:#eff6ff;border:1px solid #bfdbfe">
             <p class="text-xs mb-1.5 flex items-center gap-1.5" style="color:#1e40af">
-              <i class="pi pi-chart-bar text-xs" style="color:#3b82f6" />Tarifa CGM
-            </p>
+              <i class="pi pi-chart-bar text-xs" style="color:#3b82f6"/>Tarifa CGM</p>
             <p class="text-base font-bold tabular-nums" style="color:#1d4ed8">
-              {{ valorVigente(contratoActivo.indexacion_cgm, contratoActivo.tarifa_cgm) }}
+              {{ valorVigente(idxCgm) }}
               <span class="text-xs font-normal text-gray-400 ml-0.5">$/kWh</span>
             </p>
-            <button v-if="(contratoActivo.indexacion_cgm || []).length > 0" type="button"
+            <button v-if="idxCgm.length" type="button"
               class="mt-2 flex items-center gap-1 text-xs font-medium hover:opacity-75 transition-opacity"
               style="background:none;border:none;padding:0;cursor:pointer;color:#3b82f6"
-              @click="togglePanel('cgm')">
+              @click="paneles.cgm = !paneles.cgm">
               <i class="pi pi-chevron-down text-xs transition-transform duration-200"
-                :style="paneles.cgm ? 'transform:rotate(180deg)' : ''" />
+                :style="paneles.cgm ? 'transform:rotate(180deg)' : ''"/>
               {{ paneles.cgm ? 'Ocultar' : 'Ver indexación' }}
             </button>
           </div>
@@ -138,58 +124,166 @@
           <!-- Tarifa Representación -->
           <div class="rounded-lg p-3.5" style="background:#eff6ff;border:1px solid #bfdbfe">
             <p class="text-xs mb-1.5 flex items-center gap-1.5" style="color:#1e40af">
-              <i class="pi pi-file-edit text-xs" style="color:#3b82f6" />Tarifa Representación
-            </p>
+              <i class="pi pi-file-edit text-xs" style="color:#3b82f6"/>Tarifa Representación</p>
             <p class="text-base font-bold tabular-nums" style="color:#1d4ed8">
-              {{ valorVigente(contratoActivo.indexacion_rep, contratoActivo.tarifa_rep) }}
+              {{ valorVigente(idxRep) }}
               <span class="text-xs font-normal text-gray-400 ml-0.5">$/kWh</span>
             </p>
-            <button v-if="(contratoActivo.indexacion_rep || []).length > 0" type="button"
+            <button v-if="idxRep.length" type="button"
               class="mt-2 flex items-center gap-1 text-xs font-medium hover:opacity-75 transition-opacity"
               style="background:none;border:none;padding:0;cursor:pointer;color:#3b82f6"
-              @click="togglePanel('rep')">
+              @click="paneles.rep = !paneles.rep">
               <i class="pi pi-chevron-down text-xs transition-transform duration-200"
-                :style="paneles.rep ? 'transform:rotate(180deg)' : ''" />
+                :style="paneles.rep ? 'transform:rotate(180deg)' : ''"/>
               {{ paneles.rep ? 'Ocultar' : 'Ver indexación' }}
             </button>
           </div>
         </div>
 
-        <!-- Tabla indexación CGM — renderizada inline, sin sub-componente -->
+        <!-- ═══ TABLA CGM inline — sin sub-componentes ═══════════════════════ -->
         <div :style="{ overflow:'hidden', transition:'max-height 0.35s ease',
             maxHeight: paneles.cgm ? '800px' : '0px' }">
-          <div class="pt-3">
-            <TablaCgm
-              titulo="Indexación CGM"
-              :filas="normalizarAniversarios(contratoActivo.indexacion_cgm)"
-              :hoy="hoy"
-            />
+          <div class="pt-3 rounded-xl overflow-hidden" style="border:1px solid #bfdbfe">
+            <div class="flex items-center justify-between px-4 py-2.5" style="background:#eff6ff">
+              <div class="flex items-center gap-1.5">
+                <span class="text-xs font-semibold" style="color:#1e40af">Indexación CGM</span>
+                <span class="inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] cursor-help"
+                  style="background:#bfdbfe;color:#1e40af"
+                  title="La indexación se aplica en la fecha de renovación anual del contrato, usando el IPC del año inmediatamente anterior certificado por el DANE.">ⓘ</span>
+              </div>
+              <span class="text-xs text-gray-400">Hoy: {{ hoy }}</span>
+            </div>
+            <table class="w-full text-sm border-collapse">
+              <thead>
+                <tr class="bg-gray-50 border-b border-gray-100">
+                  <th class="px-4 py-2 text-left text-xs font-semibold text-gray-500">Fecha aniversario</th>
+                  <th class="px-4 py-2 text-left text-xs font-semibold text-gray-500">IPC aplicado</th>
+                  <th class="px-4 py-2 text-right text-xs font-semibold text-gray-500">Valor ($/kWh)</th>
+                  <th class="px-4 py-2 text-center text-xs font-semibold text-gray-500">Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-if="!idxCgm.length">
+                  <td colspan="4" class="px-4 py-6 text-center text-xs text-gray-400">Sin datos de indexación.</td>
+                </tr>
+                <tr v-for="(f, i) in idxCgm" :key="i"
+                  class="border-b border-gray-50"
+                  :style="iVigente(idxCgm) === i ? 'background:#fff7ed' : ''">
+                  <td class="px-4 py-2.5">
+                    <div class="flex items-center gap-1.5">
+                      <span class="font-mono font-semibold"
+                        :style="iVigente(idxCgm) === i ? 'color:#d97706' : 'color:#2C2039'">
+                        {{ fmtFecha(f.fecha) }}
+                      </span>
+                      <span v-if="f.es_base" class="text-[10px] px-1.5 py-0.5 rounded font-bold"
+                        style="background:#e0f2fe;color:#0369a1">base</span>
+                      <span v-if="iVigente(idxCgm) === i && !f.es_base"
+                        class="text-[10px] px-1.5 py-0.5 rounded font-bold"
+                        style="background:#fef3c7;color:#d97706">actual</span>
+                      <i v-if="iVigente(idxCgm) === i" class="pi pi-arrow-left text-xs" style="color:#d97706"/>
+                    </div>
+                  </td>
+                  <td class="px-4 py-2.5">
+                    <span v-if="f.ipc == null" class="text-gray-400 text-xs">— (base)</span>
+                    <span v-else class="font-mono tabular-nums" style="color:#374151">{{ f.ipc }}%</span>
+                  </td>
+                  <td class="px-4 py-2.5 text-right font-semibold tabular-nums"
+                    :style="iVigente(idxCgm) === i ? 'color:#d97706' : 'color:#2C2039'">
+                    {{ fmtVal(f.valor) }}
+                  </td>
+                  <td class="px-4 py-2.5 text-center">
+                    <span v-if="estadoFila(idxCgm, i) === 'pagado'"
+                      class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full"
+                      style="background:#dcfce7;color:#166534"><i class="pi pi-check text-xs"/>Pagado</span>
+                    <span v-else-if="estadoFila(idxCgm, i) === 'vigente'"
+                      class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full"
+                      style="background:#fef3c7;color:#d97706">Vigente</span>
+                    <span v-else class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full"
+                      style="background:#f3f4f6;color:#9ca3af">Pendiente</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
 
-        <!-- Tabla indexación Representación — renderizada inline, sin sub-componente -->
+        <!-- ═══ TABLA REPRESENTACIÓN inline ════════════════════════════════════ -->
         <div :style="{ overflow:'hidden', transition:'max-height 0.35s ease',
             maxHeight: paneles.rep ? '800px' : '0px' }">
-          <div class="pt-3">
-            <TablaCgm
-              titulo="Indexación Representación"
-              :filas="normalizarAniversarios(contratoActivo.indexacion_rep)"
-              :hoy="hoy"
-            />
+          <div class="pt-3 rounded-xl overflow-hidden" style="border:1px solid #bfdbfe">
+            <div class="flex items-center justify-between px-4 py-2.5" style="background:#eff6ff">
+              <div class="flex items-center gap-1.5">
+                <span class="text-xs font-semibold" style="color:#1e40af">Indexación Representación</span>
+                <span class="inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] cursor-help"
+                  style="background:#bfdbfe;color:#1e40af"
+                  title="La indexación se aplica en la fecha de renovación anual del contrato, usando el IPC del año inmediatamente anterior certificado por el DANE.">ⓘ</span>
+              </div>
+              <span class="text-xs text-gray-400">Hoy: {{ hoy }}</span>
+            </div>
+            <table class="w-full text-sm border-collapse">
+              <thead>
+                <tr class="bg-gray-50 border-b border-gray-100">
+                  <th class="px-4 py-2 text-left text-xs font-semibold text-gray-500">Fecha aniversario</th>
+                  <th class="px-4 py-2 text-left text-xs font-semibold text-gray-500">IPC aplicado</th>
+                  <th class="px-4 py-2 text-right text-xs font-semibold text-gray-500">Valor ($/kWh)</th>
+                  <th class="px-4 py-2 text-center text-xs font-semibold text-gray-500">Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-if="!idxRep.length">
+                  <td colspan="4" class="px-4 py-6 text-center text-xs text-gray-400">Sin datos de indexación.</td>
+                </tr>
+                <tr v-for="(f, i) in idxRep" :key="i"
+                  class="border-b border-gray-50"
+                  :style="iVigente(idxRep) === i ? 'background:#fff7ed' : ''">
+                  <td class="px-4 py-2.5">
+                    <div class="flex items-center gap-1.5">
+                      <span class="font-mono font-semibold"
+                        :style="iVigente(idxRep) === i ? 'color:#d97706' : 'color:#2C2039'">
+                        {{ fmtFecha(f.fecha) }}
+                      </span>
+                      <span v-if="f.es_base" class="text-[10px] px-1.5 py-0.5 rounded font-bold"
+                        style="background:#e0f2fe;color:#0369a1">base</span>
+                      <span v-if="iVigente(idxRep) === i && !f.es_base"
+                        class="text-[10px] px-1.5 py-0.5 rounded font-bold"
+                        style="background:#fef3c7;color:#d97706">actual</span>
+                      <i v-if="iVigente(idxRep) === i" class="pi pi-arrow-left text-xs" style="color:#d97706"/>
+                    </div>
+                  </td>
+                  <td class="px-4 py-2.5">
+                    <span v-if="f.ipc == null" class="text-gray-400 text-xs">— (base)</span>
+                    <span v-else class="font-mono tabular-nums" style="color:#374151">{{ f.ipc }}%</span>
+                  </td>
+                  <td class="px-4 py-2.5 text-right font-semibold tabular-nums"
+                    :style="iVigente(idxRep) === i ? 'color:#d97706' : 'color:#2C2039'">
+                    {{ fmtVal(f.valor) }}
+                  </td>
+                  <td class="px-4 py-2.5 text-center">
+                    <span v-if="estadoFila(idxRep, i) === 'pagado'"
+                      class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full"
+                      style="background:#dcfce7;color:#166534"><i class="pi pi-check text-xs"/>Pagado</span>
+                    <span v-else-if="estadoFila(idxRep, i) === 'vigente'"
+                      class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full"
+                      style="background:#fef3c7;color:#d97706">Vigente</span>
+                    <span v-else class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full"
+                      style="background:#f3f4f6;color:#9ca3af">Pendiente</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
 
       </div>
     </template>
 
-    <!-- ── Dialog editar (campos manuales del contrato) ───────────────────────── -->
+    <!-- Dialog editar -->
     <Dialog v-model:visible="dialogVisible" modal :style="{ width: '480px' }"
       :breakpoints="{ '520px': '95vw' }">
       <template #header>
         <div class="flex items-center gap-2">
-          <div class="w-7 h-7 rounded-lg flex items-center justify-center"
-            style="background:#eff6ff">
-            <i class="pi pi-pencil text-xs" style="color:#3b82f6" />
+          <div class="w-7 h-7 rounded-lg flex items-center justify-center" style="background:#eff6ff">
+            <i class="pi pi-pencil text-xs" style="color:#3b82f6"/>
           </div>
           <span class="font-semibold text-sm" style="color:#2C2039">Editar contrato</span>
         </div>
@@ -207,8 +301,7 @@
           </div>
           <div class="flex flex-col gap-1">
             <label class="text-xs font-medium text-gray-600">Fecha firma</label>
-            <InputText v-model="editForm.fecha_firma_contrato" class="w-full"
-              placeholder="YYYY-MM-DD" />
+            <InputText v-model="editForm.fecha_firma_contrato" class="w-full" placeholder="YYYY-MM-DD" />
           </div>
           <div class="flex flex-col gap-1">
             <label class="text-xs font-medium text-gray-600">Tarifa Admin (%)</label>
@@ -243,7 +336,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch, reactive } from 'vue'
+import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import Button        from 'primevue/button'
 import Tag           from 'primevue/tag'
@@ -255,8 +348,8 @@ import Select        from 'primevue/select'
 import { useToast }  from 'primevue/usetoast'
 import api           from '@/api/client'
 
-const route  = useRoute()
-const toast  = useToast()
+const route = useRoute()
+const toast = useToast()
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 const ESTADO_LABELS   = { vigente:'Vigente', vencido:'Vencido', terminado:'Terminado', en_renovacion:'En renovación', 'Operación':'Operación', 'Construcción':'Construcción' }
@@ -267,35 +360,41 @@ const ESTADOS_OPCIONES = [
   { label:'Terminado', value:'terminado' },
   { label:'En renovación', value:'en_renovacion' },
 ]
+const hoy = new Date().toISOString().split('T')[0]
 
 // ── Estado ────────────────────────────────────────────────────────────────────
-const proyectoNombre = ref('')
-const codigoTSF      = ref('')
-const contratos      = ref([])   // lista de contratos del proyecto (uno por inversionista)
-const loading        = ref(true)
+const proyectoNombre  = ref('')
+const codigoTSF       = ref('')
+const contratos       = ref([])
+const loading         = ref(true)
 const guardando       = ref(false)
 const dialogVisible   = ref(false)
 const invSeleccionado = ref('')
-const hoy = new Date().toISOString().split('T')[0]
+const paneles         = reactive({ cgm: false, rep: false })
 
-// Paneles expandibles — reactive object igual que OperacionView
-const paneles = reactive({ cgm: false, rep: false })
-function togglePanel(tipo) {
-  paneles[tipo] = !paneles[tipo]
-}
-
+// ── Inversionista activo ──────────────────────────────────────────────────────
 const contratoActivo = computed(() =>
   contratos.value.find(c => c.inversionista === invSeleccionado.value)
-  || contratos.value[0]
-  || null
+  ?? contratos.value[0]
+  ?? null
 )
+
+// Arrays de indexación ya normalizados del contrato activo
+const idxCgm = computed(() => normalizarAniversarios(contratoActivo.value?.indexacion_cgm))
+const idxRep = computed(() => normalizarAniversarios(contratoActivo.value?.indexacion_rep))
 
 // Reset paneles al cambiar inversionista
 watch(invSeleccionado, () => { paneles.cgm = false; paneles.rep = false })
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+function seleccionarInv(inv) {
+  invSeleccionado.value = inv
+}
+
+// ── Helpers de indexación ─────────────────────────────────────────────────────
+
+/** Normaliza el array JSONB → {fecha, anno, ipc, valor, es_base} */
 function normalizarAniversarios(raw) {
-  if (!Array.isArray(raw)) return []
+  if (!Array.isArray(raw) || !raw.length) return []
   return raw.map(f => ({
     fecha:   f.fecha   ?? null,
     anno:    f.anno    ?? null,
@@ -305,14 +404,41 @@ function normalizarAniversarios(raw) {
   }))
 }
 
-function valorVigente(raw, base) {
-  const filas = normalizarAniversarios(raw)
-  if (!filas.length) return base != null ? Number(base).toFixed(3) : '—'
+/** Índice de la fila vigente (último aniversario cuya fecha ≤ hoy) */
+function iVigente(filas) {
   const hoyDate = new Date(hoy)
-  // Último aniversario cuya fecha ≤ hoy
-  const pasadas = filas.filter(f => f.fecha && new Date(f.fecha) <= hoyDate)
-  const v = pasadas.length ? pasadas[pasadas.length - 1] : filas[0]
-  return v?.valor != null ? Number(v.valor).toFixed(3) : (base != null ? Number(base).toFixed(3) : '—')
+  let idx = -1
+  for (let i = 0; i < filas.length; i++) {
+    if (filas[i].fecha && new Date(filas[i].fecha) <= hoyDate) idx = i
+  }
+  return idx >= 0 ? idx : 0
+}
+
+/** Estado de la fila: pagado / vigente / pendiente */
+function estadoFila(filas, i) {
+  const iv = iVigente(filas)
+  if (i === iv) return 'vigente'
+  if (filas[i].fecha && new Date(filas[i].fecha) < new Date(hoy)) return 'pagado'
+  return 'pendiente'
+}
+
+/** Valor de la fila vigente (para mostrar en el bloque de tarifa) */
+function valorVigente(filas) {
+  if (!filas.length) return '—'
+  const f = filas[iVigente(filas)]
+  return f?.valor != null ? Number(f.valor).toFixed(3) : '—'
+}
+
+/** Formatea fecha YYYY-MM-DD → DD/MM/YYYY */
+function fmtFecha(fecha) {
+  if (!fecha) return '—'
+  const p = fecha.split('-')
+  return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : fecha
+}
+
+/** Formatea valor numérico a 3 decimales */
+function fmtVal(v) {
+  return v != null ? Number(v).toFixed(3) : '—'
 }
 
 // ── Dialog editar ─────────────────────────────────────────────────────────────
@@ -331,12 +457,12 @@ function abrirDialog() {
   if (!c) return
   Object.assign(editForm, {
     inversionista_nombre: c.inversionista || '',
-    estado: c.estado || 'vigente',
+    estado:               c.estado || 'vigente',
     fecha_firma_contrato: c.fecha_firma || '',
-    enlace_drive: c.soporte_url || '',
-    tarifa_admin_pct: c.tarifa_admin != null ? c.tarifa_admin * 100 : null,
-    tarifa_cgm: c.tarifa_cgm ?? null,
-    tarifa_representacion: c.tarifa_rep ?? null,
+    enlace_drive:         c.soporte_url || '',
+    tarifa_admin_pct:     c.tarifa_admin != null ? c.tarifa_admin * 100 : null,
+    tarifa_cgm:           c.tarifa_cgm ?? null,
+    tarifa_representacion:c.tarifa_rep ?? null,
   })
   dialogVisible.value = true
 }
@@ -347,15 +473,15 @@ async function guardar() {
   guardando.value = true
   try {
     const payload = {
-      servicio_aplica: 'representacion',
-      proyecto_id: Number(route.params.id),
+      servicio_aplica:      'representacion',
+      proyecto_id:          Number(route.params.id),
       inversionista_nombre: editForm.inversionista_nombre,
-      estado: editForm.estado,
+      estado:               editForm.estado,
       fecha_firma_contrato: editForm.fecha_firma_contrato || null,
-      enlace_drive: editForm.enlace_drive || null,
-      tarifa_admin: editForm.tarifa_admin_pct != null ? editForm.tarifa_admin_pct / 100 : null,
-      tarifa_cgm: editForm.tarifa_cgm ?? null,
-      tarifa_representacion: editForm.tarifa_representacion ?? null,
+      enlace_drive:         editForm.enlace_drive || null,
+      tarifa_admin:         editForm.tarifa_admin_pct != null ? editForm.tarifa_admin_pct / 100 : null,
+      tarifa_cgm:           editForm.tarifa_cgm ?? null,
+      tarifa_representacion:editForm.tarifa_representacion ?? null,
     }
     if (c.db_id) {
       await api.patch(`/contratos-servicio/${c.db_id}`, payload)
@@ -363,8 +489,8 @@ async function guardar() {
       await api.post('/contratos-servicio', {
         ...payload,
         codigo_sun_factory: c.codigo_sun_factory || null,
-        portafolio: c.portafolio || null,
-        nombre_proyecto_ref: c.proyecto || null,
+        portafolio:         c.portafolio || null,
+        nombre_proyecto_ref:c.proyecto || null,
       })
     }
     dialogVisible.value = false
@@ -402,127 +528,4 @@ onMounted(async () => {
   await cargar()
   loading.value = false
 })
-</script>
-
-<!-- Componentes locales registrados en el segundo bloque <script> (Options API)      -->
-<!-- InfoMini: mini-card de meta-info                                                 -->
-<!-- TablaCgm: tabla de indexación con aniversarios, IPC y estado                     -->
-<script>
-import { defineComponent, computed, h } from 'vue'
-
-const TOOLTIP = 'La indexación se aplica en la fecha de renovación anual del contrato, usando el IPC del año inmediatamente anterior certificado por el DANE.'
-
-// ── InfoMini ─────────────────────────────────────────────────────────────────
-const InfoMini = {
-  props: { icon: String, label: String, value: [String, Number] },
-  template: `
-    <div class="rounded-lg p-3" style="background:#eff6ff;border:1px solid #bfdbfe">
-      <p class="text-xs mb-1 flex items-center gap-1" style="color:#1e40af">
-        <i :class="icon" class="text-xs" style="color:#3b82f6"/>{{ label }}
-      </p>
-      <slot>
-        <p class="text-sm font-semibold leading-snug" style="color:#1c1917">{{ value || '—' }}</p>
-      </slot>
-    </div>`,
-}
-
-// ── TablaCgm — tabla de aniversarios con IPC y estado ────────────────────────
-const TablaCgm = defineComponent({
-  name: 'TablaCgm',
-  props: {
-    titulo: { type: String, required: true },
-    filas:  { type: Array,  default: () => [] },
-    hoy:    { type: String, required: true },
-  },
-  setup(props) {
-    const iVigente = computed(() => {
-      const hoyDate = new Date(props.hoy)
-      let idx = -1
-      for (let i = 0; i < props.filas.length; i++) {
-        const f = props.filas[i]
-        if (f.fecha && new Date(f.fecha) <= hoyDate) idx = i
-      }
-      return idx >= 0 ? idx : 0
-    })
-
-    function esVigente(i)      { return i === iVigente.value }
-    function fmtFecha(fecha) {
-      if (!fecha) return '—'
-      const parts = fecha.split('-')
-      return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : fecha
-    }
-    function fmtVal(v) { return v != null ? Number(v).toFixed(3) : '—' }
-    function estadoFila(f, i) {
-      if (esVigente(i)) return 'vigente'
-      if (f.fecha && new Date(f.fecha) < new Date(props.hoy)) return 'pagado'
-      return 'pendiente'
-    }
-
-    return { iVigente, esVigente, fmtFecha, fmtVal, estadoFila, TOOLTIP }
-  },
-  template: `
-    <div class="rounded-xl overflow-hidden" style="border:1px solid #bfdbfe">
-      <div class="flex items-center justify-between px-4 py-2.5" style="background:#eff6ff">
-        <div class="flex items-center gap-1.5">
-          <span class="text-xs font-semibold" style="color:#1e40af">{{ titulo }}</span>
-          <span class="inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] cursor-help select-none"
-            style="background:#bfdbfe;color:#1e40af" :title="TOOLTIP">ⓘ</span>
-        </div>
-        <span class="text-xs text-gray-400">Hoy: {{ hoy }}</span>
-      </div>
-      <table class="w-full text-sm border-collapse">
-        <thead>
-          <tr class="bg-gray-50 border-b border-gray-100">
-            <th class="px-4 py-2 text-left text-xs font-semibold text-gray-500">Fecha aniversario</th>
-            <th class="px-4 py-2 text-left text-xs font-semibold text-gray-500">IPC aplicado</th>
-            <th class="px-4 py-2 text-right text-xs font-semibold text-gray-500">Valor ($/kWh)</th>
-            <th class="px-4 py-2 text-center text-xs font-semibold text-gray-500">Estado</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-if="!filas.length">
-            <td colspan="4" class="px-4 py-6 text-center text-xs text-gray-400">Sin datos de indexación.</td>
-          </tr>
-          <tr v-for="(f, i) in filas" :key="i"
-            class="border-b border-gray-50"
-            :style="esVigente(i) ? 'background:#fff7ed' : ''">
-            <td class="px-4 py-2.5">
-              <div class="flex items-center gap-1.5">
-                <span class="font-mono font-semibold"
-                  :style="esVigente(i) ? 'color:#d97706' : 'color:#2C2039'">
-                  {{ fmtFecha(f.fecha) }}
-                </span>
-                <span v-if="f.es_base" class="text-[10px] px-1.5 py-0.5 rounded font-bold"
-                  style="background:#e0f2fe;color:#0369a1">base</span>
-                <span v-if="esVigente(i) && !f.es_base" class="text-[10px] px-1.5 py-0.5 rounded font-bold"
-                  style="background:#fef3c7;color:#d97706">actual</span>
-                <i v-if="esVigente(i)" class="pi pi-arrow-left text-xs" style="color:#d97706" />
-              </div>
-            </td>
-            <td class="px-4 py-2.5">
-              <span v-if="f.ipc == null" class="text-gray-400 text-xs">— (base)</span>
-              <span v-else class="font-mono tabular-nums" style="color:#374151">{{ f.ipc }}%</span>
-            </td>
-            <td class="px-4 py-2.5 text-right font-semibold tabular-nums"
-              :style="esVigente(i) ? 'color:#d97706' : 'color:#2C2039'">
-              {{ fmtVal(f.valor) }}
-            </td>
-            <td class="px-4 py-2.5 text-center">
-              <span v-if="estadoFila(f,i)==='pagado'"
-                class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full"
-                style="background:#dcfce7;color:#166534"><i class="pi pi-check text-xs"/>Pagado</span>
-              <span v-else-if="estadoFila(f,i)==='vigente'"
-                class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full"
-                style="background:#fef3c7;color:#d97706">Vigente</span>
-              <span v-else
-                class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full"
-                style="background:#f3f4f6;color:#9ca3af">Pendiente</span>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>`,
-})
-
-export default { components: { InfoMini, TablaCgm } }
 </script>
