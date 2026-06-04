@@ -84,11 +84,31 @@
       <template #item="{ element: proy }">
         <div class="sl-project-block">
 
-          <!-- Nombre + estado -->
+          <!-- Nombre + estado + reconectador -->
           <div class="sl-project-name">
             <i class="pi pi-bars sl-drag-handle" title="Arrastrar para reorganizar" />
             <span class="sl-status-dot" :style="{ background: STATUS_COLORS[proy.status] || '#9ca3af' }" />
-            {{ proy.nombre }}
+            <span class="sl-project-nombre">{{ proy.nombre }}</span>
+            <div class="sl-rcn-wrap" @click.stop>
+              <span
+                v-if="rcnMap[proy.proyecto_id]?.username"
+                class="sl-rcn-user"
+                :title="`Credenciales: ${rcnMap[proy.proyecto_id].username}`"
+                @click="openEditCreds(proy)"
+              >
+                <i class="pi pi-user" />
+              </span>
+              <button
+                :class="['sl-rcn-toggle', rcnMap[proy.proyecto_id]?.estado === 'ON' && 'sl-rcn-toggle--on']"
+                :title="rcnMap[proy.proyecto_id]?.estado === 'ON' ? 'Reconectador ON — click para apagar' : 'Reconectador OFF — click para encender'"
+                @click="onToggleRcn(proy)"
+              >
+                <span class="sl-rcn-thumb" />
+              </button>
+              <span
+                :class="['sl-rcn-label', rcnMap[proy.proyecto_id]?.estado === 'ON' ? 'sl-rcn-label--on' : 'sl-rcn-label--off']"
+              >{{ rcnMap[proy.proyecto_id]?.estado === 'ON' ? 'ON' : 'OFF' }}</span>
+            </div>
           </div>
 
           <!-- Cargando detalle -->
@@ -215,6 +235,68 @@
     </div>
 
   </div><!-- /sl-root -->
+
+  <!-- ══ MODAL RECONECTADOR ══ -->
+  <Teleport to="body">
+    <div v-if="rcnModal.open" class="sl-modal-backdrop" @click.self="rcnModal.open = false">
+      <div class="sl-modal">
+        <div class="sl-modal-header">
+          <div class="sl-modal-title">
+            <span :class="['sl-modal-badge', rcnModal.accion === 'ON' ? 'sl-modal-badge--on' : 'sl-modal-badge--off']">
+              {{ rcnModal.accion }}
+            </span>
+            <span>Reconectador — {{ rcnModal.nombre }}</span>
+          </div>
+          <button class="sl-modal-close" @click="rcnModal.open = false">
+            <i class="pi pi-times" />
+          </button>
+        </div>
+
+        <p class="sl-modal-desc">
+          Ingresa tus credenciales de Solenium para <strong>{{ rcnModal.accion === 'ON' ? 'activar' : 'desactivar' }}</strong> el reconectador.
+        </p>
+
+        <div class="sl-modal-form">
+          <label class="sl-modal-label">
+            Usuario
+            <input v-model="rcnModal.username" class="sl-modal-input" type="text"
+              placeholder="usuario@solenium.co" autocomplete="username" />
+          </label>
+          <label class="sl-modal-label">
+            Contraseña
+            <input v-model="rcnModal.password" class="sl-modal-input" type="password"
+              placeholder="••••••••" autocomplete="current-password"
+              @keydown.enter="submitRcn" />
+          </label>
+          <label class="sl-modal-check">
+            <input v-model="rcnModal.isInterrogating" type="checkbox" />
+            <span>Is interrogating</span>
+          </label>
+        </div>
+
+        <div v-if="rcnModal.error" class="sl-modal-error">
+          <i class="pi pi-exclamation-triangle" />
+          {{ rcnModal.error }}
+        </div>
+
+        <div class="sl-modal-actions">
+          <button class="sl-modal-cancel" @click="rcnModal.open = false" :disabled="rcnModal.loading">
+            Cancelar
+          </button>
+          <button
+            :class="['sl-modal-submit', rcnModal.accion === 'ON' ? 'sl-modal-submit--on' : 'sl-modal-submit--off']"
+            @click="submitRcn"
+            :disabled="rcnModal.loading || !rcnModal.username || !rcnModal.password"
+          >
+            <i v-if="rcnModal.loading" class="pi pi-spin pi-spinner" />
+            <i v-else-if="rcnModal.accion === 'ON'" class="pi pi-power-off" />
+            <i v-else class="pi pi-stop-circle" />
+            {{ rcnModal.loading ? 'Enviando...' : `Confirmar ${rcnModal.accion}` }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </Teleport>
 </template>
 
 <script setup>
@@ -533,6 +615,81 @@ function fmtKw(kw) {
   return kw.toFixed(1) + ' kW'
 }
 
+// ── Reconectadores ────────────────────────────────────────────────────────────
+// rcnMap: { [proyecto_id]: { estado: 'ON'|'OFF', username: string } }
+// El estado y username se persisten en localStorage; la contraseña NUNCA se guarda.
+const RCN_KEY  = 'sl_reconectadores_v1'
+const rcnMap   = reactive(JSON.parse(localStorage.getItem(RCN_KEY) || '{}'))
+
+function _saveRcn() {
+  localStorage.setItem(RCN_KEY, JSON.stringify(rcnMap))
+}
+
+// Estado del modal
+const rcnModal = reactive({
+  open:           false,
+  proyectoId:     null,
+  nombre:         '',
+  accion:         'ON',      // 'ON' | 'OFF'
+  username:       '',
+  password:       '',
+  isInterrogating: true,
+  loading:        false,
+  error:          '',
+})
+
+function onToggleRcn(proy) {
+  const current = rcnMap[proy.proyecto_id]?.estado ?? 'OFF'
+  const nextAccion = current === 'ON' ? 'OFF' : 'ON'
+  rcnModal.proyectoId    = proy.proyecto_id
+  rcnModal.nombre        = proy.nombre
+  rcnModal.accion        = nextAccion
+  rcnModal.username      = rcnMap[proy.proyecto_id]?.username ?? ''
+  rcnModal.password      = ''
+  rcnModal.isInterrogating = true
+  rcnModal.error         = ''
+  rcnModal.loading       = false
+  rcnModal.open          = true
+}
+
+function openEditCreds(proy) {
+  rcnModal.proyectoId    = proy.proyecto_id
+  rcnModal.nombre        = proy.nombre
+  rcnModal.accion        = rcnMap[proy.proyecto_id]?.estado ?? 'OFF'
+  rcnModal.username      = rcnMap[proy.proyecto_id]?.username ?? ''
+  rcnModal.password      = ''
+  rcnModal.isInterrogating = true
+  rcnModal.error         = ''
+  rcnModal.loading       = false
+  rcnModal.open          = true
+}
+
+async function submitRcn() {
+  if (!rcnModal.username || !rcnModal.password) return
+  rcnModal.loading = true
+  rcnModal.error   = ''
+  try {
+    await api.post(`/reconectadores/${rcnModal.proyectoId}/comando`, {
+      username:         rcnModal.username,
+      password:         rcnModal.password,
+      accion:           rcnModal.accion,
+      is_interrogating: rcnModal.isInterrogating,
+    })
+    // Persistir estado y username (nunca la contraseña)
+    rcnMap[rcnModal.proyectoId] = {
+      estado:   rcnModal.accion,
+      username: rcnModal.username,
+    }
+    _saveRcn()
+    rcnModal.open = false
+  } catch (err) {
+    const msg = err.response?.data?.detail || err.message || 'Error desconocido'
+    rcnModal.error = msg
+  } finally {
+    rcnModal.loading = false
+  }
+}
+
 onMounted(() => {
   cargar()
   if (autoInterval.value) refreshTimer = setInterval(cargar, autoInterval.value)
@@ -672,4 +829,101 @@ onUnmounted(() => {
 .sl-genhoy-badge--nd  { background: #f1f0f5; color: #9ca3af; }
 .sl-genhoy-track { height: 5px; background: #e9e6f5; border-radius: 999px; overflow: hidden; }
 .sl-genhoy-fill  { height: 100%; border-radius: 999px; transition: width 0.6s ease, background 0.3s; }
+
+/* ── Project name row ── */
+.sl-project-nombre { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── Reconectador toggle ── */
+.sl-rcn-wrap { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+.sl-rcn-user {
+  display: flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; border-radius: 50%; background: #f0edf8;
+  color: #915BD8; font-size: 10px; cursor: pointer; transition: background 0.15s;
+}
+.sl-rcn-user:hover { background: #e4dbf5; }
+.sl-rcn-toggle {
+  position: relative; width: 36px; height: 20px; border-radius: 999px;
+  background: #d1d5db; border: none; cursor: pointer; padding: 0;
+  transition: background 0.25s; flex-shrink: 0;
+}
+.sl-rcn-toggle--on  { background: #16a34a; }
+.sl-rcn-toggle:hover:not(.sl-rcn-toggle--on)  { background: #b8bcc4; }
+.sl-rcn-toggle--on:hover  { background: #15803d; }
+.sl-rcn-thumb {
+  position: absolute; top: 3px; left: 3px;
+  width: 14px; height: 14px; border-radius: 50%; background: #fff;
+  transition: transform 0.25s; box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.sl-rcn-toggle--on .sl-rcn-thumb { transform: translateX(16px); }
+.sl-rcn-label { font-size: 10px; font-weight: 800; letter-spacing: 0.5px; min-width: 22px; }
+.sl-rcn-label--on  { color: #16a34a; }
+.sl-rcn-label--off { color: #9ca3af; }
+
+/* ── Modal backdrop ── */
+.sl-modal-backdrop {
+  position: fixed; inset: 0; background: rgba(44,32,57,0.45);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 9999; backdrop-filter: blur(2px);
+}
+
+/* ── Modal card ── */
+.sl-modal {
+  background: #fff; border-radius: 16px; padding: 28px 32px;
+  width: 100%; max-width: 420px; box-shadow: 0 24px 48px rgba(0,0,0,0.18);
+  display: flex; flex-direction: column; gap: 18px;
+  font-family: 'Sora', system-ui, sans-serif;
+}
+.sl-modal-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.sl-modal-title  { display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 800; color: #2C2039; }
+.sl-modal-close  { background: none; border: none; cursor: pointer; color: #9ca3af; font-size: 14px; padding: 4px; border-radius: 6px; transition: color 0.15s; }
+.sl-modal-close:hover { color: #6b7280; }
+
+.sl-modal-badge {
+  font-size: 11px; font-weight: 800; padding: 2px 9px; border-radius: 999px;
+  letter-spacing: 1px;
+}
+.sl-modal-badge--on  { background: rgba(22,163,74,0.12); color: #16a34a; }
+.sl-modal-badge--off { background: rgba(220,38,38,0.1);  color: #dc2626; }
+
+.sl-modal-desc { font-size: 13px; color: #6b7280; margin: 0; line-height: 1.5; }
+
+.sl-modal-form  { display: flex; flex-direction: column; gap: 14px; }
+.sl-modal-label { display: flex; flex-direction: column; gap: 5px; font-size: 12px; font-weight: 700; color: #4b5563; }
+.sl-modal-input {
+  border: 1.5px solid #e5e7eb; border-radius: 8px; padding: 9px 12px;
+  font-size: 14px; font-family: inherit; outline: none; transition: border-color 0.15s;
+  color: #111827;
+}
+.sl-modal-input:focus { border-color: #915BD8; }
+
+.sl-modal-check { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: #6b7280; cursor: pointer; }
+.sl-modal-check input { accent-color: #915BD8; width: 14px; height: 14px; cursor: pointer; }
+
+.sl-modal-error {
+  display: flex; align-items: flex-start; gap: 8px;
+  background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px;
+  padding: 10px 14px; font-size: 13px; color: #dc2626; line-height: 1.4;
+}
+
+.sl-modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 4px; }
+.sl-modal-cancel {
+  padding: 9px 18px; border-radius: 8px; border: 1.5px solid #e5e7eb;
+  background: #fff; color: #6b7280; font-size: 13px; font-weight: 600;
+  cursor: pointer; font-family: inherit; transition: border-color 0.15s, color 0.15s;
+}
+.sl-modal-cancel:hover:not(:disabled) { border-color: #d1d5db; color: #374151; }
+.sl-modal-cancel:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.sl-modal-submit {
+  display: flex; align-items: center; gap: 7px;
+  padding: 9px 20px; border-radius: 8px; border: none;
+  font-size: 13px; font-weight: 700; cursor: pointer;
+  font-family: inherit; transition: opacity 0.15s;
+  color: #fff;
+}
+.sl-modal-submit--on  { background: #16a34a; }
+.sl-modal-submit--on:hover:not(:disabled)  { background: #15803d; }
+.sl-modal-submit--off { background: #dc2626; }
+.sl-modal-submit--off:hover:not(:disabled) { background: #b91c1c; }
+.sl-modal-submit:disabled { opacity: 0.5; cursor: not-allowed; }
 </style>
