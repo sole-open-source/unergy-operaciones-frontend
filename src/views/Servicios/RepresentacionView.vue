@@ -98,23 +98,33 @@
             <!-- Fila de meta-info -->
             <div class="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2 border-b text-xs"
               style="border-color:#f0f7ff">
-              <span class="flex items-center gap-1 text-gray-500">
-                <i class="pi pi-user text-[10px]" style="color:#3b82f6"/>
-                <span class="font-medium" style="color:#1e40af">Contratante:</span>
-                {{ c.contratante_nombre || 'Unergy Energía Digital S.A.S.' }}
+              <!-- Nombre del proyecto -->
+              <span class="flex items-center gap-1 font-semibold" style="color:#2C2039">
+                <i class="pi pi-bolt text-[10px]" style="color:#3b82f6"/>
+                {{ proyectoNombre }}
               </span>
-              <span class="flex items-center gap-1 text-gray-500">
-                <i class="pi pi-calendar text-[10px]" style="color:#3b82f6"/>
-                <span class="font-medium" style="color:#1e40af">Firma:</span>
-                {{ c.fecha_firma_contrato || '—' }}
-              </span>
+              <!-- Portafolio -->
               <span v-if="c.portafolio" class="flex items-center gap-1 text-gray-500">
                 <i class="pi pi-folder text-[10px]" style="color:#3b82f6"/>
                 <span class="font-medium" style="color:#1e40af">Portafolio:</span>
                 {{ c.portafolio }}
               </span>
+              <!-- Badge estado -->
               <Tag v-if="c.estado" :value="ESTADO_LABELS[c.estado]||c.estado"
                    :severity="ESTADO_SEVERITY[c.estado]" class="text-[10px] !py-0 !px-1.5" />
+              <!-- Inversionista -->
+              <span class="flex items-center gap-1 text-gray-500">
+                <i class="pi pi-briefcase text-[10px]" style="color:#3b82f6"/>
+                <span class="font-medium" style="color:#1e40af">Inversionista:</span>
+                {{ c.inversionista_nombre || '—' }}
+              </span>
+              <!-- Fecha firma -->
+              <span class="flex items-center gap-1 text-gray-500">
+                <i class="pi pi-calendar text-[10px]" style="color:#3b82f6"/>
+                <span class="font-medium" style="color:#1e40af">Firma:</span>
+                {{ c.fecha_firma_contrato || '—' }}
+              </span>
+              <!-- Link contrato (solo si existe) -->
               <a v-if="c.enlace_drive?.startsWith('http')"
                  :href="c.enlace_drive" target="_blank" rel="noopener"
                  class="flex items-center gap-1 font-medium hover:underline ml-auto"
