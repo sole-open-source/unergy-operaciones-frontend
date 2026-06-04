@@ -36,6 +36,13 @@
             </span>
           </button>
         </div>
+        <!-- Botón sincronizar reconectadores -->
+        <button class="sl-sync-btn" @click="openSyncModal" title="Consultar estado real de reconectadores en Solenium">
+          <i class="pi pi-wifi" />
+          <span class="sl-sync-label">Reconectadores</span>
+          <span v-if="rcnOnCount > 0" class="sl-sync-badge">{{ rcnOnCount }} ON</span>
+        </button>
+
         <!-- Botón actualizar + auto-refresh -->
         <div class="sl-refresh-wrap">
           <button class="sl-refresh-btn" @click="cargar" :disabled="loading">
@@ -235,6 +242,98 @@
     </div>
 
   </div><!-- /sl-root -->
+
+  <!-- ══ MODAL SYNC RECONECTADORES ══ -->
+  <Teleport to="body">
+    <div v-if="syncModal.open" class="sl-modal-backdrop" @click.self="syncModal.open = false">
+      <div class="sl-modal sl-modal--wide">
+        <div class="sl-modal-header">
+          <div class="sl-modal-title">
+            <i class="pi pi-wifi" style="color:#915BD8" />
+            Estado real de reconectadores
+          </div>
+          <button class="sl-modal-close" @click="syncModal.open = false"><i class="pi pi-times" /></button>
+        </div>
+
+        <!-- Formulario de credenciales (solo cuando no hay resultados aún) -->
+        <template v-if="!syncModal.resultados.length && !syncModal.loading">
+          <p class="sl-modal-desc">
+            Ingresa tus credenciales de Solenium para consultar el estado actual de todos los reconectadores.
+          </p>
+          <div class="sl-modal-form">
+            <label class="sl-modal-label">
+              Usuario
+              <input v-model="syncModal.username" class="sl-modal-input" type="text" placeholder="usuario@solenium.co" />
+            </label>
+            <label class="sl-modal-label">
+              Contraseña
+              <input v-model="syncModal.password" class="sl-modal-input" type="password" placeholder="••••••••" @keydown.enter="submitSync" />
+            </label>
+          </div>
+          <div v-if="syncModal.error" class="sl-modal-error">
+            <i class="pi pi-exclamation-triangle" /> {{ syncModal.error }}
+          </div>
+          <div class="sl-modal-actions">
+            <button class="sl-modal-cancel" @click="syncModal.open = false">Cancelar</button>
+            <button class="sl-modal-submit sl-modal-submit--on" @click="submitSync"
+              :disabled="syncModal.loading || !syncModal.username || !syncModal.password">
+              <i class="pi pi-search" /> Consultar estado
+            </button>
+          </div>
+        </template>
+
+        <!-- Spinner cargando -->
+        <div v-else-if="syncModal.loading" class="sl-sync-loading">
+          <i class="pi pi-spin pi-spinner" style="color:#915BD8;font-size:24px" />
+          <span>Consultando Solenium...</span>
+        </div>
+
+        <!-- Resultados -->
+        <template v-else>
+          <div v-if="syncModal.advertencia" class="sl-sync-warn">
+            <i class="pi pi-info-circle" /> {{ syncModal.advertencia }}
+          </div>
+
+          <!-- Resumen -->
+          <div class="sl-sync-summary">
+            <div class="sl-sync-kpi sl-sync-kpi--on">
+              <span class="sl-sync-kpi-num">{{ syncModal.resultados.filter(r => r.estado === 'ON').length }}</span>
+              <span class="sl-sync-kpi-label">ON</span>
+            </div>
+            <div class="sl-sync-kpi sl-sync-kpi--off">
+              <span class="sl-sync-kpi-num">{{ syncModal.resultados.filter(r => r.estado === 'OFF').length }}</span>
+              <span class="sl-sync-kpi-label">OFF</span>
+            </div>
+            <div class="sl-sync-kpi sl-sync-kpi--nd">
+              <span class="sl-sync-kpi-num">{{ syncModal.resultados.filter(r => r.estado === null).length }}</span>
+              <span class="sl-sync-kpi-label">Sin dato</span>
+            </div>
+          </div>
+
+          <!-- Lista -->
+          <div class="sl-sync-list">
+            <div v-for="r in syncModal.resultados" :key="r.proyecto_id" class="sl-sync-row">
+              <span class="sl-sync-nombre">{{ r.nombre }}</span>
+              <span :class="['sl-sync-estado',
+                r.estado === 'ON'  ? 'sl-sync-estado--on'  :
+                r.estado === 'OFF' ? 'sl-sync-estado--off' : 'sl-sync-estado--nd']">
+                {{ r.estado ?? '?' }}
+              </span>
+            </div>
+          </div>
+
+          <div class="sl-modal-actions" style="margin-top:8px">
+            <button class="sl-modal-cancel" @click="syncModal.resultados = []; syncModal.password = ''">
+              <i class="pi pi-refresh" /> Nueva consulta
+            </button>
+            <button class="sl-modal-submit sl-modal-submit--on" @click="aplicarSyncEstados">
+              <i class="pi pi-check" /> Aplicar a la vista
+            </button>
+          </div>
+        </template>
+      </div>
+    </div>
+  </Teleport>
 
   <!-- ══ MODAL RECONECTADOR ══ -->
   <Teleport to="body">
@@ -615,6 +714,11 @@ function fmtKw(kw) {
   return kw.toFixed(1) + ' kW'
 }
 
+// ── Reconectadores — computed ─────────────────────────────────────────────────
+const rcnOnCount = computed(() =>
+  Object.values(rcnMap).filter(v => v?.estado === 'ON').length
+)
+
 // ── Reconectadores ────────────────────────────────────────────────────────────
 // rcnMap: { [proyecto_id]: { estado: 'ON'|'OFF', username: string } }
 // El estado y username se persisten en localStorage; la contraseña NUNCA se guarda.
@@ -662,6 +766,60 @@ function openEditCreds(proy) {
   rcnModal.error         = ''
   rcnModal.loading       = false
   rcnModal.open          = true
+}
+
+// ── Sync modal ────────────────────────────────────────────────────────────────
+const syncModal = reactive({
+  open:       false,
+  username:   '',
+  password:   '',
+  loading:    false,
+  error:      '',
+  resultados: [],
+  advertencia: null,
+})
+
+function openSyncModal() {
+  syncModal.resultados  = []
+  syncModal.error       = ''
+  syncModal.advertencia = null
+  syncModal.password    = ''
+  // Pre-rellena username si hay uno guardado en algún proyecto
+  const saved = Object.values(rcnMap).find(v => v?.username)
+  syncModal.username = saved?.username ?? ''
+  syncModal.open = true
+}
+
+async function submitSync() {
+  if (!syncModal.username || !syncModal.password) return
+  syncModal.loading  = true
+  syncModal.error    = ''
+  syncModal.resultados = []
+  try {
+    const { data } = await api.post('/reconectadores/sync-estados', {
+      username: syncModal.username,
+      password: syncModal.password,
+    })
+    syncModal.resultados  = data.proyectos ?? []
+    syncModal.advertencia = data.advertencia ?? null
+  } catch (err) {
+    syncModal.error = err.response?.data?.detail || err.message || 'Error al consultar Solenium'
+  } finally {
+    syncModal.loading = false
+  }
+}
+
+function aplicarSyncEstados() {
+  for (const r of syncModal.resultados) {
+    if (r.estado !== null) {
+      rcnMap[r.proyecto_id] = {
+        estado:   r.estado,
+        username: rcnMap[r.proyecto_id]?.username ?? syncModal.username,
+      }
+    }
+  }
+  _saveRcn()
+  syncModal.open = false
 }
 
 async function submitRcn() {
@@ -926,4 +1084,55 @@ onUnmounted(() => {
 .sl-modal-submit--off { background: #dc2626; }
 .sl-modal-submit--off:hover:not(:disabled) { background: #b91c1c; }
 .sl-modal-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── Modal ancho (sync) ── */
+.sl-modal--wide { max-width: 560px; }
+
+/* ── Botón sync en header ── */
+.sl-sync-btn {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 14px; border-radius: 8px; border: 1.5px solid #e9e6f5;
+  background: #faf8ff; color: #915BD8; font-size: 13px; font-weight: 600;
+  cursor: pointer; font-family: inherit; transition: all 0.15s;
+}
+.sl-sync-btn:hover { background: #f0edf8; border-color: #c4b3df; }
+.sl-sync-label { display: none; }
+@media (min-width: 640px) { .sl-sync-label { display: inline; } }
+.sl-sync-badge {
+  background: #16a34a; color: #fff;
+  font-size: 10px; font-weight: 800; padding: 1px 7px; border-radius: 999px;
+  letter-spacing: 0.5px;
+}
+
+/* ── Sync loading ── */
+.sl-sync-loading { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 32px 0; color: #6b7280; font-size: 14px; }
+
+/* ── Sync warn ── */
+.sl-sync-warn {
+  display: flex; align-items: flex-start; gap: 8px;
+  background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px;
+  padding: 10px 14px; font-size: 12px; color: #92400e; line-height: 1.4;
+}
+
+/* ── Sync summary KPIs ── */
+.sl-sync-summary { display: flex; gap: 10px; }
+.sl-sync-kpi { display: flex; flex-direction: column; align-items: center; padding: 10px 20px; border-radius: 10px; flex: 1; }
+.sl-sync-kpi--on  { background: rgba(22,163,74,0.08); }
+.sl-sync-kpi--off { background: rgba(220,38,38,0.07); }
+.sl-sync-kpi--nd  { background: #f9fafb; }
+.sl-sync-kpi-num  { font-size: 22px; font-weight: 800; color: #2C2039; }
+.sl-sync-kpi--on  .sl-sync-kpi-num { color: #16a34a; }
+.sl-sync-kpi--off .sl-sync-kpi-num { color: #dc2626; }
+.sl-sync-kpi--nd  .sl-sync-kpi-num { color: #9ca3af; }
+.sl-sync-kpi-label { font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; }
+
+/* ── Sync lista ── */
+.sl-sync-list { display: flex; flex-direction: column; gap: 4px; max-height: 320px; overflow-y: auto; }
+.sl-sync-row { display: flex; align-items: center; justify-content: space-between; padding: 7px 10px; border-radius: 7px; background: #f9fafb; }
+.sl-sync-row:hover { background: #f3f1f8; }
+.sl-sync-nombre { font-size: 13px; color: #374151; font-weight: 500; }
+.sl-sync-estado { font-size: 11px; font-weight: 800; padding: 2px 10px; border-radius: 999px; letter-spacing: 0.5px; }
+.sl-sync-estado--on  { background: rgba(22,163,74,0.12);  color: #16a34a; }
+.sl-sync-estado--off { background: rgba(220,38,38,0.08);  color: #dc2626; }
+.sl-sync-estado--nd  { background: #f3f4f6; color: #9ca3af; }
 </style>
