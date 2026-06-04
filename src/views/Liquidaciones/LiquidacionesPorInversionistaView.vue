@@ -75,6 +75,15 @@
               </div>
               <div class="flex-1 min-w-[140px] bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
                 <div class="flex items-start justify-between mb-2">
+                  <span class="text-xs font-medium text-gray-400 uppercase tracking-wide">Comercialización</span>
+                  <i class="pi pi-chart-bar text-gray-300 text-[11px]" />
+                </div>
+                <div class="text-xl font-bold text-red-600">
+                  {{ fmtCompact(resumenMap[cliente.cliente_id].comercializacion) }}
+                </div>
+              </div>
+              <div class="flex-1 min-w-[140px] bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
+                <div class="flex items-start justify-between mb-2">
                   <span class="text-xs font-medium text-gray-400 uppercase tracking-wide">Costos Operativos</span>
                   <i class="pi pi-minus text-gray-300 text-[11px]" />
                 </div>
@@ -387,10 +396,11 @@ const resumenMap = computed(() => {
         if (!mes) continue
         mesSet.add(mes)
 
-        if (!monthKPI[mes]) monthKPI[mes] = { bruto: 0, costos: 0, facturas: 0 }
-        monthKPI[mes].bruto    += (liq.total_ingresos_cop || 0) * ptj
-        monthKPI[mes].costos   += (liq.total_costos_cop   || 0) * ptj
-        monthKPI[mes].facturas += (liq.total_facturas_cop || 0) * ptj
+        if (!monthKPI[mes]) monthKPI[mes] = { bruto: 0, comercializacion: 0, costos: 0, facturas: 0 }
+        monthKPI[mes].bruto           += (liq.total_ingresos_cop       || 0) * ptj
+        monthKPI[mes].comercializacion += (liq.total_comercializacion_cop || 0) * ptj
+        monthKPI[mes].costos          += (liq.total_costos_cop          || 0) * ptj
+        monthKPI[mes].facturas        += (liq.total_facturas_cop        || 0) * ptj
 
         const valorTabla = (liq.ingreso_neto_cop || 0) * ptj
         if (!proyMap[proy.proyecto_nombre]) proyMap[proy.proyecto_nombre] = {}
@@ -404,10 +414,12 @@ const resumenMap = computed(() => {
 
     // KPIs totales
     let ingresoBruto     = 0
+    let comercializacion = 0
     let costosOperativos = 0
     let serviciosUnergy  = 0
     for (const k of Object.values(monthKPI)) {
       ingresoBruto     += k.bruto
+      comercializacion += k.comercializacion
       costosOperativos += k.costos
       serviciosUnergy  += k.facturas
     }
@@ -438,7 +450,7 @@ const resumenMap = computed(() => {
     }
 
     map[cliente.cliente_id] = {
-      ingresoBruto, costosOperativos, serviciosUnergy, ingresoNeto,
+      ingresoBruto, comercializacion, costosOperativos, serviciosUnergy, ingresoNeto,
       meses, proyNames, barData, maxAbsNeto,
       tablaRows, totalRow,
     }
