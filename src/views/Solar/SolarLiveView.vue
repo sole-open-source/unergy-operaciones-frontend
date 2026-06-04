@@ -36,13 +36,6 @@
             </span>
           </button>
         </div>
-        <!-- Botón sincronizar reconectadores -->
-        <button class="sl-sync-btn" @click="openSyncModal" title="Consultar estado real de reconectadores en Solenium">
-          <i class="pi pi-wifi" />
-          <span class="sl-sync-label">Reconectadores</span>
-          <span v-if="rcnOnCount > 0" class="sl-sync-badge">{{ rcnOnCount }} ON</span>
-        </button>
-
         <!-- Botón actualizar + auto-refresh -->
         <div class="sl-refresh-wrap">
           <button class="sl-refresh-btn" @click="cargar" :disabled="loading">
@@ -100,21 +93,26 @@
               <span
                 v-if="rcnMap[proy.proyecto_id]?.username"
                 class="sl-rcn-user"
-                :title="`Credenciales: ${rcnMap[proy.proyecto_id].username}`"
+                :title="`Credenciales guardadas: ${rcnMap[proy.proyecto_id].username}`"
                 @click="openEditCreds(proy)"
               >
                 <i class="pi pi-user" />
               </span>
-              <button
-                :class="['sl-rcn-toggle', rcnMap[proy.proyecto_id]?.estado === 'ON' && 'sl-rcn-toggle--on']"
-                :title="rcnMap[proy.proyecto_id]?.estado === 'ON' ? 'Reconectador ON — click para apagar' : 'Reconectador OFF — click para encender'"
-                @click="onToggleRcn(proy)"
-              >
-                <span class="sl-rcn-thumb" />
-              </button>
-              <span
-                :class="['sl-rcn-label', rcnMap[proy.proyecto_id]?.estado === 'ON' ? 'sl-rcn-label--on' : 'sl-rcn-label--off']"
-              >{{ rcnMap[proy.proyecto_id]?.estado === 'ON' ? 'ON' : 'OFF' }}</span>
+              <i v-if="rcnMap[proy.proyecto_id]?.loading" class="pi pi-spin pi-spinner sl-rcn-loading" />
+              <template v-else>
+                <button
+                  :class="['sl-rcn-toggle', rcnMap[proy.proyecto_id]?.active === true && 'sl-rcn-toggle--on']"
+                  :title="rcnMap[proy.proyecto_id]?.active === true ? 'Reconectador ON — click para apagar' : 'Reconectador OFF — click para encender'"
+                  @click="onToggleRcn(proy)"
+                >
+                  <span class="sl-rcn-thumb" />
+                </button>
+                <span :class="['sl-rcn-label',
+                  rcnMap[proy.proyecto_id]?.active === true  ? 'sl-rcn-label--on'  :
+                  rcnMap[proy.proyecto_id]?.active === false ? 'sl-rcn-label--off' : 'sl-rcn-label--nd']">
+                  {{ rcnMap[proy.proyecto_id]?.active === true ? 'ON' : rcnMap[proy.proyecto_id]?.active === false ? 'OFF' : '—' }}
+                </span>
+              </template>
             </div>
           </div>
 
@@ -243,98 +241,6 @@
 
   </div><!-- /sl-root -->
 
-  <!-- ══ MODAL SYNC RECONECTADORES ══ -->
-  <Teleport to="body">
-    <div v-if="syncModal.open" class="sl-modal-backdrop" @click.self="syncModal.open = false">
-      <div class="sl-modal sl-modal--wide">
-        <div class="sl-modal-header">
-          <div class="sl-modal-title">
-            <i class="pi pi-wifi" style="color:#915BD8" />
-            Estado real de reconectadores
-          </div>
-          <button class="sl-modal-close" @click="syncModal.open = false"><i class="pi pi-times" /></button>
-        </div>
-
-        <!-- Formulario de credenciales (solo cuando no hay resultados aún) -->
-        <template v-if="!syncModal.resultados.length && !syncModal.loading">
-          <p class="sl-modal-desc">
-            Ingresa tus credenciales de Solenium para consultar el estado actual de todos los reconectadores.
-          </p>
-          <div class="sl-modal-form">
-            <label class="sl-modal-label">
-              Usuario
-              <input v-model="syncModal.username" class="sl-modal-input" type="text" placeholder="usuario@solenium.co" />
-            </label>
-            <label class="sl-modal-label">
-              Contraseña
-              <input v-model="syncModal.password" class="sl-modal-input" type="password" placeholder="••••••••" @keydown.enter="submitSync" />
-            </label>
-          </div>
-          <div v-if="syncModal.error" class="sl-modal-error">
-            <i class="pi pi-exclamation-triangle" /> {{ syncModal.error }}
-          </div>
-          <div class="sl-modal-actions">
-            <button class="sl-modal-cancel" @click="syncModal.open = false">Cancelar</button>
-            <button class="sl-modal-submit sl-modal-submit--on" @click="submitSync"
-              :disabled="syncModal.loading || !syncModal.username || !syncModal.password">
-              <i class="pi pi-search" /> Consultar estado
-            </button>
-          </div>
-        </template>
-
-        <!-- Spinner cargando -->
-        <div v-else-if="syncModal.loading" class="sl-sync-loading">
-          <i class="pi pi-spin pi-spinner" style="color:#915BD8;font-size:24px" />
-          <span>Consultando Solenium...</span>
-        </div>
-
-        <!-- Resultados -->
-        <template v-else>
-          <div v-if="syncModal.advertencia" class="sl-sync-warn">
-            <i class="pi pi-info-circle" /> {{ syncModal.advertencia }}
-          </div>
-
-          <!-- Resumen -->
-          <div class="sl-sync-summary">
-            <div class="sl-sync-kpi sl-sync-kpi--on">
-              <span class="sl-sync-kpi-num">{{ syncModal.resultados.filter(r => r.estado === 'ON').length }}</span>
-              <span class="sl-sync-kpi-label">ON</span>
-            </div>
-            <div class="sl-sync-kpi sl-sync-kpi--off">
-              <span class="sl-sync-kpi-num">{{ syncModal.resultados.filter(r => r.estado === 'OFF').length }}</span>
-              <span class="sl-sync-kpi-label">OFF</span>
-            </div>
-            <div class="sl-sync-kpi sl-sync-kpi--nd">
-              <span class="sl-sync-kpi-num">{{ syncModal.resultados.filter(r => r.estado === null).length }}</span>
-              <span class="sl-sync-kpi-label">Sin dato</span>
-            </div>
-          </div>
-
-          <!-- Lista -->
-          <div class="sl-sync-list">
-            <div v-for="r in syncModal.resultados" :key="r.proyecto_id" class="sl-sync-row">
-              <span class="sl-sync-nombre">{{ r.nombre }}</span>
-              <span :class="['sl-sync-estado',
-                r.estado === 'ON'  ? 'sl-sync-estado--on'  :
-                r.estado === 'OFF' ? 'sl-sync-estado--off' : 'sl-sync-estado--nd']">
-                {{ r.estado ?? '?' }}
-              </span>
-            </div>
-          </div>
-
-          <div class="sl-modal-actions" style="margin-top:8px">
-            <button class="sl-modal-cancel" @click="syncModal.resultados = []; syncModal.password = ''">
-              <i class="pi pi-refresh" /> Nueva consulta
-            </button>
-            <button class="sl-modal-submit sl-modal-submit--on" @click="aplicarSyncEstados">
-              <i class="pi pi-check" /> Aplicar a la vista
-            </button>
-          </div>
-        </template>
-      </div>
-    </div>
-  </Teleport>
-
   <!-- ══ MODAL RECONECTADOR ══ -->
   <Teleport to="body">
     <div v-if="rcnModal.open" class="sl-modal-backdrop" @click.self="rcnModal.open = false">
@@ -349,6 +255,15 @@
           <button class="sl-modal-close" @click="rcnModal.open = false">
             <i class="pi pi-times" />
           </button>
+        </div>
+
+        <!-- Selector de acción cuando el estado es desconocido (active === null) -->
+        <div v-if="rcnModal.accionForzada" class="sl-modal-accion-sel">
+          <span class="sl-modal-accion-label">Acción:</span>
+          <button :class="['sl-modal-accion-btn', rcnModal.accion === 'ON' && 'sl-modal-accion-btn--on']"
+            @click="rcnModal.accion = 'ON'">ON</button>
+          <button :class="['sl-modal-accion-btn', rcnModal.accion === 'OFF' && 'sl-modal-accion-btn--off']"
+            @click="rcnModal.accion = 'OFF'">OFF</button>
         </div>
 
         <p class="sl-modal-desc">
@@ -692,8 +607,9 @@ async function cargar() {
   } catch { /* silencioso */ } finally {
     loading.value = false
   }
-  // Cargar gen-hoy y detalles en paralelo
+  // Cargar gen-hoy, estados reconectadores y detalles en paralelo
   cargarGenHoy()
+  cargarEstadosRcn()
   const ids = proyectos.value.map(p => p.proyecto_id)
   const BATCH = 10
   for (let i = 0; i < ids.length; i += BATCH) {
@@ -714,112 +630,86 @@ function fmtKw(kw) {
   return kw.toFixed(1) + ' kW'
 }
 
-// ── Reconectadores — computed ─────────────────────────────────────────────────
-const rcnOnCount = computed(() =>
-  Object.values(rcnMap).filter(v => v?.estado === 'ON').length
-)
-
 // ── Reconectadores ────────────────────────────────────────────────────────────
-// rcnMap: { [proyecto_id]: { estado: 'ON'|'OFF', username: string } }
-// El estado y username se persisten en localStorage; la contraseña NUNCA se guarda.
-const RCN_KEY  = 'sl_reconectadores_v1'
-const rcnMap   = reactive(JSON.parse(localStorage.getItem(RCN_KEY) || '{}'))
+// rcnMap: { [proyecto_id]: { active: true|false|null, loading: bool, username: string } }
+// `active` viene de GET /relay/ de Solenium.
+//   true  → ON  (reconectador cerrado / activo)
+//   false → OFF (reconectador abierto / inactivo)
+//   null  → sin dato — NO se asume ningún estado; el toggle muestra "—"
+// El username se persiste en localStorage; la contraseña NUNCA se guarda.
 
-function _saveRcn() {
-  localStorage.setItem(RCN_KEY, JSON.stringify(rcnMap))
+const RCN_CREDS_KEY = 'sl_rcn_creds_v1'   // solo guarda { [proyecto_id]: username }
+const rcnMap = reactive({})                 // poblado por cargarEstadosRcn()
+
+function _saveCredencial(proyectoId, username) {
+  const saved = JSON.parse(localStorage.getItem(RCN_CREDS_KEY) || '{}')
+  saved[proyectoId] = username
+  localStorage.setItem(RCN_CREDS_KEY, JSON.stringify(saved))
+}
+function _loadCredencial(proyectoId) {
+  const saved = JSON.parse(localStorage.getItem(RCN_CREDS_KEY) || '{}')
+  return saved[proyectoId] ?? ''
 }
 
-// Estado del modal
+async function cargarEstadosRcn() {
+  try {
+    const { data } = await api.get('/reconectadores/estados')
+    for (const r of data) {
+      rcnMap[r.proyecto_id] = {
+        active:   r.active,   // true | false | null
+        loading:  false,
+        username: _loadCredencial(r.proyecto_id),
+      }
+    }
+  } catch { /* silencioso — no rompe la vista si falla */ }
+}
+
+// Modal de comando
 const rcnModal = reactive({
-  open:           false,
-  proyectoId:     null,
-  nombre:         '',
-  accion:         'ON',      // 'ON' | 'OFF'
-  username:       '',
-  password:       '',
+  open:            false,
+  proyectoId:      null,
+  nombre:          '',
+  accion:          'ON',   // 'ON' | 'OFF'
+  accionForzada:   false,  // true cuando active===null (el usuario elige la acción)
+  username:        '',
+  password:        '',
   isInterrogating: true,
-  loading:        false,
-  error:          '',
+  loading:         false,
+  error:           '',
 })
 
 function onToggleRcn(proy) {
-  const current = rcnMap[proy.proyecto_id]?.estado ?? 'OFF'
-  const nextAccion = current === 'ON' ? 'OFF' : 'ON'
-  rcnModal.proyectoId    = proy.proyecto_id
-  rcnModal.nombre        = proy.nombre
-  rcnModal.accion        = nextAccion
-  rcnModal.username      = rcnMap[proy.proyecto_id]?.username ?? ''
-  rcnModal.password      = ''
+  const estado = rcnMap[proy.proyecto_id]
+  const active = estado?.active
+
+  // active === null → sin dato: mostramos selector de acción, sin asumir nada
+  const accionForzada = active === null || active === undefined
+  const nextAccion    = accionForzada ? 'ON' : (active ? 'OFF' : 'ON')
+
+  rcnModal.proyectoId      = proy.proyecto_id
+  rcnModal.nombre          = proy.nombre
+  rcnModal.accion          = nextAccion
+  rcnModal.accionForzada   = accionForzada
+  rcnModal.username        = _loadCredencial(proy.proyecto_id)
+  rcnModal.password        = ''
   rcnModal.isInterrogating = true
-  rcnModal.error         = ''
-  rcnModal.loading       = false
-  rcnModal.open          = true
+  rcnModal.error           = ''
+  rcnModal.loading         = false
+  rcnModal.open            = true
 }
 
 function openEditCreds(proy) {
-  rcnModal.proyectoId    = proy.proyecto_id
-  rcnModal.nombre        = proy.nombre
-  rcnModal.accion        = rcnMap[proy.proyecto_id]?.estado ?? 'OFF'
-  rcnModal.username      = rcnMap[proy.proyecto_id]?.username ?? ''
-  rcnModal.password      = ''
+  const active = rcnMap[proy.proyecto_id]?.active
+  rcnModal.proyectoId      = proy.proyecto_id
+  rcnModal.nombre          = proy.nombre
+  rcnModal.accion          = active === true ? 'OFF' : 'ON'
+  rcnModal.accionForzada   = active === null || active === undefined
+  rcnModal.username        = _loadCredencial(proy.proyecto_id)
+  rcnModal.password        = ''
   rcnModal.isInterrogating = true
-  rcnModal.error         = ''
-  rcnModal.loading       = false
-  rcnModal.open          = true
-}
-
-// ── Sync modal ────────────────────────────────────────────────────────────────
-const syncModal = reactive({
-  open:       false,
-  username:   '',
-  password:   '',
-  loading:    false,
-  error:      '',
-  resultados: [],
-  advertencia: null,
-})
-
-function openSyncModal() {
-  syncModal.resultados  = []
-  syncModal.error       = ''
-  syncModal.advertencia = null
-  syncModal.password    = ''
-  // Pre-rellena username si hay uno guardado en algún proyecto
-  const saved = Object.values(rcnMap).find(v => v?.username)
-  syncModal.username = saved?.username ?? ''
-  syncModal.open = true
-}
-
-async function submitSync() {
-  if (!syncModal.username || !syncModal.password) return
-  syncModal.loading  = true
-  syncModal.error    = ''
-  syncModal.resultados = []
-  try {
-    const { data } = await api.post('/reconectadores/sync-estados', {
-      username: syncModal.username,
-      password: syncModal.password,
-    })
-    syncModal.resultados  = data.proyectos ?? []
-    syncModal.advertencia = data.advertencia ?? null
-  } catch (err) {
-    syncModal.error = err.response?.data?.detail || err.message || 'Error al consultar Solenium'
-  } finally {
-    syncModal.loading = false
-  }
-}
-
-function aplicarSyncEstados() {
-  for (const r of syncModal.resultados) {
-    if (r.estado !== null) {
-      rcnMap[r.proyecto_id] = {
-        estado:   r.estado,
-        username: rcnMap[r.proyecto_id]?.username ?? syncModal.username,
-      }
-    }
-  }
-  _saveRcn()
-  syncModal.open = false
+  rcnModal.error           = ''
+  rcnModal.loading         = false
+  rcnModal.open            = true
 }
 
 async function submitRcn() {
@@ -833,16 +723,16 @@ async function submitRcn() {
       accion:           rcnModal.accion,
       is_interrogating: rcnModal.isInterrogating,
     })
-    // Persistir estado y username (nunca la contraseña)
-    rcnMap[rcnModal.proyectoId] = {
-      estado:   rcnModal.accion,
-      username: rcnModal.username,
+    // Guardar username (nunca la contraseña)
+    _saveCredencial(rcnModal.proyectoId, rcnModal.username)
+    // Actualizar estado local con lo que se envió
+    if (rcnMap[rcnModal.proyectoId]) {
+      rcnMap[rcnModal.proyectoId].active   = rcnModal.accion === 'ON'
+      rcnMap[rcnModal.proyectoId].username = rcnModal.username
     }
-    _saveRcn()
     rcnModal.open = false
   } catch (err) {
-    const msg = err.response?.data?.detail || err.message || 'Error desconocido'
-    rcnModal.error = msg
+    rcnModal.error = err.response?.data?.detail || err.message || 'Error desconocido'
   } finally {
     rcnModal.loading = false
   }
@@ -1085,54 +975,20 @@ onUnmounted(() => {
 .sl-modal-submit--off:hover:not(:disabled) { background: #b91c1c; }
 .sl-modal-submit:disabled { opacity: 0.5; cursor: not-allowed; }
 
-/* ── Modal ancho (sync) ── */
-.sl-modal--wide { max-width: 560px; }
+/* ── Reconectador: spinner mientras carga ── */
+.sl-rcn-loading { font-size: 12px; color: #915BD8; }
 
-/* ── Botón sync en header ── */
-.sl-sync-btn {
-  display: flex; align-items: center; gap: 6px;
-  padding: 7px 14px; border-radius: 8px; border: 1.5px solid #e9e6f5;
-  background: #faf8ff; color: #915BD8; font-size: 13px; font-weight: 600;
+/* ── Reconectador: label estado desconocido ── */
+.sl-rcn-label--nd { color: #d1d5db; }
+
+/* ── Modal: selector de acción (cuando active===null) ── */
+.sl-modal-accion-sel { display: flex; align-items: center; gap: 8px; }
+.sl-modal-accion-label { font-size: 12px; font-weight: 700; color: #6b7280; }
+.sl-modal-accion-btn {
+  padding: 5px 16px; border-radius: 6px; border: 1.5px solid #e5e7eb;
+  background: #f9fafb; color: #6b7280; font-size: 12px; font-weight: 700;
   cursor: pointer; font-family: inherit; transition: all 0.15s;
 }
-.sl-sync-btn:hover { background: #f0edf8; border-color: #c4b3df; }
-.sl-sync-label { display: none; }
-@media (min-width: 640px) { .sl-sync-label { display: inline; } }
-.sl-sync-badge {
-  background: #16a34a; color: #fff;
-  font-size: 10px; font-weight: 800; padding: 1px 7px; border-radius: 999px;
-  letter-spacing: 0.5px;
-}
-
-/* ── Sync loading ── */
-.sl-sync-loading { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 32px 0; color: #6b7280; font-size: 14px; }
-
-/* ── Sync warn ── */
-.sl-sync-warn {
-  display: flex; align-items: flex-start; gap: 8px;
-  background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px;
-  padding: 10px 14px; font-size: 12px; color: #92400e; line-height: 1.4;
-}
-
-/* ── Sync summary KPIs ── */
-.sl-sync-summary { display: flex; gap: 10px; }
-.sl-sync-kpi { display: flex; flex-direction: column; align-items: center; padding: 10px 20px; border-radius: 10px; flex: 1; }
-.sl-sync-kpi--on  { background: rgba(22,163,74,0.08); }
-.sl-sync-kpi--off { background: rgba(220,38,38,0.07); }
-.sl-sync-kpi--nd  { background: #f9fafb; }
-.sl-sync-kpi-num  { font-size: 22px; font-weight: 800; color: #2C2039; }
-.sl-sync-kpi--on  .sl-sync-kpi-num { color: #16a34a; }
-.sl-sync-kpi--off .sl-sync-kpi-num { color: #dc2626; }
-.sl-sync-kpi--nd  .sl-sync-kpi-num { color: #9ca3af; }
-.sl-sync-kpi-label { font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; }
-
-/* ── Sync lista ── */
-.sl-sync-list { display: flex; flex-direction: column; gap: 4px; max-height: 320px; overflow-y: auto; }
-.sl-sync-row { display: flex; align-items: center; justify-content: space-between; padding: 7px 10px; border-radius: 7px; background: #f9fafb; }
-.sl-sync-row:hover { background: #f3f1f8; }
-.sl-sync-nombre { font-size: 13px; color: #374151; font-weight: 500; }
-.sl-sync-estado { font-size: 11px; font-weight: 800; padding: 2px 10px; border-radius: 999px; letter-spacing: 0.5px; }
-.sl-sync-estado--on  { background: rgba(22,163,74,0.12);  color: #16a34a; }
-.sl-sync-estado--off { background: rgba(220,38,38,0.08);  color: #dc2626; }
-.sl-sync-estado--nd  { background: #f3f4f6; color: #9ca3af; }
+.sl-modal-accion-btn--on  { background: rgba(22,163,74,0.1);  border-color: #16a34a; color: #16a34a; }
+.sl-modal-accion-btn--off { background: rgba(220,38,38,0.08); border-color: #dc2626; color: #dc2626; }
 </style>
