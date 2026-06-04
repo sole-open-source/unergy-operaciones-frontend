@@ -149,6 +149,59 @@
               </div>
 
             </div>
+
+            <!-- ── Generación de hoy ── -->
+            <div class="sl-genhoy">
+              <div class="sl-genhoy-head">
+                <span class="sl-genhoy-title">
+                  <i class="pi pi-sun" style="color:#f59e0b;font-size:11px" />
+                  Generación de hoy
+                </span>
+                <div class="sl-genhoy-vals">
+                  <span :style="{
+                    color: getGenHoy(proy.proyecto_id).pct === null ? '#6b5a8a'
+                         : getGenHoy(proy.proyecto_id).pct >= 100 ? '#4ade80'
+                         : getGenHoy(proy.proyecto_id).pct >= 75  ? '#fbbf24'
+                         : '#f87171',
+                    fontWeight: 700, fontSize: '12px'
+                  }">
+                    {{ getGenHoy(proy.proyecto_id).real.toLocaleString('es-CO') }} kWh
+                  </span>
+                  <span style="color:#4a3960;font-size:11px">/</span>
+                  <span style="color:#a89fc0;font-size:11px">
+                    {{ getGenHoy(proy.proyecto_id).p90.toLocaleString('es-CO') }} kWh P90
+                  </span>
+                  <span v-if="getGenHoy(proy.proyecto_id).pct !== null"
+                    class="sl-genhoy-pct"
+                    :style="{
+                      color: getGenHoy(proy.proyecto_id).pct >= 100 ? '#4ade80'
+                           : getGenHoy(proy.proyecto_id).pct >= 75  ? '#fbbf24'
+                           : '#f87171'
+                    }">
+                    {{ getGenHoy(proy.proyecto_id).pct }}%
+                  </span>
+                  <span v-if="getGenHoy(proy.proyecto_id).fuente === 'inversor'"
+                    class="sl-genhoy-badge" title="Dato de inversores">INV</span>
+                  <span v-else-if="getGenHoy(proy.proyecto_id).fuente === 'medidor'"
+                    class="sl-genhoy-badge sl-genhoy-badge--med" title="Dato de medidor de frontera">MED</span>
+                  <span v-else
+                    class="sl-genhoy-badge sl-genhoy-badge--nd" title="Sin dato disponible">S/D</span>
+                </div>
+              </div>
+              <div class="sl-genhoy-track">
+                <div class="sl-genhoy-fill" :style="{
+                  width: getGenHoy(proy.proyecto_id).p90 > 0
+                    ? Math.min(100, getGenHoy(proy.proyecto_id).real / getGenHoy(proy.proyecto_id).p90 * 100) + '%'
+                    : '0%',
+                  background: getGenHoy(proy.proyecto_id).pct === null ? '#3d2f52'
+                    : getGenHoy(proy.proyecto_id).pct >= 100 ? '#16a34a'
+                    : getGenHoy(proy.proyecto_id).pct >= 75  ? '#d97706'
+                    : getGenHoy(proy.proyecto_id).real > 0   ? '#dc2626'
+                    : '#3d2f52'
+                }" />
+              </div>
+            </div>
+
           </template>
         </div>
       </template>
@@ -189,6 +242,43 @@ const detailMap   = reactive({})
 const lastUpdated = ref('')
 const cols        = ref(1)
 let refreshTimer  = null
+
+// ── Generación de hoy ──────────────────────────────────────────────────────
+const genHoyMap  = reactive({})   // proyecto_id → { kwh_real, fuente }
+const p90List    = ref([])        // proyectos con p90_mensual_kwh
+
+const _todayColStr = new Date(Date.now() - 5 * 3600 * 1000).toISOString().slice(0, 10)
+
+function dailyP90(proyectoId) {
+  const p   = p90List.value.find(x => x.id === proyectoId)
+  const arr = p?.p90_mensual_kwh
+  if (!arr?.length) return 0
+  const dt           = new Date(_todayColStr + 'T00:00:00')
+  const daysInMonth  = new Date(dt.getFullYear(), dt.getMonth() + 1, 0).getDate()
+  return +((Number(arr[dt.getMonth()]) || 0) / daysInMonth).toFixed(1)
+}
+
+function getGenHoy(id) {
+  const g    = genHoyMap[id]
+  const real = g ? +Number(g.kwh_real || 0).toFixed(1) : 0
+  const p90  = dailyP90(id)
+  const fuente = g?.fuente ?? 'sin_dato'
+  const pct  = p90 > 0 ? Math.round(real / p90 * 100) : null
+  return { real, p90, fuente, pct }
+}
+
+async function cargarGenHoy() {
+  try {
+    const [resHoy, resProy] = await Promise.all([
+      api.get('/generacion-solar/generacion-hoy'),
+      api.get('/proyectos', { params: { size: 500 } }),
+    ])
+    p90List.value = resProy.data.items ?? []
+    for (const row of resHoy.data.proyectos ?? []) {
+      genHoyMap[row.proyecto_id] = { kwh_real: row.kwh_real, fuente: row.fuente }
+    }
+  } catch { /* silencioso */ }
+}
 
 // ── Auto-refresh ───────────────────────────────────────────────────────────
 const AUTO_KEY = 'solar_auto_refresh'
@@ -421,9 +511,10 @@ async function cargar() {
   } catch { /* silencioso */ } finally {
     loading.value = false
   }
-  // Cargar detalles en lotes de 4 para que las primeras gráficas aparezcan rápido
+  // Cargar gen-hoy y detalles en paralelo
+  cargarGenHoy()
   const ids = proyectos.value.map(p => p.proyecto_id)
-  const BATCH = 4
+  const BATCH = 10
   for (let i = 0; i < ids.length; i += BATCH) {
     await Promise.all(ids.slice(i, i + BATCH).map(id => loadDetail(id)))
   }
@@ -569,4 +660,16 @@ onUnmounted(() => {
 /* ── Wrap gráfica ── */
 .sl-chart-wrap { height: 180px; position: relative; }
 .sl-no-data { height: 180px; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; color: #cbd5e1; }
+
+/* ── Generación de hoy ── */
+.sl-genhoy { display: flex; flex-direction: column; gap: 6px; padding-top: 4px; border-top: 1px solid #ece8f4; }
+.sl-genhoy-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.sl-genhoy-title { display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #915BD8; }
+.sl-genhoy-vals { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.sl-genhoy-pct { font-size: 11px; font-weight: 700; }
+.sl-genhoy-badge { font-size: 9px; font-weight: 800; padding: 1px 6px; border-radius: 4px; background: rgba(145,91,216,0.12); color: #7c3aed; letter-spacing: 0.3px; }
+.sl-genhoy-badge--med { background: rgba(212,160,23,0.14); color: #a16207; }
+.sl-genhoy-badge--nd  { background: #f1f0f5; color: #9ca3af; }
+.sl-genhoy-track { height: 5px; background: #e9e6f5; border-radius: 999px; overflow: hidden; }
+.sl-genhoy-fill  { height: 100%; border-radius: 999px; transition: width 0.6s ease, background 0.3s; }
 </style>
