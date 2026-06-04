@@ -218,11 +218,9 @@
                   width: getGenHoy(proy.proyecto_id).p90 > 0
                     ? Math.min(100, getGenHoy(proy.proyecto_id).real / getGenHoy(proy.proyecto_id).p90 * 100) + '%'
                     : '0%',
-                  background: getGenHoy(proy.proyecto_id).pct === null ? '#3d2f52'
-                    : getGenHoy(proy.proyecto_id).pct >= 100 ? '#16a34a'
-                    : getGenHoy(proy.proyecto_id).pct >= 75  ? '#d97706'
-                    : getGenHoy(proy.proyecto_id).real > 0   ? '#dc2626'
-                    : '#3d2f52'
+                  background: getGenHoy(proy.proyecto_id).pct >= 100 ? '#4ADE80'
+                    : getGenHoy(proy.proyecto_id).real > 0 ? '#C4B5FD'
+                    : '#e9e6f5'
                 }" />
               </div>
             </div>
