@@ -35,8 +35,9 @@ const routes = [
   { path: '/alertas/monitoreo',   name: 'AlertasMonitoreo',   component: () => import('@/views/Alertas/AlertasMonitoreoView.vue'),  meta: { roles: ['admin', 'operaciones', 'monitoreo'] } },
 
   // ── Finanzas ─────────────────────────────────────────────────────
-  { path: '/liquidaciones',               name: 'Liquidaciones',              component: () => import('@/views/Liquidaciones/LiquidacionesListView.vue'),           meta: { roles: ['admin', 'liquidaciones'] } },
-  { path: '/liquidaciones/inversionista', name: 'LiquidacionesPorInversionista', component: () => import('@/views/Liquidaciones/LiquidacionesPorInversionistaView.vue'), meta: { roles: ['admin', 'liquidaciones'] } },
+  { path: '/liquidaciones',                  name: 'Liquidaciones',                  component: () => import('@/views/Liquidaciones/LiquidacionesListView.vue'),                meta: { roles: ['admin', 'liquidaciones'] } },
+  { path: '/liquidaciones/inversionista',    name: 'LiquidacionesPorInversionista',    component: () => import('@/views/Liquidaciones/LiquidacionesPorInversionistaView.vue'),   meta: { roles: ['admin', 'liquidaciones'] } },
+  { path: '/liquidaciones/cargar-excel',     name: 'CargaExcel',                       component: () => import('@/views/Liquidaciones/CargaExcelView.vue'),                      meta: { roles: ['admin', 'liquidaciones'] } },
   { path: '/finanzas/costos',             name: 'Costos',                     component: () => import('@/views/Finanzas/CostosView.vue'),                                meta: { roles: ['admin', 'liquidaciones'] } },
   { path: '/liquidaciones/minigranjas',   redirect: '/liquidaciones' },
   { path: '/liquidaciones/:id',           name: 'LiquidacionDetalle',         component: () => import('@/views/Liquidaciones/LiquidacionDetailView.vue'),           meta: { roles: ['admin', 'liquidaciones'] } },
