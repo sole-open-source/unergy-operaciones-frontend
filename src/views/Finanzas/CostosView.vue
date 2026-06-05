@@ -22,26 +22,34 @@
     <!-- ══ TAB 0 — MANTENIMIENTO ══════════════════════════════════════════ -->
     <div v-if="activeTab === 0" class="mon-tab-view">
 
-      <!-- ── 1. Panel O&M Mensual (arriba) ─────────────────────────────── -->
-      <div class="mon-tab-bar" style="border-top:1px solid #f3f0ff;padding-top:6px;padding-bottom:6px;margin-bottom:16px">
-        <i class="pi pi-calculator text-sm" style="color:#915BD8" />
-        <span class="text-sm font-semibold text-gray-700 mr-2">Panel O&amp;M Mensual</span>
-        <div class="mon-tab-group">
-          <button
-            v-for="(tab, i) in SUBTABS_OM"
-            :key="i"
-            class="mon-tab"
-            :class="{ 'mon-tab--active': activeSubTabOM === i }"
-            @click="activeSubTabOM = i"
-          >
-            <i :class="tab.icon" style="font-size:12px" />
-            {{ tab.label }}
-          </button>
+      <!-- ── 1. Panel O&M Mensual — contenedor con borde propio ──────────── -->
+      <div class="om-panel-card">
+        <!-- Header del panel — NO sticky, no hereda mon-tab-bar -->
+        <div class="om-panel-header">
+          <div class="flex items-center gap-2">
+            <i class="pi pi-calculator text-sm" style="color:#915BD8" />
+            <span class="text-sm font-semibold" style="color:#2C2039">Panel O&amp;M Mensual</span>
+          </div>
+          <div class="mon-tab-group">
+            <button
+              v-for="(tab, i) in SUBTABS_OM"
+              :key="i"
+              class="mon-tab"
+              :class="{ 'mon-tab--active': activeSubTabOM === i }"
+              @click="activeSubTabOM = i"
+            >
+              <i :class="tab.icon" style="font-size:12px" />
+              {{ tab.label }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Contenido del panel — tabla queda dentro del card -->
+        <div class="om-panel-body">
+          <OMAOperaciones v-if="activeSubTabOM === 0" />
+          <OMAProveedor   v-if="activeSubTabOM === 1" />
         </div>
       </div>
-
-      <OMAOperaciones v-if="activeSubTabOM === 0" />
-      <OMAProveedor   v-if="activeSubTabOM === 1" />
 
       <!-- ── 2. Separador ─────────────────────────────────────────────── -->
       <div class="flex items-center gap-3 my-5">
@@ -457,6 +465,29 @@ async function onProyectoChange() {
 .costos-selector-select {
   min-width: 260px;
   max-width: 380px;
+}
+
+/* ── Panel O&M — contenedor aislado, sin sticky ── */
+.om-panel-card {
+  background: #ffffff;
+  border: 1px solid #E5E2EC;
+  border-radius: 12px;
+  overflow: hidden;          /* tabla no se desborda fuera del card */
+  margin-bottom: 0;
+}
+.om-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 14px;
+  background: #FDFCFF;
+  border-bottom: 1px solid #ECE7F2;
+  /* sin position:sticky — el header queda fijo dentro del card, no de la página */
+}
+.om-panel-body {
+  padding: 0;               /* OMAOperaciones y OMAProveedor manejan su propio padding */
+  background: #f9f8fc;
 }
 
 /* ── Contenido ── */
