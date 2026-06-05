@@ -1,9 +1,9 @@
 <template>
-  <div class="min-h-screen p-6" style="background: #F7F5FB;">
+  <div :class="embedded ? 'p-4 sm:p-5' : 'min-h-screen p-6'" :style="embedded ? '' : 'background: #F7F5FB;'">
     <div class="max-w-3xl mx-auto space-y-5">
 
       <!-- Header -->
-      <div>
+      <div v-if="!embedded">
         <h1 class="text-xl font-bold" style="color: #2C2039;">Cargar Excel de Liquidaciones</h1>
         <p class="text-sm mt-1" style="color: #9b8fb0;">Carga el panel de seguimiento contable mensual desde un archivo .xlsx</p>
       </div>
@@ -214,6 +214,8 @@
 import { ref, computed } from 'vue'
 import * as XLSX from 'xlsx'
 import api from '@/api/client'
+
+defineProps({ embedded: { type: Boolean, default: false } })
 
 // ── Estado ──────────────────────────────────────────────────────────────────
 const file = ref(null)
