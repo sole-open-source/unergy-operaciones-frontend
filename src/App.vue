@@ -11,6 +11,12 @@
         style="color: #2C2039;" title="Menú">
         <i class="pi pi-bars" />
       </button>
+
+      <!-- Reabrir sidebar (escritorio, cuando está oculto) -->
+      <button v-if="collapsed" @click="toggleCollapsed"
+        class="hidden lg:flex sb-reopen" title="Mostrar barra lateral">
+        <i class="pi pi-angle-double-right" />
+      </button>
       <main :class="isSolar ? 'flex-1 overflow-hidden p-0' : 'flex-1 overflow-y-auto p-4 pt-14 sm:p-5 sm:pt-14 lg:p-6 lg:pt-6'">
         <RouterView />
       </main>
@@ -31,7 +37,7 @@ import { useSidebar } from '@/composables/useSidebar'
 
 const route = useRoute()
 const toast = useToast()
-const { mobileOpen, toggle } = useSidebar()
+const { mobileOpen, toggle, collapsed, toggleCollapsed } = useSidebar()
 const routeReady = computed(() => !!route.name)
 const isLoginPage = computed(() => ['Login', 'ForgotPassword', 'ResetPassword'].includes(route.name))
 const isSolar     = computed(() => route.name === 'SolarLive')
@@ -40,3 +46,18 @@ onMounted(() => {
   window.__primeToast = (opts) => toast.add(opts)
 })
 </script>
+
+<style>
+.sb-reopen {
+  position: fixed; top: 14px; left: 0; z-index: 40;
+  width: 26px; height: 38px; padding-left: 2px;
+  align-items: center; justify-content: center;
+  background: linear-gradient(135deg, #915BD8, #4C1D95);
+  color: #fff; border: none; cursor: pointer;
+  border-radius: 0 10px 10px 0;
+  box-shadow: 0 4px 14px rgba(76, 29, 149, .35);
+  transition: width .15s ease, padding-left .15s ease;
+}
+.sb-reopen:hover { width: 32px; padding-left: 4px; }
+.sb-reopen .pi { font-size: 13px; }
+</style>

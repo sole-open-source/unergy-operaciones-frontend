@@ -5,38 +5,56 @@
   <aside :class="[
     'flex flex-col shrink-0 z-50 transition-transform duration-200 sb-aside',
     'fixed inset-y-0 left-0 w-[264px] lg:relative lg:translate-x-0',
-    mobileOpen ? 'translate-x-0' : '-translate-x-full'
+    mobileOpen ? 'translate-x-0' : '-translate-x-full',
+    collapsed ? 'lg:hidden' : ''
   ]">
     <!-- Marca -->
     <div class="sb-brand">
-      <div class="flex items-center gap-2.5 min-w-0">
-        <div class="sb-logo">U</div>
-        <div class="min-w-0">
-          <div class="sb-brand-name">Unergy</div>
-          <div class="sb-brand-sub">Plataforma Operaciones</div>
-        </div>
+      <RouterLink to="/dashboard" class="sb-brand-link" @click="mobileOpen = false">
+        <img src="/logos/Logo_linea_purpura_profundo.png" alt="Unergy" class="sb-brand-logo" />
+        <span class="sb-brand-sub">Plataforma Operaciones</span>
+      </RouterLink>
+      <div class="flex items-center gap-1 shrink-0">
+        <!-- Ocultar barra (escritorio) -->
+        <button class="hidden lg:flex sb-icon-btn" @click="toggleCollapsed" title="Ocultar barra lateral">
+          <i class="pi pi-angle-double-left" />
+        </button>
+        <!-- Cerrar (mobile) -->
+        <button class="lg:hidden sb-icon-btn" @click="mobileOpen = false" title="Cerrar">
+          <i class="pi pi-times" />
+        </button>
       </div>
-      <button class="lg:hidden sb-icon-btn" @click="mobileOpen = false">
-        <i class="pi pi-times" />
-      </button>
     </div>
 
     <!-- Nav -->
     <nav class="flex-1 px-2.5 py-2 overflow-y-auto sb-nav">
       <template v-for="group in navGroups" :key="group.label || '__main__'">
-        <div v-if="group.label" class="sb-group">{{ group.label }}</div>
-
-        <RouterLink
-          v-for="item in group.items"
-          :key="item.to"
-          :to="item.to"
-          class="sb-item"
-          active-class="sb-item--active"
-          @click="mobileOpen = false"
+        <button
+          v-if="group.label"
+          type="button"
+          class="sb-group"
+          :class="{ 'sb-group--collapsed': isGroupCollapsed(group.label) }"
+          @click="toggleGroup(group.label)"
         >
-          <i :class="[item.icon, 'sb-item-ico']" />
-          <span class="truncate">{{ item.label }}</span>
-        </RouterLink>
+          <span class="truncate">{{ group.label }}</span>
+          <i class="pi pi-chevron-down sb-group-chev" />
+        </button>
+
+        <transition name="sb-collapse">
+          <div v-show="!group.label || !isGroupCollapsed(group.label)">
+            <RouterLink
+              v-for="item in group.items"
+              :key="item.to"
+              :to="item.to"
+              class="sb-item"
+              active-class="sb-item--active"
+              @click="mobileOpen = false"
+            >
+              <i :class="[item.icon, 'sb-item-ico']" />
+              <span class="truncate">{{ item.label }}</span>
+            </RouterLink>
+          </div>
+        </transition>
       </template>
     </nav>
 
@@ -114,7 +132,7 @@ import api from '@/api/client'
 
 const auth = useAuthStore()
 const router = useRouter()
-const { mobileOpen } = useSidebar()
+const { mobileOpen, collapsed, toggleCollapsed, isGroupCollapsed, toggleGroup } = useSidebar()
 
 const initials = computed(() => {
   const name = (auth.user?.nombre || auth.user?.email || '').trim()
@@ -287,26 +305,42 @@ const navGroups = computed(() =>
 
 /* Marca */
 .sb-brand {
-  display: flex; align-items: center; justify-content: space-between;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
   padding: 14px 16px; border-bottom: 1px solid #F0ECF6; flex-shrink: 0;
 }
-.sb-logo {
-  width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0;
-  background: linear-gradient(135deg, #915BD8, #6D28D9);
-  color: #fff; font-weight: 800; font-size: 18px;
-  display: flex; align-items: center; justify-content: center;
+.sb-brand-link {
+  display: flex; flex-direction: column; gap: 3px; min-width: 0;
+  text-decoration: none;
 }
-.sb-brand-name { font-size: 15px; font-weight: 800; color: #2C2039; line-height: 1.1; }
-.sb-brand-sub  { font-size: 10.5px; color: #9b8fb0; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sb-brand-logo {
+  height: 26px; width: auto; object-fit: contain; align-self: flex-start;
+  display: block;
+}
+.sb-brand-sub  { font-size: 10.5px; color: #9b8fb0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-/* Nav */
-.sb-nav::-webkit-scrollbar { width: 6px; }
-.sb-nav::-webkit-scrollbar-thumb { background: #E5DEF0; border-radius: 3px; }
+/* Nav — scrollbar morado oscuro */
+.sb-nav { scrollbar-width: thin; scrollbar-color: #4C1D95 transparent; }
+.sb-nav::-webkit-scrollbar { width: 8px; }
+.sb-nav::-webkit-scrollbar-thumb { background: #4C1D95; border-radius: 4px; }
+.sb-nav::-webkit-scrollbar-thumb:hover { background: #3B1278; }
 .sb-nav::-webkit-scrollbar-track { background: transparent; }
+
+/* Grupos plegables */
 .sb-group {
+  display: flex; align-items: center; justify-content: space-between; width: 100%;
   font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
-  color: #A89EC0; padding: 14px 12px 4px;
+  color: #A89EC0; padding: 14px 10px 4px; background: transparent; border: none;
+  cursor: pointer; text-align: left; transition: color .12s;
 }
+.sb-group:hover { color: #6D28D9; }
+.sb-group-chev {
+  font-size: 10px; transition: transform .18s ease; color: inherit; flex-shrink: 0;
+}
+.sb-group--collapsed .sb-group-chev { transform: rotate(-90deg); }
+
+/* Transición plegar/desplegar */
+.sb-collapse-enter-active, .sb-collapse-leave-active { transition: opacity .15s ease; }
+.sb-collapse-enter-from, .sb-collapse-leave-to { opacity: 0; }
 .sb-item {
   display: flex; align-items: center; gap: 11px; padding: 8px 10px; margin-bottom: 1px;
   border-radius: 9px; font-size: 13.5px; font-weight: 600; color: #5b5470;
