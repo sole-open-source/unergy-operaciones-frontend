@@ -89,7 +89,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import { fmtCOP, pct, construirEstadoResultados, indiceSoportesProyecto } from '@/utils/liquidaciones'
+import { fmtCOP, pct, normPct, construirEstadoResultados, indiceSoportesProyecto } from '@/utils/liquidaciones'
 
 const props = defineProps({
   liq: { type: Object, required: true },
@@ -136,7 +136,11 @@ const columnas = computed(() => {
     const ingresosMandatos = mandatos.filter(m => m.tipo === 'ingresos' && esDelInv(m, pi.id))
     const costosMandatos = mandatos.filter(m => m.tipo === 'costos' && esDelInv(m, pi.id))
     if (!ingresosMandatos.length && !costosMandatos.length) continue
-    const er = construirEstadoResultados({ ingresosMandatos, costosMandatos, esAutoconsumo, soportes })
+    // Facturas de servicio (rep/CGM/admin) son a nivel proyecto → se prorratean por
+    // participación para que aparezca la parte de cada inversionista (columna propia).
+    const frac = normPct(pi.porcentaje_participacion)
+    const facturas = (liq.facturas || []).map(f => ({ ...f, valor_cop: (Number(f.valor_cop) || 0) * frac }))
+    const er = construirEstadoResultados({ ingresosMandatos, costosMandatos, facturas, esAutoconsumo, soportes })
     if (!er.grupos.length) continue
     cols.push({
       id: 'inv' + pi.id,
