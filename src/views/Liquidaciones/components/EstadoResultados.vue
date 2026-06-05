@@ -3,11 +3,6 @@
     <div class="px-4 py-2.5 flex items-center gap-2 border-b" style="border-color:#f0ebf6">
       <i class="pi pi-chart-line text-sm" style="color:#915BD8" />
       <h3 class="text-sm font-bold" style="color:#2C2039">Estado de Resultados</h3>
-      <a v-if="liq?.estado_resultados_url" :href="liq.estado_resultados_url" target="_blank" rel="noopener"
-        class="ml-auto flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-md hover:opacity-80"
-        style="background:#F6FF72; color:#2C2039">
-        <i class="pi pi-external-link text-[10px]" />Hoja completa
-      </a>
     </div>
 
     <table class="w-full text-sm">

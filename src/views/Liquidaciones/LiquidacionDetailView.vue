@@ -1,5 +1,5 @@
 <template>
-  <div class="space-y-4" style="background:#FDFAF7; min-height:100vh; padding:1rem">
+  <div class="space-y-4 p-3 sm:p-4" style="background:#FDFAF7; min-height:100vh">
 
     <!-- Header -->
     <div class="flex items-center gap-3 flex-wrap">
@@ -45,11 +45,14 @@
         </button>
       </div>
 
-      <!-- Estado de Resultados en cascada (fórmula oficial del neto) -->
-      <EstadoResultados :liq="liq" />
+      <!-- Hero: Estado de Resultados + Generación del mes (responsive) -->
+      <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
+        <EstadoResultados :liq="liq" />
+        <GeneracionMensualChart :proyecto-id="liq.proyecto_id" :periodo="liq.periodo" />
+      </div>
 
       <!-- Datos adicionales: comprobante, consecutivos -->
-      <div class="bg-white rounded-xl shadow-sm px-4 py-3 flex flex-wrap gap-4 text-xs" style="color:#2C2039">
+      <div class="bg-white rounded-xl shadow-sm border px-4 py-3 flex flex-wrap gap-x-5 gap-y-1.5 text-xs" style="color:#2C2039;border-color:#e8e0f0">
         <span><span class="text-gray-400">Comprobante:</span>
           <strong class="ml-1">{{ liq.comprobante_contable_ref || '—' }}</strong></span>
         <span><span class="text-gray-400">Consec. Ingresos:</span>
@@ -61,9 +64,6 @@
         <span v-if="liq.observaciones_resultados" class="text-gray-500 italic">
           {{ liq.observaciones_resultados }}</span>
       </div>
-
-      <!-- Soportes agrupados -->
-      <SoportesPanel :liq="liq" />
 
       <!-- ══ INGRESOS ══ -->
       <div class="bg-white rounded-xl shadow-sm overflow-hidden">
@@ -77,163 +77,88 @@
           </span>
         </div>
 
-        <div v-if="seccionesAbiertas.has('ingresos')" class="overflow-x-auto">
-          <table class="w-full text-xs">
-            <thead>
-              <tr class="text-gray-600" style="background:#f1f5f9">
-                <th class="px-3 py-1.5 text-left w-44">Inversionista</th>
-                <th class="px-3 py-1.5 text-right w-24">Participación</th>
-                <th class="px-3 py-1.5 text-left w-28">N° Mandato</th>
-                <th class="px-3 py-1.5 text-left w-24">Consec.</th>
-                <th class="px-3 py-1.5 text-left">Concepto</th>
-                <th class="px-3 py-1.5 text-right w-36">Valor COP</th>
-                <th class="px-3 py-1.5 text-left w-32">Ref. Factura</th>
-                <th class="px-3 py-1.5 w-24 text-center">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              <!-- Fila total proyecto -->
-              <tr v-if="!invFiltroId" class="font-semibold border-b-2" style="background:rgba(145,91,216,0.08); border-color:rgba(145,91,216,0.3)">
-                <td class="px-3 py-1.5 font-bold" style="color:#2C2039" colspan="2">Total Proyecto</td>
-                <td class="px-3 py-1.5" />
-                <td class="px-3 py-1.5" />
-                <td class="px-3 py-1.5" style="color:#915BD8">Porcentaje de Participación</td>
-                <td class="px-3 py-1.5 text-right font-semibold" style="color:#915BD8">100.00%</td>
-                <td class="px-3 py-1.5" />
-                <td class="px-3 py-1.5" />
-              </tr>
+        <div v-if="seccionesAbiertas.has('ingresos')" class="p-3 space-y-3">
+          <!-- Total proyecto (cuando hay >1 inversionista) -->
+          <div v-if="!invFiltroId && inversionistasConDetalle.length > 1 && mandatosTotal.length"
+            class="rounded-xl border overflow-hidden" style="border-color:#ede7f6">
+            <div class="px-3 py-1.5 flex items-center gap-2 text-[11px] font-semibold" style="background:rgba(145,91,216,0.08); color:#6E3FB8">
+              <i class="pi pi-sitemap text-[10px]" /> Total proyecto · 100%
+            </div>
+            <div v-for="m in mandatosTotal" :key="m.id" class="px-3 py-2 border-t" style="border-color:#f4f0fa">
+              <div v-for="l in (m.lineas || [])" :key="l.id" class="flex flex-wrap items-center gap-x-3 gap-y-1 py-1">
+                <span class="flex-1 min-w-[130px] text-sm" style="color:#2C2039">{{ etiqueta(l.tipo_linea) }}</span>
+                <span class="font-mono text-sm tabular-nums whitespace-nowrap" style="color:#2C2039">{{ fmt(l.valor_cop) }}</span>
+                <a v-if="l.soporte_url" :href="l.soporte_url" target="_blank" rel="noopener"
+                  class="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md"
+                  style="background:#F1EAF9; color:#6E3FB8" :title="l.referencia_factura || 'Ver soporte'">
+                  <i class="pi pi-paperclip text-[10px]" />{{ l.referencia_factura || 'Soporte' }}
+                </a>
+              </div>
+              <div v-if="m.valor_neto_cop" class="flex justify-between items-center mt-1 pt-1.5 border-t text-sm font-semibold" style="border-color:#f4f0fa; color:#915BD8">
+                <span>Valor a pagar</span><span class="font-mono">{{ fmt(m.valor_neto_cop) }}</span>
+              </div>
+            </div>
+          </div>
 
-              <!-- Mandatos del Total (inversionista_id = null) -->
-              <template v-if="!invFiltroId && inversionistasConDetalle.length > 1">
-                <template v-for="m in mandatosTotal" :key="m.id">
-                  <tr style="background:rgba(145,91,216,0.04)">
-                    <td colspan="2" class="px-3 py-1 text-xs text-gray-400 italic">
-                      {{ m.tipo === 'ingresos' ? 'Mandato' : 'Costos' }}
-                      <span v-if="m.beneficiario_nombre"> — {{ m.beneficiario_nombre }}</span>
-                      <span v-else> — Total proyecto</span>
-                    </td>
-                    <td class="px-3 py-1 text-xs text-gray-400 font-mono">{{ m.consecutivo || '—' }}</td>
-                    <td colspan="5" />
-                  </tr>
-                  <tr v-for="l in (m.lineas || [])" :key="l.id"
-                    class="border-b border-gray-50 hover:bg-gray-50">
-                    <td colspan="4" />
-                    <td class="px-3 py-1.5 text-sm text-gray-700">{{ etiqueta(l.tipo_linea) }}</td>
-                    <td class="px-3 py-1.5 text-right font-mono text-sm">{{ fmt(l.valor_cop) }}</td>
-                    <td class="px-3 py-1.5 text-xs">
-                      <a v-if="l.soporte_url"
-                        :href="l.soporte_url" target="_blank" rel="noopener"
-                        style="color:#915BD8" class="hover:underline">
-                        {{ l.referencia_factura || 'Ver soporte' }}
-                      </a>
-                      <span v-else>{{ l.referencia_factura || '' }}</span>
-                    </td>
-                    <td class="px-3 py-1.5" />
-                  </tr>
-                  <tr v-if="m.valor_neto_cop" style="background:rgba(145,91,216,0.06)">
-                    <td colspan="4" />
-                    <td class="px-3 py-1.5 font-semibold text-sm" style="color:#915BD8">Valor a Pagar</td>
-                    <td class="px-3 py-1.5 text-right font-mono font-semibold" style="color:#915BD8">
-                      {{ fmt(m.valor_neto_cop) }}
-                    </td>
-                    <td colspan="2" />
-                  </tr>
+          <!-- Por inversionista -->
+          <div v-for="inv in inversionistasConDetalle" :key="inv.id" class="rounded-xl border overflow-hidden" style="border-color:#e8e0f0">
+            <div class="flex items-center gap-2 px-3 py-2" style="background:#2C2039">
+              <span class="text-white font-semibold text-sm truncate" :title="inv.nombre">{{ inv.nombre }}</span>
+              <span class="text-[10px] px-2 py-0.5 rounded-full shrink-0" style="background:rgba(255,255,255,0.16); color:#fff">{{ pct(inv.porcentaje) }}</span>
+              <Button icon="pi pi-plus" text rounded size="small" class="ml-auto !text-green-300"
+                v-tooltip.top="'Agregar mandato de ingresos'"
+                @click="abrirDialogMandato('ingresos', inv.id, inv.nombre)" />
+            </div>
+
+            <div class="p-2 space-y-2">
+              <div v-for="m in inv.mandatosIngresos" :key="m.id" class="rounded-lg border overflow-hidden" style="border-color:#eef3ee">
+                <div class="flex flex-wrap items-center gap-x-2 gap-y-1 px-3 py-1.5 text-[11px]" style="background:rgba(34,197,94,0.07)">
+                  <span class="font-semibold text-green-800">Mandato</span>
+                  <span v-if="m.numero_mandato" class="font-mono text-gray-500">· {{ m.numero_mandato }}</span>
+                  <span class="text-gray-400">· consec. {{ m.consecutivo ?? liq.consecutivo_inicial_ingresos ?? '—' }}</span>
+                  <div class="ml-auto flex gap-0.5">
+                    <Button icon="pi pi-pencil" text size="small" severity="info" @click="abrirDialogMandato('ingresos', inv.id, inv.nombre, m)" />
+                    <Button icon="pi pi-trash" text size="small" severity="danger" @click="eliminarMandato(m.id)" />
+                    <Button icon="pi pi-plus" text size="small" class="!text-green-600" v-tooltip.top="'Agregar línea'" @click="abrirDialogLinea(m.id, 'ingresos')" />
+                  </div>
+                </div>
+                <template v-if="m.lineas.length">
+                  <div v-for="l in m.lineas" :key="l.id"
+                    class="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 border-t" style="border-color:#f2f6f2">
+                    <span class="flex-1 min-w-[130px] text-sm" style="color:#2C2039">{{ ETIQUETAS[l.tipo_linea] || l.concepto }}</span>
+                    <span class="font-mono text-sm tabular-nums whitespace-nowrap" style="color:#2C2039">{{ fmt(l.valor_cop) }}</span>
+                    <a v-if="l.soporte_url" :href="l.soporte_url" target="_blank" rel="noopener"
+                      class="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md"
+                      style="background:#F1EAF9; color:#6E3FB8" :title="l.referencia_factura || 'Ver soporte'">
+                      <i class="pi pi-paperclip text-[10px]" />{{ l.referencia_factura || 'Soporte' }}
+                    </a>
+                    <button v-else-if="requiereSoporte(l)" type="button"
+                      class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md border border-dashed hover:bg-gray-50"
+                      style="border-color:#e0d5f0; color:#bba8d4" @click="abrirDialogLinea(m.id, 'ingresos', l)">
+                      <i class="pi pi-plus text-[9px]" />soporte
+                    </button>
+                    <div class="flex gap-0.5">
+                      <Button icon="pi pi-pencil" text size="small" severity="info" @click="abrirDialogLinea(m.id, 'ingresos', l)" />
+                      <Button icon="pi pi-trash" text size="small" severity="danger" @click="eliminarLinea(m.id, l.id)" />
+                    </div>
+                  </div>
                 </template>
-              </template>
+                <div v-else class="px-3 py-2 text-center text-[11px] text-gray-400 italic border-t" style="border-color:#f2f6f2">
+                  Sin líneas — usa + para añadir
+                </div>
+                <div v-if="m.valor_neto_cop" class="flex justify-between items-center px-3 py-1.5 text-sm font-semibold border-t" style="background:#faf7ff; border-color:#f2f6f2; color:#915BD8">
+                  <span>Valor a pagar</span><span class="font-mono">{{ fmt(m.valor_neto_cop) }}</span>
+                </div>
+              </div>
+              <div v-if="!inv.mandatosIngresos.length" class="px-3 py-2 text-center text-[11px] text-gray-400 italic">
+                Sin mandato de ingresos — usa el botón + del inversionista
+              </div>
+            </div>
+          </div>
 
-              <!-- Por inversionista -->
-              <template v-for="inv in inversionistasConDetalle" :key="inv.id">
-                <!-- Header inversionista -->
-                <tr class="text-white border-t border-gray-600" style="background:#2C2039">
-                  <td class="px-3 py-1.5 font-semibold truncate max-w-[176px]" :title="inv.nombre">
-                    {{ inv.nombre }}
-                  </td>
-                  <td class="px-3 py-1.5 text-right text-gray-300 font-semibold">{{ pct(inv.porcentaje) }}</td>
-                  <td class="px-3 py-1.5" colspan="2" />
-                  <td class="px-3 py-1.5 text-gray-300">Porcentaje de Participación</td>
-                  <td class="px-3 py-1.5 text-right font-semibold">{{ pct(inv.porcentaje) }}</td>
-                  <td class="px-3 py-1.5" />
-                  <td class="px-3 py-1.5 text-center">
-                    <Button icon="pi pi-plus" text size="small" class="!text-green-400"
-                      title="Agregar mandato de ingresos"
-                      @click="abrirDialogMandato('ingresos', inv.id, inv.nombre)" />
-                  </td>
-                </tr>
-
-                <!-- Mandatos de ingresos -->
-                <template v-for="m in inv.mandatosIngresos" :key="m.id">
-                  <!-- Sub-header de mandato -->
-                  <tr style="background:rgba(30,92,46,0.06)">
-                    <td class="px-3 py-1 text-green-800 font-medium text-[11px]" colspan="2">
-                      Mandato
-                    </td>
-                    <td class="px-3 py-1 text-[11px] text-gray-600 font-mono">{{ m.numero_mandato || '—' }}</td>
-                    <td class="px-3 py-1 text-[11px] text-gray-500">
-                      {{ m.consecutivo ?? liq.consecutivo_inicial_ingresos ?? '—' }}
-                    </td>
-                    <td class="px-3 py-1 text-[11px] text-gray-500 italic">
-                      {{ m.beneficiario_nombre || '' }}
-                    </td>
-                    <td class="px-3 py-1" />
-                    <td class="px-3 py-1" />
-                    <td class="px-3 py-1 text-center">
-                      <div class="flex justify-center gap-0.5">
-                        <Button icon="pi pi-pencil" text size="small" severity="info"
-                          @click="abrirDialogMandato('ingresos', inv.id, inv.nombre, m)" />
-                        <Button icon="pi pi-trash" text size="small" severity="danger"
-                          @click="eliminarMandato(m.id)" />
-                        <Button icon="pi pi-plus" text size="small" class="!text-green-600"
-                          title="Agregar línea"
-                          @click="abrirDialogLinea(m.id, 'ingresos')" />
-                      </div>
-                    </td>
-                  </tr>
-                  <!-- Líneas del mandato -->
-                  <tr v-for="l in m.lineas" :key="l.id"
-                    class="border-b hover:bg-green-50"
-                    style="background:rgba(240,253,244,0.8); border-color:rgba(44,32,57,0.06)">
-                    <td class="px-3 py-1.5" colspan="4" />
-                    <td class="px-3 py-1.5" style="color:#2C2039">{{ ETIQUETAS[l.tipo_linea] || l.concepto }}</td>
-                    <td class="px-3 py-1.5 text-right font-mono">{{ fmt(l.valor_cop) }}</td>
-                    <td class="px-3 py-1.5 text-gray-500 whitespace-nowrap">
-                      <a v-if="l.soporte_url" :href="l.soporte_url" target="_blank"
-                        class="flex items-center gap-1 hover:underline" style="color:#915BD8">
-                        <i class="pi pi-external-link text-xs" />{{ l.referencia_factura || 'Ver' }}
-                      </a>
-                      <span v-else>{{ l.referencia_factura }}</span>
-                    </td>
-                    <td class="px-3 py-1.5 text-center">
-                      <div class="flex justify-center gap-0.5">
-                        <Button icon="pi pi-pencil" text size="small" severity="info"
-                          @click="abrirDialogLinea(m.id, 'ingresos', l)" />
-                        <Button icon="pi pi-trash" text size="small" severity="danger"
-                          @click="eliminarLinea(m.id, l.id)" />
-                      </div>
-                    </td>
-                  </tr>
-                  <tr v-if="!m.lineas.length">
-                    <td colspan="8" class="px-3 py-1.5 text-center text-gray-400 italic text-[11px]"
-                      style="background:rgba(240,253,244,0.5)">
-                      Sin líneas — usa el botón + para añadir
-                    </td>
-                  </tr>
-                </template>
-
-                <tr v-if="!inv.mandatosIngresos.length" class="border-b border-gray-100">
-                  <td colspan="8" class="px-3 py-2 text-center text-gray-400 italic text-xs"
-                    style="background:rgba(240,253,244,0.4)">
-                    Sin mandato de ingresos — usa el botón + del inversionista para agregar
-                  </td>
-                </tr>
-              </template>
-
-              <tr v-if="!inversionistasConDetalle.length">
-                <td colspan="8" class="px-4 py-4 text-center text-gray-400">
-                  Sin inversionistas registrados en el proyecto
-                </td>
-              </tr>
-            </tbody>
-          </table>
+          <div v-if="!inversionistasConDetalle.length" class="px-4 py-6 text-center text-sm text-gray-400">
+            Sin inversionistas registrados en el proyecto
+          </div>
         </div>
       </div>
 
@@ -251,191 +176,109 @@
           </div>
         </div>
 
-        <div v-if="seccionesAbiertas.has('costos')">
-          <!-- Costos de proyecto (LiquidacionCosto) -->
-          <div v-if="!invFiltroId" class="overflow-x-auto border-b border-gray-200">
-            <table class="w-full text-xs">
-              <thead>
-                <tr class="text-gray-600" style="background:#f1f5f9">
-                  <th class="px-3 py-1.5 text-left w-36">Tipo</th>
-                  <th class="px-3 py-1.5 text-left">Descripción</th>
-                  <th class="px-3 py-1.5 text-left w-32">Proveedor</th>
-                  <th class="px-3 py-1.5 text-left w-28">Soporte</th>
-                  <th class="px-3 py-1.5 text-right w-36">Valor COP</th>
-                  <th class="px-3 py-1.5 w-20" />
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="c in (liq.costos || [])" :key="c.id"
-                  class="border-b hover:bg-red-50"
-                  style="background:rgba(255,240,240,0.6); border-color:rgba(44,32,57,0.06)">
-                  <td class="px-3 py-1.5 text-red-700 font-medium">{{ c.tipo_costo }}</td>
-                  <td class="px-3 py-1.5" style="color:#2C2039">{{ c.descripcion }}</td>
-                  <td class="px-3 py-1.5 text-gray-500">{{ c.proveedor }}</td>
-                  <td class="px-3 py-1.5">
-                    <a v-if="c.soporte_url" :href="c.soporte_url" target="_blank"
-                      class="flex items-center gap-1 hover:underline" style="color:#915BD8">
-                      <i class="pi pi-external-link text-xs" />{{ c.nro_soporte || 'Ver' }}
-                    </a>
-                    <span v-else class="text-gray-400">{{ c.nro_soporte }}</span>
-                  </td>
-                  <td class="px-3 py-1.5 text-right font-mono text-red-600">{{ fmt(c.valor_cop) }}</td>
-                  <td class="px-3 py-1.5">
-                    <div class="flex gap-0.5 justify-end">
-                      <Button icon="pi pi-pencil" text size="small" severity="info" @click="abrirDialogCosto(c)" />
-                      <Button icon="pi pi-trash" text size="small" severity="danger" @click="eliminarCosto(c.id)" />
-                    </div>
-                  </td>
-                </tr>
-                <tr v-if="!(liq.costos || []).length">
-                  <td colspan="6" class="px-4 py-3 text-center text-xs text-gray-400 italic"
-                    style="background:rgba(255,240,240,0.3)">
-                    Sin costos de proyecto — usa "Agregar costo"
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+        <div v-if="seccionesAbiertas.has('costos')" class="p-3 space-y-3">
+          <!-- Costos del proyecto (LiquidacionCosto) -->
+          <div v-if="!invFiltroId && (liq.costos || []).length" class="rounded-xl border overflow-hidden" style="border-color:#f6e4e6">
+            <div class="px-3 py-1.5 flex items-center gap-2 text-[11px] font-semibold" style="background:rgba(214,68,85,0.07); color:#b3324a">
+              <i class="pi pi-wrench text-[10px]" /> Costos del proyecto
+            </div>
+            <div v-for="c in liq.costos" :key="c.id" class="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 border-t" style="border-color:#f8eef0">
+              <div class="flex-1 min-w-[150px]">
+                <span class="text-sm" style="color:#2C2039">{{ ETIQUETAS[c.tipo_costo] || c.descripcion || c.tipo_costo }}</span>
+                <span v-if="c.proveedor" class="text-[11px] text-gray-400 ml-1">· {{ c.proveedor }}</span>
+              </div>
+              <span class="font-mono text-sm tabular-nums whitespace-nowrap text-red-600">{{ fmt(c.valor_cop) }}</span>
+              <a v-if="c.soporte_url" :href="c.soporte_url" target="_blank" rel="noopener"
+                class="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md"
+                style="background:#F1EAF9; color:#6E3FB8" :title="c.nro_soporte || 'Ver soporte'">
+                <i class="pi pi-paperclip text-[10px]" />{{ c.nro_soporte || 'Soporte' }}
+              </a>
+              <button v-else type="button"
+                class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md border border-dashed hover:bg-gray-50"
+                style="border-color:#e0d5f0; color:#bba8d4" @click="abrirDialogCosto(c)">
+                <i class="pi pi-plus text-[9px]" />soporte
+              </button>
+              <div class="flex gap-0.5">
+                <Button icon="pi pi-pencil" text size="small" severity="info" @click="abrirDialogCosto(c)" />
+                <Button icon="pi pi-trash" text size="small" severity="danger" @click="eliminarCosto(c.id)" />
+              </div>
+            </div>
           </div>
 
-          <!-- Costos por inversionista (mandatos tipo costos) -->
-          <div v-if="inversionistasConDetalle.length" class="overflow-x-auto">
-            <table class="w-full text-xs">
-              <thead>
-                <tr class="text-gray-500" style="background:#f8f8f8">
-                  <th class="px-3 py-1 text-left w-44">Inversionista</th>
-                  <th class="px-3 py-1 text-right w-24">Participación</th>
-                  <th class="px-3 py-1 text-left w-28">N° Mandato</th>
-                  <th class="px-3 py-1 text-left w-24">Consec.</th>
-                  <th class="px-3 py-1 text-left">Concepto</th>
-                  <th class="px-3 py-1 text-right w-36">Valor COP</th>
-                  <th class="px-3 py-1 text-left w-32">Ref. Factura</th>
-                  <th class="px-3 py-1 w-24 text-center">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                <!-- Fila total proyecto costos -->
-                <tr v-if="!invFiltroId" class="font-semibold border-b-2" style="background:rgba(145,91,216,0.08); border-color:rgba(145,91,216,0.3)">
-                  <td class="px-3 py-1.5 font-bold" style="color:#2C2039" colspan="2">Total Proyecto</td>
-                  <td class="px-3 py-1.5" />
-                  <td class="px-3 py-1.5" />
-                  <td class="px-3 py-1.5" style="color:#915BD8">Porcentaje de Participación</td>
-                  <td class="px-3 py-1.5 text-right font-semibold" style="color:#915BD8">100.00%</td>
-                  <td class="px-3 py-1.5" />
-                  <td class="px-3 py-1.5" />
-                </tr>
+          <!-- Total proyecto (mandatos de costos) -->
+          <div v-if="!invFiltroId && inversionistasConDetalle.length > 1 && mandatosTotalCostos.length"
+            class="rounded-xl border overflow-hidden" style="border-color:#ede7f6">
+            <div class="px-3 py-1.5 flex items-center gap-2 text-[11px] font-semibold" style="background:rgba(145,91,216,0.08); color:#6E3FB8">
+              <i class="pi pi-sitemap text-[10px]" /> Total proyecto · costos
+            </div>
+            <div v-for="m in mandatosTotalCostos" :key="m.id" class="px-3 py-2 border-t" style="border-color:#f4f0fa">
+              <div v-for="l in (m.lineas || [])" :key="l.id" class="flex flex-wrap items-center gap-x-3 gap-y-1 py-1">
+                <span class="flex-1 min-w-[130px] text-sm" style="color:#2C2039">{{ etiqueta(l.tipo_linea) }}</span>
+                <span class="font-mono text-sm tabular-nums whitespace-nowrap text-red-600">{{ fmt(l.valor_cop) }}</span>
+                <a v-if="l.soporte_url" :href="l.soporte_url" target="_blank" rel="noopener"
+                  class="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md"
+                  style="background:#F1EAF9; color:#6E3FB8" :title="l.referencia_factura || 'Ver soporte'">
+                  <i class="pi pi-paperclip text-[10px]" />{{ l.referencia_factura || 'Soporte' }}
+                </a>
+              </div>
+              <div v-if="m.valor_neto_cop" class="flex justify-between items-center mt-1 pt-1.5 border-t text-sm font-semibold" style="border-color:#f4f0fa; color:#915BD8">
+                <span>Valor a pagar</span><span class="font-mono">{{ fmt(m.valor_neto_cop) }}</span>
+              </div>
+            </div>
+          </div>
 
-                <!-- Mandatos del Total Costos (inversionista_id = null) -->
-                <template v-if="!invFiltroId && inversionistasConDetalle.length > 1">
-                  <template v-for="m in mandatosTotalCostos" :key="m.id">
-                    <tr style="background:rgba(145,91,216,0.04)">
-                      <td colspan="2" class="px-3 py-1 text-xs text-gray-400 italic">
-                        Costos
-                        <span v-if="m.beneficiario_nombre"> — {{ m.beneficiario_nombre }}</span>
-                        <span v-else> — Total proyecto</span>
-                      </td>
-                      <td class="px-3 py-1 text-xs text-gray-400 font-mono">{{ m.consecutivo || '—' }}</td>
-                      <td colspan="5" />
-                    </tr>
-                    <tr v-for="l in (m.lineas || [])" :key="l.id"
-                      class="border-b border-gray-50 hover:bg-gray-50">
-                      <td colspan="4" />
-                      <td class="px-3 py-1.5 text-sm text-gray-700">{{ etiqueta(l.tipo_linea) }}</td>
-                      <td class="px-3 py-1.5 text-right font-mono text-sm">{{ fmt(l.valor_cop) }}</td>
-                      <td class="px-3 py-1.5 text-xs">
-                        <a v-if="l.soporte_url"
-                          :href="l.soporte_url" target="_blank" rel="noopener"
-                          style="color:#915BD8" class="hover:underline">
-                          {{ l.referencia_factura || 'Ver soporte' }}
-                        </a>
-                        <span v-else>{{ l.referencia_factura || '' }}</span>
-                      </td>
-                      <td class="px-3 py-1.5" />
-                    </tr>
-                    <tr v-if="m.valor_neto_cop" style="background:rgba(145,91,216,0.06)">
-                      <td colspan="4" />
-                      <td class="px-3 py-1.5 font-semibold text-sm" style="color:#915BD8">Valor a Pagar</td>
-                      <td class="px-3 py-1.5 text-right font-mono font-semibold" style="color:#915BD8">
-                        {{ fmt(m.valor_neto_cop) }}
-                      </td>
-                      <td colspan="2" />
-                    </tr>
-                  </template>
+          <!-- Por inversionista -->
+          <div v-for="inv in inversionistasConDetalle" :key="`cos_${inv.id}`" class="rounded-xl border overflow-hidden" style="border-color:#e8e0f0">
+            <div class="flex items-center gap-2 px-3 py-2" style="background:#2C2039">
+              <span class="text-white font-semibold text-sm truncate" :title="inv.nombre">{{ inv.nombre }}</span>
+              <span class="text-[10px] px-2 py-0.5 rounded-full shrink-0" style="background:rgba(255,255,255,0.16); color:#fff">{{ pct(inv.porcentaje) }}</span>
+              <Button icon="pi pi-plus" text rounded size="small" class="ml-auto !text-red-300"
+                v-tooltip.top="'Agregar mandato de costos'"
+                @click="abrirDialogMandato('costos', inv.id, inv.nombre)" />
+            </div>
+            <div class="p-2 space-y-2">
+              <div v-for="m in inv.mandatosCostos" :key="m.id" class="rounded-lg border overflow-hidden" style="border-color:#f6e9eb">
+                <div class="flex flex-wrap items-center gap-x-2 gap-y-1 px-3 py-1.5 text-[11px]" style="background:rgba(214,68,85,0.06)">
+                  <span class="font-semibold text-red-800">Costos</span>
+                  <span v-if="m.numero_mandato" class="font-mono text-gray-500">· {{ m.numero_mandato }}</span>
+                  <span class="text-gray-400">· consec. {{ m.consecutivo ?? liq.consecutivo_inicial_costos ?? '—' }}</span>
+                  <div class="ml-auto flex gap-0.5">
+                    <Button icon="pi pi-pencil" text size="small" severity="info" @click="abrirDialogMandato('costos', inv.id, inv.nombre, m)" />
+                    <Button icon="pi pi-trash" text size="small" severity="danger" @click="eliminarMandato(m.id)" />
+                    <Button icon="pi pi-plus" text size="small" class="!text-red-600" v-tooltip.top="'Agregar línea'" @click="abrirDialogLinea(m.id, 'costos')" />
+                  </div>
+                </div>
+                <template v-if="m.lineas.length">
+                  <div v-for="l in m.lineas" :key="l.id" class="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 border-t" style="border-color:#f8eef0">
+                    <span class="flex-1 min-w-[130px] text-sm" style="color:#2C2039">{{ ETIQUETAS[l.tipo_linea] || l.concepto }}</span>
+                    <span class="font-mono text-sm tabular-nums whitespace-nowrap text-red-600">{{ fmt(l.valor_cop) }}</span>
+                    <a v-if="l.soporte_url" :href="l.soporte_url" target="_blank" rel="noopener"
+                      class="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md"
+                      style="background:#F1EAF9; color:#6E3FB8" :title="l.referencia_factura || 'Ver soporte'">
+                      <i class="pi pi-paperclip text-[10px]" />{{ l.referencia_factura || 'Soporte' }}
+                    </a>
+                    <button v-else-if="requiereSoporte(l)" type="button"
+                      class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md border border-dashed hover:bg-gray-50"
+                      style="border-color:#e0d5f0; color:#bba8d4" @click="abrirDialogLinea(m.id, 'costos', l)">
+                      <i class="pi pi-plus text-[9px]" />soporte
+                    </button>
+                    <div class="flex gap-0.5">
+                      <Button icon="pi pi-pencil" text size="small" severity="info" @click="abrirDialogLinea(m.id, 'costos', l)" />
+                      <Button icon="pi pi-trash" text size="small" severity="danger" @click="eliminarLinea(m.id, l.id)" />
+                    </div>
+                  </div>
                 </template>
-
-                <template v-for="inv in inversionistasConDetalle" :key="`cos_${inv.id}`">
-                  <tr class="text-white border-t border-gray-600" style="background:#2C2039">
-                    <td class="px-3 py-1.5 font-semibold truncate max-w-[176px]" :title="inv.nombre">{{ inv.nombre }}</td>
-                    <td class="px-3 py-1.5 text-right text-gray-300">{{ pct(inv.porcentaje) }}</td>
-                    <td class="px-3 py-1.5" colspan="4" />
-                    <td class="px-3 py-1.5" />
-                    <td class="px-3 py-1.5 text-center">
-                      <Button icon="pi pi-plus" text size="small" class="!text-red-400"
-                        title="Agregar mandato de costos"
-                        @click="abrirDialogMandato('costos', inv.id, inv.nombre)" />
-                    </td>
-                  </tr>
-
-                  <template v-for="m in inv.mandatosCostos" :key="m.id">
-                    <tr style="background:rgba(127,29,29,0.05)">
-                      <td class="px-3 py-1 text-red-800 font-medium text-[11px]" colspan="2">Costos</td>
-                      <td class="px-3 py-1 text-[11px] text-gray-600 font-mono">{{ m.numero_mandato || '—' }}</td>
-                      <td class="px-3 py-1 text-[11px] text-gray-500">
-                        {{ m.consecutivo ?? liq.consecutivo_inicial_costos ?? '—' }}
-                      </td>
-                      <td class="px-3 py-1 text-[11px] text-gray-500 italic">{{ m.beneficiario_nombre || '' }}</td>
-                      <td class="px-3 py-1" />
-                      <td class="px-3 py-1" />
-                      <td class="px-3 py-1 text-center">
-                        <div class="flex justify-center gap-0.5">
-                          <Button icon="pi pi-pencil" text size="small" severity="info"
-                            @click="abrirDialogMandato('costos', inv.id, inv.nombre, m)" />
-                          <Button icon="pi pi-trash" text size="small" severity="danger"
-                            @click="eliminarMandato(m.id)" />
-                          <Button icon="pi pi-plus" text size="small" class="!text-red-600"
-                            title="Agregar línea"
-                            @click="abrirDialogLinea(m.id, 'costos')" />
-                        </div>
-                      </td>
-                    </tr>
-                    <tr v-for="l in m.lineas" :key="l.id"
-                      class="border-b hover:bg-red-50"
-                      style="background:rgba(255,240,240,0.5); border-color:rgba(44,32,57,0.06)">
-                      <td class="px-3 py-1.5" colspan="4" />
-                      <td class="px-3 py-1.5" style="color:#2C2039">{{ ETIQUETAS[l.tipo_linea] || l.concepto }}</td>
-                      <td class="px-3 py-1.5 text-right font-mono text-red-600">{{ fmt(l.valor_cop) }}</td>
-                      <td class="px-3 py-1.5 text-gray-500 whitespace-nowrap">
-                        <a v-if="l.soporte_url" :href="l.soporte_url" target="_blank"
-                          class="flex items-center gap-1 hover:underline" style="color:#915BD8">
-                          <i class="pi pi-external-link text-xs" />{{ l.referencia_factura || 'Ver' }}
-                        </a>
-                        <span v-else>{{ l.referencia_factura }}</span>
-                      </td>
-                      <td class="px-3 py-1.5 text-center">
-                        <div class="flex justify-center gap-0.5">
-                          <Button icon="pi pi-pencil" text size="small" severity="info"
-                            @click="abrirDialogLinea(m.id, 'costos', l)" />
-                          <Button icon="pi pi-trash" text size="small" severity="danger"
-                            @click="eliminarLinea(m.id, l.id)" />
-                        </div>
-                      </td>
-                    </tr>
-                    <tr v-if="!m.lineas.length">
-                      <td colspan="8" class="px-3 py-1.5 text-center text-gray-400 italic text-[11px]"
-                        style="background:rgba(255,240,240,0.3)">
-                        Sin líneas — usa el botón + para añadir
-                      </td>
-                    </tr>
-                  </template>
-
-                  <tr v-if="!inv.mandatosCostos.length">
-                    <td colspan="8" class="px-3 py-1.5 text-center text-gray-400 italic text-[11px]"
-                      style="background:rgba(255,240,240,0.2)">
-                      Sin mandato de costos
-                    </td>
-                  </tr>
-                </template>
-              </tbody>
-            </table>
+                <div v-else class="px-3 py-2 text-center text-[11px] text-gray-400 italic border-t" style="border-color:#f8eef0">
+                  Sin líneas — usa + para añadir
+                </div>
+                <div v-if="m.valor_neto_cop" class="flex justify-between items-center px-3 py-1.5 text-sm font-semibold border-t" style="background:#faf7ff; border-color:#f8eef0; color:#915BD8">
+                  <span>Valor a pagar</span><span class="font-mono">{{ fmt(m.valor_neto_cop) }}</span>
+                </div>
+              </div>
+              <div v-if="!inv.mandatosCostos.length" class="px-3 py-2 text-center text-[11px] text-gray-400 italic">
+                Sin mandato de costos
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -452,52 +295,34 @@
             @click.stop="abrirDialogFactura()" />
         </div>
 
-        <div v-if="seccionesAbiertas.has('servicios')">
-          <div v-if="(liq.facturas || []).length" class="overflow-x-auto">
-            <table class="w-full text-xs">
-              <thead>
-                <tr class="text-gray-600" style="background:#f1f5f9">
-                  <th class="px-3 py-1.5 text-left w-36">Servicio</th>
-                  <th class="px-3 py-1.5 text-left w-28">N° Factura</th>
-                  <th class="px-3 py-1.5 text-left w-24">Soporte</th>
-                  <th class="px-3 py-1.5 text-left w-24">Emisión</th>
-                  <th class="px-3 py-1.5 text-left w-24">Vencimiento</th>
-                  <th class="px-3 py-1.5 text-left w-24">Estado</th>
-                  <th class="px-3 py-1.5 text-right w-36">Valor COP</th>
-                  <th class="px-3 py-1.5 w-20" />
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="f in (liq.facturas || [])" :key="f.id"
-                  class="border-b hover:bg-yellow-50"
-                  style="background:rgba(246,255,114,0.12); border-color:rgba(44,32,57,0.06)">
-                  <td class="px-3 py-1.5 text-yellow-700 font-medium">{{ LABEL_SERVICIO[f.tipo_servicio] || f.tipo_servicio }}</td>
-                  <td class="px-3 py-1.5 font-mono text-xs" style="color:#2C2039">{{ f.numero_factura }}</td>
-                  <td class="px-3 py-1.5">
-                    <a v-if="f.soporte_url" :href="f.soporte_url" target="_blank"
-                      class="flex items-center gap-1 hover:underline" style="color:#915BD8">
-                      <i class="pi pi-file-pdf text-red-500 text-xs" />{{ f.nro_soporte || 'Ver' }}
-                    </a>
-                    <span v-else class="text-gray-400">{{ f.nro_soporte }}</span>
-                  </td>
-                  <td class="px-3 py-1.5 text-gray-500">{{ f.fecha_emision }}</td>
-                  <td class="px-3 py-1.5 text-gray-500">{{ f.fecha_vencimiento }}</td>
-                  <td class="px-3 py-1.5">
-                    <Tag :value="f.estado" :severity="facturaEstadoSeverity(f.estado)" class="text-[10px]" />
-                  </td>
-                  <td class="px-3 py-1.5 text-right font-mono" style="color:#2C2039">{{ fmt(f.valor_cop) }}</td>
-                  <td class="px-3 py-1.5">
-                    <div class="flex gap-0.5 justify-end">
-                      <Button icon="pi pi-pencil" text size="small" severity="info" @click="abrirDialogFactura(f)" />
-                      <Button icon="pi pi-trash" text size="small" severity="danger" @click="eliminarFactura(f.id)" />
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+        <div v-if="seccionesAbiertas.has('servicios')" class="p-3">
+          <div v-if="(liq.facturas || []).length" class="space-y-2">
+            <div v-for="f in liq.facturas" :key="f.id"
+              class="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border px-3 py-2"
+              style="border-color:#f0e9d8; background:rgba(246,255,114,0.06)">
+              <div class="flex-1 min-w-[150px]">
+                <span class="text-sm font-medium" style="color:#92400e">{{ LABEL_SERVICIO[f.tipo_servicio] || f.tipo_servicio }}</span>
+                <span v-if="f.numero_factura" class="text-[11px] font-mono text-gray-400 ml-1">· {{ f.numero_factura }}</span>
+              </div>
+              <Tag :value="f.estado" :severity="facturaEstadoSeverity(f.estado)" class="text-[10px]" />
+              <span class="font-mono text-sm tabular-nums whitespace-nowrap" style="color:#2C2039">{{ fmt(f.valor_cop) }}</span>
+              <a v-if="f.soporte_url" :href="f.soporte_url" target="_blank" rel="noopener"
+                class="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md"
+                style="background:#F1EAF9; color:#6E3FB8" :title="f.nro_soporte || 'Ver soporte'">
+                <i class="pi pi-paperclip text-[10px]" />{{ f.nro_soporte || 'Soporte' }}
+              </a>
+              <button v-else type="button"
+                class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md border border-dashed hover:bg-gray-50"
+                style="border-color:#e0d5f0; color:#bba8d4" @click="abrirDialogFactura(f)">
+                <i class="pi pi-plus text-[9px]" />soporte
+              </button>
+              <div class="flex gap-0.5">
+                <Button icon="pi pi-pencil" text size="small" severity="info" @click="abrirDialogFactura(f)" />
+                <Button icon="pi pi-trash" text size="small" severity="danger" @click="eliminarFactura(f.id)" />
+              </div>
+            </div>
           </div>
-          <div v-else class="px-4 py-4 text-center text-xs text-gray-400 italic"
-            style="background:rgba(246,255,114,0.08)">
+          <div v-else class="px-4 py-4 text-center text-xs text-gray-400 italic">
             Sin facturas de servicio — usa "Agregar"
           </div>
         </div>
@@ -717,6 +542,10 @@
             <InputNumber v-model="lineaForm.orden" :useGrouping="false" :maxFractionDigits="0" class="w-full" />
           </div>
         </div>
+        <div class="flex flex-col gap-1">
+          <label class="text-xs text-gray-600">URL Soporte</label>
+          <InputText v-model="lineaForm.soporte_url" class="w-full" placeholder="https://..." />
+        </div>
         <div class="flex justify-end gap-2 pt-1">
           <Button label="Cancelar" severity="secondary" size="small" @click="dialogLinea = false" />
           <Button :label="lineaEditId ? 'Actualizar' : 'Agregar'" size="small" :loading="guardando" @click="guardarLinea" />
@@ -743,7 +572,7 @@ import Textarea from 'primevue/textarea'
 import Checkbox from 'primevue/checkbox'
 import api from '@/api/client'
 import EstadoResultados from './components/EstadoResultados.vue'
-import SoportesPanel from './components/SoportesPanel.vue'
+import GeneracionMensualChart from './components/GeneracionMensualChart.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -915,7 +744,7 @@ const lineaEditId = ref(null)
 const lineaCtx = reactive({ mandatoId: null, mandatoTipo: '' })
 const lineaForm = reactive({
   tipo_linea: null, concepto: '', valor_cop: null,
-  porcentaje: null, referencia_factura: '', orden: 0,
+  porcentaje: null, referencia_factura: '', soporte_url: '', orden: 0,
 })
 
 const tiposLineaActual = computed(() => {
@@ -938,6 +767,7 @@ function abrirDialogLinea(mandatoId, mandatoTipo, l = null) {
     valor_cop: l?.valor_cop ?? null,
     porcentaje: l?.porcentaje ?? null,
     referencia_factura: l?.referencia_factura ?? '',
+    soporte_url: l?.soporte_url ?? '',
     orden: l?.orden ?? 0,
   })
   dialogLinea.value = true
@@ -1048,6 +878,10 @@ const inversionistasConDetalle = computed(() => {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const etiqueta = t => ETIQUETAS[normTipo(t)] || ETIQUETAS[t] || t
+
+// Líneas que NO requieren documento soporte (impuestos, totales)
+const TIPOS_SIN_SOPORTE = new Set(['iva', 'reteica', 'retencion_fuente', 'ica_opex', 'otro_impuesto', 'valor_a_pagar'])
+const requiereSoporte = l => !TIPOS_SIN_SOPORTE.has(normTipo(l?.tipo_linea))
 
 function fmt(v) {
   if (v == null) return '—'
@@ -1283,6 +1117,7 @@ async function guardarLinea() {
       valor_cop: lineaForm.valor_cop,
       porcentaje: lineaForm.porcentaje ?? null,
       referencia_factura: lineaForm.referencia_factura || null,
+      soporte_url: lineaForm.soporte_url || null,
       orden: lineaForm.orden ?? 0,
     }
     const liqId = route.params.id
