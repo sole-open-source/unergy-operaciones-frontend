@@ -45,14 +45,14 @@
         </button>
       </div>
 
-      <!-- Comparación financiera: este mes vs promedio del proyecto -->
-      <IngresoCostoComparativo :proyecto-id="liq.proyecto_id" :periodo="liq.periodo" />
+      <!-- Generación y tarifas del mes (ancho completo) -->
+      <GeneracionMensualChart :proyecto-id="liq.proyecto_id" :proyecto-nombre="liq.proyecto_nombre" :periodo="liq.periodo" />
 
-      <!-- Hero: Estado de Resultados + Generación del mes (responsive, simétrico) -->
-      <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 items-stretch">
-        <EstadoResultados :liq="liq" class="h-full" />
-        <GeneracionMensualChart class="h-full" :proyecto-id="liq.proyecto_id" :proyecto-nombre="liq.proyecto_nombre" :periodo="liq.periodo" />
-      </div>
+      <!-- Estado de Resultados consolidado: Total + cada inversionista (resumen con IVA y soportes) -->
+      <EstadoResultadosConsolidado :liq="liq" :inversionistas="inversionistasVista" />
+
+      <!-- Estado de Resultados (Total) — desglose detallado con soportes inline -->
+      <EstadoResultados :liq="liq" />
 
       <!-- Datos adicionales: comprobante, consecutivos -->
       <div class="bg-white rounded-xl shadow-sm border px-4 py-3 flex flex-wrap gap-x-5 gap-y-1.5 text-xs" style="color:#2C2039;border-color:#e8e0f0">
@@ -67,10 +67,6 @@
         <span v-if="liq.observaciones_resultados" class="text-gray-500 italic">
           {{ liq.observaciones_resultados }}</span>
       </div>
-
-      <!-- Capa inferior: Estado de Resultados desglosado por inversionista
-           (misma estética/simetría que la tarjeta Total; incluye IVA y soportes). -->
-      <EstadoResultadosPorInversionista :liq="liq" :inversionistas="inversionistasVista" />
 
       <!-- Las secciones editables (Ingresos/Costos/Servicios) se consolidaron en el
            Estado de Resultados de arriba (con soportes inline). -->
@@ -319,9 +315,8 @@ import Textarea from 'primevue/textarea'
 import Checkbox from 'primevue/checkbox'
 import api from '@/api/client'
 import EstadoResultados from './components/EstadoResultados.vue'
-import EstadoResultadosPorInversionista from './components/EstadoResultadosPorInversionista.vue'
+import EstadoResultadosConsolidado from './components/EstadoResultadosConsolidado.vue'
 import GeneracionMensualChart from './components/GeneracionMensualChart.vue'
-import IngresoCostoComparativo from './components/IngresoCostoComparativo.vue'
 
 const route = useRoute()
 const router = useRouter()
