@@ -31,6 +31,8 @@
           severity="secondary" @click="regenerar" :disabled="editMode" title="Reconstruir el informe desde los datos actuales" />
         <Button label="Descargar PDF" icon="pi pi-file-pdf" size="small"
           style="background:#F6FF72; border-color:#F6FF72; color:#2C2039" @click="descargar" />
+        <Button label="Descargar Excel" icon="pi pi-file-excel" size="small"
+          style="background:#1D6F42; border-color:#1D6F42" @click="descargarExcel" />
       </div>
     </div>
 
@@ -492,6 +494,104 @@ function descargar() {
     `<style>${REPORT_CSS}${PRINT_PAGE_CSS}</style></head><body><div class="liq-doc">${inner}</div>` +
     `<script>window.onload=function(){setTimeout(function(){window.print();},400);};<\/script></body></html>`)
   w.document.close()
+}
+
+// ── Descargar Excel (identidad de marca + fórmulas + multi-hoja) ───────────────
+async function descargarExcel() {
+  if (!liq.value) return
+  try {
+    const XLSX = await import('xlsx-js-style')
+    const cs = cols.value
+    const sel = selInv.value
+    const list = sel != null ? cs.filter(c => c.id === 'inv' + sel) : cs
+    if (!list.length) { toast('No hay datos para exportar', true); return }
+    const wb = XLSX.utils.book_new()
+    const usados = new Set()
+    for (const c of list) {
+      let base = (c.es_total ? 'Total' : (c.nombre || 'Inversionista')).replace(/[\[\]\*\?\/\\:]/g, ' ').slice(0, 28).trim() || 'Hoja'
+      let name = base, i = 2
+      while (usados.has(name)) { name = `${base.slice(0, 25)} ${i++}` }
+      usados.add(name)
+      XLSX.utils.book_append_sheet(wb, sheetForEr(XLSX, c), name)
+    }
+    const slug = (liq.value.proyecto_nombre || 'liquidacion').replace(/[^a-z0-9]+/gi, '_')
+    XLSX.writeFile(wb, `Estado_Resultados_${slug}_${(liq.value.periodo || '').slice(0, 7)}.xlsx`)
+  } catch (e) {
+    toast('⚠️ No se pudo generar el Excel', true)
+  }
+}
+
+function sheetForEr(XLSX, col) {
+  const er = col.er
+  const proyecto = liq.value?.proyecto_nombre || ''
+  const periodo = formatPeriodo(liq.value?.periodo)
+  const entidad = col.es_total ? 'Total del proyecto' : `${col.nombre} (${col.pct})`
+
+  // Paleta de marca Unergy
+  const C = { morado: '915BD8', moradoOsc: '6E3FB8', oscuro: '2C2039', lila: 'F4F1FA', neto: 'EAE0FB', blanco: 'FFFFFF', gris: '6B5A8A', borde: 'ECE4F5' }
+  const COP = '"$"#,##0'
+  const bf = { style: 'thin', color: { rgb: C.borde } }
+  const bAll = { top: bf, bottom: bf, left: bf, right: bf }
+  const bTop = { ...bAll, top: { style: 'medium', color: { rgb: C.morado } } }
+
+  const rows = [
+    ['UNERGY — Estado de Resultados', '', ''],
+    [proyecto, '', ''],
+    [`${periodo}  ·  ${entidad}`, '', ''],
+    ['', '', ''],
+    ['Concepto', 'Valor (COP)', 'Soporte / Ref.'],
+  ]
+  const grupos = []
+  er.grupos.forEach(g => {
+    const hdr = rows.length
+    rows.push([g.label, null, ''])
+    const start = rows.length
+    g.lineas.forEach(l => rows.push([`    ${l.label}`, Number(l.valor) || 0, l.refCodigo || l.referencia || '']))
+    grupos.push({ hdr, sign: g.sign, start, end: rows.length - 1 })
+  })
+  const netoRow = rows.length
+  rows.push(['Valor a pagar (neto)', null, ''])
+
+  const ws = XLSX.utils.aoa_to_sheet(rows)
+  const enc = (r, c) => XLSX.utils.encode_cell({ r, c })
+  const setCell = (r, c, patch) => { const ref = enc(r, c); ws[ref] = { ...(ws[ref] || { t: 's', v: '' }), ...patch } }
+  const setStyle = (r, c, s) => { const ref = enc(r, c); if (!ws[ref]) ws[ref] = { t: 's', v: '' }; ws[ref].s = s }
+
+  // Fórmulas: subtotal por grupo = SUM(líneas); neto = Σ signo·subtotal
+  grupos.forEach(g => {
+    if (g.end >= g.start) setCell(g.hdr, 1, { t: 'n', f: `SUM(${enc(g.start, 1)}:${enc(g.end, 1)})` })
+    else setCell(g.hdr, 1, { t: 'n', v: 0 })
+  })
+  const terms = grupos.map(g => `${g.sign < 0 ? '-' : '+'}${enc(g.hdr, 1)}`).join('').replace(/^\+/, '')
+  setCell(netoRow, 1, { t: 'n', f: terms || '0' })
+
+  // Estilos de marca
+  setStyle(0, 0, { font: { bold: true, sz: 14, color: { rgb: C.blanco } }, fill: { fgColor: { rgb: C.oscuro } }, alignment: { vertical: 'center' } })
+  setStyle(1, 0, { font: { bold: true, sz: 12, color: { rgb: C.moradoOsc } } })
+  setStyle(2, 0, { font: { sz: 10, color: { rgb: C.gris } } })
+  for (let c = 0; c < 3; c++) setStyle(4, c, { font: { bold: true, sz: 10, color: { rgb: C.blanco } }, fill: { fgColor: { rgb: C.morado } }, alignment: { horizontal: c === 1 ? 'right' : (c === 2 ? 'center' : 'left') }, border: bAll })
+  grupos.forEach(g => {
+    setStyle(g.hdr, 0, { font: { bold: true, sz: 10, color: { rgb: C.moradoOsc } }, fill: { fgColor: { rgb: C.lila } }, border: bAll })
+    setStyle(g.hdr, 1, { font: { bold: true, color: { rgb: C.oscuro } }, fill: { fgColor: { rgb: C.lila } }, numFmt: COP, alignment: { horizontal: 'right' }, border: bAll })
+    setStyle(g.hdr, 2, { fill: { fgColor: { rgb: C.lila } }, border: bAll })
+    for (let r = g.start; r <= g.end; r++) {
+      setStyle(r, 0, { font: { color: { rgb: C.oscuro } }, border: bAll })
+      setStyle(r, 1, { numFmt: COP, alignment: { horizontal: 'right' }, font: { color: { rgb: C.oscuro } }, border: bAll })
+      setStyle(r, 2, { font: { sz: 9, color: { rgb: C.moradoOsc } }, alignment: { horizontal: 'center' }, border: bAll })
+    }
+  })
+  setStyle(netoRow, 0, { font: { bold: true, sz: 11, color: { rgb: C.oscuro } }, fill: { fgColor: { rgb: C.neto } }, border: bTop })
+  setStyle(netoRow, 1, { font: { bold: true, sz: 11, color: { rgb: C.moradoOsc } }, fill: { fgColor: { rgb: C.neto } }, numFmt: COP, alignment: { horizontal: 'right' }, border: bTop })
+  setStyle(netoRow, 2, { fill: { fgColor: { rgb: C.neto } }, border: bTop })
+
+  ws['!merges'] = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: 2 } },
+    { s: { r: 1, c: 0 }, e: { r: 1, c: 2 } },
+    { s: { r: 2, c: 0 }, e: { r: 2, c: 2 } },
+  ]
+  ws['!cols'] = [{ wch: 42 }, { wch: 18 }, { wch: 22 }]
+  ws['!rows'] = [{ hpt: 24 }]
+  return ws
 }
 
 // ── CSS del informe (inyectado para preview + usado en la ventana de impresión) ─
