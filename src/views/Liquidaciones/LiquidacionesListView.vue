@@ -1,10 +1,13 @@
 <template>
-  <div class="space-y-4">
-    <PageHeader title="Liquidaciones">
+  <div class="space-y-4" :class="{ 'p-4 sm:p-5': embedded }">
+    <PageHeader v-if="!embedded" title="Liquidaciones">
       <template #actions>
         <Button label="Nueva liquidación" icon="pi pi-plus" size="small" @click="dialogNueva = true" />
       </template>
     </PageHeader>
+    <div v-else class="flex justify-end">
+      <Button label="Nueva liquidación" icon="pi pi-plus" size="small" @click="dialogNueva = true" />
+    </div>
 
     <!-- Tabs -->
     <div class="flex gap-0 border-b" style="border-color: rgba(44,32,57,0.10);">
@@ -147,6 +150,8 @@ import InputText from 'primevue/inputtext'
 import { useToast } from 'primevue/usetoast'
 import api from '@/api/client'
 import { proyectoActivoEnMes } from '@/utils/proyectoActivo'
+
+defineProps({ embedded: { type: Boolean, default: false } })
 
 const TABS = [
   { label: 'Todas',       filter: null },

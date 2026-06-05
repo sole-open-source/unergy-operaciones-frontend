@@ -1,6 +1,6 @@
 <template>
-  <div class="space-y-4">
-    <PageHeader title="Liquidaciones por Inversionista" />
+  <div class="space-y-4" :class="{ 'p-4 sm:p-5': embedded }">
+    <PageHeader v-if="!embedded" title="Liquidaciones por Inversionista" />
 
     <!-- Filtros -->
     <div class="bg-white rounded-xl shadow-sm p-3 flex flex-wrap gap-3 items-end">
@@ -251,6 +251,8 @@ import Tag from 'primevue/tag'
 import api from '@/api/client'
 
 const router = useRouter()
+
+defineProps({ embedded: { type: Boolean, default: false } })
 
 const vista = ref([])
 const loading = ref(false)
