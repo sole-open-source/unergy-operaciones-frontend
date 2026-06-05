@@ -16,10 +16,9 @@
           style="background:#F6FF72; color:#2C2039">
           <i class="pi pi-chart-line text-xs" />Estado de Resultados
         </a>
-        <Button label="Editar resumen" icon="pi pi-calculator" outlined size="small"
-          style="border-color:#915BD8; color:#915BD8" @click="abrirEditResumen" />
-        <Button label="Estado" icon="pi pi-pencil" outlined size="small"
-          style="border-color:#2C2039; color:#2C2039" @click="dialogEstado = true" />
+        <Button label="Descargar PDF" icon="pi pi-file-pdf" size="small"
+          style="background:#915BD8; border-color:#915BD8"
+          @click="router.push(`/liquidaciones/${route.params.id}/pdf`)" />
       </div>
     </div>
 
