@@ -84,36 +84,11 @@
       <template #item="{ element: proy }">
         <div class="sl-project-block">
 
-          <!-- Nombre + estado + reconectador -->
+          <!-- Nombre + estado -->
           <div class="sl-project-name">
             <i class="pi pi-bars sl-drag-handle" title="Arrastrar para reorganizar" />
             <span class="sl-status-dot" :style="{ background: STATUS_COLORS[proy.status] || '#9ca3af' }" />
             <span class="sl-project-nombre">{{ proy.nombre }}</span>
-            <div class="sl-rcn-wrap" @click.stop>
-              <span
-                v-if="rcnMap[proy.proyecto_id]?.username"
-                class="sl-rcn-user"
-                :title="`Credenciales guardadas: ${rcnMap[proy.proyecto_id].username}`"
-                @click="openEditCreds(proy)"
-              >
-                <i class="pi pi-user" />
-              </span>
-              <i v-if="rcnMap[proy.proyecto_id]?.loading" class="pi pi-spin pi-spinner sl-rcn-loading" />
-              <template v-else>
-                <button
-                  :class="['sl-rcn-toggle', rcnMap[proy.proyecto_id]?.active === true && 'sl-rcn-toggle--on']"
-                  :title="rcnMap[proy.proyecto_id]?.active === true ? 'Reconectador ON — click para apagar' : 'Reconectador OFF — click para encender'"
-                  @click="onToggleRcn(proy)"
-                >
-                  <span class="sl-rcn-thumb" />
-                </button>
-                <span :class="['sl-rcn-label',
-                  rcnMap[proy.proyecto_id]?.active === true  ? 'sl-rcn-label--on'  :
-                  rcnMap[proy.proyecto_id]?.active === false ? 'sl-rcn-label--off' : 'sl-rcn-label--nd']">
-                  {{ rcnMap[proy.proyecto_id]?.active === true ? 'ON' : rcnMap[proy.proyecto_id]?.active === false ? 'OFF' : '—' }}
-                </span>
-              </template>
-            </div>
           </div>
 
           <!-- Cargando detalle -->
@@ -239,76 +214,6 @@
 
   </div><!-- /sl-root -->
 
-  <!-- ══ MODAL RECONECTADOR ══ -->
-  <Teleport to="body">
-    <div v-if="rcnModal.open" class="sl-modal-backdrop" @click.self="rcnModal.open = false">
-      <div class="sl-modal">
-        <div class="sl-modal-header">
-          <div class="sl-modal-title">
-            <span :class="['sl-modal-badge', rcnModal.accion === 'ON' ? 'sl-modal-badge--on' : 'sl-modal-badge--off']">
-              {{ rcnModal.accion }}
-            </span>
-            <span>Reconectador — {{ rcnModal.nombre }}</span>
-          </div>
-          <button class="sl-modal-close" @click="rcnModal.open = false">
-            <i class="pi pi-times" />
-          </button>
-        </div>
-
-        <!-- Selector de acción cuando el estado es desconocido (active === null) -->
-        <div v-if="rcnModal.accionForzada" class="sl-modal-accion-sel">
-          <span class="sl-modal-accion-label">Acción:</span>
-          <button :class="['sl-modal-accion-btn', rcnModal.accion === 'ON' && 'sl-modal-accion-btn--on']"
-            @click="rcnModal.accion = 'ON'">ON</button>
-          <button :class="['sl-modal-accion-btn', rcnModal.accion === 'OFF' && 'sl-modal-accion-btn--off']"
-            @click="rcnModal.accion = 'OFF'">OFF</button>
-        </div>
-
-        <p class="sl-modal-desc">
-          Ingresa tus credenciales de Solenium para <strong>{{ rcnModal.accion === 'ON' ? 'activar' : 'desactivar' }}</strong> el reconectador.
-        </p>
-
-        <div class="sl-modal-form">
-          <label class="sl-modal-label">
-            Usuario
-            <input v-model="rcnModal.username" class="sl-modal-input" type="text"
-              placeholder="usuario@solenium.co" autocomplete="username" />
-          </label>
-          <label class="sl-modal-label">
-            Contraseña
-            <input v-model="rcnModal.password" class="sl-modal-input" type="password"
-              placeholder="••••••••" autocomplete="current-password"
-              @keydown.enter="submitRcn" />
-          </label>
-          <label class="sl-modal-check">
-            <input v-model="rcnModal.isInterrogating" type="checkbox" />
-            <span>Is interrogating</span>
-          </label>
-        </div>
-
-        <div v-if="rcnModal.error" class="sl-modal-error">
-          <i class="pi pi-exclamation-triangle" />
-          {{ rcnModal.error }}
-        </div>
-
-        <div class="sl-modal-actions">
-          <button class="sl-modal-cancel" @click="rcnModal.open = false" :disabled="rcnModal.loading">
-            Cancelar
-          </button>
-          <button
-            :class="['sl-modal-submit', rcnModal.accion === 'ON' ? 'sl-modal-submit--on' : 'sl-modal-submit--off']"
-            @click="submitRcn"
-            :disabled="rcnModal.loading || !rcnModal.username || !rcnModal.password"
-          >
-            <i v-if="rcnModal.loading" class="pi pi-spin pi-spinner" />
-            <i v-else-if="rcnModal.accion === 'ON'" class="pi pi-power-off" />
-            <i v-else class="pi pi-stop-circle" />
-            {{ rcnModal.loading ? 'Enviando...' : `Confirmar ${rcnModal.accion}` }}
-          </button>
-        </div>
-      </div>
-    </div>
-  </Teleport>
 </template>
 
 <script setup>
@@ -605,9 +510,8 @@ async function cargar() {
   } catch { /* silencioso */ } finally {
     loading.value = false
   }
-  // Cargar gen-hoy, estados reconectadores y detalles en paralelo
+  // Cargar gen-hoy y detalles en paralelo
   cargarGenHoy()
-  cargarEstadosRcn()
   const ids = proyectos.value.map(p => p.proyecto_id)
   const BATCH = 10
   for (let i = 0; i < ids.length; i += BATCH) {
@@ -628,113 +532,6 @@ function fmtKw(kw) {
   return kw.toFixed(1) + ' kW'
 }
 
-// ── Reconectadores ────────────────────────────────────────────────────────────
-// rcnMap: { [proyecto_id]: { active: true|false|null, loading: bool, username: string } }
-// `active` viene de GET /relay/ de Solenium.
-//   true  → ON  (reconectador cerrado / activo)
-//   false → OFF (reconectador abierto / inactivo)
-//   null  → sin dato — NO se asume ningún estado; el toggle muestra "—"
-// El username se persiste en localStorage; la contraseña NUNCA se guarda.
-
-const RCN_CREDS_KEY = 'sl_rcn_creds_v1'   // solo guarda { [proyecto_id]: username }
-const rcnMap = reactive({})                 // poblado por cargarEstadosRcn()
-
-function _saveCredencial(proyectoId, username) {
-  const saved = JSON.parse(localStorage.getItem(RCN_CREDS_KEY) || '{}')
-  saved[proyectoId] = username
-  localStorage.setItem(RCN_CREDS_KEY, JSON.stringify(saved))
-}
-function _loadCredencial(proyectoId) {
-  const saved = JSON.parse(localStorage.getItem(RCN_CREDS_KEY) || '{}')
-  return saved[proyectoId] ?? ''
-}
-
-async function cargarEstadosRcn() {
-  try {
-    const { data } = await api.get('/reconectadores/estados')
-    for (const r of data) {
-      rcnMap[r.proyecto_id] = {
-        active:   r.active,   // true | false | null
-        loading:  false,
-        username: _loadCredencial(r.proyecto_id),
-      }
-    }
-  } catch { /* silencioso — no rompe la vista si falla */ }
-}
-
-// Modal de comando
-const rcnModal = reactive({
-  open:            false,
-  proyectoId:      null,
-  nombre:          '',
-  accion:          'ON',   // 'ON' | 'OFF'
-  accionForzada:   false,  // true cuando active===null (el usuario elige la acción)
-  username:        '',
-  password:        '',
-  isInterrogating: true,
-  loading:         false,
-  error:           '',
-})
-
-function onToggleRcn(proy) {
-  const estado = rcnMap[proy.proyecto_id]
-  const active = estado?.active
-
-  // active === null → sin dato: mostramos selector de acción, sin asumir nada
-  const accionForzada = active === null || active === undefined
-  const nextAccion    = accionForzada ? 'ON' : (active ? 'OFF' : 'ON')
-
-  rcnModal.proyectoId      = proy.proyecto_id
-  rcnModal.nombre          = proy.nombre
-  rcnModal.accion          = nextAccion
-  rcnModal.accionForzada   = accionForzada
-  rcnModal.username        = _loadCredencial(proy.proyecto_id)
-  rcnModal.password        = ''
-  rcnModal.isInterrogating = true
-  rcnModal.error           = ''
-  rcnModal.loading         = false
-  rcnModal.open            = true
-}
-
-function openEditCreds(proy) {
-  const active = rcnMap[proy.proyecto_id]?.active
-  rcnModal.proyectoId      = proy.proyecto_id
-  rcnModal.nombre          = proy.nombre
-  rcnModal.accion          = active === true ? 'OFF' : 'ON'
-  rcnModal.accionForzada   = active === null || active === undefined
-  rcnModal.username        = _loadCredencial(proy.proyecto_id)
-  rcnModal.password        = ''
-  rcnModal.isInterrogating = true
-  rcnModal.error           = ''
-  rcnModal.loading         = false
-  rcnModal.open            = true
-}
-
-async function submitRcn() {
-  if (!rcnModal.username || !rcnModal.password) return
-  rcnModal.loading = true
-  rcnModal.error   = ''
-  try {
-    await api.post(`/reconectadores/${rcnModal.proyectoId}/comando`, {
-      username:         rcnModal.username,
-      password:         rcnModal.password,
-      accion:           rcnModal.accion,
-      is_interrogating: rcnModal.isInterrogating,
-    })
-    // Guardar username (nunca la contraseña)
-    _saveCredencial(rcnModal.proyectoId, rcnModal.username)
-    // Actualizar estado local con lo que se envió
-    if (rcnMap[rcnModal.proyectoId]) {
-      rcnMap[rcnModal.proyectoId].active   = rcnModal.accion === 'ON'
-      rcnMap[rcnModal.proyectoId].username = rcnModal.username
-    }
-    rcnModal.open = false
-  } catch (err) {
-    rcnModal.error = err.response?.data?.detail || err.message || 'Error desconocido'
-  } finally {
-    rcnModal.loading = false
-  }
-}
 
 onMounted(() => {
   cargar()
@@ -879,114 +676,4 @@ onUnmounted(() => {
 /* ── Project name row ── */
 .sl-project-nombre { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* ── Reconectador toggle ── */
-.sl-rcn-wrap { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
-.sl-rcn-user {
-  display: flex; align-items: center; justify-content: center;
-  width: 20px; height: 20px; border-radius: 50%; background: #f0edf8;
-  color: #915BD8; font-size: 10px; cursor: pointer; transition: background 0.15s;
-}
-.sl-rcn-user:hover { background: #e4dbf5; }
-.sl-rcn-toggle {
-  position: relative; width: 36px; height: 20px; border-radius: 999px;
-  background: #d1d5db; border: none; cursor: pointer; padding: 0;
-  transition: background 0.25s; flex-shrink: 0;
-}
-.sl-rcn-toggle--on  { background: #16a34a; }
-.sl-rcn-toggle:hover:not(.sl-rcn-toggle--on)  { background: #b8bcc4; }
-.sl-rcn-toggle--on:hover  { background: #15803d; }
-.sl-rcn-thumb {
-  position: absolute; top: 3px; left: 3px;
-  width: 14px; height: 14px; border-radius: 50%; background: #fff;
-  transition: transform 0.25s; box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-}
-.sl-rcn-toggle--on .sl-rcn-thumb { transform: translateX(16px); }
-.sl-rcn-label { font-size: 10px; font-weight: 800; letter-spacing: 0.5px; min-width: 22px; }
-.sl-rcn-label--on  { color: #16a34a; }
-.sl-rcn-label--off { color: #9ca3af; }
-
-/* ── Modal backdrop ── */
-.sl-modal-backdrop {
-  position: fixed; inset: 0; background: rgba(44,32,57,0.45);
-  display: flex; align-items: center; justify-content: center;
-  z-index: 9999; backdrop-filter: blur(2px);
-}
-
-/* ── Modal card ── */
-.sl-modal {
-  background: #fff; border-radius: 16px; padding: 28px 32px;
-  width: 100%; max-width: 420px; box-shadow: 0 24px 48px rgba(0,0,0,0.18);
-  display: flex; flex-direction: column; gap: 18px;
-  font-family: 'Sora', system-ui, sans-serif;
-}
-.sl-modal-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.sl-modal-title  { display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 800; color: #2C2039; }
-.sl-modal-close  { background: none; border: none; cursor: pointer; color: #9ca3af; font-size: 14px; padding: 4px; border-radius: 6px; transition: color 0.15s; }
-.sl-modal-close:hover { color: #6b7280; }
-
-.sl-modal-badge {
-  font-size: 11px; font-weight: 800; padding: 2px 9px; border-radius: 999px;
-  letter-spacing: 1px;
-}
-.sl-modal-badge--on  { background: rgba(22,163,74,0.12); color: #16a34a; }
-.sl-modal-badge--off { background: rgba(220,38,38,0.1);  color: #dc2626; }
-
-.sl-modal-desc { font-size: 13px; color: #6b7280; margin: 0; line-height: 1.5; }
-
-.sl-modal-form  { display: flex; flex-direction: column; gap: 14px; }
-.sl-modal-label { display: flex; flex-direction: column; gap: 5px; font-size: 12px; font-weight: 700; color: #4b5563; }
-.sl-modal-input {
-  border: 1.5px solid #e5e7eb; border-radius: 8px; padding: 9px 12px;
-  font-size: 14px; font-family: inherit; outline: none; transition: border-color 0.15s;
-  color: #111827;
-}
-.sl-modal-input:focus { border-color: #915BD8; }
-
-.sl-modal-check { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: #6b7280; cursor: pointer; }
-.sl-modal-check input { accent-color: #915BD8; width: 14px; height: 14px; cursor: pointer; }
-
-.sl-modal-error {
-  display: flex; align-items: flex-start; gap: 8px;
-  background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px;
-  padding: 10px 14px; font-size: 13px; color: #dc2626; line-height: 1.4;
-}
-
-.sl-modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 4px; }
-.sl-modal-cancel {
-  padding: 9px 18px; border-radius: 8px; border: 1.5px solid #e5e7eb;
-  background: #fff; color: #6b7280; font-size: 13px; font-weight: 600;
-  cursor: pointer; font-family: inherit; transition: border-color 0.15s, color 0.15s;
-}
-.sl-modal-cancel:hover:not(:disabled) { border-color: #d1d5db; color: #374151; }
-.sl-modal-cancel:disabled { opacity: 0.5; cursor: not-allowed; }
-
-.sl-modal-submit {
-  display: flex; align-items: center; gap: 7px;
-  padding: 9px 20px; border-radius: 8px; border: none;
-  font-size: 13px; font-weight: 700; cursor: pointer;
-  font-family: inherit; transition: opacity 0.15s;
-  color: #fff;
-}
-.sl-modal-submit--on  { background: #16a34a; }
-.sl-modal-submit--on:hover:not(:disabled)  { background: #15803d; }
-.sl-modal-submit--off { background: #dc2626; }
-.sl-modal-submit--off:hover:not(:disabled) { background: #b91c1c; }
-.sl-modal-submit:disabled { opacity: 0.5; cursor: not-allowed; }
-
-/* ── Reconectador: spinner mientras carga ── */
-.sl-rcn-loading { font-size: 12px; color: #915BD8; }
-
-/* ── Reconectador: label estado desconocido ── */
-.sl-rcn-label--nd { color: #d1d5db; }
-
-/* ── Modal: selector de acción (cuando active===null) ── */
-.sl-modal-accion-sel { display: flex; align-items: center; gap: 8px; }
-.sl-modal-accion-label { font-size: 12px; font-weight: 700; color: #6b7280; }
-.sl-modal-accion-btn {
-  padding: 5px 16px; border-radius: 6px; border: 1.5px solid #e5e7eb;
-  background: #f9fafb; color: #6b7280; font-size: 12px; font-weight: 700;
-  cursor: pointer; font-family: inherit; transition: all 0.15s;
-}
-.sl-modal-accion-btn--on  { background: rgba(22,163,74,0.1);  border-color: #16a34a; color: #16a34a; }
-.sl-modal-accion-btn--off { background: rgba(220,38,38,0.08); border-color: #dc2626; color: #dc2626; }
 </style>
