@@ -489,13 +489,20 @@ onMounted(cargar)
 .fmo-inv-table th,.fmo-mant-table th{background:#1A0F2E;color:#F6FF72;font-size:9px;font-weight:700;letter-spacing:.8px;padding:8px 10px;text-align:left}
 .fmo-inv-table td,.fmo-mant-table td{padding:7px 10px;border-bottom:1px solid #F0EBF8;vertical-align:top;line-height:1.5}
 /* Print */
+@page{margin:6mm 8mm;size:A4 portrait}
 @media print {
   *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
   .inf-breadcrumb,.inf-toolbar,.inf-edit-hint,.inf-toast{display:none!important}
   body{background:#fff!important}
   .inf-detail-wrapper{padding:0!important;max-width:100%!important}
-  .rpt-page,.fmo-page{box-shadow:none!important;border-radius:0!important;margin-bottom:0!important;page-break-after:always;break-after:page}
+  /* Cada página ocupa el alto imprimible para anclar el pie abajo, sin partir estructura */
+  .rpt-page,.fmo-page{box-shadow:none!important;border-radius:0!important;margin-bottom:0!important;overflow:visible!important;page-break-after:always;break-after:page;display:flex!important;flex-direction:column!important;min-height:calc(297mm - 12mm - 1mm)}
   .rpt-page:last-child,.fmo-page:last-child{page-break-after:auto!important}
+  .rpt-footer{margin-top:auto!important}
+  .rpt-section,.rpt-kpi-row,.rpt-kpi,.rpt-chart-card,.rpt-status-box,.rpt-obs-text,.fmo-ok-box,.fmo-multa-box{break-inside:avoid;page-break-inside:avoid}
+  .rpt-section-title,.fmo-section-title{break-after:avoid;page-break-after:avoid}
+  .rpt-table tr,.fmo-inv-table tr,.fmo-mant-table tr{break-inside:avoid;page-break-inside:avoid}
+  .rpt-table thead,.fmo-inv-table thead,.fmo-mant-table thead{display:table-header-group}
   .rpt-header,.fmo-header{background:#1A0F2E!important}
   .rpt-meta-item{background:#221533!important}
   .rpt-table th,.fmo-inv-table th,.fmo-mant-table th{background:#1A0F2E!important;color:#E8C840!important}

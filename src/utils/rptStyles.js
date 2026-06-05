@@ -248,7 +248,7 @@ body {
 @page { margin: 6mm 8mm; size: A4 portrait; }
 @media print {
   body { background: #fff !important; margin: 0 !important; padding: 0 !important; }
-  .rpt-page {
+  .rpt-page, .fmo-page {
     box-shadow: none !important;
     border-radius: 0 !important;
     /* Ocupa el 100% del área de contenido sin margen entre páginas */
@@ -259,10 +259,25 @@ body {
     width: 100% !important;
     max-width: 100% !important;
     box-sizing: border-box !important;
+    /* Cada página ocupa el alto imprimible (A4 − márgenes @page) para que el
+       pie quede SIEMPRE al fondo y el encabezado arriba, sin depender del contenido */
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: calc(297mm - 12mm - 1mm);
   }
-  .rpt-page:last-child { page-break-after: avoid; break-after: avoid; }
+  .rpt-page:last-child, .fmo-page:last-child { page-break-after: avoid; break-after: avoid; }
   /* El header negativo necesita ajustarse al nuevo padding de la página */
-  .rpt-header { margin: 0 -10px 18px !important; border-radius: 0 !important; }
+  .rpt-header, .fmo-header { margin: 0 -10px 18px !important; border-radius: 0 !important; }
+  /* Pie de página anclado al fondo de la hoja (no depende del tamaño del contenido) */
+  .rpt-footer { margin-top: auto !important; }
+  /* No partir estructuras entre páginas */
+  .rpt-section, .rpt-kpi-row, .rpt-kpi, .rpt-chart-card, .rpt-status-box,
+  .rpt-obs-text, .rpt-obs-editable, .fmo-ok-box, .fmo-multa-box {
+    break-inside: avoid; page-break-inside: avoid;
+  }
+  .rpt-section-title, .fmo-section-title { break-after: avoid; page-break-after: avoid; }
+  .rpt-table tr, .fmo-inv-table tr, .fmo-mant-table tr { break-inside: avoid; page-break-inside: avoid; }
+  .rpt-table thead, .fmo-inv-table thead, .fmo-mant-table thead { display: table-header-group; }
   .rpt-page-sep { display: none !important; }
   .rpt-edit-hint { display: none !important; }
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
