@@ -45,6 +45,10 @@
                 style="background:#F1EAF9; color:#6E3FB8" :title="l.referencia || 'Ver soporte'">
                 <i class="pi pi-paperclip text-[10px]" />{{ l.referencia || 'Soporte' }}
               </a>
+              <span v-else-if="l.referencia" class="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md"
+                style="background:#f5f1fa; color:#9b8fb0" :title="l.referencia">
+                <i class="pi pi-hashtag text-[10px]" />{{ l.referencia }}
+              </span>
               <span v-else-if="l.requiereSoporte" class="text-[10px] italic" style="color:#cdbfe2" title="Sin soporte adjunto">— sin soporte</span>
               <span class="text-xs font-mono tabular-nums whitespace-nowrap" style="color:#6b5a8a">{{ fmtCOP(l.valor) }}</span>
             </div>
@@ -63,7 +67,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import { fmtCOP, pct, construirEstadoResultados } from '@/utils/liquidaciones'
+import { fmtCOP, pct, construirEstadoResultados, indiceSoportesProyecto } from '@/utils/liquidaciones'
 
 const props = defineProps({
   liq: { type: Object, required: true },
@@ -82,6 +86,9 @@ const esDelInv = (m, piId) => m.inversionista?.id === piId || m.inversionista_id
 const cards = computed(() => {
   const mandatos = props.liq?.mandatos || []
   const esAutoconsumo = props.liq?.tipo_venta === 'autoconsumo'
+  // Adjuntos a nivel proyecto: el documento de cada concepto es único y se
+  // comparte entre inversionistas (ver indiceSoportesProyecto).
+  const soportes = indiceSoportesProyecto(props.liq)
   const out = []
   for (const pi of (props.inversionistas || [])) {
     const ingresosMandatos = mandatos.filter(m => m.tipo === 'ingresos' && esDelInv(m, pi.id))
@@ -90,7 +97,7 @@ const cards = computed(() => {
 
     // Facturas de servicio (CGM/representación/admin) son a nivel proyecto, no
     // por inversionista → no se pasan aquí.
-    const er = construirEstadoResultados({ ingresosMandatos, costosMandatos, esAutoconsumo })
+    const er = construirEstadoResultados({ ingresosMandatos, costosMandatos, esAutoconsumo, soportes })
     if (!er.grupos.length) continue
 
     out.push({

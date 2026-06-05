@@ -133,9 +133,46 @@ export const TIPOS_SIN_SOPORTE = new Set([
 
 const _num = (v) => Number(v) || 0
 const _etiqueta = (t) => ETIQUETAS[normTipo(t)] || t
+const _norm = (s) => (s == null ? '' : String(s)).trim().toLowerCase()
+
+function _buscarSoporte(soportes, tipo, concepto) {
+  if (!soportes) return null
+  return soportes[tipo] || soportes[_norm(concepto)] || null
+}
+
+/**
+ * Índice de adjuntos a nivel PROYECTO, indexado por tipo y por concepto.
+ * Los adjuntos (soporte_url) solo se guardan a nivel proyecto (LiquidacionCosto
+ * por tipo_costo y LiquidacionFactura por tipo_servicio); cada concepto comparte
+ * un único documento de respaldo entre todos los inversionistas. Este índice
+ * permite mostrar ese mismo soporte en el desglose por inversionista.
+ */
+export function indiceSoportesProyecto(liq) {
+  const idx = {}
+  const add = (key, url, ref) => {
+    if (!key || !url) return
+    if (!idx[key]) idx[key] = { url, ref: ref || null }
+  }
+  for (const c of (liq?.costos || [])) {
+    add(c.tipo_costo, c.soporte_url, c.nro_soporte)
+    add(_norm(c.descripcion), c.soporte_url, c.nro_soporte)
+  }
+  for (const f of (liq?.facturas || [])) {
+    add(f.tipo_servicio, f.soporte_url, f.nro_soporte || f.numero_factura)
+  }
+  // Por si alguna línea de mandato (Total o no) sí trae su propio soporte.
+  for (const m of (liq?.mandatos || [])) {
+    for (const l of (m.lineas || [])) {
+      if (!l.soporte_url) continue
+      add(normTipo(l.tipo_linea), l.soporte_url, l.referencia_factura)
+      add(_norm(l.concepto), l.soporte_url, l.referencia_factura)
+    }
+  }
+  return idx
+}
 
 /** Líneas individuales (con su soporte) de una lista de mandatos. */
-function _lineasDeMandatos(mandatos, filtro, { abs = false } = {}) {
+function _lineasDeMandatos(mandatos, filtro, { abs = false, soportes = null } = {}) {
   const out = []
   for (const m of (mandatos || [])) {
     for (const l of (m.lineas || [])) {
@@ -144,11 +181,20 @@ function _lineasDeMandatos(mandatos, filtro, { abs = false } = {}) {
       if (filtro && !filtro(t)) continue
       const valor = _num(l.valor_cop)
       if (valor === 0) continue
+      let soporte_url = l.soporte_url || null
+      let referencia = l.referencia_factura || null
+      // El adjunto del concepto vive a nivel proyecto (mismo documento para todos
+      // los inversionistas) → completarlo desde el índice cuando la línea no lo trae.
+      if (!soporte_url && soportes) {
+        const s = _buscarSoporte(soportes, t, l.concepto)
+        if (s) { soporte_url = s.url; referencia = referencia || s.ref }
+      }
       out.push({
+        tipo: t,
         label: _etiqueta(l.tipo_linea),
         valor: abs ? Math.abs(valor) : valor,
-        soporte_url: l.soporte_url || null,
-        referencia: l.referencia_factura || null,
+        soporte_url,
+        referencia,
         requiereSoporte: !TIPOS_SIN_SOPORTE.has(t),
       })
     }
@@ -164,7 +210,7 @@ function _lineasDeMandatos(mandatos, filtro, { abs = false } = {}) {
  */
 export function construirEstadoResultados({
   ingresosMandatos = [], costosMandatos = [],
-  costos = [], facturas = [], esAutoconsumo = false,
+  costos = [], facturas = [], esAutoconsumo = false, soportes = null,
 } = {}) {
   // Valor a pagar (ingresos)
   const conNetoIng = ingresosMandatos.filter(x => x.valor_neto_cop != null)
@@ -198,23 +244,24 @@ export function construirEstadoResultados({
 
   const grupos = []
 
-  const ing = _lineasDeMandatos(ingresosMandatos, t => TIPOS_INGRESO_BRUTO.has(t))
+  const ing = _lineasDeMandatos(ingresosMandatos, t => TIPOS_INGRESO_BRUTO.has(t), { soportes })
   if (ing.length) grupos.push({ key: 'ingresos', label: 'Ingresos', lineas: ing, total: ing.reduce((s, l) => s + l.valor, 0), sign: 1 })
 
   if (!esAutoconsumo) {
-    const com = _lineasDeMandatos(ingresosMandatos, t => TIPOS_COMERCIALIZACION.has(t), { abs: true })
+    const com = _lineasDeMandatos(ingresosMandatos, t => TIPOS_COMERCIALIZACION.has(t), { abs: true, soportes })
     if (com.length) grupos.push({ key: 'comercializacion', label: 'Comercialización / Bolsa', lineas: com, total: com.reduce((s, l) => s + l.valor, 0), sign: -1 })
   }
 
-  const aj = _lineasDeMandatos(ingresosMandatos, t => !TIPOS_INGRESO_BRUTO.has(t) && !TIPOS_COMERCIALIZACION.has(t))
+  const aj = _lineasDeMandatos(ingresosMandatos, t => !TIPOS_INGRESO_BRUTO.has(t) && !TIPOS_COMERCIALIZACION.has(t), { soportes })
   if (aj.length) {
     const t = aj.reduce((s, l) => s + l.valor, 0)
     grupos.push({ key: 'ajustes', label: 'Ajustes', lineas: aj, total: t, sign: t < 0 ? -1 : 1 })
   }
 
-  let cos = _lineasDeMandatos(costosMandatos)
+  let cos = _lineasDeMandatos(costosMandatos, null, { soportes })
   if (!cos.length) {
     cos = (costos || []).filter(c => _num(c.valor_cop) !== 0).map(c => ({
+      tipo: c.tipo_costo,
       label: ETIQUETAS[c.tipo_costo] || c.descripcion || c.tipo_costo,
       valor: _num(c.valor_cop), soporte_url: c.soporte_url || null,
       referencia: c.nro_soporte || null, requiereSoporte: true,
@@ -223,6 +270,7 @@ export function construirEstadoResultados({
   if (cos.length) grupos.push({ key: 'costos', label: 'Costos operativos (OPEX)', lineas: cos, total: costosOperativos, sign: -1 })
 
   const fac = (facturas || []).filter(f => _num(f.valor_cop) !== 0).map(f => ({
+    tipo: f.tipo_servicio,
     label: LABEL_SERVICIO[f.tipo_servicio] || f.tipo_servicio,
     valor: _num(f.valor_cop), soporte_url: f.soporte_url || null,
     referencia: f.nro_soporte || f.numero_factura || null, requiereSoporte: true,

@@ -24,6 +24,10 @@
             style="background:#F1EAF9; color:#6E3FB8" :title="l.referencia || 'Ver soporte'">
             <i class="pi pi-paperclip text-[10px]" />{{ l.referencia || 'Soporte' }}
           </a>
+          <span v-else-if="l.referencia" class="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md"
+            style="background:#f5f1fa; color:#9b8fb0" :title="l.referencia">
+            <i class="pi pi-hashtag text-[10px]" />{{ l.referencia }}
+          </span>
           <span v-else-if="l.requiereSoporte" class="text-[10px] italic" style="color:#cdbfe2" title="Sin soporte adjunto">— sin soporte</span>
           <span class="text-xs font-mono tabular-nums whitespace-nowrap" style="color:#6b5a8a">{{ fmtCOP(l.valor) }}</span>
         </div>
@@ -44,7 +48,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import { fmtCOP, construirEstadoResultados } from '@/utils/liquidaciones'
+import { fmtCOP, construirEstadoResultados, indiceSoportesProyecto } from '@/utils/liquidaciones'
 
 const props = defineProps({ liq: { type: Object, required: true } })
 
@@ -63,6 +67,7 @@ const er = computed(() => construirEstadoResultados({
   costos: props.liq?.costos || [],
   facturas: props.liq?.facturas || [],
   esAutoconsumo: props.liq?.tipo_venta === 'autoconsumo',
+  soportes: indiceSoportesProyecto(props.liq),
 }))
 
 const grupos = computed(() => er.value.grupos)
