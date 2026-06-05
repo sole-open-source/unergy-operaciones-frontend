@@ -4,14 +4,14 @@
 
   <aside :class="[
     'flex flex-col shrink-0 z-50 transition-transform duration-200 sb-aside',
-    'fixed inset-y-0 left-0 w-[264px] lg:relative lg:translate-x-0',
+    'fixed inset-y-0 left-0 w-[216px] lg:relative lg:translate-x-0',
     mobileOpen ? 'translate-x-0' : '-translate-x-full',
     collapsed ? 'lg:hidden' : ''
   ]">
     <!-- Marca -->
     <div class="sb-brand">
       <RouterLink to="/dashboard" class="sb-brand-link" @click="mobileOpen = false">
-        <img src="/logos/Logo_linea_purpura_profundo.png" alt="Unergy" class="sb-brand-logo" />
+        <img src="/logos/Icono_purpura_energico.png" alt="Unergy" class="sb-brand-logo" />
         <span class="sb-brand-sub">Plataforma Operaciones</span>
       </RouterLink>
       <div class="flex items-center shrink-0">
@@ -310,7 +310,7 @@ const navGroups = computed(() =>
   text-decoration: none;
 }
 .sb-brand-logo {
-  height: 26px; width: auto; object-fit: contain; align-self: flex-start;
+  height: 30px; width: auto; object-fit: contain; align-self: flex-start;
   display: block;
 }
 .sb-brand-sub  { font-size: 10.5px; color: #9b8fb0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
