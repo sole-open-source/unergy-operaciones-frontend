@@ -106,7 +106,29 @@
           </div>
 
           <div v-show="showCargarFactura" class="px-4 py-3">
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+              <!-- Tipo (siempre visible, primer campo) -->
+              <div class="flex flex-col gap-1 md:col-span-2">
+                <label class="text-xs font-medium text-gray-500">Tipo <span class="text-red-400">*</span></label>
+                <div class="flex gap-2">
+                  <label
+                    class="flex-1 flex items-center gap-2 text-xs px-2.5 py-1.5 rounded-lg border cursor-pointer transition-colors"
+                    :class="facturaForm.tipo === 'solenium'
+                      ? 'border-purple-400 bg-purple-50 text-purple-700 font-semibold'
+                      : 'border-gray-200 text-gray-500 hover:border-gray-300'">
+                    <input type="radio" v-model="facturaForm.tipo" value="solenium" class="accent-purple-600" />
+                    Proveedor O&amp;M (Solenium)
+                  </label>
+                  <label
+                    class="flex-1 flex items-center gap-2 text-xs px-2.5 py-1.5 rounded-lg border cursor-pointer transition-colors"
+                    :class="facturaForm.tipo === 'inversionistas'
+                      ? 'border-blue-400 bg-blue-50 text-blue-700 font-semibold'
+                      : 'border-gray-200 text-gray-500 hover:border-gray-300'">
+                    <input type="radio" v-model="facturaForm.tipo" value="inversionistas" class="accent-blue-600" />
+                    Cobros a clientes (Inversionistas)
+                  </label>
+                </div>
+              </div>
               <!-- Período -->
               <div class="flex flex-col gap-1">
                 <label class="text-xs font-medium text-gray-500">Mes / Año</label>
@@ -136,6 +158,8 @@
                   class="text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-purple-200"
                 />
               </div>
+            </div>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
               <!-- Archivo -->
               <div class="flex flex-col gap-1">
                 <label class="text-xs font-medium text-gray-500">Archivo (PDF / imagen)</label>
@@ -153,6 +177,8 @@
                 </label>
               </div>
             </div>
+
+            </div><!-- /grid archivo -->
 
             <!-- Link Drive (alternativa al archivo) -->
             <div class="flex flex-col gap-1 mt-2.5">
@@ -249,6 +275,7 @@ const showCargarFactura = ref(false)
 const guardandoFactura  = ref(false)
 const facturaOk         = ref(false)
 const facturaForm = ref({
+  tipo:    'solenium',                             // 'solenium' | 'inversionistas'
   periodo: new Date().toISOString().slice(0, 7),  // "2026-06"
   numero:  '',
   monto:   null,
@@ -269,28 +296,34 @@ async function guardarFactura() {
   guardandoFactura.value = true
   facturaOk.value = false
   try {
-    // Obtener lista actual de facturas
+    const esInversionistas = facturaForm.value.tipo === 'inversionistas'
+    const campoActual      = esInversionistas ? 'facturas_inversionistas' : 'facturas_solenium'
+    const endpoint         = esInversionistas ? 'facturas-inversionistas' : 'facturas-solenium'
+
+    // Obtener lista actual de facturas del tipo seleccionado
     const { data: contrato } = await api.get(`/contratos-servicio/${contratoMantenimientoId.value}`)
-    const facturasActuales = Array.isArray(contrato.facturas_solenium)
-      ? contrato.facturas_solenium
+    const facturasActuales = Array.isArray(contrato[campoActual])
+      ? contrato[campoActual]
       : []
 
     const nueva = {
-      id:              String(Date.now()),
-      fecha:           facturaForm.value.periodo,
-      numero_factura:  facturaForm.value.numero || null,
-      monto:           facturaForm.value.monto   || null,
-      enlace_soporte:  facturaForm.value.enlace  || null,
+      id:             String(Date.now()),
+      fecha:          facturaForm.value.periodo,
+      numero_factura: facturaForm.value.numero || null,
+      monto:          facturaForm.value.monto  || null,
+      enlace_soporte: facturaForm.value.enlace || null,
     }
 
     await api.patch(
-      `/contratos-servicio/${contratoMantenimientoId.value}/facturas-solenium`,
+      `/contratos-servicio/${contratoMantenimientoId.value}/${endpoint}`,
       [...facturasActuales, nueva],
     )
 
     facturaOk.value = true
-    // Resetear formulario
+    // Resetear formulario (conservar tipo seleccionado)
+    const tipoActual = facturaForm.value.tipo
     facturaForm.value = {
+      tipo:    tipoActual,
       periodo: new Date().toISOString().slice(0, 7),
       numero:  '',
       monto:   null,
