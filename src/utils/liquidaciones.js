@@ -263,7 +263,17 @@ export function construirEstadoResultados({
     costosOperativos = cos.reduce((s, l) => s + l.valor, 0)
   }
 
-  const facturasTotal = (facturas || []).reduce((s, f) => s + _num(f.valor_cop), 0)
+  // Dedupe facturas duplicadas (mismo servicio y valor): defensa ante registros
+  // cargados dos veces; se conserva la que tenga soporte adjunto.
+  const _facturas = []
+  const _seenFac = new Set()
+  for (const f of [...(facturas || [])].sort((a, b) => (b?.soporte_url ? 1 : 0) - (a?.soporte_url ? 1 : 0))) {
+    const k = `${f?.tipo_servicio}|${_num(f?.valor_cop)}`
+    if (_seenFac.has(k)) continue
+    _seenFac.add(k)
+    _facturas.push(f)
+  }
+  const facturasTotal = _facturas.reduce((s, f) => s + _num(f.valor_cop), 0)
   const neto = valorAPagar - costosOperativos - facturasTotal
 
   const grupos = []
@@ -284,7 +294,7 @@ export function construirEstadoResultados({
 
   if (cos.length) grupos.push({ key: 'costos', label: 'Costos operativos (OPEX)', lineas: cos, total: costosOperativos, sign: -1 })
 
-  const fac = (facturas || []).filter(f => _num(f.valor_cop) !== 0).map(f => {
+  const fac = _facturas.filter(f => _num(f.valor_cop) !== 0).map(f => {
     const ref = f.nro_soporte || f.numero_factura || null
     return {
       tipo: f.tipo_servicio,
