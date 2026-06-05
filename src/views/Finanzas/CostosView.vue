@@ -186,8 +186,6 @@
               </div>
             </div>
 
-            </div><!-- /grid archivo -->
-
             <!-- Link Drive (alternativa al archivo) -->
             <div class="flex flex-col gap-1 mt-2.5">
               <label class="text-xs font-medium text-gray-500">
