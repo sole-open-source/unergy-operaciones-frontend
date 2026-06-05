@@ -133,16 +133,31 @@ function columnasDe(l, invs) {
     const ing = mandatos.filter(m => m.tipo === 'ingresos' && esDel(m, pi.id))
     const cos = mandatos.filter(m => m.tipo === 'costos' && esDel(m, pi.id))
     if (!ing.length && !cos.length) continue
-    // Facturas de servicio (representación/CGM/administración) son a nivel proyecto;
-    // se prorratean por participación para que aparezcan y el neto del inversionista las descuente.
-    const frac = normPct(pi.porcentaje_participacion)
-    const facturasInv = (l.facturas || []).map(f => ({ ...f, valor_cop: (Number(f.valor_cop) || 0) * frac }))
-    const er = construirEstadoResultados({ ingresosMandatos: ing, costosMandatos: cos, facturas: facturasInv, esAutoconsumo: esAuto, soportes })
+    // er SIN facturas: en la vista "Todos" las facturas de servicio van solo en el Total
+    // (se prorratean por inversionista solo cuando se selecciona uno — ver erConFacturas).
+    const er = construirEstadoResultados({ ingresosMandatos: ing, costosMandatos: cos, esAutoconsumo: esAuto, soportes })
     if (!er.grupos.length) continue
-    cols.push({ id: 'inv' + pi.id, nombre: pi.cliente_nombre || 'Inversionista', pct: pct(pi.porcentaje_participacion), er })
+    cols.push({
+      id: 'inv' + pi.id, nombre: pi.cliente_nombre || 'Inversionista',
+      pct: pct(pi.porcentaje_participacion), er,
+      _ing: ing, _cos: cos, _frac: normPct(pi.porcentaje_participacion),
+    })
   }
   for (const c of cols) c.neto = c.er.neto
   return cols
+}
+
+// er del informe para una columna: Total tal cual; inversionista con SUS facturas
+// de servicio prorrateadas (para informe/Excel individual completo).
+function erConFacturas(col) {
+  if (!col || col.es_total) return col?.er
+  const l = liq.value || {}
+  const soportes = indiceSoportesProyecto(l)
+  const facturasInv = (l.facturas || []).map(f => ({ ...f, valor_cop: (Number(f.valor_cop) || 0) * (col._frac || 0) }))
+  return construirEstadoResultados({
+    ingresosMandatos: col._ing || [], costosMandatos: col._cos || [],
+    facturas: facturasInv, esAutoconsumo: l.tipo_venta === 'autoconsumo', soportes,
+  })
 }
 
 // Tabla angosta (Concepto · Valor · Soporte) para un estado de resultados.
@@ -251,11 +266,12 @@ function buildHtml() {
   const selCol = sel != null ? cs.find(c => c.id === 'inv' + sel) : null
   let estado = ''
   if (selCol) {
+    const erSel = erConFacturas(selCol)
     estado = `
     <section class="rpt-block rpt-inv">
       <div class="rpt-inv-head"><span class="rpt-inv-name">${esc(selCol.nombre)}</span><span class="rpt-inv-pct">${selCol.pct}</span></div>
-      ${kpisHtml(selCol.er)}
-      ${detalleHtml(selCol.er)}
+      ${kpisHtml(erSel)}
+      ${detalleHtml(erSel)}
     </section>`
   } else {
     const total = cs.find(c => c.es_total)
@@ -522,7 +538,7 @@ async function descargarExcel() {
 }
 
 function sheetForEr(XLSX, col) {
-  const er = col.er
+  const er = erConFacturas(col)
   const proyecto = liq.value?.proyecto_nombre || ''
   const periodo = formatPeriodo(liq.value?.periodo)
   const entidad = col.es_total ? 'Total del proyecto' : `${col.nombre} (${col.pct})`
