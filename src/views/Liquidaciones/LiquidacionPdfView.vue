@@ -18,6 +18,9 @@
         </div>
       </div>
       <div class="flex items-center gap-2 flex-wrap">
+        <Select v-model="selInv" :options="opcionesInv" optionLabel="label" optionValue="value"
+          size="small" class="liqpdf-sel" :disabled="editMode" @change="onSelChange"
+          title="Inversionista que aparecerá en el informe" />
         <Button v-if="!editMode" label="Editar" icon="pi pi-pencil" outlined size="small"
           style="border-color:#915BD8; color:#915BD8" @click="enterEdit" />
         <Button v-if="editMode" label="Descartar" icon="pi pi-undo" outlined size="small"
@@ -49,6 +52,7 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
+import Select from 'primevue/select'
 import ProgressSpinner from 'primevue/progressspinner'
 import api from '@/api/client'
 import {
@@ -72,6 +76,26 @@ const toastErr = ref(false)
 let _t = null
 
 const periodoLabel = computed(() => formatPeriodo(liq.value?.periodo))
+
+// Selección de inversionista (null = todos: Total + cada inversionista)
+const selInv = ref(null)
+// Datos de generación (API monitoreo) y comparativo (vista por-proyecto)
+const dias = ref([])            // [{date, kwh}]
+const genActual = ref(null)     // kWh del mes
+const genProm = ref(null)       // promedio kWh de los 3 meses anteriores
+const comp = ref(null)          // { actual:{ingresos,costosOp,facturas,neto}, promedio:{…}|null }
+const tarifas = ref({ representacion: null, cgm: null, admin: null })
+
+// Columnas (Total + inversionistas con movimientos) para selector y armado
+const cols = computed(() => (liq.value ? columnasDe(liq.value, inversionistas.value) : []))
+const opcionesInv = computed(() => [
+  { label: 'Todos (Total + inversionistas)', value: null },
+  ...cols.value.filter(c => !c.es_total).map(c => ({ label: `${c.nombre} (${c.pct})`, value: Number(String(c.id).replace('inv', '')) })),
+])
+
+const fmtKwh = (v) => v == null ? '—' : (Math.abs(v) >= 1000 ? (v / 1000).toFixed(1) + ' MWh' : Math.round(v) + ' kWh')
+const _cop2 = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 2, maximumFractionDigits: 2 })
+const fmtTarifa = (v) => v == null ? '—' : _cop2.format(v)
 
 function toast(msg, err = false) {
   toastMsg.value = msg; toastErr.value = err
@@ -143,17 +167,110 @@ function kpisHtml(er) {
   return `<div class="rpt-kpis">${k.map(x => `<div class="rpt-kpi${x.big ? ' rpt-kpi-big' : ''}"><div class="rpt-kpi-lbl">${x.lbl}</div><div class="rpt-kpi-val">${x.val}</div></div>`).join('')}</div>`
 }
 
-function buildHtml(l, invs) {
-  const cols = columnasDe(l, invs)
-  const total = cols.find(c => c.es_total)
-  const invsCols = cols.filter(c => !c.es_total)
+// Gráfica de generación diaria como SVG inline (vive en el HTML guardado/impreso).
+function svgGeneracion(ds) {
+  if (!ds.length) return '<div class="rpt-empty">Sin datos de generación para este período.</div>'
+  const W = 720, H = 168, padL = 42, padR = 8, padT = 8, padB = 20
+  const max = Math.max(...ds.map(d => d.kwh), 1)
+  const innerW = W - padL - padR, innerH = H - padT - padB
+  const n = ds.length, bw = innerW / n, baseY = padT + innerH
+  const bars = ds.map((d, i) => {
+    const h = Math.max((d.kwh / max) * innerH, 0)
+    const x = padL + i * bw + bw * 0.12, y = baseY - h
+    return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${(bw * 0.76).toFixed(1)}" height="${h.toFixed(1)}" rx="1" fill="#915BD8"/>`
+  }).join('')
+  const xlabels = ds.map((d, i) => {
+    if (i % 5 !== 0 && i !== n - 1) return ''
+    const x = padL + i * bw + bw * 0.5
+    return `<text x="${x.toFixed(1)}" y="${H - 6}" text-anchor="middle" font-size="8" fill="#9b8fb0">${Number(d.date.split('-')[2])}</text>`
+  }).join('')
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">` +
+    `<line x1="${padL}" y1="${baseY}" x2="${W - padR}" y2="${baseY}" stroke="#ece4f5"/>` +
+    `<text x="${padL - 5}" y="${padT + 8}" text-anchor="end" font-size="8" fill="#9b8fb0">${fmtKwh(max)}</text>` +
+    `<text x="${padL - 5}" y="${baseY}" text-anchor="end" font-size="8" fill="#9b8fb0">0</text>` +
+    `${bars}${xlabels}</svg>`
+}
+
+// "Este mes vs promedio del proyecto" (nivel proyecto, contexto del informe).
+function comparativoSectionHtml() {
+  const c = comp.value
+  if (!c || !c.actual) return ''
+  const a = c.actual, p = c.promedio
+  const delta = (cur, prev) => (prev && cur != null ? (cur - prev) / Math.abs(prev) * 100 : null)
+  const costosA = a.costosOp + a.facturas
+  const costosP = p ? p.costosOp + p.facturas : null
+  const items = [
+    { lbl: 'Generado', val: fmtKwh(genActual.value), d: delta(genActual.value, genProm.value) },
+    { lbl: 'Ingresos', val: fmtCOP(a.ingresos), d: delta(a.ingresos, p?.ingresos) },
+    { lbl: 'Costos totales', val: fmtCOP(costosA), d: delta(costosA, costosP) },
+    { lbl: 'Ingreso neto', val: fmtCOP(a.neto), d: delta(a.neto, p?.neto) },
+  ]
+  const cards = items.map(x => `<div class="rpt-kpi"><div class="rpt-kpi-lbl">${x.lbl}</div><div class="rpt-kpi-val">${x.val}</div>` +
+    (x.d != null ? `<div class="rpt-delta ${x.d >= 0 ? 'up' : 'down'}">${x.d >= 0 ? '▲' : '▼'} ${Math.abs(x.d).toFixed(0)}% vs prom.</div>` : '') + `</div>`).join('')
+  return `<section class="rpt-block"><h2 class="rpt-h2">Este mes vs promedio del proyecto</h2><div class="rpt-kpis rpt-kpis-4">${cards}</div></section>`
+}
+
+// Generación del mes (gráfica + KPIs + tarifas), nivel proyecto.
+function generacionSectionHtml() {
+  if (!dias.value.length) return ''
+  const tot = dias.value.reduce((s, d) => s + d.kwh, 0)
+  const t = tarifas.value
+  const hayTar = t.representacion != null || t.cgm != null || t.admin != null
+  const tarifasHtml = hayTar ? `<div class="rpt-tarifas">
+      <div class="rpt-tar"><span>Representación</span><b>${fmtTarifa(t.representacion)}</b></div>
+      <div class="rpt-tar"><span>CGM</span><b>${fmtTarifa(t.cgm)}</b></div>
+      <div class="rpt-tar"><span>Administración</span><b>${fmtTarifa(t.admin)}</b></div>
+    </div>` : ''
+  return `<section class="rpt-block">
+      <h2 class="rpt-h2">Generación del mes</h2>
+      <div class="rpt-gen-kpis"><span>Generado <b>${fmtKwh(tot)}</b></span><span>Días <b>${dias.value.length}</b></span><span>Promedio/día <b>${fmtKwh(tot / dias.value.length)}</b></span></div>
+      <div class="rpt-chart">${svgGeneracion(dias.value)}</div>
+      ${tarifasHtml}
+    </section>`
+}
+
+function buildHtml() {
+  const l = liq.value
+  if (!l) return ''
+  const cs = cols.value
   const periodo = formatPeriodo(l.periodo)
   const proyecto = esc(l.proyecto_nombre || '')
 
+  // Estado de Resultados según selección de inversionista
+  const sel = selInv.value
+  const selCol = sel != null ? cs.find(c => c.id === 'inv' + sel) : null
+  let estado = ''
+  if (selCol) {
+    estado = `
+    <section class="rpt-block rpt-inv">
+      <div class="rpt-inv-head"><span class="rpt-inv-name">${esc(selCol.nombre)}</span><span class="rpt-inv-pct">${selCol.pct}</span></div>
+      ${kpisHtml(selCol.er)}
+      ${detalleHtml(selCol.er)}
+    </section>`
+  } else {
+    const total = cs.find(c => c.es_total)
+    const invsCols = cs.filter(c => !c.es_total)
+    estado = (total ? `
+    <section class="rpt-block">
+      <h2 class="rpt-h2">Resumen del proyecto · Total</h2>
+      ${kpisHtml(total.er)}
+      ${detalleHtml(total.er)}
+    </section>` : '') +
+      (invsCols.length ? `
+    <section class="rpt-block"><h2 class="rpt-h2">Desglose por inversionista</h2></section>` +
+        invsCols.map(c => `
+    <section class="rpt-block rpt-inv">
+      <div class="rpt-inv-head"><span class="rpt-inv-name">${esc(c.nombre)}</span><span class="rpt-inv-pct">${c.pct}</span></div>
+      ${detalleHtml(c.er)}
+    </section>`).join('') : '')
+  }
+
+  const invLine = selCol ? `<div class="rpt-cover-inv">Inversionista: <b>${esc(selCol.nombre)}</b> · ${selCol.pct}</div>` : ''
   const cover = `
     <section class="rpt-block rpt-cover">
       <div class="rpt-title">Estado de Resultados</div>
       <div class="rpt-subtitle">${proyecto}</div>
+      ${invLine}
       <div class="rpt-meta-grid">
         <div class="rpt-meta"><div class="rpt-meta-lbl">Periodo</div><div class="rpt-meta-val">${periodo}</div></div>
         <div class="rpt-meta"><div class="rpt-meta-lbl">Estado</div><div class="rpt-meta-val">${esc(l.estado || '—')}</div></div>
@@ -162,43 +279,131 @@ function buildHtml(l, invs) {
       </div>
     </section>`
 
-  const resumen = total ? `
-    <section class="rpt-block">
-      <h2 class="rpt-h2">Resumen del proyecto · Total</h2>
-      ${kpisHtml(total.er)}
-      ${detalleHtml(total.er)}
-    </section>` : ''
-
-  const porInv = invsCols.length ? `
-    <section class="rpt-block rpt-keep-head">
-      <h2 class="rpt-h2">Desglose por inversionista</h2>
-    </section>
-    ${invsCols.map(c => `
-    <section class="rpt-block rpt-inv">
-      <div class="rpt-inv-head"><span class="rpt-inv-name">${esc(c.nombre)}</span><span class="rpt-inv-pct">${c.pct}</span></div>
-      ${detalleHtml(c.er)}
-    </section>`).join('')}` : ''
-
   const obs = l.observaciones_resultados ? `
     <section class="rpt-block">
       <h2 class="rpt-h2">Observaciones</h2>
       <p class="rpt-obs">${esc(l.observaciones_resultados)}</p>
     </section>` : ''
 
-  // Wrapper de página con thead/tfoot → header y pie se repiten en cada hoja
-  // (técnica robusta de HTML-a-PDF, sin cortar contenido ni desbordar el ancho).
+  const content = cover + comparativoSectionHtml() + generacionSectionHtml() + estado + obs
+
+  // Wrapper de página con thead/tfoot → header y pie se repiten en cada hoja.
   return `
 <table class="rpt-page">
   <thead class="rpt-running"><tr><td>
     <div class="rpt-head"><span class="rpt-head-brand">Unergy · Estado de Resultados</span><span class="rpt-head-meta">${proyecto} — ${periodo}</span></div>
   </td></tr></thead>
   <tbody><tr><td>
-    <div class="rpt-content">${cover}${resumen}${porInv}${obs}</div>
+    <div class="rpt-content">${content}</div>
   </td></tr></tbody>
   <tfoot class="rpt-running"><tr><td>
     <div class="rpt-foot"><span>Unergy S.A.S. · Informe para uso del cliente</span><span>${proyecto} — ${periodo}</span></div>
   </td></tr></tfoot>
 </table>`.trim()
+}
+
+// ── Datos en vivo: generación (API monitoreo) y comparativo (vista por-proyecto) ─
+const _norm = (s) => (s || '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim()
+function ultimoDiaMes(periodo) {
+  const [y, m] = periodo.split('-').map(Number)
+  const d = new Date(y, m, 0)
+  return `${y}-${String(m).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+function mesPrevio(periodo, k) {
+  const [y, m] = periodo.split('-').map(Number)
+  const d = new Date(y, m - 1 - k, 1)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
+}
+async function resolverSub() {
+  const { data } = await api.get('/monitoreo/_legacy', { params: { action: 'getProjects' } })
+  const projects = data?.projects ?? []
+  const pid = liq.value?.proyecto_id != null ? String(liq.value.proyecto_id) : null
+  const nombre = _norm(liq.value?.proyecto_nombre)
+  let m = pid && projects.find(p => String(p.id ?? p.proyecto_id) === pid && p.sub_project)
+  if (!m && nombre) m = projects.find(p => _norm(p.nombre_comercial) === nombre && p.sub_project)
+  if (!m && nombre) m = projects.find(p => p.sub_project && (_norm(p.nombre_comercial).includes(nombre) || nombre.includes(_norm(p.nombre_comercial))))
+  return m?.sub_project ?? null
+}
+async function _genData(sub, periodo) {
+  const { data } = await api.get('/monitoreo/_legacy', { params: { action: 'getGeneration', sub_project: sub, date_from: periodo, date_to: ultimoDiaMes(periodo) } })
+  if (data && data.ok === false) return null
+  const map = new Map()
+  for (const it of (Array.isArray(data?.data) ? data.data : [])) {
+    if (!it || it.kwh == null || !it.date) continue
+    map.set(it.date, (map.get(it.date) || 0) + Number(it.kwh))
+  }
+  return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([date, kwh]) => ({ date, kwh }))
+}
+async function loadGeneracion() {
+  dias.value = []; genActual.value = null; genProm.value = null
+  if (!liq.value?.periodo) return
+  try {
+    const sub = await resolverSub()
+    if (sub) {
+      dias.value = await _genData(sub, liq.value.periodo) || []
+      genActual.value = dias.value.length ? dias.value.reduce((s, d) => s + d.kwh, 0) : null
+      const prevs = []
+      for (let k = 1; k <= 3; k++) {
+        const ds = await _genData(sub, mesPrevio(liq.value.periodo, k))
+        const t = (ds || []).reduce((s, d) => s + d.kwh, 0)
+        if (t > 0) prevs.push(t)
+      }
+      if (prevs.length) genProm.value = prevs.reduce((a, b) => a + b, 0) / prevs.length
+    }
+  } catch { /* generación opcional */ }
+  await loadTarifas()
+}
+async function loadTarifas() {
+  tarifas.value = { representacion: null, cgm: null, admin: null }
+  if (!liq.value?.proyecto_id) return
+  try {
+    const { data } = await api.get('/contratos-servicio', { params: { proyecto_id: liq.value.proyecto_id } })
+    const contratos = Array.isArray(data) ? data : []
+    const anio = Number(liq.value.periodo.split('-')[0])
+    const tar = (idx, base) => {
+      const arr = Array.isArray(idx) ? idx.filter(r => r && r.valor != null) : []
+      if (arr.length) {
+        const ex = arr.find(r => Number(r.año ?? r.anio) === anio)
+        if (ex) return Number(ex.valor)
+        const pr = arr.filter(r => Number(r.año ?? r.anio) <= anio).sort((a, b) => Number(b.año ?? b.anio) - Number(a.año ?? a.anio))
+        if (pr.length) return Number(pr[0].valor)
+      }
+      return base != null ? Number(base) : null
+    }
+    const tv = { representacion: null, cgm: null, admin: null }
+    for (const c of contratos) {
+      if (tv.representacion == null && (c.indexacion_representacion?.length || c.tarifa_representacion != null)) tv.representacion = tar(c.indexacion_representacion, c.tarifa_representacion)
+      if (tv.cgm == null && (c.indexacion_cgm?.length || c.tarifa_cgm != null)) tv.cgm = tar(c.indexacion_cgm, c.tarifa_cgm)
+      if (tv.admin == null && c.tarifa_admin != null) tv.admin = Number(c.tarifa_admin)
+    }
+    tarifas.value = tv
+  } catch { /* tarifas opcionales */ }
+}
+async function loadComparativo() {
+  comp.value = null
+  if (!liq.value?.proyecto_id) return
+  try {
+    const { data } = await api.get('/liquidaciones/vistas/por-proyecto', { params: { proyecto_id: liq.value.proyecto_id } })
+    const proy = Array.isArray(data) ? (data.find(p => String(p.proyecto_id) === String(liq.value.proyecto_id)) || data[0]) : null
+    const liqs = proy?.liquidaciones || []
+    const sum = (arr, k) => (arr || []).reduce((s, x) => s + (Number(x?.[k]) || 0), 0)
+    const itemsDe = (q) => {
+      const ing = sum(q.mandatos_total_ingresos, 'valor_neto_cop') || Number(q.resumen?.total_ingresos_cop) || 0
+      const cos = sum(q.mandatos_total_costos, 'valor_neto_cop') || Number(q.resumen?.total_costos_cop) || 0
+      const fac = sum(q.facturas_servicio, 'valor_cop') || Number(q.resumen?.total_facturas_cop) || 0
+      return { ingresos: ing, costosOp: cos, facturas: fac, neto: ing - cos - fac }
+    }
+    const conV = (it) => it.ingresos !== 0 || it.costosOp !== 0 || it.facturas !== 0
+    const per = liq.value.periodo
+    const actualLiq = liqs.find(x => x.periodo === per)
+    const prev = liqs.filter(x => x.periodo < per).sort((a, b) => b.periodo.localeCompare(a.periodo)).slice(0, 3).map(itemsDe).filter(conV)
+    let promedio = null
+    if (prev.length) {
+      const avg = (k) => prev.reduce((s, it) => s + it[k], 0) / prev.length
+      promedio = { ingresos: avg('ingresos'), costosOp: avg('costosOp'), facturas: avg('facturas'), neto: avg('neto') }
+    }
+    comp.value = { actual: actualLiq ? itemsDe(actualLiq) : null, promedio }
+  } catch { /* comparativo opcional */ }
 }
 
 // ── Carga ─────────────────────────────────────────────────────────────────────
@@ -213,6 +418,8 @@ async function load() {
         inversionistas.value = Array.isArray(r.data) ? r.data : (r.data?.items ?? [])
       } catch { inversionistas.value = [] }
     }
+    // Datos en vivo (generación + comparativo), opcionales y en paralelo
+    await Promise.all([loadGeneracion(), loadComparativo()])
     // Informe guardado en BD
     let guardado = null
     try {
@@ -220,7 +427,7 @@ async function load() {
       guardado = inf?.html_content || null
       actualizadoEn.value = inf?.actualizado_en ? new Date(inf.actualizado_en).toLocaleString('es-CO') : null
     } catch { /* sin informe previo */ }
-    htmlContent.value = guardado || buildHtml(liq.value, inversionistas.value)
+    htmlContent.value = guardado || buildHtml()
   } catch (e) {
     toast('Error cargando la liquidación', true)
   } finally {
@@ -234,9 +441,13 @@ function discardEdit() {
   // recargar último guardado / generado
   load()
 }
+function onSelChange() {
+  if (editMode.value || !liq.value) return
+  htmlContent.value = buildHtml()
+}
 function regenerar() {
   if (!liq.value) return
-  htmlContent.value = buildHtml(liq.value, inversionistas.value)
+  htmlContent.value = buildHtml()
   toast('Informe regenerado desde los datos')
 }
 
@@ -296,6 +507,20 @@ const REPORT_CSS = `
 .rpt-kpi-val{font-size:15px;font-weight:800;color:#2C2039;font-variant-numeric:tabular-nums;}
 .rpt-kpi-big{background:rgba(145,91,216,0.08);border-color:rgba(145,91,216,.25);}
 .rpt-kpi-big .rpt-kpi-val{color:#6E3FB8;}
+.rpt-kpis-4{grid-template-columns:repeat(4,1fr);}
+.rpt-delta{font-size:9px;font-weight:700;margin-top:2px;}
+.rpt-delta.up{color:#2D8A4E;}
+.rpt-delta.down{color:#D64455;}
+.rpt-cover-inv{font-size:12px;color:#2C2039;margin:-6px 0 12px;}
+.rpt-cover-inv b{color:#6E3FB8;}
+.rpt-gen-kpis{display:flex;flex-wrap:wrap;gap:16px;margin-bottom:8px;font-size:11px;color:#6b5a8a;}
+.rpt-gen-kpis b{color:#2C2039;font-size:13px;margin-left:4px;}
+.rpt-chart{background:#fcfaff;border:1px solid #ece4f5;border-radius:8px;padding:10px;margin-bottom:8px;}
+.rpt-chart svg{display:block;width:100%;height:auto;}
+.rpt-empty{color:#9b8fb0;font-size:11px;padding:8px;}
+.rpt-tarifas{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+.rpt-tar{background:#faf7ff;border:1px solid #ece4f5;border-radius:8px;padding:6px 10px;text-align:center;font-size:10px;color:#6E3FB8;font-weight:700;text-transform:uppercase;letter-spacing:.4px;}
+.rpt-tar b{display:block;color:#2C2039;font-size:13px;margin-top:2px;font-variant-numeric:tabular-nums;}
 .rpt-inv{margin-bottom:14px;}
 .rpt-inv-head{display:flex;justify-content:space-between;align-items:center;background:#faf7ff;border:1px solid #ece4f5;border-bottom:none;border-radius:8px 8px 0 0;padding:7px 10px;}
 .rpt-inv-name{font-weight:800;font-size:12px;color:#2C2039;}
@@ -320,9 +545,9 @@ const REPORT_CSS = `
   .liq-doc{font-size:11px;}
   thead.rpt-running{display:table-header-group;}
   tfoot.rpt-running{display:table-footer-group;}
-  /* No cortar: filas, KPIs, portada ni bloques chicos de inversionista */
+  /* No cortar: filas, KPIs, portada, gráfica, tarifas ni bloques de inversionista */
   .rpt-detail tr{break-inside:avoid;page-break-inside:avoid;}
-  .rpt-kpis,.rpt-cover,.rpt-inv{break-inside:avoid;page-break-inside:avoid;}
+  .rpt-kpis,.rpt-cover,.rpt-inv,.rpt-chart,.rpt-tarifas,.rpt-gen-kpis{break-inside:avoid;page-break-inside:avoid;}
   /* Mantener cada encabezado pegado a su contenido */
   .rpt-h2,.rpt-inv-head{break-after:avoid;page-break-after:avoid;}
   /* Tablas largas paginan repitiendo su encabezado */
@@ -352,6 +577,7 @@ onBeforeUnmount(() => { if (_styleEl) _styleEl.remove() })
   display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;
   box-shadow:0 2px 10px rgba(44,32,57,.04); margin-bottom:12px;
 }
+.liqpdf-sel{ max-width:260px; }
 .liqpdf-hint{
   background:rgba(145,91,216,0.06); border:1px solid rgba(145,91,216,0.2);
   border-radius:8px; padding:8px 12px; font-size:11px; color:#6b5a8a; margin-bottom:12px; line-height:1.5;
