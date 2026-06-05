@@ -135,6 +135,17 @@ const _num = (v) => Number(v) || 0
 const _etiqueta = (t) => ETIQUETAS[normTipo(t)] || t
 const _norm = (s) => (s == null ? '' : String(s)).trim().toLowerCase()
 
+/**
+ * Código corto de una referencia de soporte. La referencia suele venir como
+ * "SOFV909 | SOFV909 Minigranja Solar El Son Mes Abril Mantenimiento" → "SOFV909".
+ * Toma el primer segmento (antes de "|") y su primera palabra.
+ */
+export function codigoSoporte(ref) {
+  if (!ref) return null
+  const first = String(ref).split('|')[0].trim()
+  return first.split(/\s+/)[0] || first || null
+}
+
 function _buscarSoporte(soportes, tipo, concepto) {
   if (!soportes) return null
   return soportes[tipo] || soportes[_norm(concepto)] || null
@@ -195,6 +206,7 @@ function _lineasDeMandatos(mandatos, filtro, { abs = false, soportes = null } = 
         valor: abs ? Math.abs(valor) : valor,
         soporte_url,
         referencia,
+        refCodigo: codigoSoporte(referencia),
         requiereSoporte: !TIPOS_SIN_SOPORTE.has(t),
       })
     }
@@ -264,17 +276,20 @@ export function construirEstadoResultados({
       tipo: c.tipo_costo,
       label: ETIQUETAS[c.tipo_costo] || c.descripcion || c.tipo_costo,
       valor: _num(c.valor_cop), soporte_url: c.soporte_url || null,
-      referencia: c.nro_soporte || null, requiereSoporte: true,
+      referencia: c.nro_soporte || null, refCodigo: codigoSoporte(c.nro_soporte), requiereSoporte: true,
     }))
   }
   if (cos.length) grupos.push({ key: 'costos', label: 'Costos operativos (OPEX)', lineas: cos, total: costosOperativos, sign: -1 })
 
-  const fac = (facturas || []).filter(f => _num(f.valor_cop) !== 0).map(f => ({
-    tipo: f.tipo_servicio,
-    label: LABEL_SERVICIO[f.tipo_servicio] || f.tipo_servicio,
-    valor: _num(f.valor_cop), soporte_url: f.soporte_url || null,
-    referencia: f.nro_soporte || f.numero_factura || null, requiereSoporte: true,
-  }))
+  const fac = (facturas || []).filter(f => _num(f.valor_cop) !== 0).map(f => {
+    const ref = f.nro_soporte || f.numero_factura || null
+    return {
+      tipo: f.tipo_servicio,
+      label: LABEL_SERVICIO[f.tipo_servicio] || f.tipo_servicio,
+      valor: _num(f.valor_cop), soporte_url: f.soporte_url || null,
+      referencia: ref, refCodigo: codigoSoporte(ref), requiereSoporte: true,
+    }
+  })
   if (fac.length) grupos.push({ key: 'facturas', label: 'Facturas de servicio', lineas: fac, total: facturasTotal, sign: -1 })
 
   return { grupos, valorAPagar, costosOperativos, facturasTotal, neto }

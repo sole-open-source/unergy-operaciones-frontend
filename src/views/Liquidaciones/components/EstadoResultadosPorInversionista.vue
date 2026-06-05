@@ -43,11 +43,11 @@
               <a v-if="l.soporte_url" :href="l.soporte_url" target="_blank" rel="noopener"
                 class="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md"
                 style="background:#F1EAF9; color:#6E3FB8" :title="l.referencia || 'Ver soporte'">
-                <i class="pi pi-paperclip text-[10px]" />{{ l.referencia || 'Soporte' }}
+                <i class="pi pi-paperclip text-[10px]" />{{ l.refCodigo || 'Soporte' }}
               </a>
-              <span v-else-if="l.referencia" class="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md"
+              <span v-else-if="l.refCodigo" class="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md"
                 style="background:#f5f1fa; color:#9b8fb0" :title="l.referencia">
-                <i class="pi pi-hashtag text-[10px]" />{{ l.referencia }}
+                <i class="pi pi-hashtag text-[10px]" />{{ l.refCodigo }}
               </span>
               <span v-else-if="l.requiereSoporte" class="text-[10px] italic" style="color:#cdbfe2" title="Sin soporte adjunto">— sin soporte</span>
               <span class="text-xs font-mono tabular-nums whitespace-nowrap" style="color:#6b5a8a">{{ fmtCOP(l.valor) }}</span>
