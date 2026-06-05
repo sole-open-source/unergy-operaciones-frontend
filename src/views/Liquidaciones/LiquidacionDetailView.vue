@@ -45,6 +45,9 @@
         </button>
       </div>
 
+      <!-- Comparación financiera Ingresos vs Costos (waterfall) -->
+      <IngresoCostoWaterfall :liq="liq" />
+
       <!-- Hero: Estado de Resultados + Generación del mes (responsive, simétrico) -->
       <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 items-stretch">
         <EstadoResultados :liq="liq" class="h-full" />
@@ -313,6 +316,7 @@ import Checkbox from 'primevue/checkbox'
 import api from '@/api/client'
 import EstadoResultados from './components/EstadoResultados.vue'
 import GeneracionMensualChart from './components/GeneracionMensualChart.vue'
+import IngresoCostoWaterfall from './components/IngresoCostoWaterfall.vue'
 
 const route = useRoute()
 const router = useRouter()
