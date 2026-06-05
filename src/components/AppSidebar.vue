@@ -14,14 +14,10 @@
         <img src="/logos/Logo_linea_purpura_profundo.png" alt="Unergy" class="sb-brand-logo" />
         <span class="sb-brand-sub">Plataforma Operaciones</span>
       </RouterLink>
-      <div class="flex items-center gap-1 shrink-0">
+      <div class="flex items-center shrink-0">
         <!-- Ocultar barra (escritorio) -->
         <button class="hidden lg:flex sb-icon-btn" @click="toggleCollapsed" title="Ocultar barra lateral">
           <i class="pi pi-angle-double-left" />
-        </button>
-        <!-- Cerrar (mobile) -->
-        <button class="lg:hidden sb-icon-btn" @click="mobileOpen = false" title="Cerrar">
-          <i class="pi pi-times" />
         </button>
       </div>
     </div>
@@ -232,6 +228,7 @@ onBeforeUnmount(() => {
 
 const ALL_GROUPS = [
   {
+    label: 'General',
     items: [
       { to: '/dashboard',       label: 'Dashboard',        icon: 'pi pi-home' },
       { to: '/clientes',        label: 'Clientes',         icon: 'pi pi-building' },
