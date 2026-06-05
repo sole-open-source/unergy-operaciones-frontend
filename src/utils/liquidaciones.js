@@ -2,7 +2,10 @@
 // Helpers compartidos del módulo de Liquidaciones (formato + cálculo del neto).
 // Fuente única de verdad — antes estaban duplicados en 4 vistas.
 // ──────────────────────────────────────────────────────────────────────────
-import { ESTADO_SEVERITY, ESTADO_LABEL } from '@/constants/liquidaciones'
+import {
+  ESTADO_SEVERITY, ESTADO_LABEL, ETIQUETAS, LABEL_SERVICIO,
+  TIPOS_INGRESO_BRUTO, TIPOS_COMERCIALIZACION,
+} from '@/constants/liquidaciones'
 
 // ── Formato ────────────────────────────────────────────────────────────────
 
@@ -116,4 +119,115 @@ export function costosFromVista(liqResumen) {
   const cosTotal = liqResumen.mandatos_total_costos || []
   const facturas = liqResumen.facturas_servicio || []
   return _sum(cosTotal, 'valor_neto_cop') + _sum(facturas, 'valor_cop')
+}
+
+// ── Desglose del Estado de Resultados (grupos + neto, con soportes) ──────────
+// Lógica única usada tanto por la tarjeta "Total" como por la vista por
+// inversionista del detalle. Recibe los mandatos YA seleccionados (Total del
+// proyecto o de un inversionista) y devuelve los grupos listos para pintar.
+
+// Líneas que NO requieren documento soporte (impuestos / totales).
+export const TIPOS_SIN_SOPORTE = new Set([
+  'iva', 'reteica', 'retencion_fuente', 'ica_opex', 'otro_impuesto', 'valor_a_pagar',
+])
+
+const _num = (v) => Number(v) || 0
+const _etiqueta = (t) => ETIQUETAS[normTipo(t)] || t
+
+/** Líneas individuales (con su soporte) de una lista de mandatos. */
+function _lineasDeMandatos(mandatos, filtro, { abs = false } = {}) {
+  const out = []
+  for (const m of (mandatos || [])) {
+    for (const l of (m.lineas || [])) {
+      const t = normTipo(l.tipo_linea)
+      if (t === 'valor_a_pagar') continue
+      if (filtro && !filtro(t)) continue
+      const valor = _num(l.valor_cop)
+      if (valor === 0) continue
+      out.push({
+        label: _etiqueta(l.tipo_linea),
+        valor: abs ? Math.abs(valor) : valor,
+        soporte_url: l.soporte_url || null,
+        referencia: l.referencia_factura || null,
+        requiereSoporte: !TIPOS_SIN_SOPORTE.has(t),
+      })
+    }
+  }
+  return out
+}
+
+/**
+ * Construye el desglose del Estado de Resultados a partir de los mandatos de
+ * ingresos/costos ya filtrados. `costos` y `facturas` son a nivel proyecto
+ * (opcionales: la vista por inversionista no los pasa).
+ * Devuelve { grupos, valorAPagar, costosOperativos, facturasTotal, neto }.
+ */
+export function construirEstadoResultados({
+  ingresosMandatos = [], costosMandatos = [],
+  costos = [], facturas = [], esAutoconsumo = false,
+} = {}) {
+  // Valor a pagar (ingresos)
+  const conNetoIng = ingresosMandatos.filter(x => x.valor_neto_cop != null)
+  let valorAPagar
+  if (conNetoIng.length) {
+    valorAPagar = conNetoIng.reduce((s, x) => s + _num(x.valor_neto_cop), 0)
+  } else {
+    let bruto = 0, comer = 0
+    for (const x of ingresosMandatos) for (const l of (x.lineas || [])) {
+      const t = normTipo(l.tipo_linea)
+      if (TIPOS_INGRESO_BRUTO.has(t)) bruto += _num(l.valor_cop)
+      if (TIPOS_COMERCIALIZACION.has(t)) comer += Math.abs(_num(l.valor_cop))
+    }
+    valorAPagar = bruto - comer
+  }
+
+  // Costos operativos
+  const conNetoCos = costosMandatos.filter(x => x.valor_neto_cop != null)
+  let costosOperativos
+  if (conNetoCos.length) {
+    costosOperativos = conNetoCos.reduce((s, x) => s + _num(x.valor_neto_cop), 0)
+  } else if (costosMandatos.length) {
+    costosOperativos = costosMandatos.reduce((s, x) =>
+      s + (x.lineas || []).reduce((a, l) => a + _num(l.valor_cop), 0), 0)
+  } else {
+    costosOperativos = (costos || []).reduce((s, c) => s + _num(c.valor_cop), 0)
+  }
+
+  const facturasTotal = (facturas || []).reduce((s, f) => s + _num(f.valor_cop), 0)
+  const neto = valorAPagar - costosOperativos - facturasTotal
+
+  const grupos = []
+
+  const ing = _lineasDeMandatos(ingresosMandatos, t => TIPOS_INGRESO_BRUTO.has(t))
+  if (ing.length) grupos.push({ key: 'ingresos', label: 'Ingresos', lineas: ing, total: ing.reduce((s, l) => s + l.valor, 0), sign: 1 })
+
+  if (!esAutoconsumo) {
+    const com = _lineasDeMandatos(ingresosMandatos, t => TIPOS_COMERCIALIZACION.has(t), { abs: true })
+    if (com.length) grupos.push({ key: 'comercializacion', label: 'Comercialización / Bolsa', lineas: com, total: com.reduce((s, l) => s + l.valor, 0), sign: -1 })
+  }
+
+  const aj = _lineasDeMandatos(ingresosMandatos, t => !TIPOS_INGRESO_BRUTO.has(t) && !TIPOS_COMERCIALIZACION.has(t))
+  if (aj.length) {
+    const t = aj.reduce((s, l) => s + l.valor, 0)
+    grupos.push({ key: 'ajustes', label: 'Ajustes', lineas: aj, total: t, sign: t < 0 ? -1 : 1 })
+  }
+
+  let cos = _lineasDeMandatos(costosMandatos)
+  if (!cos.length) {
+    cos = (costos || []).filter(c => _num(c.valor_cop) !== 0).map(c => ({
+      label: ETIQUETAS[c.tipo_costo] || c.descripcion || c.tipo_costo,
+      valor: _num(c.valor_cop), soporte_url: c.soporte_url || null,
+      referencia: c.nro_soporte || null, requiereSoporte: true,
+    }))
+  }
+  if (cos.length) grupos.push({ key: 'costos', label: 'Costos operativos (OPEX)', lineas: cos, total: costosOperativos, sign: -1 })
+
+  const fac = (facturas || []).filter(f => _num(f.valor_cop) !== 0).map(f => ({
+    label: LABEL_SERVICIO[f.tipo_servicio] || f.tipo_servicio,
+    valor: _num(f.valor_cop), soporte_url: f.soporte_url || null,
+    referencia: f.nro_soporte || f.numero_factura || null, requiereSoporte: true,
+  }))
+  if (fac.length) grupos.push({ key: 'facturas', label: 'Facturas de servicio', lineas: fac, total: facturasTotal, sign: -1 })
+
+  return { grupos, valorAPagar, costosOperativos, facturasTotal, neto }
 }

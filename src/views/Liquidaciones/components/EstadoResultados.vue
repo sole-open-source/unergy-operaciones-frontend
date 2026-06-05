@@ -44,109 +44,29 @@
 
 <script setup>
 import { computed } from 'vue'
-import { fmtCOP, normTipo } from '@/utils/liquidaciones'
-import { ETIQUETAS, TIPOS_INGRESO_BRUTO, TIPOS_COMERCIALIZACION, LABEL_SERVICIO } from '@/constants/liquidaciones'
+import { fmtCOP, construirEstadoResultados } from '@/utils/liquidaciones'
 
 const props = defineProps({ liq: { type: Object, required: true } })
 
-const num = (v) => Number(v) || 0
-const etiqueta = (t) => ETIQUETAS[normTipo(t)] || t
-
-// Líneas que no requieren documento soporte (impuestos / totales)
-const SIN_SOPORTE = new Set(['iva', 'reteica', 'retencion_fuente', 'ica_opex', 'otro_impuesto', 'valor_a_pagar'])
-
+// Mandatos del "Total" (sin inversionista) para el nivel proyecto; si no hay,
+// caer a los mandatos por inversionista.
 function pickMandatos(tipo) {
   const m = props.liq?.mandatos || []
   const total = m.filter(x => x.tipo === tipo && x.inversionista_id == null && !x.inversionista)
   if (total.length) return total
   return m.filter(x => x.tipo === tipo && (x.inversionista || x.inversionista_id != null))
 }
-const ingresosMandatos = computed(() => pickMandatos('ingresos'))
-const costosMandatos = computed(() => pickMandatos('costos'))
 
-// Líneas individuales (con su soporte) de una lista de mandatos
-function lineasDe(mandatos, filtro, { abs = false } = {}) {
-  const out = []
-  for (const m of mandatos) {
-    for (const l of (m.lineas || [])) {
-      const t = normTipo(l.tipo_linea)
-      if (t === 'valor_a_pagar') continue
-      if (filtro && !filtro(t)) continue
-      const valor = num(l.valor_cop)
-      if (valor === 0) continue
-      out.push({
-        label: etiqueta(l.tipo_linea),
-        valor: abs ? Math.abs(valor) : valor,
-        soporte_url: l.soporte_url || null,
-        referencia: l.referencia_factura || null,
-        requiereSoporte: !SIN_SOPORTE.has(t),
-      })
-    }
-  }
-  return out
-}
+const er = computed(() => construirEstadoResultados({
+  ingresosMandatos: pickMandatos('ingresos'),
+  costosMandatos: pickMandatos('costos'),
+  costos: props.liq?.costos || [],
+  facturas: props.liq?.facturas || [],
+  esAutoconsumo: props.liq?.tipo_venta === 'autoconsumo',
+}))
 
-const valorAPagar = computed(() => {
-  const m = ingresosMandatos.value
-  const conNeto = m.filter(x => x.valor_neto_cop != null)
-  if (conNeto.length) return conNeto.reduce((s, x) => s + num(x.valor_neto_cop), 0)
-  let bruto = 0, comer = 0
-  for (const x of m) for (const l of (x.lineas || [])) {
-    const t = normTipo(l.tipo_linea)
-    if (TIPOS_INGRESO_BRUTO.has(t)) bruto += num(l.valor_cop)
-    if (TIPOS_COMERCIALIZACION.has(t)) comer += Math.abs(num(l.valor_cop))
-  }
-  return bruto - comer
-})
-
-const costosOperativos = computed(() => {
-  const m = costosMandatos.value
-  const conNeto = m.filter(x => x.valor_neto_cop != null)
-  if (conNeto.length) return conNeto.reduce((s, x) => s + num(x.valor_neto_cop), 0)
-  if (m.length) return m.reduce((s, x) => s + (x.lineas || []).reduce((a, l) => a + num(l.valor_cop), 0), 0)
-  return (props.liq?.costos || []).reduce((s, c) => s + num(c.valor_cop), 0)
-})
-
-const facturasTotal = computed(() => (props.liq?.facturas || []).reduce((s, f) => s + num(f.valor_cop), 0))
-const neto = computed(() => valorAPagar.value - costosOperativos.value - facturasTotal.value)
-
-const grupos = computed(() => {
-  const out = []
-  const esAutoconsumo = props.liq?.tipo_venta === 'autoconsumo'
-
-  const ing = lineasDe(ingresosMandatos.value, t => TIPOS_INGRESO_BRUTO.has(t))
-  if (ing.length) out.push({ key: 'ingresos', label: 'Ingresos', lineas: ing, total: ing.reduce((s, l) => s + l.valor, 0), sign: 1 })
-
-  if (!esAutoconsumo) {
-    const com = lineasDe(ingresosMandatos.value, t => TIPOS_COMERCIALIZACION.has(t), { abs: true })
-    if (com.length) out.push({ key: 'comercializacion', label: 'Comercialización / Bolsa', lineas: com, total: com.reduce((s, l) => s + l.valor, 0), sign: -1 })
-  }
-
-  const aj = lineasDe(ingresosMandatos.value, t => !TIPOS_INGRESO_BRUTO.has(t) && !TIPOS_COMERCIALIZACION.has(t))
-  if (aj.length) {
-    const t = aj.reduce((s, l) => s + l.valor, 0)
-    out.push({ key: 'ajustes', label: 'Ajustes', lineas: aj, total: t, sign: t < 0 ? -1 : 1 })
-  }
-
-  let cos = lineasDe(costosMandatos.value)
-  if (!cos.length) {
-    cos = (props.liq?.costos || []).filter(c => num(c.valor_cop) !== 0).map(c => ({
-      label: ETIQUETAS[c.tipo_costo] || c.descripcion || c.tipo_costo,
-      valor: num(c.valor_cop), soporte_url: c.soporte_url || null,
-      referencia: c.nro_soporte || null, requiereSoporte: true,
-    }))
-  }
-  if (cos.length) out.push({ key: 'costos', label: 'Costos operativos (OPEX)', lineas: cos, total: costosOperativos.value, sign: -1 })
-
-  const fac = (props.liq?.facturas || []).filter(f => num(f.valor_cop) !== 0).map(f => ({
-    label: LABEL_SERVICIO[f.tipo_servicio] || f.tipo_servicio,
-    valor: num(f.valor_cop), soporte_url: f.soporte_url || null,
-    referencia: f.nro_soporte || f.numero_factura || null, requiereSoporte: true,
-  }))
-  if (fac.length) out.push({ key: 'facturas', label: 'Facturas de servicio', lineas: fac, total: facturasTotal.value, sign: -1 })
-
-  return out
-})
+const grupos = computed(() => er.value.grupos)
+const neto = computed(() => er.value.neto)
 
 defineExpose({ neto })
 </script>

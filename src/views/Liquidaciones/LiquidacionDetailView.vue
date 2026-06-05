@@ -68,6 +68,10 @@
           {{ liq.observaciones_resultados }}</span>
       </div>
 
+      <!-- Capa inferior: Estado de Resultados desglosado por inversionista
+           (misma estética/simetría que la tarjeta Total; incluye IVA y soportes). -->
+      <EstadoResultadosPorInversionista :liq="liq" :inversionistas="inversionistasVista" />
+
       <!-- Las secciones editables (Ingresos/Costos/Servicios) se consolidaron en el
            Estado de Resultados de arriba (con soportes inline). -->
     </template>
@@ -315,6 +319,7 @@ import Textarea from 'primevue/textarea'
 import Checkbox from 'primevue/checkbox'
 import api from '@/api/client'
 import EstadoResultados from './components/EstadoResultados.vue'
+import EstadoResultadosPorInversionista from './components/EstadoResultadosPorInversionista.vue'
 import GeneracionMensualChart from './components/GeneracionMensualChart.vue'
 import IngresoCostoComparativo from './components/IngresoCostoComparativo.vue'
 
@@ -526,6 +531,13 @@ const invFiltrado = computed(() =>
     ? (proyectoInversionistas.value.find(pi => pi.id === invFiltroId.value) ?? null)
     : null
 )
+
+// Inversionistas a mostrar en la capa "por inversionista": si hay filtro ?inv=,
+// solo ese; si no, todos los del proyecto.
+const inversionistasVista = computed(() => {
+  const list = proyectoInversionistas.value || []
+  return invFiltroId.value != null ? list.filter(pi => pi.id === invFiltroId.value) : list
+})
 
 const TIPOS_INGRESO_BRUTO = new Set(['ingreso_bruto', 'despacho', 'ventas_en_bolsa', 'redistribucion_ingresos'])
 const TIPOS_COMERCIALIZACION = new Set(['ajuste_comercializacion', 'comercializacion', 'compras_en_bolsa'])
