@@ -177,6 +177,40 @@
       </div>
     </div>
 
+    <!-- ── Factura consolidada del proveedor ──────────────────────────── -->
+    <div class="flex items-center gap-3 p-3 rounded-xl border"
+      :style="facturaProveedor.nombre_archivo
+        ? 'background:#f0fdf4;border-color:#bbf7d0'
+        : 'background:#fafafa;border-color:#e5e7eb'">
+      <i class="pi pi-file-pdf text-sm flex-shrink-0"
+        :style="facturaProveedor.nombre_archivo ? 'color:#16a34a' : 'color:#d1d5db'"/>
+      <div class="flex-1 min-w-0">
+        <p class="text-xs font-semibold"
+          :style="facturaProveedor.nombre_archivo ? 'color:#15803d' : 'color:#9ca3af'">
+          Factura consolidada del proveedor — {{ periodoLabel }}
+        </p>
+        <p class="text-[10px] mt-0.5"
+          :style="facturaProveedor.nombre_archivo ? 'color:#166534' : 'color:#9ca3af'">
+          {{ facturaProveedor.nombre_archivo
+              ? `Subida el ${fmtFechaFactura(facturaProveedor.subido_en)}`
+              : 'El proveedor aún no ha subido la factura de este período.' }}
+        </p>
+      </div>
+      <a v-if="facturaProveedor.tiene_archivo"
+        :href="`${apiBaseFactura}/om/factura/${periodoActual}/file`"
+        target="_blank" rel="noopener"
+        class="flex items-center gap-1 text-xs font-medium hover:underline flex-shrink-0"
+        style="color:#15803d">
+        <i class="pi pi-download text-xs"/>Descargar
+      </a>
+      <a v-else-if="facturaProveedor.enlace_pdf"
+        :href="facturaProveedor.enlace_pdf" target="_blank" rel="noopener"
+        class="flex items-center gap-1 text-xs font-medium hover:underline flex-shrink-0"
+        style="color:#915BD8">
+        <i class="pi pi-external-link text-xs"/>Ver
+      </a>
+    </div>
+
     <!-- ── Dialog administración IPC ─────────────────────────────────── -->
     <Dialog v-model:visible="showIPCDialog" modal header="Tasas IPC" :style="{ width: '420px' }">
       <div class="space-y-3 pt-1">
@@ -380,6 +414,23 @@ async function guardarIPC() {
   }
 }
 
-watch(periodoActual, cargarDatos)
-onMounted(cargarDatos)
+// ── Factura del proveedor (lectura desde Operaciones) ─────────────────────────
+const facturaProveedor = ref({ nombre_archivo: null, enlace_pdf: null, tiene_archivo: false, subido_en: null })
+const apiBaseFactura   = import.meta.env.VITE_API_URL?.replace(/\/$/, '') + '/api/v1'
+
+function fmtFechaFactura(iso) {
+  if (!iso) return ''
+  try { return new Date(iso).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' }) }
+  catch { return '' }
+}
+
+async function cargarFacturaProveedor() {
+  try {
+    const { data } = await api.get(`/om/factura/${periodoActual.value}`)
+    facturaProveedor.value = data
+  } catch { facturaProveedor.value = { nombre_archivo: null, enlace_pdf: null, tiene_archivo: false, subido_en: null } }
+}
+
+watch(periodoActual, () => { cargarDatos(); cargarFacturaProveedor() })
+onMounted(() => { cargarDatos(); cargarFacturaProveedor() })
 </script>
