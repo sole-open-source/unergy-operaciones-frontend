@@ -112,33 +112,12 @@
               </div>
             </div>
 
-            <!-- FIX 3: Gráfico barras horizontales — Ingreso Neto por mes -->
+            <!-- Gráfico de barras — Ingreso Neto por mes (vue-chartjs) -->
             <div v-if="resumenMap[cliente.cliente_id].meses.length" class="mb-4">
               <div class="text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-2">
                 Ingreso neto por mes
               </div>
-              <div class="space-y-2">
-                <div v-for="bar in resumenMap[cliente.cliente_id].barData" :key="bar.mes"
-                  class="flex items-center gap-2">
-                  <span class="w-11 text-right shrink-0 text-[11px] text-gray-500">
-                    {{ shortMes(bar.mes) }}
-                  </span>
-                  <div class="flex-1 h-4 relative">
-                    <div class="absolute inset-0 rounded-r-sm bg-gray-100" />
-                    <div class="absolute inset-y-0 left-0 rounded-r-sm"
-                      :style="{
-                        width: resumenMap[cliente.cliente_id].maxAbsNeto > 0
-                          ? `${Math.max(2, Math.abs(bar.neto) / resumenMap[cliente.cliente_id].maxAbsNeto * 100)}%`
-                          : '0%',
-                        background: bar.neto >= 0 ? '#915BD8' : '#ef4444'
-                      }" />
-                  </div>
-                  <span class="w-16 shrink-0 text-[11px] font-mono"
-                    :style="bar.neto >= 0 ? 'color:#374151' : 'color:#ef4444'">
-                    {{ fmtCompact(bar.neto) }}
-                  </span>
-                </div>
-              </div>
+              <NetoMensualBar :bars="resumenMap[cliente.cliente_id].barData.map(b => ({ label: shortMes(b.mes), neto: b.neto }))" />
             </div>
 
             <!-- Tabla colapsable por proyecto -->
@@ -249,6 +228,7 @@ import DatePicker from 'primevue/datepicker'
 import ProgressSpinner from 'primevue/progressspinner'
 import Tag from 'primevue/tag'
 import api from '@/api/client'
+import NetoMensualBar from './components/NetoMensualBar.vue'
 
 const router = useRouter()
 

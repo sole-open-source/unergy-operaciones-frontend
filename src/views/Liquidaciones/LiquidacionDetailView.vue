@@ -45,29 +45,8 @@
         </button>
       </div>
 
-      <!-- Tarjetas resumen financiero -->
-      <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <div class="bg-white rounded-xl shadow-sm p-4 text-center border-t-4" style="border-color:#22c55e">
-          <div class="text-xs text-gray-500 mb-1">Ingresos brutos</div>
-          <div class="text-base font-semibold text-green-700">{{ fmt(resumenCalculado.ingresos_brutos) }}</div>
-        </div>
-        <div v-if="liq.tipo_venta !== 'autoconsumo'" class="bg-white rounded-xl shadow-sm p-4 text-center border-t-4" style="border-color:#ef4444">
-          <div class="text-xs text-gray-500 mb-1">Comercialización XM</div>
-          <div class="text-base font-semibold text-red-600">{{ fmt(resumenCalculado.comercializacion) }}</div>
-        </div>
-        <div class="bg-white rounded-xl shadow-sm p-4 text-center border-t-4" style="border-color:#ef4444">
-          <div class="text-xs text-gray-500 mb-1">Costos operativos</div>
-          <div class="text-base font-semibold text-red-600">{{ fmt(resumenCalculado.costos_op) }}</div>
-        </div>
-        <div class="bg-white rounded-xl shadow-sm p-4 text-center border-t-4 border-red-200">
-          <div class="text-xs text-gray-500 mb-1">Facturas servicio</div>
-          <div class="text-base font-semibold text-red-600">{{ fmt(resumenCalculado.facturas) }}</div>
-        </div>
-        <div class="bg-white rounded-xl shadow-sm p-4 text-center border-t-4" style="border-color:#915BD8">
-          <div class="text-xs text-gray-500 mb-1">Ingreso neto</div>
-          <div class="text-base font-semibold" style="color:#915BD8">{{ fmt(resumenCalculado.neto) }}</div>
-        </div>
-      </div>
+      <!-- Estado de Resultados en cascada (fórmula oficial del neto) -->
+      <EstadoResultados :liq="liq" />
 
       <!-- Datos adicionales: comprobante, consecutivos -->
       <div class="bg-white rounded-xl shadow-sm px-4 py-3 flex flex-wrap gap-4 text-xs" style="color:#2C2039">
@@ -82,6 +61,9 @@
         <span v-if="liq.observaciones_resultados" class="text-gray-500 italic">
           {{ liq.observaciones_resultados }}</span>
       </div>
+
+      <!-- Soportes agrupados -->
+      <SoportesPanel :liq="liq" />
 
       <!-- ══ INGRESOS ══ -->
       <div class="bg-white rounded-xl shadow-sm overflow-hidden">
@@ -760,6 +742,8 @@ import DatePicker from 'primevue/datepicker'
 import Textarea from 'primevue/textarea'
 import Checkbox from 'primevue/checkbox'
 import api from '@/api/client'
+import EstadoResultados from './components/EstadoResultados.vue'
+import SoportesPanel from './components/SoportesPanel.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -770,7 +754,8 @@ const proyectoInversionistas = ref([])
 const loading = ref(false)
 const guardando = ref(false)
 
-const seccionesAbiertas = ref(new Set(['ingresos', 'costos', 'servicios']))
+// Secciones de edición colapsadas por defecto: el resumen lo da el Estado de Resultados arriba
+const seccionesAbiertas = ref(new Set())
 function toggleSeccion(key) {
   if (seccionesAbiertas.value.has(key)) seccionesAbiertas.value.delete(key)
   else seccionesAbiertas.value.add(key)

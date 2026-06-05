@@ -135,7 +135,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
@@ -358,6 +358,23 @@ function formatPeriodo(p) {
   const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
   return `${meses[parseInt(m) - 1]} ${y}`
 }
+
+// ─── Persistencia de filtros (localStorage) ───────────────────────────────────
+const LS_KEY = 'liq.list.filtros'
+try {
+  const saved = JSON.parse(localStorage.getItem(LS_KEY) || '{}')
+  if (saved.q != null) filtros.value.q = saved.q
+  if (saved.estado != null) filtros.value.estado = saved.estado
+  if (saved.tipo_venta != null) filtros.value.tipo_venta = saved.tipo_venta
+  if (Number.isInteger(saved.tab) && saved.tab >= 0 && saved.tab < TABS.length) tabActivo.value = saved.tab
+} catch { /* ignora json corrupto */ }
+
+watch([filtros, tabActivo], () => {
+  localStorage.setItem(LS_KEY, JSON.stringify({
+    q: filtros.value.q, estado: filtros.value.estado,
+    tipo_venta: filtros.value.tipo_venta, tab: tabActivo.value,
+  }))
+}, { deep: true })
 
 onMounted(() => {
   loadVistas()
