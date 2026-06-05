@@ -56,7 +56,7 @@ import Select from 'primevue/select'
 import ProgressSpinner from 'primevue/progressspinner'
 import api from '@/api/client'
 import {
-  fmtCOP, pct, formatPeriodo,
+  fmtCOP, pct, normPct, formatPeriodo,
   construirEstadoResultados, indiceSoportesProyecto,
 } from '@/utils/liquidaciones'
 
@@ -96,6 +96,8 @@ const opcionesInv = computed(() => [
 const fmtKwh = (v) => v == null ? '—' : (Math.abs(v) >= 1000 ? (v / 1000).toFixed(1) + ' MWh' : Math.round(v) + ' kWh')
 const _cop2 = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const fmtTarifa = (v) => v == null ? '—' : _cop2.format(v)
+// Administración se cobra como % (no $/kWh). Acepta fracción (0.02) o número (2).
+const fmtAdminPct = (v) => v == null ? '—' : `${(Math.abs(Number(v)) < 1 ? Number(v) * 100 : Number(v)).toFixed(2)}%`
 
 function toast(msg, err = false) {
   toastMsg.value = msg; toastErr.value = err
@@ -129,7 +131,11 @@ function columnasDe(l, invs) {
     const ing = mandatos.filter(m => m.tipo === 'ingresos' && esDel(m, pi.id))
     const cos = mandatos.filter(m => m.tipo === 'costos' && esDel(m, pi.id))
     if (!ing.length && !cos.length) continue
-    const er = construirEstadoResultados({ ingresosMandatos: ing, costosMandatos: cos, esAutoconsumo: esAuto, soportes })
+    // Facturas de servicio (representación/CGM/administración) son a nivel proyecto;
+    // se prorratean por participación para que aparezcan y el neto del inversionista las descuente.
+    const frac = normPct(pi.porcentaje_participacion)
+    const facturasInv = (l.facturas || []).map(f => ({ ...f, valor_cop: (Number(f.valor_cop) || 0) * frac }))
+    const er = construirEstadoResultados({ ingresosMandatos: ing, costosMandatos: cos, facturas: facturasInv, esAutoconsumo: esAuto, soportes })
     if (!er.grupos.length) continue
     cols.push({ id: 'inv' + pi.id, nombre: pi.cliente_nombre || 'Inversionista', pct: pct(pi.porcentaje_participacion), er })
   }
@@ -158,9 +164,11 @@ function detalleHtml(er) {
 }
 
 function kpisHtml(er) {
+  // "Ingresos" = ingreso bruto (total del grupo Ingresos), no el valor a pagar.
+  const ingresos = er.grupos.find(g => g.key === 'ingresos')?.total ?? er.valorAPagar
   const costosTot = (er.costosOperativos || 0) + (er.facturasTotal || 0)
   const k = [
-    { lbl: 'Valor a pagar (ingresos)', val: fmtCOP(er.valorAPagar) },
+    { lbl: 'Ingresos', val: fmtCOP(ingresos) },
     { lbl: 'Costos y facturas', val: fmtCOP(costosTot) },
     { lbl: 'Ingreso neto', val: fmtCOP(er.neto), big: true },
   ]
@@ -217,9 +225,9 @@ function generacionSectionHtml() {
   const t = tarifas.value
   const hayTar = t.representacion != null || t.cgm != null || t.admin != null
   const tarifasHtml = hayTar ? `<div class="rpt-tarifas">
-      <div class="rpt-tar"><span>Representación</span><b>${fmtTarifa(t.representacion)}</b></div>
-      <div class="rpt-tar"><span>CGM</span><b>${fmtTarifa(t.cgm)}</b></div>
-      <div class="rpt-tar"><span>Administración</span><b>${fmtTarifa(t.admin)}</b></div>
+      <div class="rpt-tar"><span>Representación ($/kWh)</span><b>${fmtTarifa(t.representacion)}</b></div>
+      <div class="rpt-tar"><span>CGM ($/kWh)</span><b>${fmtTarifa(t.cgm)}</b></div>
+      <div class="rpt-tar"><span>Administración (%)</span><b>${fmtAdminPct(t.admin)}</b></div>
     </div>` : ''
   return `<section class="rpt-block">
       <h2 class="rpt-h2">Generación del mes</h2>
@@ -388,10 +396,14 @@ async function loadComparativo() {
     const liqs = proy?.liquidaciones || []
     const sum = (arr, k) => (arr || []).reduce((s, x) => s + (Number(x?.[k]) || 0), 0)
     const itemsDe = (q) => {
-      const ing = sum(q.mandatos_total_ingresos, 'valor_neto_cop') || Number(q.resumen?.total_ingresos_cop) || 0
-      const cos = sum(q.mandatos_total_costos, 'valor_neto_cop') || Number(q.resumen?.total_costos_cop) || 0
-      const fac = sum(q.facturas_servicio, 'valor_cop') || Number(q.resumen?.total_facturas_cop) || 0
-      return { ingresos: ing, costosOp: cos, facturas: fac, neto: ing - cos - fac }
+      // "Ingresos" = ingreso bruto; el neto se calcula sobre el valor a pagar.
+      const gross = Number(q.resumen?.total_ingresos_cop) || sum(q.mandatos_total_ingresos, 'total_ingresos_cop') || 0
+      const vap = sum(q.mandatos_total_ingresos, 'valor_neto_cop') || 0
+      const ingresos = gross || vap
+      const cos = Number(q.resumen?.total_costos_cop) || sum(q.mandatos_total_costos, 'valor_neto_cop') || 0
+      const fac = Number(q.resumen?.total_facturas_cop) || sum(q.facturas_servicio, 'valor_cop') || 0
+      const neto = Number(q.resumen?.ingreso_neto_cop) || ((vap || ingresos) - cos - fac)
+      return { ingresos, costosOp: cos, facturas: fac, neto }
     }
     const conV = (it) => it.ingresos !== 0 || it.costosOp !== 0 || it.facturas !== 0
     const per = liq.value.periodo
