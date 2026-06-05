@@ -108,9 +108,9 @@ function toast(msg, err = false) {
 function volver() {
   // Si hay edición sin guardar, confirmar antes de salir.
   if (editMode.value && !window.confirm('Tienes cambios sin guardar. ¿Salir de todos modos?')) return
-  // Volver a donde venía; si se abrió por link directo, ir al detalle de la liquidación.
-  if (window.history.length > 1) router.back()
-  else router.push(`/liquidaciones/${route.params.id}`)
+  // Navegación determinística hacia arriba (el padre del informe es su detalle).
+  // Evita el ping-pong/loop que causa mezclar history.back() con push.
+  router.push(`/liquidaciones/${route.params.id}`)
 }
 
 // ── Construcción del informe (bloques verticales: Total + cada inversionista) ──

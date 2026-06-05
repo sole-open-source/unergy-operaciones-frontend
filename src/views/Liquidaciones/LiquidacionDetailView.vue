@@ -321,10 +321,10 @@ const route = useRoute()
 const router = useRouter()
 const toast = useToast()
 
-// Volver a donde venía; si fue link directo, ir al listado de liquidaciones.
+// Navegación determinística hacia arriba (el padre del detalle es el listado).
+// Evita loops de history.back() cuando se entra por link directo.
 function volver() {
-  if (window.history.length > 1) router.back()
-  else router.push('/liquidaciones')
+  router.push('/liquidaciones')
 }
 
 const liq = ref(null)
