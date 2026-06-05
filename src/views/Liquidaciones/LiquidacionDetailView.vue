@@ -3,7 +3,7 @@
 
     <!-- Header -->
     <div class="flex items-center gap-2 flex-wrap">
-      <Button icon="pi pi-arrow-left" text size="small" @click="$router.back()" />
+      <Button icon="pi pi-arrow-left" label="Volver" text size="small" @click="volver" />
       <div class="flex items-center gap-2 flex-wrap">
         <h2 class="text-base font-semibold" style="color:#2C2039">
           {{ liq?.proyecto_nombre }} — {{ formatPeriodo(liq?.periodo) }}
@@ -320,6 +320,12 @@ import IngresoCostoComparativo from './components/IngresoCostoComparativo.vue'
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
+
+// Volver a donde venía; si fue link directo, ir al listado de liquidaciones.
+function volver() {
+  if (window.history.length > 1) router.back()
+  else router.push('/liquidaciones')
+}
 
 const liq = ref(null)
 const proyectoInversionistas = ref([])

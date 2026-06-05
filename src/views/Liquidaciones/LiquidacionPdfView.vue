@@ -8,7 +8,7 @@
     <!-- Toolbar (no se imprime) -->
     <div class="liqpdf-toolbar">
       <div class="flex items-center gap-2">
-        <Button icon="pi pi-arrow-left" text size="small" @click="volver" />
+        <Button icon="pi pi-arrow-left" label="Volver" text size="small" @click="volver" />
         <div>
           <div class="text-sm font-bold" style="color:#2C2039">Informe PDF — Estado de Resultados</div>
           <div class="text-[11px]" style="color:#9b8fb0">
@@ -105,7 +105,13 @@ function toast(msg, err = false) {
   toastMsg.value = msg; toastErr.value = err
   clearTimeout(_t); _t = setTimeout(() => { toastMsg.value = '' }, 4000)
 }
-function volver() { router.push(`/liquidaciones/${route.params.id}`) }
+function volver() {
+  // Si hay edición sin guardar, confirmar antes de salir.
+  if (editMode.value && !window.confirm('Tienes cambios sin guardar. ¿Salir de todos modos?')) return
+  // Volver a donde venía; si se abrió por link directo, ir al detalle de la liquidación.
+  if (window.history.length > 1) router.back()
+  else router.push(`/liquidaciones/${route.params.id}`)
+}
 
 // ── Construcción del informe (bloques verticales: Total + cada inversionista) ──
 // Una matriz ancha se desborda en el PDF; en su lugar cada entidad (Total e
@@ -504,11 +510,20 @@ function descargar() {
   const titulo = `Estado de Resultados — ${liq.value?.proyecto_nombre || ''} ${periodoLabel.value}`
   const w = window.open('', '_blank')
   if (!w) { toast('Permite las ventanas emergentes para descargar el PDF', true); return }
+  const barCSS = `.liq-bar{position:sticky;top:0;z-index:50;display:flex;gap:8px;justify-content:flex-end;align-items:center;padding:8px 14px;background:#2C2039;font-family:'Sora',sans-serif}
+.liq-bar .t{margin-right:auto;color:#cdbfe2;font-size:12px;font-weight:600}
+.liq-bar button{font-family:'Sora',sans-serif;font-size:12px;font-weight:700;border:none;border-radius:7px;padding:7px 13px;cursor:pointer;background:#4a3560;color:#fff}
+.liq-bar button.prim{background:#F6FF72;color:#2C2039}
+@media print{.liq-bar{display:none!important}}`
   w.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>${esc(titulo)}</title>` +
     `<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>` +
     `<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&display=swap" rel="stylesheet">` +
-    `<style>${REPORT_CSS}${PRINT_PAGE_CSS}</style></head><body><div class="liq-doc">${inner}</div>` +
-    `<script>window.onload=function(){setTimeout(function(){window.print();},400);};<\/script></body></html>`)
+    `<style>${REPORT_CSS}${PRINT_PAGE_CSS}${barCSS}</style></head><body>` +
+    `<div class="liq-bar"><span class="t">${esc(titulo)}</span>` +
+    `<button onclick="window.close()">✕ Cerrar</button>` +
+    `<button class="prim" onclick="window.print()">Imprimir / Guardar PDF</button></div>` +
+    `<div class="liq-doc">${inner}</div>` +
+    `<script>window.onload=function(){setTimeout(function(){window.print();},500);};<\/script></body></html>`)
   w.document.close()
 }
 
