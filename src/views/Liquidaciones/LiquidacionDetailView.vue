@@ -48,7 +48,7 @@
       <!-- Hero: Estado de Resultados + Generación del mes (responsive) -->
       <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
         <EstadoResultados :liq="liq" />
-        <GeneracionMensualChart :proyecto-id="liq.proyecto_id" :periodo="liq.periodo" />
+        <GeneracionMensualChart :proyecto-id="liq.proyecto_id" :proyecto-nombre="liq.proyecto_nombre" :periodo="liq.periodo" />
       </div>
 
       <!-- Datos adicionales: comprobante, consecutivos -->
