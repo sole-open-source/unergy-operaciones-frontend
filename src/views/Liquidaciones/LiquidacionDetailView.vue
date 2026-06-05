@@ -51,11 +51,8 @@
       <!-- Generación y tarifas del mes (ancho completo) -->
       <GeneracionMensualChart :proyecto-id="liq.proyecto_id" :proyecto-nombre="liq.proyecto_nombre" :periodo="liq.periodo" />
 
-      <!-- Estado de Resultados consolidado: Total + cada inversionista (resumen con IVA y soportes) -->
+      <!-- Estado de Resultados por inversionista: Total + cada inversionista (con IVA y soportes) -->
       <EstadoResultadosConsolidado :liq="liq" :inversionistas="inversionistasVista" />
-
-      <!-- Estado de Resultados (Total) — desglose detallado con soportes inline -->
-      <EstadoResultados :liq="liq" />
 
       <!-- Datos adicionales: comprobante, consecutivos -->
       <div class="bg-white rounded-xl shadow-sm border px-4 py-3 flex flex-wrap gap-x-5 gap-y-1.5 text-xs" style="color:#2C2039;border-color:#e8e0f0">
@@ -317,7 +314,6 @@ import DatePicker from 'primevue/datepicker'
 import Textarea from 'primevue/textarea'
 import Checkbox from 'primevue/checkbox'
 import api from '@/api/client'
-import EstadoResultados from './components/EstadoResultados.vue'
 import EstadoResultadosConsolidado from './components/EstadoResultadosConsolidado.vue'
 import GeneracionMensualChart from './components/GeneracionMensualChart.vue'
 import IngresoCostoComparativo from './components/IngresoCostoComparativo.vue'
