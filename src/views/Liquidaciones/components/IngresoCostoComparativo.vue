@@ -20,7 +20,7 @@
         </div>
       </div>
 
-      <div style="height: 240px">
+      <div v-if="showChart" style="height: 240px">
         <Bar :data="chartData" :options="chartOptions" />
       </div>
     </div>
@@ -45,6 +45,7 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend)
 const props = defineProps({
   proyectoId: { type: [Number, String], required: true },
   periodo: { type: String, required: true },   // YYYY-MM-01
+  showChart: { type: Boolean, default: true },  // false → solo KPIs (indicador vs promedio)
 })
 
 const loading = ref(false)
@@ -74,6 +75,8 @@ const actual = computed(() => {
 const historico = computed(() =>
   liqs.value
     .filter(x => x.periodo < props.periodo)
+    .sort((a, b) => b.periodo.localeCompare(a.periodo))   // más recientes primero
+    .slice(0, 3)                                           // promedio de los 3 meses anteriores
     .map(itemsDe)
     .filter(conValores)
 )

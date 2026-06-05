@@ -45,6 +45,9 @@
         </button>
       </div>
 
+      <!-- Indicador: este mes vs promedio de los 3 meses anteriores (solo KPIs) -->
+      <IngresoCostoComparativo :proyecto-id="liq.proyecto_id" :periodo="liq.periodo" :show-chart="false" />
+
       <!-- Generación y tarifas del mes (ancho completo) -->
       <GeneracionMensualChart :proyecto-id="liq.proyecto_id" :proyecto-nombre="liq.proyecto_nombre" :periodo="liq.periodo" />
 
@@ -317,6 +320,7 @@ import api from '@/api/client'
 import EstadoResultados from './components/EstadoResultados.vue'
 import EstadoResultadosConsolidado from './components/EstadoResultadosConsolidado.vue'
 import GeneracionMensualChart from './components/GeneracionMensualChart.vue'
+import IngresoCostoComparativo from './components/IngresoCostoComparativo.vue'
 
 const route = useRoute()
 const router = useRouter()

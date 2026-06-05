@@ -49,23 +49,23 @@
             <!-- Líneas del grupo -->
             <tr v-for="l in g.lineas" :key="g.key + '_' + l.key" class="border-t" style="border-color:#f7f3fc">
               <td class="px-4 py-1.5 sticky left-0 z-10 bg-white">
-                <div class="flex items-center gap-2 pl-3">
-                  <span class="flex-1" style="color:#5b5470">{{ l.label }}</span>
-                  <a v-if="l.soporte_url" :href="l.soporte_url" target="_blank" rel="noopener"
-                    class="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md shrink-0"
-                    style="background:#F1EAF9; color:#6E3FB8" :title="l.referencia || 'Ver soporte'">
-                    <i class="pi pi-paperclip text-[10px]" />{{ l.refCodigo || 'Soporte' }}
-                  </a>
-                  <span v-else-if="l.refCodigo" class="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md shrink-0"
-                    style="background:#f5f1fa; color:#9b8fb0" :title="l.referencia">
-                    <i class="pi pi-hashtag text-[10px]" />{{ l.refCodigo }}
-                  </span>
-                </div>
+                <span class="pl-3 block" style="color:#5b5470">{{ l.label }}</span>
               </td>
               <td v-for="c in columnas" :key="c.id"
-                class="px-4 py-1.5 text-right font-mono tabular-nums whitespace-nowrap"
-                :style="{ color: '#6b5a8a', background: c.es_total ? 'rgba(145,91,216,0.04)' : 'transparent' }">
-                {{ l.valores[c.id] != null ? fmtCOP(l.valores[c.id]) : '—' }}
+                class="px-4 py-1.5 text-right whitespace-nowrap align-top"
+                :style="{ background: c.es_total ? 'rgba(145,91,216,0.04)' : 'transparent' }">
+                <div class="flex flex-col items-end gap-0.5">
+                  <span class="font-mono tabular-nums" style="color:#6b5a8a">
+                    {{ celda(l, c.id) ? fmtCOP(celda(l, c.id).valor) : '—' }}
+                  </span>
+                  <a v-if="celda(l, c.id)?.soporte_url" :href="celda(l, c.id).soporte_url" target="_blank" rel="noopener"
+                    class="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded"
+                    style="background:#F1EAF9; color:#6E3FB8" :title="celda(l, c.id).referencia || 'Ver soporte'">
+                    <i class="pi pi-paperclip text-[9px]" />{{ celda(l, c.id).refCodigo || 'Soporte' }}
+                  </a>
+                  <span v-else-if="celda(l, c.id)?.refCodigo" class="text-[10px]" style="color:#bba8d4"
+                    :title="celda(l, c.id).referencia">{{ celda(l, c.id).refCodigo }}</span>
+                </div>
               </td>
             </tr>
           </template>
@@ -152,7 +152,9 @@ const columnas = computed(() => {
   return cols
 })
 
-// Matriz: grupos → líneas (unión de conceptos entre columnas) con valor por columna
+// Matriz: grupos → líneas (unión de conceptos entre columnas). Cada celda guarda
+// su valor y su soporte (el documento es a nivel proyecto, pero cada inversionista
+// puede traer su propio código de referencia).
 const grupos = computed(() => {
   const cols = columnas.value
   const out = []
@@ -163,19 +165,13 @@ const grupos = computed(() => {
       if (!grupo) continue
       for (const l of grupo.lineas) {
         const key = l.tipo || l.label
-        if (!lineMap.has(key)) {
-          lineMap.set(key, {
-            key, label: l.label,
-            soporte_url: l.soporte_url || null,
-            refCodigo: l.refCodigo || null,
-            referencia: l.referencia || null,
-            valores: {},
-          })
-        }
+        if (!lineMap.has(key)) lineMap.set(key, { key, label: l.label, celdas: {} })
         const row = lineMap.get(key)
-        if (!row.soporte_url && l.soporte_url) { row.soporte_url = l.soporte_url; row.refCodigo = l.refCodigo; row.referencia = l.referencia }
-        if (!row.refCodigo && l.refCodigo) { row.refCodigo = l.refCodigo; row.referencia = l.referencia }
-        row.valores[c.id] = (row.valores[c.id] || 0) + l.valor
+        const cel = row.celdas[c.id] || { valor: 0, soporte_url: null, refCodigo: null, referencia: null }
+        cel.valor += l.valor
+        if (!cel.soporte_url && l.soporte_url) { cel.soporte_url = l.soporte_url; cel.refCodigo = l.refCodigo; cel.referencia = l.referencia }
+        if (!cel.refCodigo && l.refCodigo) { cel.refCodigo = l.refCodigo; cel.referencia = l.referencia }
+        row.celdas[c.id] = cel
       }
     }
     if (!lineMap.size) continue
@@ -183,6 +179,8 @@ const grupos = computed(() => {
   }
   return out
 })
+
+const celda = (linea, colId) => linea.celdas[colId] || null
 
 // Subtotal de un grupo para una columna (null si esa columna no tiene ese grupo)
 function subtotal(grupo, colId) {
