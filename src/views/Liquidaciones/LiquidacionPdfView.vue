@@ -79,14 +79,10 @@ function toast(msg, err = false) {
 }
 function volver() { router.push(`/liquidaciones/${route.params.id}`) }
 
-// ── Construcción del informe (matriz Total + inversionistas) ──────────────────
-const GRUPOS = [
-  { key: 'ingresos', label: 'Ingresos', sign: 1 },
-  { key: 'comercializacion', label: 'Comercialización / Bolsa', sign: -1 },
-  { key: 'ajustes', label: 'Ajustes', sign: 1 },
-  { key: 'costos', label: 'Costos operativos (OPEX)', sign: -1 },
-  { key: 'facturas', label: 'Facturas de servicio', sign: -1 },
-]
+// ── Construcción del informe (bloques verticales: Total + cada inversionista) ──
+// Una matriz ancha se desborda en el PDF; en su lugar cada entidad (Total e
+// inversionista) lleva su propia tabla angosta Concepto · Valor · Soporte, que
+// pagina limpio y nunca corta columnas.
 const esc = (s) => (s == null ? '' : String(s)).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
 const esDel = (m, piId) => m.inversionista?.id === piId || m.inversionista_id === piId
 
@@ -117,100 +113,92 @@ function columnasDe(l, invs) {
   return cols
 }
 
-function matrizDe(cols) {
-  const out = []
-  for (const g of GRUPOS) {
-    const map = new Map()
-    for (const c of cols) {
-      const gr = c.er.grupos.find(x => x.key === g.key); if (!gr) continue
-      for (const ln of gr.lineas) {
-        const key = ln.tipo || ln.label
-        if (!map.has(key)) map.set(key, { label: ln.label, celdas: {} })
-        const row = map.get(key)
-        const cel = row.celdas[c.id] || { valor: 0, soporte_url: null, refCodigo: null, referencia: null }
-        cel.valor += ln.valor
-        if (!cel.soporte_url && ln.soporte_url) { cel.soporte_url = ln.soporte_url; cel.refCodigo = ln.refCodigo; cel.referencia = ln.referencia }
-        if (!cel.refCodigo && ln.refCodigo) { cel.refCodigo = ln.refCodigo; cel.referencia = ln.referencia }
-        row.celdas[c.id] = cel
-      }
-    }
-    if (!map.size) continue
-    const totales = {}
-    for (const c of cols) { const gr = c.er.grupos.find(x => x.key === g.key); totales[c.id] = gr ? gr.total : null }
-    out.push({ ...g, lineas: [...map.values()], totales })
-  }
-  return out
+// Tabla angosta (Concepto · Valor · Soporte) para un estado de resultados.
+function detalleHtml(er) {
+  const filas = er.grupos.map(g => {
+    const neg = g.sign < 0
+    const sub = `<tr class="rpt-grp"><td class="rpt-c-con">${esc(g.label)}</td>` +
+      `<td class="rpt-c-val" style="color:${neg ? '#D64455' : '#2C2039'}">${neg ? '−' : ''}${fmtCOP(Math.abs(g.total))}</td>` +
+      `<td class="rpt-c-sop"></td></tr>`
+    const lineas = g.lineas.map(ln => {
+      let sop = ''
+      if (ln.soporte_url) sop = `<a class="rpt-sop" href="${esc(ln.soporte_url)}" target="_blank" rel="noopener">${esc(ln.refCodigo || 'Soporte')}</a>`
+      else if (ln.refCodigo) sop = `<span class="rpt-sop-muted">${esc(ln.refCodigo)}</span>`
+      return `<tr class="rpt-ln"><td class="rpt-c-con rpt-indent">${esc(ln.label)}</td>` +
+        `<td class="rpt-c-val">${fmtCOP(ln.valor)}</td><td class="rpt-c-sop">${sop}</td></tr>`
+    }).join('')
+    return sub + lineas
+  }).join('')
+  const neto = `<tr class="rpt-neto"><td class="rpt-c-con">Valor a pagar</td><td class="rpt-c-val">${fmtCOP(er.neto)}</td><td class="rpt-c-sop"></td></tr>`
+  return `<table class="rpt-detail"><thead><tr><th class="rpt-c-con">Concepto</th><th class="rpt-c-val">Valor</th><th class="rpt-c-sop">Soporte</th></tr></thead><tbody>${filas}${neto}</tbody></table>`
+}
+
+function kpisHtml(er) {
+  const costosTot = (er.costosOperativos || 0) + (er.facturasTotal || 0)
+  const k = [
+    { lbl: 'Valor a pagar (ingresos)', val: fmtCOP(er.valorAPagar) },
+    { lbl: 'Costos y facturas', val: fmtCOP(costosTot) },
+    { lbl: 'Ingreso neto', val: fmtCOP(er.neto), big: true },
+  ]
+  return `<div class="rpt-kpis">${k.map(x => `<div class="rpt-kpi${x.big ? ' rpt-kpi-big' : ''}"><div class="rpt-kpi-lbl">${x.lbl}</div><div class="rpt-kpi-val">${x.val}</div></div>`).join('')}</div>`
 }
 
 function buildHtml(l, invs) {
   const cols = columnasDe(l, invs)
-  const grupos = matrizDe(cols)
+  const total = cols.find(c => c.es_total)
+  const invsCols = cols.filter(c => !c.es_total)
   const periodo = formatPeriodo(l.periodo)
   const proyecto = esc(l.proyecto_nombre || '')
 
-  const thCols = cols.map(c =>
-    `<th class="liq-th-num${c.es_total ? ' liq-col-total' : ''}"><div class="liq-th-name">${esc(c.nombre)}</div><div class="liq-th-pct">${c.pct}</div></th>`
-  ).join('')
+  const cover = `
+    <section class="rpt-block rpt-cover">
+      <div class="rpt-title">Estado de Resultados</div>
+      <div class="rpt-subtitle">${proyecto}</div>
+      <div class="rpt-meta-grid">
+        <div class="rpt-meta"><div class="rpt-meta-lbl">Periodo</div><div class="rpt-meta-val">${periodo}</div></div>
+        <div class="rpt-meta"><div class="rpt-meta-lbl">Estado</div><div class="rpt-meta-val">${esc(l.estado || '—')}</div></div>
+        <div class="rpt-meta"><div class="rpt-meta-lbl">Tasa de cambio</div><div class="rpt-meta-val">${l.tasa_cambio ?? '—'}</div></div>
+        <div class="rpt-meta"><div class="rpt-meta-lbl">Comprobante</div><div class="rpt-meta-val">${esc(l.comprobante_contable_ref || '—')}</div></div>
+      </div>
+    </section>`
 
-  const bodyRows = grupos.map(g => {
-    const subCells = cols.map(c => {
-      const t = g.totales[c.id]
-      if (t == null) return `<td class="liq-num liq-muted${c.es_total ? ' liq-col-total' : ''}">—</td>`
-      const neg = g.sign < 0
-      return `<td class="liq-num liq-sub${c.es_total ? ' liq-col-total' : ''}" style="color:${neg ? '#D64455' : '#2C2039'}">${neg ? '−' : ''}${fmtCOP(Math.abs(t))}</td>`
-    }).join('')
-    const subRow = `<tr class="liq-grp"><td class="liq-grp-label">${esc(g.label)}</td>${subCells}</tr>`
-    const lineRows = g.lineas.map(ln => {
-      const cells = cols.map(c => {
-        const cel = ln.celdas[c.id]
-        if (!cel) return `<td class="liq-num liq-muted${c.es_total ? ' liq-col-total' : ''}">—</td>`
-        let sop = ''
-        if (cel.soporte_url) sop = `<a class="liq-sop" href="${esc(cel.soporte_url)}" target="_blank" rel="noopener">${esc(cel.refCodigo || 'Soporte')}</a>`
-        else if (cel.refCodigo) sop = `<span class="liq-sop-muted">${esc(cel.refCodigo)}</span>`
-        return `<td class="liq-num${c.es_total ? ' liq-col-total' : ''}"><span class="liq-cell-val">${fmtCOP(cel.valor)}</span>${sop ? '<span class="liq-cell-sop">' + sop + '</span>' : ''}</td>`
-      }).join('')
-      return `<tr class="liq-line"><td class="liq-line-label">${esc(ln.label)}</td>${cells}</tr>`
-    }).join('')
-    return subRow + lineRows
-  }).join('')
+  const resumen = total ? `
+    <section class="rpt-block">
+      <h2 class="rpt-h2">Resumen del proyecto · Total</h2>
+      ${kpisHtml(total.er)}
+      ${detalleHtml(total.er)}
+    </section>` : ''
 
-  const netoRow = `<tr class="liq-neto"><td class="liq-neto-label">Valor a pagar</td>${cols.map(c => `<td class="liq-num liq-neto-val${c.es_total ? ' liq-col-total' : ''}">${fmtCOP(c.neto)}</td>`).join('')}</tr>`
+  const porInv = invsCols.length ? `
+    <section class="rpt-block rpt-keep-head">
+      <h2 class="rpt-h2">Desglose por inversionista</h2>
+    </section>
+    ${invsCols.map(c => `
+    <section class="rpt-block rpt-inv">
+      <div class="rpt-inv-head"><span class="rpt-inv-name">${esc(c.nombre)}</span><span class="rpt-inv-pct">${c.pct}</span></div>
+      ${detalleHtml(c.er)}
+    </section>`).join('')}` : ''
 
-  const obs = l.observaciones_resultados
-    ? `<section class="pdf-section liq-obs"><h2 class="liq-h2">Observaciones</h2><p class="liq-obs-text">${esc(l.observaciones_resultados)}</p></section>` : ''
+  const obs = l.observaciones_resultados ? `
+    <section class="rpt-block">
+      <h2 class="rpt-h2">Observaciones</h2>
+      <p class="rpt-obs">${esc(l.observaciones_resultados)}</p>
+    </section>` : ''
 
+  // Wrapper de página con thead/tfoot → header y pie se repiten en cada hoja
+  // (técnica robusta de HTML-a-PDF, sin cortar contenido ni desbordar el ancho).
   return `
-<div class="liq-running-header">
-  <span class="lh-brand">Unergy · Estado de Resultados</span>
-  <span class="lh-meta">${proyecto} — ${periodo}</span>
-</div>
-
-<section class="pdf-section liq-cover">
-  <div class="liq-title">Estado de Resultados</div>
-  <div class="liq-cover-sub">${proyecto}</div>
-  <div class="liq-meta-grid">
-    <div class="liq-meta"><div class="liq-meta-lbl">Periodo</div><div class="liq-meta-val">${periodo}</div></div>
-    <div class="liq-meta"><div class="liq-meta-lbl">Estado</div><div class="liq-meta-val">${esc(l.estado || '—')}</div></div>
-    <div class="liq-meta"><div class="liq-meta-lbl">Tasa de cambio</div><div class="liq-meta-val">${l.tasa_cambio ?? '—'}</div></div>
-    <div class="liq-meta"><div class="liq-meta-lbl">Comprobante</div><div class="liq-meta-val">${esc(l.comprobante_contable_ref || '—')}</div></div>
-  </div>
-</section>
-
-<section class="pdf-section">
-  <h2 class="liq-h2">Estado de Resultados por inversionista</h2>
-  <table class="liq-table">
-    <thead><tr><th class="liq-th-concepto">Concepto</th>${thCols}</tr></thead>
-    <tbody>${bodyRows}</tbody>
-    <tfoot>${netoRow}</tfoot>
-  </table>
-</section>
-
-${obs}
-
-<div class="liq-running-footer">
-  <span>Unergy S.A.S. · Informe generado para uso del cliente</span>
-  <span>${proyecto} — ${periodo}</span>
-</div>`.trim()
+<table class="rpt-page">
+  <thead class="rpt-running"><tr><td>
+    <div class="rpt-head"><span class="rpt-head-brand">Unergy · Estado de Resultados</span><span class="rpt-head-meta">${proyecto} — ${periodo}</span></div>
+  </td></tr></thead>
+  <tbody><tr><td>
+    <div class="rpt-content">${cover}${resumen}${porInv}${obs}</div>
+  </td></tr></tbody>
+  <tfoot class="rpt-running"><tr><td>
+    <div class="rpt-foot"><span>Unergy S.A.S. · Informe para uso del cliente</span><span>${proyecto} — ${periodo}</span></div>
+  </td></tr></tfoot>
+</table>`.trim()
 }
 
 // ── Carga ─────────────────────────────────────────────────────────────────────
@@ -286,52 +274,62 @@ function descargar() {
 // ── CSS del informe (inyectado para preview + usado en la ventana de impresión) ─
 // El @page va solo a la ventana de impresión (PRINT_PAGE_CSS) para no afectar el resto de la app.
 const REPORT_CSS = `
-.liq-doc{background:#fff;color:#2C2039;font-family:'Sora',system-ui,sans-serif;font-size:12px;line-height:1.5;}
-.liq-running-header,.liq-running-footer{display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:10px;color:#9b8fb0;}
-.liq-running-header{border-bottom:1px solid #ece4f5;padding-bottom:6px;margin-bottom:16px;}
-.liq-running-footer{border-top:1px solid #ece4f5;padding-top:6px;margin-top:16px;}
-.lh-brand{font-weight:700;color:#6E3FB8;}
-.liq-cover{margin-bottom:18px;}
-.liq-title{font-size:22px;font-weight:800;color:#2C2039;letter-spacing:-0.5px;}
-.liq-cover-sub{font-size:14px;font-weight:600;color:#6E3FB8;margin-top:2px;margin-bottom:12px;}
-.liq-meta-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
-.liq-meta{background:#faf7ff;border:1px solid #ece4f5;border-radius:8px;padding:8px 10px;}
-.liq-meta-lbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#9b8fb0;margin-bottom:2px;}
-.liq-meta-val{font-size:13px;font-weight:700;color:#2C2039;}
-.liq-h2{font-size:13px;font-weight:800;color:#2C2039;margin:0 0 10px;padding-left:9px;border-left:3px solid #915BD8;}
-.liq-table{width:100%;border-collapse:collapse;font-size:11px;}
-.liq-table th,.liq-table td{padding:6px 9px;text-align:right;white-space:nowrap;vertical-align:top;}
-.liq-th-concepto{text-align:left;background:#faf7ff;color:#6E3FB8;font-size:10px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #ece4f5;}
-.liq-th-num{background:#faf7ff;border-bottom:1px solid #ece4f5;}
-.liq-th-name{font-weight:700;color:#2C2039;}
-.liq-th-pct{font-size:9px;color:#bba8d4;font-weight:600;}
-.liq-col-total{background:rgba(145,91,216,0.06);}
-.liq-grp .liq-grp-label{text-align:left;font-weight:800;font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#6E3FB8;background:#fcfaff;}
-.liq-grp .liq-sub{font-weight:800;background:#fcfaff;}
-.liq-grp td{background:#fcfaff;}
-.liq-line td{border-top:1px solid #f4eefc;}
-.liq-line-label{text-align:left;color:#5b5470;padding-left:18px !important;}
-.liq-cell-val{font-variant-numeric:tabular-nums;color:#3d3550;}
-.liq-cell-sop{display:block;margin-top:1px;}
-.liq-sop{font-size:9px;color:#6E3FB8;text-decoration:none;}
-.liq-sop-muted{font-size:9px;color:#bba8d4;}
-.liq-muted{color:#cdbfe2;}
-.liq-neto td{border-top:2px solid #915BD8;background:rgba(145,91,216,0.08);font-weight:800;}
-.liq-neto-label{text-align:left;color:#2C2039;}
-.liq-neto-val{color:#6E3FB8;}
-.liq-obs{margin-top:16px;}
-.liq-obs-text{background:#faf7ff;border-left:3px solid #4ADE80;border-radius:8px;padding:10px 12px;color:#3d3550;font-size:11px;}
+.liq-doc{background:#fff;color:#2C2039;font-family:'Sora',system-ui,sans-serif;font-size:12px;line-height:1.45;}
+.rpt-page{width:100%;border-collapse:collapse;table-layout:fixed;}
+.rpt-running > tr > td{padding:0;}
+.rpt-head,.rpt-foot{display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:10px;color:#9b8fb0;}
+.rpt-head{border-bottom:1px solid #ece4f5;padding-bottom:6px;margin-bottom:14px;}
+.rpt-foot{border-top:1px solid #ece4f5;padding-top:6px;margin-top:14px;}
+.rpt-head-brand{font-weight:700;color:#6E3FB8;}
+.rpt-block{margin-bottom:16px;}
+.rpt-cover{margin-bottom:18px;}
+.rpt-title{font-size:21px;font-weight:800;letter-spacing:-.5px;color:#2C2039;}
+.rpt-subtitle{font-size:14px;font-weight:600;color:#6E3FB8;margin:2px 0 12px;}
+.rpt-meta-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+.rpt-meta{background:#faf7ff;border:1px solid #ece4f5;border-radius:8px;padding:8px 10px;}
+.rpt-meta-lbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#9b8fb0;margin-bottom:2px;}
+.rpt-meta-val{font-size:13px;font-weight:700;color:#2C2039;}
+.rpt-h2{font-size:13px;font-weight:800;color:#2C2039;margin:0 0 10px;padding-left:9px;border-left:3px solid #915BD8;}
+.rpt-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;}
+.rpt-kpi{background:#faf7ff;border:1px solid #ece4f5;border-radius:8px;padding:8px 10px;}
+.rpt-kpi-lbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#9b8fb0;margin-bottom:3px;}
+.rpt-kpi-val{font-size:15px;font-weight:800;color:#2C2039;font-variant-numeric:tabular-nums;}
+.rpt-kpi-big{background:rgba(145,91,216,0.08);border-color:rgba(145,91,216,.25);}
+.rpt-kpi-big .rpt-kpi-val{color:#6E3FB8;}
+.rpt-inv{margin-bottom:14px;}
+.rpt-inv-head{display:flex;justify-content:space-between;align-items:center;background:#faf7ff;border:1px solid #ece4f5;border-bottom:none;border-radius:8px 8px 0 0;padding:7px 10px;}
+.rpt-inv-name{font-weight:800;font-size:12px;color:#2C2039;}
+.rpt-inv-pct{font-size:11px;font-weight:700;color:#6E3FB8;font-variant-numeric:tabular-nums;}
+.rpt-detail{width:100%;border-collapse:collapse;font-size:11px;}
+.rpt-detail th{background:#faf7ff;color:#6E3FB8;font-size:9px;text-transform:uppercase;letter-spacing:.5px;font-weight:700;padding:5px 9px;border-bottom:1px solid #ece4f5;}
+.rpt-detail td{padding:4px 9px;border-top:1px solid #f4eefc;vertical-align:top;}
+.rpt-c-con{text-align:left;color:#3d3550;word-break:break-word;}
+.rpt-c-val{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;width:30%;}
+.rpt-c-sop{text-align:right;white-space:nowrap;width:22%;}
+.rpt-indent{padding-left:20px !important;color:#5b5470;}
+.rpt-grp td{background:#fcfaff;font-weight:800;font-size:10px;text-transform:uppercase;letter-spacing:.3px;color:#6E3FB8;}
+.rpt-grp .rpt-c-val{color:#2C2039;}
+.rpt-neto td{border-top:2px solid #915BD8;background:rgba(145,91,216,0.08);font-weight:800;}
+.rpt-neto .rpt-c-con{color:#2C2039;}
+.rpt-neto .rpt-c-val{color:#6E3FB8;}
+.rpt-sop{font-size:9px;color:#6E3FB8;text-decoration:none;}
+.rpt-sop-muted{font-size:9px;color:#bba8d4;}
+.rpt-obs{background:#faf7ff;border-left:3px solid #4ADE80;border-radius:8px;padding:10px 12px;color:#3d3550;font-size:11px;}
 @media print{
   *{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;}
   .liq-doc{font-size:11px;}
-  .liq-running-header{position:fixed;top:0;left:0;right:0;margin:0;padding:4mm 12mm;background:#fff;border-bottom:1px solid #ece4f5;}
-  .liq-running-footer{position:fixed;bottom:0;left:0;right:0;margin:0;padding:4mm 12mm;background:#fff;border-top:1px solid #ece4f5;}
-  .pdf-section{break-inside:avoid;page-break-inside:avoid;}
-  .liq-line,.liq-grp,.liq-neto{break-inside:avoid;page-break-inside:avoid;}
-  .liq-table thead{display:table-header-group;}
+  thead.rpt-running{display:table-header-group;}
+  tfoot.rpt-running{display:table-footer-group;}
+  /* No cortar: filas, KPIs, portada ni bloques chicos de inversionista */
+  .rpt-detail tr{break-inside:avoid;page-break-inside:avoid;}
+  .rpt-kpis,.rpt-cover,.rpt-inv{break-inside:avoid;page-break-inside:avoid;}
+  /* Mantener cada encabezado pegado a su contenido */
+  .rpt-h2,.rpt-inv-head{break-after:avoid;page-break-after:avoid;}
+  /* Tablas largas paginan repitiendo su encabezado */
+  .rpt-detail thead{display:table-header-group;}
 }
 `
-const PRINT_PAGE_CSS = `@page{size:A4;margin:24mm 12mm 20mm 12mm;}
+const PRINT_PAGE_CSS = `@page{size:A4;margin:13mm;}
 html,body{margin:0;padding:0;background:#fff;}
 body .liq-doc{padding:0;}`
 
