@@ -50,7 +50,10 @@
 import { computed } from 'vue'
 import { fmtCOP, construirEstadoResultados, indiceSoportesProyecto } from '@/utils/liquidaciones'
 
-const props = defineProps({ liq: { type: Object, required: true } })
+const props = defineProps({
+  liq: { type: Object, required: true },
+  invId: { type: Number, default: null },  // proyecto_inversionista_id para filtrar facturas
+})
 
 // Mandatos del "Total" (sin inversionista) para el nivel proyecto; si no hay,
 // caer a los mandatos por inversionista.
@@ -61,11 +64,18 @@ function pickMandatos(tipo) {
   return m.filter(x => x.tipo === tipo && (x.inversionista || x.inversionista_id != null))
 }
 
+// Filtrar facturas por inversionista cuando hay contexto; null = nivel Total
+const facturasVistas = computed(() => {
+  const all = props.liq?.facturas || []
+  if (props.invId == null) return all
+  return all.filter(f => f.proyecto_inversionista_id === props.invId)
+})
+
 const er = computed(() => construirEstadoResultados({
   ingresosMandatos: pickMandatos('ingresos'),
   costosMandatos: pickMandatos('costos'),
   costos: props.liq?.costos || [],
-  facturas: props.liq?.facturas || [],
+  facturas: facturasVistas.value,
   esAutoconsumo: props.liq?.tipo_venta === 'autoconsumo',
   soportes: indiceSoportesProyecto(props.liq),
 }))
