@@ -1,19 +1,19 @@
 <template>
   <div class="bg-white rounded-xl shadow-sm border overflow-hidden" style="border-color:#e8e0f0">
-    <div class="px-4 py-2.5 flex items-center gap-2 border-b" style="border-color:#f0ebf6">
+    <div class="px-3 py-2 flex items-center gap-2 border-b" style="border-color:#f0ebf6">
       <i class="pi pi-chart-bar text-sm" style="color:#915BD8" />
       <h3 class="text-sm font-bold" style="color:#2C2039">Este mes vs promedio del proyecto</h3>
-      <span v-if="mesesHist" class="ml-auto text-[11px]" style="color:#9b8fb0">promedio de {{ mesesHist }} mes(es) anteriores</span>
+      <span v-if="mesesHist" class="ml-auto text-[10px]" style="color:#9b8fb0">promedio de {{ mesesHist }} mes(es) anteriores</span>
     </div>
 
-    <ProgressSpinner v-if="loading" style="width:36px;height:36px" class="block mx-auto my-10" />
+    <ProgressSpinner v-if="loading" style="width:32px;height:32px" class="block mx-auto my-6" />
 
-    <div v-else-if="actual" class="p-4">
+    <div v-else-if="actual" class="p-3">
       <!-- KPIs del mes actual + variación vs promedio -->
-      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
-        <div v-for="k in kpis" :key="k.label" class="rounded-lg p-2.5" :style="{ background: k.bg }">
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2" :class="showChart ? 'mb-3' : ''">
+        <div v-for="k in kpis" :key="k.label" class="rounded-lg p-2" :style="{ background: k.bg }">
           <p class="text-[10px] uppercase tracking-wide font-semibold" :style="{ color: k.color }">{{ k.label }}</p>
-          <p class="text-base font-bold tabular-nums" :style="{ color: k.color }">{{ k.pct ? k.value.toFixed(1) + '%' : fmtCompact(k.value) }}</p>
+          <p class="text-sm font-bold tabular-nums" :style="{ color: k.color }">{{ k.pct ? k.value.toFixed(1) + '%' : fmtCompact(k.value) }}</p>
           <p v-if="k.delta != null" class="text-[10px] font-medium" :style="{ color: k.delta >= 0 ? '#10B981' : '#D64455' }">
             {{ k.delta >= 0 ? '▲' : '▼' }} {{ Math.abs(k.delta).toFixed(0) }}% vs prom.
           </p>

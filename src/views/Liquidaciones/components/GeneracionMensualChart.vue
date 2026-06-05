@@ -1,56 +1,56 @@
 <template>
   <div class="bg-white rounded-xl shadow-sm border overflow-hidden flex flex-col h-full" style="border-color:#e8e0f0">
-    <div class="px-4 py-2.5 flex items-center gap-2 border-b" style="border-color:#f0ebf6">
+    <div class="px-3 py-2 flex items-center gap-2 border-b" style="border-color:#f0ebf6">
       <i class="pi pi-sun text-sm" style="color:#F0C040" />
       <h3 class="text-sm font-bold" style="color:#2C2039">Generación del mes</h3>
-      <span class="text-[11px]" style="color:#9b8fb0">kWh por día · datos en vivo</span>
+      <span class="text-[10px]" style="color:#9b8fb0">kWh por día · datos en vivo</span>
     </div>
 
-    <div class="flex-1 p-4">
-      <ProgressSpinner v-if="loading" style="width:36px;height:36px" class="block mx-auto my-8" />
+    <div class="flex-1 p-3">
+      <ProgressSpinner v-if="loading" style="width:32px;height:32px" class="block mx-auto my-6" />
 
       <template v-else-if="dias.length">
-        <div class="grid grid-cols-3 gap-2 mb-3">
-          <div class="rounded-lg p-2.5" style="background:#faf7ff">
+        <div class="grid grid-cols-3 gap-2 mb-2">
+          <div class="rounded-lg p-2" style="background:#faf7ff">
             <p class="text-[10px] uppercase tracking-wide font-semibold" style="color:#9b8fb0">Generado</p>
-            <p class="text-base font-bold" style="color:#2C2039">{{ fmtKwh(totalReal) }}</p>
+            <p class="text-sm font-bold" style="color:#2C2039">{{ fmtKwh(totalReal) }}</p>
           </div>
-          <div class="rounded-lg p-2.5" style="background:#faf7ff">
+          <div class="rounded-lg p-2" style="background:#faf7ff">
             <p class="text-[10px] uppercase tracking-wide font-semibold" style="color:#9b8fb0">Días</p>
-            <p class="text-base font-bold" style="color:#6b5a8a">{{ dias.length }}</p>
+            <p class="text-sm font-bold" style="color:#6b5a8a">{{ dias.length }}</p>
           </div>
-          <div class="rounded-lg p-2.5" style="background:#faf7ff">
+          <div class="rounded-lg p-2" style="background:#faf7ff">
             <p class="text-[10px] uppercase tracking-wide font-semibold" style="color:#9b8fb0">Promedio/día</p>
-            <p class="text-base font-bold" style="color:#915BD8">{{ fmtKwh(totalReal / dias.length) }}</p>
+            <p class="text-sm font-bold" style="color:#915BD8">{{ fmtKwh(totalReal / dias.length) }}</p>
           </div>
         </div>
-        <div style="height: 180px">
+        <div style="height: 150px">
           <Bar :data="chartData" :options="chartOptions" />
         </div>
-        <p class="text-[10px] mt-2" style="color:#9b8fb0">Fuente: API de monitoreo Unergy (en vivo)</p>
+        <p class="text-[10px] mt-1.5" style="color:#9b8fb0">Fuente: API de monitoreo Unergy (en vivo)</p>
       </template>
 
-      <div v-else class="text-center py-8">
+      <div v-else class="text-center py-6">
         <i class="pi pi-chart-bar text-3xl mb-2" style="color:#e0d5f0" />
         <p class="text-xs" style="color:#9b8fb0">{{ mensaje || 'Sin generación registrada para este período.' }}</p>
       </div>
     </div>
 
     <!-- Tarifas de servicio del cliente para ese mes -->
-    <div class="border-t px-4 py-3" style="border-color:#f0ebf6; background:#fcfbfe">
-      <p class="text-[10px] uppercase tracking-wide font-semibold mb-2" style="color:#9b8fb0">
+    <div class="border-t px-3 py-2" style="border-color:#f0ebf6; background:#fcfbfe">
+      <p class="text-[10px] uppercase tracking-wide font-semibold mb-1.5" style="color:#9b8fb0">
         Tarifas de servicio · {{ periodoLabel }} <span class="normal-case font-normal">($/kWh)</span>
       </p>
       <div class="grid grid-cols-3 gap-2">
-        <div class="rounded-lg p-2.5 text-center" style="background:#F4F1FA">
+        <div class="rounded-lg px-2 py-1.5 text-center" style="background:#F4F1FA">
           <p class="text-[10px] uppercase tracking-wide font-semibold" style="color:#6E3FB8">Representación</p>
           <p class="text-sm font-bold tabular-nums" style="color:#2C2039">{{ fmtTarifa(tarifas.representacion) }}</p>
         </div>
-        <div class="rounded-lg p-2.5 text-center" style="background:#F4F1FA">
+        <div class="rounded-lg px-2 py-1.5 text-center" style="background:#F4F1FA">
           <p class="text-[10px] uppercase tracking-wide font-semibold" style="color:#6E3FB8">CGM</p>
           <p class="text-sm font-bold tabular-nums" style="color:#2C2039">{{ fmtTarifa(tarifas.cgm) }}</p>
         </div>
-        <div class="rounded-lg p-2.5 text-center" style="background:#F4F1FA">
+        <div class="rounded-lg px-2 py-1.5 text-center" style="background:#F4F1FA">
           <p class="text-[10px] uppercase tracking-wide font-semibold" style="color:#6E3FB8">Administración</p>
           <p class="text-sm font-bold tabular-nums" style="color:#2C2039">{{ fmtTarifa(tarifas.admin) }}</p>
         </div>

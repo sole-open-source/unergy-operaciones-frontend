@@ -1,6 +1,6 @@
 <template>
   <div v-if="columnas.length > 1" class="bg-white rounded-xl shadow-sm border overflow-hidden" style="border-color:#e8e0f0">
-    <div class="px-4 py-2.5 flex items-center gap-2 border-b" style="border-color:#f0ebf6">
+    <div class="px-3 py-2 flex items-center gap-2 border-b" style="border-color:#f0ebf6">
       <i class="pi pi-users text-sm" style="color:#915BD8" />
       <h3 class="text-sm font-bold" style="color:#2C2039">Estado de Resultados por inversionista</h3>
       <span class="ml-auto text-[10px] uppercase tracking-wide font-semibold" style="color:#bba8d4">
@@ -13,11 +13,11 @@
         <!-- Encabezado: Concepto | Total | Inv1 | Inv2 … -->
         <thead>
           <tr style="background:#faf7ff">
-            <th class="text-left font-bold uppercase tracking-wide text-[10px] px-4 py-2 sticky left-0 z-10"
-              style="color:#6E3FB8; background:#faf7ff; min-width:200px">Concepto</th>
+            <th class="text-left font-bold uppercase tracking-wide text-[10px] px-3 py-1.5 sticky left-0 z-10"
+              style="color:#6E3FB8; background:#faf7ff; min-width:160px">Concepto</th>
             <th v-for="c in columnas" :key="c.id"
-              class="text-right px-4 py-2 align-bottom whitespace-nowrap"
-              :style="{ minWidth: '130px', background: c.es_total ? 'rgba(145,91,216,0.06)' : '#faf7ff' }">
+              class="text-right px-3 py-1.5 align-bottom whitespace-nowrap"
+              :style="{ minWidth: '108px', background: c.es_total ? 'rgba(145,91,216,0.06)' : '#faf7ff' }">
               <div class="flex flex-col items-end gap-0.5">
                 <span class="font-bold truncate max-w-[160px]" :style="{ color: c.es_total ? '#6E3FB8' : '#2C2039' }" :title="c.nombre">
                   {{ c.nombre }}
@@ -34,10 +34,10 @@
           <template v-for="g in grupos" :key="g.key">
             <!-- Subtotal del grupo -->
             <tr style="background:#fcfaff">
-              <td class="px-4 py-1.5 font-bold uppercase tracking-wide text-[11px] sticky left-0 z-10"
+              <td class="px-3 py-1 font-bold uppercase tracking-wide text-[11px] sticky left-0 z-10"
                 style="color:#6E3FB8; background:#fcfaff">{{ g.label }}</td>
               <td v-for="c in columnas" :key="c.id"
-                class="px-4 py-1.5 text-right font-bold font-mono tabular-nums whitespace-nowrap"
+                class="px-3 py-1 text-right font-bold font-mono tabular-nums whitespace-nowrap"
                 :style="{ color: subtotal(g, c.id) == null ? '#d8cce8' : (g.sign < 0 ? '#D64455' : '#2C2039'),
                           background: c.es_total ? 'rgba(145,91,216,0.06)' : 'transparent' }">
                 <template v-if="subtotal(g, c.id) != null">
@@ -48,11 +48,11 @@
             </tr>
             <!-- Líneas del grupo -->
             <tr v-for="l in g.lineas" :key="g.key + '_' + l.key" class="border-t" style="border-color:#f7f3fc">
-              <td class="px-4 py-1.5 sticky left-0 z-10 bg-white">
+              <td class="px-3 py-1 sticky left-0 z-10 bg-white">
                 <span class="pl-3 block" style="color:#5b5470">{{ l.label }}</span>
               </td>
               <td v-for="c in columnas" :key="c.id"
-                class="px-4 py-1.5 text-right whitespace-nowrap align-top"
+                class="px-3 py-1 text-right whitespace-nowrap align-top"
                 :style="{ background: c.es_total ? 'rgba(145,91,216,0.04)' : 'transparent' }">
                 <div class="flex flex-col items-end gap-0.5">
                   <span class="font-mono tabular-nums" style="color:#6b5a8a">
@@ -73,10 +73,10 @@
 
         <tfoot>
           <tr class="border-t-2" style="border-color:#915BD8; background:rgba(145,91,216,0.07)">
-            <td class="px-4 py-2.5 font-extrabold sticky left-0 z-10"
+            <td class="px-3 py-2 font-extrabold sticky left-0 z-10"
               style="color:#2C2039; background:#f4eefb">Valor a pagar</td>
             <td v-for="c in columnas" :key="c.id"
-              class="px-4 py-2.5 text-right font-extrabold font-mono tabular-nums whitespace-nowrap"
+              class="px-3 py-2 text-right font-extrabold font-mono tabular-nums whitespace-nowrap"
               style="color:#915BD8; background:rgba(145,91,216,0.07)">
               {{ fmtCOP(c.neto) }}
             </td>
