@@ -46,7 +46,7 @@
       </div>
 
       <!-- Indicador: este mes vs promedio de los 3 meses anteriores (solo KPIs) -->
-      <IngresoCostoComparativo :proyecto-id="liq.proyecto_id" :periodo="liq.periodo" :show-chart="false" />
+      <IngresoCostoComparativo :proyecto-id="liq.proyecto_id" :proyecto-nombre="liq.proyecto_nombre" :periodo="liq.periodo" :show-chart="false" />
 
       <!-- Generación y tarifas del mes (ancho completo) -->
       <GeneracionMensualChart :proyecto-id="liq.proyecto_id" :proyecto-nombre="liq.proyecto_nombre" :periodo="liq.periodo" />

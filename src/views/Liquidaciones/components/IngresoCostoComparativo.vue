@@ -10,10 +10,12 @@
 
     <div v-else-if="actual" class="p-3">
       <!-- KPIs del mes actual + variación vs promedio -->
-      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2" :class="showChart ? 'mb-3' : ''">
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-2" :class="showChart ? 'mb-3' : ''">
         <div v-for="k in kpis" :key="k.label" class="rounded-lg p-2" :style="{ background: k.bg }">
           <p class="text-[10px] uppercase tracking-wide font-semibold" :style="{ color: k.color }">{{ k.label }}</p>
-          <p class="text-sm font-bold tabular-nums" :style="{ color: k.color }">{{ k.pct ? k.value.toFixed(1) + '%' : fmtCompact(k.value) }}</p>
+          <p class="text-sm font-bold tabular-nums" :style="{ color: k.color }">
+            {{ k.value == null ? '—' : (k.kwh ? fmtKwh(k.value) : (k.pct ? k.value.toFixed(1) + '%' : fmtCompact(k.value))) }}
+          </p>
           <p v-if="k.delta != null" class="text-[10px] font-medium" :style="{ color: k.delta >= 0 ? '#10B981' : '#D64455' }">
             {{ k.delta >= 0 ? '▲' : '▼' }} {{ Math.abs(k.delta).toFixed(0) }}% vs prom.
           </p>
@@ -33,7 +35,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { Bar } from 'vue-chartjs'
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Tooltip, Legend } from 'chart.js'
 import ProgressSpinner from 'primevue/progressspinner'
@@ -44,12 +46,20 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend)
 
 const props = defineProps({
   proyectoId: { type: [Number, String], required: true },
+  proyectoNombre: { type: String, default: '' },
   periodo: { type: String, required: true },   // YYYY-MM-01
   showChart: { type: Boolean, default: true },  // false → solo KPIs (indicador vs promedio)
 })
 
 const loading = ref(false)
 const liqs = ref([])   // todas las liquidaciones del proyecto (vista por-proyecto)
+const generado = reactive({ actual: null, promedio: null })   // energía (kWh): mes vs prom.
+
+function fmtKwh(v) {
+  if (v == null) return '—'
+  if (Math.abs(v) >= 1000) return `${(v / 1000).toFixed(1)} MWh`
+  return `${v.toFixed(0)} kWh`
+}
 
 const sum = (arr, k) => (arr || []).reduce((s, x) => s + (Number(x?.[k]) || 0), 0)
 
@@ -100,8 +110,9 @@ const kpis = computed(() => {
   const a = actual.value, p = promedio.value
   const costosTot = a.costosOp + a.facturas
   const costosTotProm = p ? p.costosOp + p.facturas : null
-  const delta = (cur, prev) => (prev ? (cur - prev) / Math.abs(prev) * 100 : null)
+  const delta = (cur, prev) => (prev && cur != null ? (cur - prev) / Math.abs(prev) * 100 : null)
   return [
+    { label: 'Generado', value: generado.actual, kwh: true, delta: delta(generado.actual, generado.promedio), color: '#6E3FB8', bg: '#f4f1fa' },
     { label: 'Ingresos', value: a.ingresos, delta: delta(a.ingresos, p?.ingresos), color: '#15803d', bg: '#ecfdf3' },
     { label: 'Costos totales', value: costosTot, delta: delta(costosTot, costosTotProm), color: '#b3324a', bg: '#fef2f3' },
     { label: 'Ingreso neto', value: a.neto, delta: delta(a.neto, p?.neto), color: '#915BD8', bg: '#faf7ff' },
@@ -148,6 +159,63 @@ async function load() {
   }
 }
 
-watch(() => [props.proyectoId, props.periodo], load)
-onMounted(load)
+// ── Energía generada (API de monitoreo en vivo): mes actual vs prom. 3 meses ──
+const norm = (s) => (s || '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim()
+
+function ultimoDiaMes(periodo) {
+  const [y, m] = periodo.split('-').map(Number)
+  const d = new Date(y, m, 0)
+  return `${y}-${String(m).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+function mesPrevio(periodo, k) {
+  const [y, m] = periodo.split('-').map(Number)
+  const d = new Date(y, m - 1 - k, 1)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
+}
+
+async function resolverSub() {
+  const { data } = await api.get('/monitoreo/_legacy', { params: { action: 'getProjects' } })
+  const projects = data?.projects ?? []
+  const pid = props.proyectoId != null ? String(props.proyectoId) : null
+  const nombre = norm(props.proyectoNombre)
+  let match = pid && projects.find(p => String(p.id ?? p.proyecto_id) === pid && p.sub_project)
+  if (!match && nombre) match = projects.find(p => norm(p.nombre_comercial) === nombre && p.sub_project)
+  if (!match && nombre) match = projects.find(p => p.sub_project && (norm(p.nombre_comercial).includes(nombre) || nombre.includes(norm(p.nombre_comercial))))
+  return match?.sub_project ?? null
+}
+
+async function totalGen(sub, periodo) {
+  const { data } = await api.get('/monitoreo/_legacy', {
+    params: { action: 'getGeneration', sub_project: sub, date_from: periodo, date_to: ultimoDiaMes(periodo) },
+  })
+  if (data && data.ok === false) return null
+  let total = 0, has = false
+  for (const it of (Array.isArray(data?.data) ? data.data : [])) {
+    if (!it || it.kwh == null) continue
+    total += Number(it.kwh); has = true
+  }
+  return has ? total : null
+}
+
+async function loadGeneracion() {
+  generado.actual = null
+  generado.promedio = null
+  if (!props.periodo) return
+  try {
+    const sub = await resolverSub()
+    if (!sub) return
+    generado.actual = await totalGen(sub, props.periodo)
+    const prevs = []
+    for (let k = 1; k <= 3; k++) {
+      const v = await totalGen(sub, mesPrevio(props.periodo, k))
+      if (v != null && v > 0) prevs.push(v)
+    }
+    if (prevs.length) generado.promedio = prevs.reduce((a, b) => a + b, 0) / prevs.length
+  } catch { /* generación opcional */ }
+}
+
+function cargar() { load(); loadGeneracion() }
+
+watch(() => [props.proyectoId, props.periodo], cargar)
+onMounted(cargar)
 </script>

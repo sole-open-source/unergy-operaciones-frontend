@@ -10,20 +10,6 @@
       <ProgressSpinner v-if="loading" style="width:32px;height:32px" class="block mx-auto my-6" />
 
       <template v-else-if="dias.length">
-        <div class="grid grid-cols-3 gap-2 mb-2">
-          <div class="rounded-lg p-2" style="background:#faf7ff">
-            <p class="text-[10px] uppercase tracking-wide font-semibold" style="color:#9b8fb0">Generado</p>
-            <p class="text-sm font-bold" style="color:#2C2039">{{ fmtKwh(totalReal) }}</p>
-          </div>
-          <div class="rounded-lg p-2" style="background:#faf7ff">
-            <p class="text-[10px] uppercase tracking-wide font-semibold" style="color:#9b8fb0">Días</p>
-            <p class="text-sm font-bold" style="color:#6b5a8a">{{ dias.length }}</p>
-          </div>
-          <div class="rounded-lg p-2" style="background:#faf7ff">
-            <p class="text-[10px] uppercase tracking-wide font-semibold" style="color:#9b8fb0">Promedio/día</p>
-            <p class="text-sm font-bold" style="color:#915BD8">{{ fmtKwh(totalReal / dias.length) }}</p>
-          </div>
-        </div>
         <div style="height: 150px">
           <Bar :data="chartData" :options="chartOptions" />
         </div>
