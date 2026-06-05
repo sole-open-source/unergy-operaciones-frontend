@@ -66,6 +66,29 @@
         />
       </div>
 
+      <!-- ══ SUB-TABS O&M ═══════════════════════════════════════════════════ -->
+      <div class="mt-6">
+        <div class="mon-tab-bar" style="border-top:1px solid #f3f0ff;padding-top:16px">
+          <i class="pi pi-calculator text-sm" style="color:#915BD8" />
+          <span class="text-sm font-semibold text-gray-700 mr-2">Panel O&amp;M Mensual</span>
+          <div class="mon-tab-group">
+            <button
+              v-for="(tab, i) in SUBTABS_OM"
+              :key="i"
+              class="mon-tab"
+              :class="{ 'mon-tab--active': activeSubTabOM === i }"
+              @click="activeSubTabOM = i"
+            >
+              <i :class="tab.icon" style="font-size:12px" />
+              {{ tab.label }}
+            </button>
+          </div>
+        </div>
+
+        <OMAOperaciones v-if="activeSubTabOM === 0" />
+        <OMAProveedor   v-if="activeSubTabOM === 1" />
+      </div>
+
     </div>
 
     <!-- ══ TAB 1 — ARRIENDOS ══════════════════════════════════════════════ -->
@@ -94,6 +117,14 @@ import { ref, onMounted } from 'vue'
 import Select from 'primevue/select'
 import api from '@/api/client'
 import FacturasMantenimiento from '@/views/Servicios/FacturasMantenimiento.vue'
+import OMAOperaciones from './OMAOperaciones.vue'
+import OMAProveedor from './OMAProveedor.vue'
+
+const SUBTABS_OM = [
+  { label: 'Operaciones', icon: 'pi pi-users' },
+  { label: 'Proveedor',   icon: 'pi pi-truck' },
+]
+const activeSubTabOM = ref(0)
 
 const TABS = [
   { label: 'Mantenimiento',         icon: 'pi pi-wrench' },
