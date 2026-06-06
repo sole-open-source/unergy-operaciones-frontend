@@ -442,101 +442,92 @@
                 </div>
               </div>
 
-              <!-- Compliance meter -->
+              <!-- Cumplimiento — barras consecutivas (entregada + proyectada) -->
               <div class="px-4 py-3 border-b" style="border-color: rgba(44,32,57,0.07);" v-if="simResults[c.id]">
-                <div class="relative h-2 rounded-full overflow-hidden mb-1.5" style="background: rgba(44,32,57,0.08);">
-                  <div
-                    class="absolute left-0 top-0 h-full rounded-full transition-all duration-300"
-                    :style="{
-                      width: simResults[c.id].pct !== null ? Math.min(simResults[c.id].pct, 100) + '%' : '0%',
-                      background: simResults[c.id].estado === 'ok' ? '#2e7d32' : simResults[c.id].estado === 'deficit' ? '#D64455' : '#F0C040',
-                    }"
-                  />
-                  <!-- Duplicado segment (red, stacked after real gen) -->
-                  <div
-                    v-if="simResults[c.id].dupPct"
-                    class="absolute top-0 h-full transition-all duration-300"
-                    style="background: repeating-linear-gradient(135deg, #D64455, #D64455 2px, #e8697a 2px, #e8697a 4px); opacity: 0.85;"
-                    :style="{
-                      left: simResults[c.id].pct !== null ? Math.min(simResults[c.id].pct, 100) + '%' : '0%',
-                      width: Math.min(simResults[c.id].dupPct, 100 - Math.min(simResults[c.id].pct || 0, 100)) + '%',
-                    }"
-                  />
-                  <!-- Min marker -->
-                  <div
-                    v-if="simResults[c.id].min !== null && simResults[c.id].min > 0"
-                    class="absolute top-0 h-full w-0.5"
-                    style="background: rgba(44,32,57,0.35);"
-                    :style="{ left: simResults[c.id].max != null ? Math.min(simResults[c.id].min / simResults[c.id].max * 100, 100) + '%' : '100%' }"
-                  />
+                <!-- Leyenda / títulos -->
+                <div class="flex items-center gap-x-3 gap-y-1 flex-wrap mb-2.5">
+                  <span class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide" style="color: #7a6e8a;">
+                    <span class="inline-block w-2.5 h-2.5 rounded-sm" :style="{ background: estadoColor(simResults[c.id].estado) }" />
+                    Energía entregada
+                  </span>
+                  <span class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide" style="color: #7a6e8a;">
+                    <span class="inline-block w-0.5 h-3 rounded" style="background: #D64455;" />
+                    Energía mínima
+                  </span>
+                  <span class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide" style="color: #7a6e8a;">
+                    <span class="inline-block w-0.5 h-3 rounded" style="background: #915BD8;" />
+                    Energía máxima
+                  </span>
+                  <span v-if="simResults[c.id].genProy != null && simResults[c.id].genProy > 0" class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide" style="color: #7a6e8a;">
+                    <span class="inline-block w-2.5 h-2.5 rounded-sm" style="background: repeating-linear-gradient(45deg, #b0a0c0 0, #b0a0c0 2px, transparent 2px, transparent 4px); border: 1px solid rgba(44,32,57,0.20);" />
+                    Energía proyectada
+                  </span>
                 </div>
-                <div class="flex items-center justify-between gap-2">
-                  <div class="flex items-center gap-1.5">
+
+                <!-- Barras -->
+                <div class="grid items-center gap-x-2 gap-y-2" style="grid-template-columns: auto minmax(0,1fr) auto;">
+                  <!-- Fila: ENTREGADA (real) -->
+                  <span class="text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style="color: #7a6e8a;">Entregada</span>
+                  <div class="relative h-2.5">
+                    <div class="absolute inset-0 rounded-full overflow-hidden" style="background: rgba(44,32,57,0.08);">
+                      <div class="absolute left-0 top-0 h-full rounded-full transition-all duration-300"
+                        :style="{ width: scalePct(simResults[c.id], simResults[c.id].gen) + '%', background: estadoColor(simResults[c.id].estado) }" />
+                      <!-- Duplicado (exposición bolsa) -->
+                      <div v-if="simResults[c.id].genDup > 0"
+                        class="absolute top-0 h-full transition-all duration-300"
+                        style="background: repeating-linear-gradient(135deg, #D64455, #D64455 2px, #e8697a 2px, #e8697a 4px); opacity: 0.85;"
+                        :style="{ left: scalePct(simResults[c.id], simResults[c.id].gen) + '%', width: Math.max(0, Math.min(scalePct(simResults[c.id], simResults[c.id].genDup), 100 - scalePct(simResults[c.id], simResults[c.id].gen))) + '%' }" />
+                    </div>
+                    <!-- Marcador mínimo -->
+                    <div v-if="simResults[c.id].min !== null && simResults[c.id].min > 0"
+                      class="absolute w-0.5 rounded" style="top: -2px; bottom: -2px; background: #D64455;"
+                      :style="{ left: scalePct(simResults[c.id], simResults[c.id].min) + '%' }" v-tooltip="'Energía mínima'" />
+                    <!-- Marcador máximo -->
+                    <div v-if="simResults[c.id].max !== null && simResults[c.id].max > 0"
+                      class="absolute w-0.5 rounded" style="top: -2px; bottom: -2px; background: #915BD8;"
+                      :style="{ left: scalePct(simResults[c.id], simResults[c.id].max) + '%' }" v-tooltip="'Energía máxima'" />
+                  </div>
+                  <div class="flex items-center gap-1.5 justify-end whitespace-nowrap">
                     <span class="font-mono text-xs font-bold" style="color: #2C2039;">{{ fmtMwh(simResults[c.id].gen) }}</span>
                     <span v-if="simResults[c.id].genDup > 0"
                       class="font-mono text-[10px] font-semibold px-1.5 py-0.5 rounded"
                       style="background: rgba(214,68,85,0.12); color: #D64455;"
                       v-tooltip="'Exposición bolsa por duplicados'"
                     >+{{ fmtMwh(simResults[c.id].genDup) }} dup</span>
+                    <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full" :style="estadoBadge(simResults[c.id].estado)">
+                      {{ estadoLabel(simResults[c.id].estado) }}
+                    </span>
                   </div>
-                  <span
-                    class="text-xs font-semibold px-2 py-0.5 rounded-full"
-                    :style="simResults[c.id].estado === 'ok'
-                      ? 'background: rgba(46,125,50,0.12); color: #2e7d32;'
-                      : simResults[c.id].estado === 'deficit'
-                      ? 'background: rgba(214,68,85,0.12); color: #D64455;'
-                      : simResults[c.id].estado === 'excedente'
-                      ? 'background: rgba(240,192,64,0.18); color: #9a6700;'
-                      : 'background: rgba(44,32,57,0.06); color: #7a6e8a;'"
-                  >
-                    {{ simResults[c.id].estado === 'ok' ? '✓ OK'
-                     : simResults[c.id].estado === 'deficit' ? '↓ Déficit'
-                     : simResults[c.id].estado === 'excedente' ? '↑ Excedente'
-                     : '— Sin datos' }}
-                  </span>
+
+                  <!-- Fila: PROYECTADA (solo mes actual) -->
+                  <template v-if="simResults[c.id].genProy != null && simResults[c.id].genProy > 0">
+                    <span class="text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style="color: #7a6e8a;">Proyectada</span>
+                    <div class="relative h-2.5">
+                      <div class="absolute inset-0 rounded-full overflow-hidden" style="background: rgba(44,32,57,0.08);">
+                        <div class="absolute left-0 top-0 h-full rounded-full transition-all duration-300"
+                          :style="{ width: scalePct(simResults[c.id], simResults[c.id].genProy) + '%', background: hatchBg(estadoColor(simResults[c.id].estadoProy)) }" />
+                      </div>
+                      <div v-if="simResults[c.id].min !== null && simResults[c.id].min > 0"
+                        class="absolute w-0.5 rounded" style="top: -2px; bottom: -2px; background: #D64455;"
+                        :style="{ left: scalePct(simResults[c.id], simResults[c.id].min) + '%' }" />
+                      <div v-if="simResults[c.id].max !== null && simResults[c.id].max > 0"
+                        class="absolute w-0.5 rounded" style="top: -2px; bottom: -2px; background: #915BD8;"
+                        :style="{ left: scalePct(simResults[c.id], simResults[c.id].max) + '%' }" />
+                    </div>
+                    <div class="flex items-center gap-1.5 justify-end whitespace-nowrap">
+                      <span class="font-mono text-xs font-bold" style="color: #2C2039;">{{ fmtMwh(simResults[c.id].genProy) }}</span>
+                      <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full" :style="estadoBadge(simResults[c.id].estadoProy)">
+                        {{ estadoLabel(simResults[c.id].estadoProy) }}
+                      </span>
+                    </div>
+                  </template>
                 </div>
-                <div v-if="simResults[c.id].min !== null || simResults[c.id].max !== null" class="text-xs mt-0.5" style="color: #7a6e8a;">
-                  <template v-if="simResults[c.id].min !== null && simResults[c.id].max !== null">{{ fmtMwh(simResults[c.id].min) }} – {{ fmtMwh(simResults[c.id].max) }}</template>
+
+                <!-- Rango contractual -->
+                <div v-if="simResults[c.id].min !== null || simResults[c.id].max !== null" class="text-xs mt-2" style="color: #7a6e8a;">
+                  <template v-if="simResults[c.id].min !== null && simResults[c.id].max !== null">Compromiso: {{ fmtMwh(simResults[c.id].min) }} – {{ fmtMwh(simResults[c.id].max) }}</template>
                   <template v-else-if="simResults[c.id].min !== null">Mín: {{ fmtMwh(simResults[c.id].min) }}</template>
                   <template v-else>Máx: {{ fmtMwh(simResults[c.id].max) }}</template>
-                </div>
-              </div>
-
-              <!-- Projection bar (current month only) -->
-              <div class="px-4 pb-3 border-b" style="border-color: rgba(44,32,57,0.07);" v-if="simResults[c.id]?.genProy != null && simResults[c.id].genProy > 0">
-                <span class="text-[10px] font-medium" style="color: #7a6e8a;">Proy. cierre</span>
-                <div class="relative h-1.5 rounded-full overflow-hidden mt-0.5 mb-1" style="background: rgba(44,32,57,0.06);">
-                  <div
-                    class="absolute left-0 top-0 h-full rounded-full transition-all duration-300"
-                    :style="{
-                      width: simResults[c.id].proyPct !== null ? Math.min(simResults[c.id].proyPct, 100) + '%' : '0%',
-                      background: simResults[c.id].estadoProy === 'ok' ? '#2e7d32' : simResults[c.id].estadoProy === 'deficit' ? '#D64455' : '#F0C040',
-                    }"
-                  />
-                  <div
-                    v-if="simResults[c.id].min !== null && simResults[c.id].min > 0"
-                    class="absolute top-0 h-full w-0.5"
-                    style="background: rgba(44,32,57,0.25);"
-                    :style="{ left: simResults[c.id].max != null ? Math.min(simResults[c.id].min / simResults[c.id].max * 100, 100) + '%' : '100%' }"
-                  />
-                </div>
-                <div class="flex items-center justify-between">
-                  <span class="font-mono text-xs font-bold" style="color: #2C2039;">{{ fmtMwh(simResults[c.id].genProy) }}</span>
-                  <span
-                    class="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
-                    :style="simResults[c.id].estadoProy === 'ok'
-                      ? 'background: rgba(46,125,50,0.12); color: #2e7d32;'
-                      : simResults[c.id].estadoProy === 'deficit'
-                      ? 'background: rgba(214,68,85,0.12); color: #D64455;'
-                      : simResults[c.id].estadoProy === 'excedente'
-                      ? 'background: rgba(240,192,64,0.18); color: #9a6700;'
-                      : 'background: rgba(44,32,57,0.06); color: #7a6e8a;'"
-                  >
-                    {{ simResults[c.id].estadoProy === 'ok' ? '✓ OK'
-                     : simResults[c.id].estadoProy === 'deficit' ? '↓ Déficit'
-                     : simResults[c.id].estadoProy === 'excedente' ? '↑ Excedente'
-                     : '— Sin datos' }}
-                  </span>
                 </div>
               </div>
 
@@ -1164,11 +1155,16 @@ const simResults = computed(() => {
       else if (max !== null && genProy > max) estadoProy = 'excedente'
       else estadoProy = 'ok'
     }
+    // Escala común para barras y marcadores: deja un 8% de aire sobre el mayor valor
+    // (máx contractual, generación real, dup o proyección) para que el marcador Máx
+    // quede siempre visible dentro de la pista y un excedente se vea pasarlo.
+    const scaleBase = Math.max(max ?? 0, min ?? 0, gen + genDup, esActual ? genProy : 0)
+    const scaleMax = scaleBase > 0 ? scaleBase * 1.08 : 1
     out[c.id] = {
       gen: Math.round(gen * 10) / 10,
       genDup: Math.round(genDup * 10) / 10,
       genProy: esActual ? Math.round(genProy * 10) / 10 : null,
-      estado, estadoProy, pct, dupPct, proyPct, min, max,
+      estado, estadoProy, pct, dupPct, proyPct, min, max, scaleMax,
       diaActual: diaAct, diasRestantes: diasRest,
     }
   }
@@ -1291,6 +1287,35 @@ function fmtFecha(iso) {
   if (!iso) return '—'
   const [y, m] = iso.split('-')
   return `${MESES_CORTOS[parseInt(m) - 1]} ${y}`
+}
+
+// ── Helpers de barras de cumplimiento (simulador) ─────────────────────────────
+// Posición/ancho en % sobre la escala común del contrato (scaleMax).
+function scalePct(r, val) {
+  if (!r || !r.scaleMax || val == null) return 0
+  return Math.min(Math.max((val / r.scaleMax) * 100, 0), 100)
+}
+function estadoColor(estado) {
+  return estado === 'ok'        ? '#2e7d32'
+       : estado === 'deficit'   ? '#D64455'
+       : estado === 'excedente' ? '#F0C040'
+       : '#b0a0c0'
+}
+function estadoBadge(estado) {
+  return estado === 'ok'        ? 'background: rgba(46,125,50,0.12); color: #2e7d32;'
+       : estado === 'deficit'   ? 'background: rgba(214,68,85,0.12); color: #D64455;'
+       : estado === 'excedente' ? 'background: rgba(240,192,64,0.18); color: #9a6700;'
+       : 'background: rgba(44,32,57,0.06); color: #7a6e8a;'
+}
+function estadoLabel(estado) {
+  return estado === 'ok'        ? '✓ OK'
+       : estado === 'deficit'   ? '↓ Déficit'
+       : estado === 'excedente' ? '↑ Excedente'
+       : '— Sin datos'
+}
+// Relleno rayado para distinguir la barra proyectada de la entregada (sólida).
+function hatchBg(color) {
+  return `repeating-linear-gradient(45deg, ${color} 0, ${color} 3px, rgba(255,255,255,0.5) 3px, rgba(255,255,255,0.5) 6px)`
 }
 
 // ── Data loading ──────────────────────────────────────────────────────────────
