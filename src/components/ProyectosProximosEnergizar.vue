@@ -13,6 +13,13 @@
       <Button icon="pi pi-plus" label="Agregar Proyecto" size="small" @click="addProject" />
     </div>
 
+    <!-- Aviso de origen de datos (config faltante / fuente caída) -->
+    <div v-if="warning" class="mx-3 mt-3 flex items-start gap-2 px-3 py-2 rounded-lg text-xs"
+      style="background: rgba(240,192,64,0.12); border: 1px solid rgba(240,192,64,0.35); color: #8a6d00;">
+      <i class="pi pi-exclamation-triangle mt-0.5" />
+      <span>{{ warning }}</span>
+    </div>
+
     <!-- Table -->
     <div class="p-3 overflow-x-auto">
       <DataTable
@@ -23,8 +30,19 @@
         class="energ-table"
       >
         <template #empty>
-          <div class="text-center py-8 text-sm" style="color: rgba(44,32,57,0.4);">
-            Aún no hay proyectos. Haz clic en «Agregar Proyecto» para empezar.
+          <div class="text-center py-8 text-sm" style="color: rgba(44,32,57,0.45);">
+            <template v-if="loading">
+              <i class="pi pi-spin pi-spinner" style="font-size:1.2rem; color:#915BD8;" />
+              <p class="mt-2">Cargando proyectos del pipeline…</p>
+            </template>
+            <template v-else-if="warning">
+              <i class="pi pi-database" style="font-size:1.4rem; color:#c4b8d4;" />
+              <p class="mt-2">No se pudieron cargar los proyectos del pipeline.</p>
+              <p class="mt-1 text-xs" style="color: rgba(44,32,57,0.4);">Revisa el aviso de arriba (configuración / fuente de datos).</p>
+            </template>
+            <template v-else>
+              Aún no hay proyectos en el pipeline. Puedes agregar uno manualmente con «Agregar Proyecto».
+            </template>
           </div>
         </template>
 
@@ -119,7 +137,7 @@ import AutoComplete from 'primevue/autocomplete'
 import Select from 'primevue/select'
 import { useEnergizationProjects } from '@/composables/useEnergizationProjects'
 
-const { projects, addProject, removeProject } = useEnergizationProjects()
+const { projects, loading, warning, addProject, removeProject } = useEnergizationProjects()
 
 const STATUS_OPTIONS = ['En construcción', 'Pruebas', 'Próximo a energizar', 'Energizado']
 const MESES_CORTOS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
