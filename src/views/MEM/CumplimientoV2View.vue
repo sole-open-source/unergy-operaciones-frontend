@@ -375,6 +375,7 @@
               :key="c.id"
               class="cv-card flex flex-col"
               :class="{ 'cv-card-dragover': dragOver === c.id }"
+              :style="{ borderLeft: '3px solid ' + estadoColor(simResults[c.id] && simResults[c.id].estado) }"
               @dragover.prevent="onDragOver(c.id)"
               @drop.prevent="onDrop(c.id)"
             >
@@ -1535,17 +1536,28 @@ onMounted(async () => {
 .cv-btn-cta:hover { filter: brightness(0.97); box-shadow: 0 3px 12px rgba(246,255,114,0.55); }
 
 .cv-card {
-  background: #fff; border: 1px solid rgba(44,32,57,0.08); border-radius: 14px;
-  overflow: hidden; transition: border-color .14s, box-shadow .14s;
+  background: #fff; border: 1px solid rgba(44,32,57,0.07); border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(44,32,57,0.04), 0 2px 10px rgba(44,32,57,0.035);
+  transition: border-color .15s, box-shadow .15s, transform .15s;
 }
-.cv-card:hover { border-color: rgba(145,91,216,0.30); box-shadow: 0 6px 22px rgba(44,32,57,0.07); }
+.cv-card:hover {
+  border-color: rgba(145,91,216,0.32);
+  box-shadow: 0 10px 28px rgba(44,32,57,0.11);
+  transform: translateY(-2px);
+}
 .cv-card-dragover { border-color: #915BD8 !important; box-shadow: 0 0 0 2px rgba(145,91,216,0.18) !important; }
-.cv-panel { background: #fff; border: 1px solid rgba(44,32,57,0.08); border-radius: 14px; }
-.cv-card-gold {
-  background: #fff; border: 1px solid rgba(240,192,64,0.45); border-radius: 14px;
-  overflow: hidden; transition: border-color .14s, box-shadow .14s;
+.cv-panel {
+  background: #fff; border: 1px solid rgba(44,32,57,0.07); border-radius: 16px;
+  box-shadow: 0 1px 2px rgba(44,32,57,0.04), 0 2px 10px rgba(44,32,57,0.035);
 }
-.cv-card-gold:hover { border-color: rgba(240,192,64,0.85); box-shadow: 0 6px 22px rgba(154,103,0,0.08); }
+.cv-card-gold {
+  background: #fff; border: 1px solid rgba(240,192,64,0.5); border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(154,103,0,0.05), 0 2px 10px rgba(154,103,0,0.04);
+  transition: border-color .15s, box-shadow .15s, transform .15s;
+}
+.cv-card-gold:hover { border-color: rgba(240,192,64,0.9); box-shadow: 0 10px 28px rgba(154,103,0,0.12); transform: translateY(-2px); }
 
 :deep(.p-datatable .p-datatable-thead th) {
   background: rgba(44,32,57,0.05);
