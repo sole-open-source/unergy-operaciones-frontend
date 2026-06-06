@@ -78,7 +78,7 @@
           </span>
         </div>
 
-        <div class="rounded-xl border p-4" style="background: white; border-color: rgba(44,32,57,0.12);">
+        <div class="cv-panel p-4">
           <div ref="chartBox" class="relative select-none" style="width: 100%; height: 360px;">
             <svg
               :viewBox="`0 0 ${SVG_W} ${SVG_H}`"
@@ -222,7 +222,7 @@
       </template>
 
       <!-- Empty chart state -->
-      <div v-else-if="!chartLoading && !chartError" class="text-center py-16 rounded-xl border" style="color: #7a6e8a; border-color: rgba(44,32,57,0.10);">
+      <div v-else-if="!chartLoading && !chartError" class="text-center py-16 cv-panel" style="color: #7a6e8a;">
         <i class="pi pi-chart-bar text-4xl mb-3 block" style="color: #915BD8;" />
         <p>Selecciona un año y un contrato para ver el cumplimiento anual.</p>
       </div>
@@ -237,8 +237,7 @@
           :value="tableDataWithTotal"
           size="small"
           stripedRows
-          class="border rounded-xl overflow-hidden cursor-pointer"
-          style="border-color: rgba(44,32,57,0.12);"
+          class="cv-panel overflow-hidden cursor-pointer"
           @row-click="e => selectContrato(e.data.id)"
           :rowClass="row => row.id === selectedContratoId ? 'row-selected' : row.id === CONSOLIDADO_ID ? 'row-consolidado' : ''"
         >
@@ -651,8 +650,7 @@
 
         <!-- VENTA mode -->
         <template v-if="pcMode === 'venta'">
-          <div v-for="c in pcData.venta" :key="c.id"
-            class="rounded-xl border overflow-hidden" style="border-color: rgba(44,32,57,0.12); background: white;">
+          <div v-for="c in pcData.venta" :key="c.id" class="cv-card">
             <div class="px-4 py-3 flex items-center justify-between"
               style="background: rgba(145,91,216,0.04); border-bottom: 1px solid rgba(44,32,57,0.07);">
               <div>
@@ -692,8 +690,7 @@
           <div v-if="!pcData.compra.length" class="text-center py-12 text-sm" style="color: #7a6e8a;">
             No hay contratos de compra vigentes en {{ MESES[pcMonth - 1] }} {{ pcYear }}
           </div>
-          <div v-for="c in pcData.compra" :key="c.id"
-            class="rounded-xl border overflow-hidden" style="border-color: rgba(240,192,64,0.4); background: white;">
+          <div v-for="c in pcData.compra" :key="c.id" class="cv-card-gold">
             <div class="px-4 py-3 flex items-center justify-between"
               style="background: rgba(240,192,64,0.08); border-bottom: 1px solid rgba(240,192,64,0.2);">
               <div>
@@ -720,7 +717,7 @@
 
         <!-- BOLSA mode -->
         <template v-if="pcMode === 'bolsa'">
-          <div class="rounded-xl border overflow-hidden" style="border-color: rgba(44,32,57,0.12); background: white;">
+          <div class="cv-card">
             <div class="px-4 py-3" style="background: rgba(44,32,57,0.04); border-bottom: 1px solid rgba(44,32,57,0.07);">
               <span class="font-bold text-sm" style="color: #2C2039;">Plantas en bolsa</span>
               <span class="ml-2 text-xs" style="color: #7a6e8a;">Sin asignación GESCON en {{ MESES[pcMonth - 1] }} {{ pcYear }}</span>
@@ -1543,6 +1540,12 @@ onMounted(async () => {
 }
 .cv-card:hover { border-color: rgba(145,91,216,0.30); box-shadow: 0 6px 22px rgba(44,32,57,0.07); }
 .cv-card-dragover { border-color: #915BD8 !important; box-shadow: 0 0 0 2px rgba(145,91,216,0.18) !important; }
+.cv-panel { background: #fff; border: 1px solid rgba(44,32,57,0.08); border-radius: 14px; }
+.cv-card-gold {
+  background: #fff; border: 1px solid rgba(240,192,64,0.45); border-radius: 14px;
+  overflow: hidden; transition: border-color .14s, box-shadow .14s;
+}
+.cv-card-gold:hover { border-color: rgba(240,192,64,0.85); box-shadow: 0 6px 22px rgba(154,103,0,0.08); }
 
 :deep(.p-datatable .p-datatable-thead th) {
   background: rgba(44,32,57,0.05);
