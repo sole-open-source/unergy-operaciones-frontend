@@ -3,6 +3,9 @@
 
     <!-- Header -->
     <PageHeader title="Cumplimiento PPA" subtitle="Generación vs. compromisos contractuales de energía">
+      <template #lead>
+        <div class="cv-icon-tile"><i class="pi pi-bolt" /></div>
+      </template>
       <template #actions>
         <span v-if="cacheSize" class="text-xs font-mono px-2 py-1 rounded" style="background: rgba(145,91,216,0.08); color: #915BD8;">
           caché: {{ cacheSize }}
@@ -18,15 +21,13 @@
     </PageHeader>
 
     <!-- Tab bar -->
-    <div class="flex gap-0 border-b -mt-2" style="border-color: rgba(44,32,57,0.10);">
+    <div class="flex gap-1 border-b -mt-1" style="border-color: rgba(44,32,57,0.08);">
       <button
         v-for="(tab, i) in TABS"
         :key="i"
         @click="activeTab = i"
-        class="px-5 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors"
-        :style="activeTab === i
-          ? 'color: #915BD8; border-color: #915BD8;'
-          : 'color: #7a6e8a; border-color: transparent;'"
+        class="cv-tab"
+        :class="{ active: activeTab === i }"
       >{{ tab }}</button>
     </div>
 
@@ -292,38 +293,25 @@
           <label class="text-xs font-semibold uppercase tracking-wider" style="color: #915BD8;">Mes</label>
           <Select v-model="simMonth" :options="MESES_OPTIONS" optionLabel="label" optionValue="value" class="w-36" @change="loadSimulator" />
         </div>
-        <button
-          @click="resetSim"
-          class="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm border transition"
-          style="border-color: rgba(145,91,216,0.35); color: #915BD8; background: transparent;"
-        >
-          <i class="pi pi-refresh text-xs" />Resetear
+        <button @click="resetSim" class="cv-btn">
+          <i class="pi pi-refresh text-xs" style="color: #915BD8;" />Resetear
         </button>
-        <button
-          v-if="hiddenContratos.size > 0"
-          @click="showAllContratos"
-          class="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm border transition"
-          style="border-color: rgba(46,125,50,0.35); color: #2e7d32; background: transparent;"
-        >
-          <i class="pi pi-eye text-xs" />Mostrar ocultos ({{ hiddenContratos.size }})
-        </button>
-        <button
-          @click="showNuevoForm = true"
-          class="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm border transition"
-          style="border-color: rgba(240,192,64,0.5); color: #9a6700; background: rgba(240,192,64,0.08);"
-        >
-          <i class="pi pi-plus text-xs" />PPA nuevo
+        <button v-if="hiddenContratos.size > 0" @click="showAllContratos" class="cv-btn">
+          <i class="pi pi-eye text-xs" style="color: #2e7d32;" />Mostrar ocultos ({{ hiddenContratos.size }})
         </button>
         <button
           @click="sortDesc = !sortDesc"
-          class="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm border transition"
-          style="border-color: rgba(145,91,216,0.25); color: #915BD8; background: transparent;"
+          class="cv-btn"
           v-tooltip="sortDesc ? 'Mayor cumplimiento primero' : 'Menor cumplimiento primero'"
         >
-          <i class="pi text-xs" :class="sortDesc ? 'pi-sort-amount-down' : 'pi-sort-amount-up'" />
+          <i class="pi text-xs" :class="sortDesc ? 'pi-sort-amount-down' : 'pi-sort-amount-up'" style="color: #915BD8;" />
           {{ sortDesc ? '↓ Mayor %' : '↑ Menor %' }}
         </button>
-        <span class="text-xs" style="color: #7a6e8a;">Arrastra las plantas entre contratos para simular</span>
+        <div class="flex-1"></div>
+        <button @click="showNuevoForm = true" class="cv-btn-cta">
+          <i class="pi pi-plus text-xs" />PPA nuevo
+        </button>
+        <span class="w-full text-xs" style="color: #9b8fb0;">Arrastra las plantas entre contratos para simular</span>
       </div>
 
       <!-- Formulario PPA nuevo -->
@@ -386,9 +374,8 @@
             <div
               v-for="c in visibleContratos"
               :key="c.id"
-              class="rounded-xl border transition-shadow flex flex-col"
-              style="border-color: rgba(44,32,57,0.12); background: white;"
-              :style="dragOver === c.id ? 'border-color: #915BD8; box-shadow: 0 0 0 2px rgba(145,91,216,0.18);' : ''"
+              class="cv-card flex flex-col"
+              :class="{ 'cv-card-dragover': dragOver === c.id }"
               @dragover.prevent="onDragOver(c.id)"
               @drop.prevent="onDrop(c.id)"
             >
@@ -1520,6 +1507,43 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+/* ── Rediseño Notion + brand Unergy (header, tabs, toolbar, tarjetas) ── */
+.cv-icon-tile {
+  width: 40px; height: 40px; border-radius: 12px; flex-shrink: 0;
+  display: grid; place-items: center;
+  background: rgba(145,91,216,0.12); color: #915BD8; font-size: 17px;
+}
+.cv-tab {
+  font-size: 13.5px; font-weight: 700; color: #9b8fb0;
+  padding: 9px 13px; border: 0; background: none; cursor: pointer;
+  border-radius: 8px 8px 0 0; border-bottom: 2px solid transparent;
+  margin-bottom: -1px; transition: background .12s, color .12s;
+}
+.cv-tab:hover { background: rgba(44,32,57,0.04); color: #2C2039; }
+.cv-tab.active { color: #2C2039; border-bottom-color: #915BD8; }
+
+.cv-btn {
+  display: inline-flex; align-items: center; gap: 6px; height: 34px;
+  padding: 0 12px; border-radius: 9px; border: 1px solid rgba(44,32,57,0.12);
+  background: #fff; color: #2C2039; font-size: 13px; cursor: pointer;
+  transition: background .12s, border-color .12s;
+}
+.cv-btn:hover { background: rgba(44,32,57,0.04); border-color: rgba(145,91,216,0.40); }
+.cv-btn-cta {
+  display: inline-flex; align-items: center; gap: 6px; height: 34px;
+  padding: 0 14px; border-radius: 9px; border: 0;
+  background: #F6FF72; color: #2C2039; font-size: 13px; font-weight: 700; cursor: pointer;
+  box-shadow: 0 1px 0 rgba(44,32,57,0.04); transition: filter .12s, box-shadow .12s;
+}
+.cv-btn-cta:hover { filter: brightness(0.97); box-shadow: 0 3px 12px rgba(246,255,114,0.55); }
+
+.cv-card {
+  background: #fff; border: 1px solid rgba(44,32,57,0.08); border-radius: 14px;
+  overflow: hidden; transition: border-color .14s, box-shadow .14s;
+}
+.cv-card:hover { border-color: rgba(145,91,216,0.30); box-shadow: 0 6px 22px rgba(44,32,57,0.07); }
+.cv-card-dragover { border-color: #915BD8 !important; box-shadow: 0 0 0 2px rgba(145,91,216,0.18) !important; }
+
 :deep(.p-datatable .p-datatable-thead th) {
   background: rgba(44,32,57,0.05);
   color: #7a6e8a;
