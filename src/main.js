@@ -23,6 +23,7 @@ const UnergPreset = definePreset(Aura, {
 })
 import ToastService from 'primevue/toastservice'
 import ConfirmationService from 'primevue/confirmationservice'
+import Tooltip from 'primevue/tooltip'
 import 'primeicons/primeicons.css'
 import './assets/main.css'
 
@@ -43,6 +44,10 @@ app.use(PrimeVue, {
 })
 app.use(ToastService)
 app.use(ConfirmationService)
+// Directiva v-tooltip de PrimeVue: se usa en ~10 vistas (incl. los badges
+// real/estimada y "% Obra" de Proyectos próximos a energizarse) pero nunca se
+// registró → todos los tooltips quedaban inertes. Una línea los activa app-wide.
+app.directive('tooltip', Tooltip)
 app.component('InfoField', InfoField)
 app.component('PageHeader', PageHeader)
 
