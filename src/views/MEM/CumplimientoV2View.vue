@@ -118,7 +118,7 @@
                     fill="rgba(214,68,85,0.32)" />
                   <rect v-if="mes.estado === 'excedente' && mes.max_mwh !== null && cierreVal(mes) > mes.max_mwh"
                     :x="dualBarRightX(i)" :y="toY(cierreVal(mes))" :width="dualBarW" :height="toY(mes.max_mwh) - toY(cierreVal(mes))"
-                    fill="rgba(240,192,64,0.55)" />
+                    fill="rgba(20,184,166,0.5)" />
                 </template>
 
                 <!-- PAST / FUTURE months: single bar -->
@@ -132,7 +132,7 @@
                     fill="rgba(214,68,85,0.32)" />
                   <rect v-if="mes.estado === 'excedente' && mes.max_mwh !== null && genVal(mes) > mes.max_mwh"
                     :x="barX(i)" :y="toY(genVal(mes))" :width="barW" :height="toY(mes.max_mwh) - toY(genVal(mes))"
-                    fill="rgba(240,192,64,0.55)" />
+                    fill="rgba(20,184,166,0.5)" />
                 </template>
 
                 <!-- Min/max lines -->
@@ -201,8 +201,8 @@
                   <span class="font-mono font-bold" style="color: #D64455;">{{ fmtMwh(anualData.meses[hovered].compras_bolsa_mwh) }}</span>
                 </div>
                 <div v-if="anualData.meses[hovered].estado === 'excedente'" class="flex justify-between gap-6 mt-2 pt-2" style="border-top: 1px solid rgba(255,255,255,0.1);">
-                  <span style="color: #F0C040;">Excedente (proy.)</span>
-                  <span class="font-mono font-bold" style="color: #F0C040;">{{ fmtMwh(anualData.meses[hovered].excedentes_bolsa_mwh) }}</span>
+                  <span style="color: #2DD4BF;">Excedente (proy.)</span>
+                  <span class="font-mono font-bold" style="color: #2DD4BF;">{{ fmtMwh(anualData.meses[hovered].excedentes_bolsa_mwh) }}</span>
                 </div>
               </div>
               <div class="mt-2 pt-1 text-xs" style="color: rgba(253,250,247,0.35);">Clic para ver desglose</div>
@@ -215,7 +215,7 @@
             <div class="flex items-center gap-2 text-xs" style="color: #7a6e8a;"><div class="w-4 h-4 rounded-sm" style="background: #915BD8;"></div>Generación real</div>
             <div class="flex items-center gap-2 text-xs" style="color: #7a6e8a;"><div class="w-4 h-4 rounded-sm" style="background: rgba(59,186,220,0.65); border: 1px dashed rgba(59,186,220,0.9);"></div>Proyección cierre (prom. 30d)</div>
             <div class="flex items-center gap-2 text-xs" style="color: #7a6e8a;"><div class="w-4 h-4 rounded-sm" style="background: rgba(214,68,85,0.38);"></div>Brecha de déficit</div>
-            <div class="flex items-center gap-2 text-xs" style="color: #7a6e8a;"><div class="w-4 h-4 rounded-sm" style="background: rgba(240,192,64,0.6);"></div>Excedente contractual</div>
+            <div class="flex items-center gap-2 text-xs" style="color: #7a6e8a;"><div class="w-4 h-4 rounded-sm" style="background: rgba(20,184,166,0.6);"></div>Excedente contractual</div>
           </div>
         </div>
       </template>
@@ -411,11 +411,7 @@
                       <span class="text-xs font-mono flex-shrink-0" style="color: #7a6e8a;">{{ (simAssignments[c.id] || []).length }} plantas</span>
                       <span v-if="simResults[c.id]?.pct !== null && simResults[c.id]?.pct !== undefined"
                         class="text-xs font-semibold px-1.5 py-0.5 rounded flex-shrink-0"
-                        :style="simResults[c.id].estado === 'ok'
-                          ? 'background: rgba(46,125,50,0.12); color: #2e7d32;'
-                          : simResults[c.id].estado === 'deficit'
-                          ? 'background: rgba(214,68,85,0.12); color: #D64455;'
-                          : 'background: rgba(240,192,64,0.18); color: #9a6700;'"
+                        :style="estadoBadge(simResults[c.id].estado)"
                       >{{ Math.round(simResults[c.id].pct) }}%</span>
                     </div>
                     <div class="text-xs mt-0.5 truncate" style="color: #7a6e8a;">{{ c.comprador_nombre }}</div>
@@ -467,40 +463,50 @@
                   </div>
                 </div>
 
-                <!-- Barras consecutivas (entregada arriba, proyectada abajo) -->
-                <div class="space-y-2">
-                  <!-- Entregada (real) -->
-                  <div class="flex items-center gap-2">
-                    <div class="relative h-2 rounded-full overflow-hidden flex-1" style="background: rgba(44,32,57,0.08);">
-                      <div class="absolute left-0 top-0 h-full rounded-full transition-all duration-300"
-                        :style="{ width: simResults[c.id].pct !== null ? Math.min(simResults[c.id].pct, 100) + '%' : '0%', background: estadoColor(simResults[c.id].estado) }" />
-                      <!-- Duplicado (exposición bolsa) -->
-                      <div v-if="simResults[c.id].dupPct"
-                        class="absolute top-0 h-full transition-all duration-300"
-                        style="background: repeating-linear-gradient(135deg, #D64455, #D64455 2px, #e8697a 2px, #e8697a 4px); opacity: 0.85;"
-                        :style="{ left: simResults[c.id].pct !== null ? Math.min(simResults[c.id].pct, 100) + '%' : '0%', width: Math.min(simResults[c.id].dupPct, 100 - Math.min(simResults[c.id].pct || 0, 100)) + '%' }" />
-                      <!-- Marcador máx -->
-                      <div v-if="simResults[c.id].min !== null && simResults[c.id].min > 0"
-                        class="absolute top-0 h-full w-0.5"
-                        style="background: rgba(44,32,57,0.35);"
-                        :style="{ left: simResults[c.id].max != null ? Math.min(simResults[c.id].min / simResults[c.id].max * 100, 100) + '%' : '100%' }" />
-                    </div>
+                <!-- Bullet chart: una barra con zonas déficit / en rango / excedente -->
+                <div class="space-y-1.5">
+                  <div class="relative rounded-md overflow-hidden" style="height: 26px; background: rgba(44,32,57,0.04);">
+                    <!-- Zonas de fondo -->
+                    <template v-if="simResults[c.id].bullet.hasZones">
+                      <div v-if="simResults[c.id].bullet.hasMin" class="absolute inset-y-0"
+                        :style="{ left: '0', width: simResults[c.id].bullet.minPct + '%', background: 'rgba(214,68,85,0.10)' }" />
+                      <div class="absolute inset-y-0"
+                        :style="{ left: simResults[c.id].bullet.minPct + '%', width: (simResults[c.id].bullet.maxPct - simResults[c.id].bullet.minPct) + '%', background: 'rgba(46,125,50,0.11)' }" />
+                      <div v-if="simResults[c.id].bullet.hasMax" class="absolute inset-y-0"
+                        :style="{ left: simResults[c.id].bullet.maxPct + '%', right: '0', background: 'rgba(20,184,166,0.14)' }" />
+                    </template>
+                    <!-- Energía entregada (color = estado) -->
+                    <div class="absolute rounded-sm transition-all duration-300"
+                      style="top: 50%; transform: translateY(-50%); height: 10px; left: 0;"
+                      :style="{ width: simResults[c.id].bullet.measurePct + '%', background: estadoColor(simResults[c.id].estado) }" />
+                    <!-- Duplicados (exposición bolsa) -->
+                    <div v-if="simResults[c.id].bullet.dupW"
+                      class="absolute transition-all duration-300"
+                      style="top: 50%; transform: translateY(-50%); height: 10px; background: repeating-linear-gradient(135deg, #D64455, #D64455 2px, #e8697a 2px, #e8697a 4px); opacity: 0.85;"
+                      :style="{ left: simResults[c.id].bullet.measurePct + '%', width: simResults[c.id].bullet.dupW + '%' }"
+                      v-tooltip="'Exposición bolsa por duplicados'" />
+                    <!-- Marcas mín / máx -->
+                    <div v-if="simResults[c.id].bullet.hasMin" class="absolute rounded"
+                      style="top: -1px; bottom: -1px; width: 2px; background: #2C2039; opacity: 0.45;"
+                      :style="{ left: simResults[c.id].bullet.minPct + '%' }" v-tooltip="'Mínimo: ' + fmtMwh(simResults[c.id].min)" />
+                    <div v-if="simResults[c.id].bullet.hasMax" class="absolute rounded"
+                      style="top: -1px; bottom: -1px; width: 2px; background: #2C2039; opacity: 0.45;"
+                      :style="{ left: simResults[c.id].bullet.maxPct + '%' }" v-tooltip="'Máximo: ' + fmtMwh(simResults[c.id].max)" />
+                    <!-- Proyección de cierre (diamante) -->
+                    <div v-if="simResults[c.id].bullet.proyPct != null" class="absolute"
+                      style="top: 50%; width: 11px; height: 11px; transform: translate(-50%,-50%) rotate(45deg); background: #fff; border: 2px solid #2C2039; border-radius: 2px;"
+                      :style="{ left: simResults[c.id].bullet.proyPct + '%' }"
+                      v-tooltip="'Proyección de cierre: ' + fmtMwh(simResults[c.id].genProy)" />
+                  </div>
+                  <!-- Estados -->
+                  <div class="flex items-center gap-1.5 flex-wrap">
                     <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap" :style="estadoBadge(simResults[c.id].estado)">
                       {{ estadoLabel(simResults[c.id].estado) }}
                     </span>
-                  </div>
-                  <!-- Proyectada (solo mes actual) -->
-                  <div v-if="simResults[c.id].genProy != null && simResults[c.id].genProy > 0" class="flex items-center gap-2">
-                    <div class="relative h-2 rounded-full overflow-hidden flex-1" style="background: rgba(44,32,57,0.06);">
-                      <div class="absolute left-0 top-0 h-full rounded-full transition-all duration-300"
-                        :style="{ width: simResults[c.id].proyPct !== null ? Math.min(simResults[c.id].proyPct, 100) + '%' : '0%', background: estadoColor(simResults[c.id].estadoProy) }" />
-                      <div v-if="simResults[c.id].min !== null && simResults[c.id].min > 0"
-                        class="absolute top-0 h-full w-0.5"
-                        style="background: rgba(44,32,57,0.25);"
-                        :style="{ left: simResults[c.id].max != null ? Math.min(simResults[c.id].min / simResults[c.id].max * 100, 100) + '%' : '100%' }" />
-                    </div>
-                    <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap" :style="estadoBadge(simResults[c.id].estadoProy)">
-                      {{ estadoLabel(simResults[c.id].estadoProy) }}
+                    <span v-if="simResults[c.id].genProy != null && simResults[c.id].genProy > 0"
+                      class="text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+                      :style="estadoBadge(simResults[c.id].estadoProy)">
+                      ◆ proy. {{ estadoLabel(simResults[c.id].estadoProy) }}
                     </span>
                   </div>
                 </div>
@@ -1130,12 +1136,30 @@ const simResults = computed(() => {
       else if (max !== null && genProy > max) estadoProy = 'excedente'
       else estadoProy = 'ok'
     }
+    // ── Geometría del bullet chart (zonas déficit/rango/excedente sobre un eje común) ──
+    const hasMin = min !== null
+    const hasMax = max !== null
+    let axisMax
+    if (hasMax)      axisMax = Math.max(max * 1.2, gen * 1.06, (genProy || 0) * 1.06)
+    else if (hasMin) axisMax = Math.max(min * 1.4, gen * 1.1, (genProy || 0) * 1.1)
+    else             axisMax = Math.max(gen, genProy || 0, 1) * 1.1
+    const clampPct = v => Math.max(0, Math.min(100, (v / axisMax) * 100))
+    const bullet = {
+      hasMin, hasMax,
+      hasZones: hasMin || hasMax,
+      minPct: hasMin ? clampPct(min) : 0,
+      maxPct: hasMax ? clampPct(max) : 100,
+      measurePct: clampPct(gen),
+      dupW: genDup > 0 ? Math.max(0, clampPct(gen + genDup) - clampPct(gen)) : 0,
+      proyPct: (esActual && genProy > 0) ? clampPct(genProy) : null,
+    }
+
     out[c.id] = {
       gen: Math.round(gen * 10) / 10,
       genDup: Math.round(genDup * 10) / 10,
       genProy: esActual ? Math.round(genProy * 10) / 10 : null,
       estado, estadoProy, pct, dupPct, proyPct, min, max,
-      diaActual: diaAct, diasRestantes: diasRest,
+      diaActual: diaAct, diasRestantes: diasRest, bullet,
     }
   }
   return out
@@ -1263,13 +1287,13 @@ function fmtFecha(iso) {
 function estadoColor(estado) {
   return estado === 'ok'        ? '#2e7d32'
        : estado === 'deficit'   ? '#D64455'
-       : estado === 'excedente' ? '#F0C040'
+       : estado === 'excedente' ? '#14B8A6'
        : '#b0a0c0'
 }
 function estadoBadge(estado) {
   return estado === 'ok'        ? 'background: rgba(46,125,50,0.12); color: #2e7d32;'
        : estado === 'deficit'   ? 'background: rgba(214,68,85,0.12); color: #D64455;'
-       : estado === 'excedente' ? 'background: rgba(240,192,64,0.18); color: #9a6700;'
+       : estado === 'excedente' ? 'background: rgba(20,184,166,0.16); color: #0F766E;'
        : 'background: rgba(44,32,57,0.06); color: #7a6e8a;'
 }
 function estadoLabel(estado) {
