@@ -79,6 +79,11 @@ export function useEnergizationProjects() {
   }
 
   function saveProjects() {
+    // No persistir un listado vacío: durante el rollout (sin ORIGINA_DATABASE_URL)
+    // o ante una degradación, la API devuelve `projects: []` + warning, y el watch
+    // profundo lo escribiría encima de la última copia buena — borrando justo el
+    // fallback que loadFromLocalStorage() necesita cuando la API falla por completo.
+    if (!projects.value.length) return
     try {
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(projects.value))
     } catch (e) {
