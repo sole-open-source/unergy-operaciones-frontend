@@ -375,7 +375,7 @@
               :key="c.id"
               class="cv-card flex flex-col"
               :class="{ 'cv-card-dragover': dragOver === c.id }"
-              :style="{ borderLeft: '3px solid ' + estadoColor(simResults[c.id] && simResults[c.id].estado) }"
+              :style="cardAccent(simResults[c.id] && simResults[c.id].estado)"
               @dragover.prevent="onDragOver(c.id)"
               @drop.prevent="onDrop(c.id)"
             >
@@ -1286,6 +1286,11 @@ function estadoLabel(estado) {
        : estado === 'deficit'   ? '↓ Déficit'
        : estado === 'excedente' ? '↑ Excedente'
        : '— Sin datos'
+}
+// Acento de color simétrico (izquierda + derecha) de la tarjeta según estado.
+function cardAccent(estado) {
+  const c = estadoColor(estado)
+  return { borderLeft: '3px solid ' + c, borderRight: '3px solid ' + c }
 }
 
 // ── Data loading ──────────────────────────────────────────────────────────────
