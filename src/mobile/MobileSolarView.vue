@@ -8,7 +8,6 @@
         <i :class="loadingDetail ? 'pi pi-spin pi-spinner' : 'pi pi-refresh'" />
       </button>
 
-      <!-- menú desplegable -->
       <div v-if="menuOpen" class="ms-menu" @click.self="menuOpen = false">
         <div class="ms-menu-card">
           <div class="ms-menu-user">
@@ -23,18 +22,15 @@
       </div>
     </header>
 
-    <!-- ══ SELECTOR DE PROYECTO ══ -->
+    <!-- ══ SELECTOR (sin flechas — se cambia con swipe) ══ -->
     <div v-if="proyectos.length" class="ms-selector">
-      <button class="ms-nav" :disabled="idx === 0" @click="goPrev"><i class="pi pi-chevron-left" /></button>
       <button class="ms-current" @click="pickerOpen = !pickerOpen">
         <span class="ms-dot" :style="{ background: statusColor(current?.status) }" />
         <span class="ms-name">{{ current?.nombre || '—' }}</span>
         <i class="pi pi-chevron-down ms-caret" />
-        <span class="ms-count">{{ idx + 1 }} / {{ proyectos.length }}</span>
       </button>
-      <button class="ms-nav" :disabled="idx === proyectos.length - 1" @click="goNext"><i class="pi pi-chevron-right" /></button>
+      <span class="ms-count">{{ idx + 1 }} / {{ proyectos.length }}</span>
 
-      <!-- lista de proyectos -->
       <div v-if="pickerOpen" class="ms-picker" @click.self="pickerOpen = false">
         <div class="ms-picker-card">
           <div class="ms-picker-head">Proyectos</div>
@@ -49,65 +45,64 @@
       </div>
     </div>
 
-    <!-- ══ CUERPO ══ -->
-    <main class="ms-body"
-      @touchstart.passive="onTouchStart" @touchend.passive="onTouchEnd">
+    <!-- ══ DECK SWIPEABLE ══ -->
+    <main v-if="proyectos.length" ref="deckRef" class="ms-deck"
+      @touchstart.passive="onTouchStart" @touchmove.passive="onTouchMove" @touchend="onTouchEnd">
+      <div class="ms-track" :style="trackStyle">
+        <section v-for="p in proyectos" :key="p.proyecto_id" class="ms-slide">
+          <!-- Chips "ahora" -->
+          <div class="ms-now">
+            <div class="ms-now-chip">
+              <span class="ms-now-dot" style="background:#915BD8" />
+              <div class="ms-now-text">
+                <span class="ms-now-label">Inversores</span>
+                <span class="ms-now-val">{{ fmtKw(nowMap[p.proyecto_id]?.inv ?? null) }}</span>
+              </div>
+            </div>
+            <div class="ms-now-chip">
+              <span class="ms-now-dot" style="background:#14B8A6" />
+              <div class="ms-now-text">
+                <span class="ms-now-label">Medidor</span>
+                <span class="ms-now-val">{{ fmtKw(nowMap[p.proyecto_id]?.med ?? null) }}</span>
+              </div>
+            </div>
+          </div>
 
-      <!-- Carga inicial -->
-      <div v-if="loadingList && !proyectos.length" class="ms-state">
-        <i class="pi pi-spin pi-spinner" /> <span>Cargando proyectos…</span>
+          <!-- Gráfica -->
+          <div class="ms-chart">
+            <div v-if="loadingDetail && !detailMap[p.proyecto_id]" class="ms-chart-loading">
+              <i class="pi pi-spin pi-spinner" /> <span>Cargando datos…</span>
+            </div>
+            <ProjectLiveChart v-else :detail="detailMap[p.proyecto_id]" />
+          </div>
+
+          <!-- Pie -->
+          <div class="ms-footer">
+            <span class="ms-updated"><i class="pi pi-clock" /> {{ lastUpdated || '—' }}</span>
+            <button v-if="rcnMap[p.proyecto_id]" class="ms-reconnect" @click="openSheet(p)">
+              <span :class="['ms-relay-badge', relayBadgeClass(p)]">{{ relayBadgeText(p) }}</span>
+              <i class="pi pi-power-off" /> Reconectar
+            </button>
+          </div>
+        </section>
       </div>
+    </main>
 
-      <!-- Sin proyectos -->
-      <div v-else-if="!proyectos.length" class="ms-state">
+    <!-- ══ ESTADOS sin proyectos ══ -->
+    <div v-else class="ms-state">
+      <template v-if="loadingList"><i class="pi pi-spin pi-spinner" /> <span>Cargando proyectos…</span></template>
+      <template v-else>
         <i class="pi pi-sun" style="font-size:34px;color:#cbd5e1" />
         <span>Sin proyectos disponibles</span>
         <button class="ms-retry" @click="cargarLista">Reintentar</button>
-      </div>
-
-      <template v-else>
-        <!-- Chips "ahora" -->
-        <div class="ms-now">
-          <div class="ms-now-chip">
-            <span class="ms-now-dot" style="background:#915BD8" />
-            <span class="ms-now-label">Inversores</span>
-            <span class="ms-now-val">{{ fmtKw(latestInv) }}</span>
-          </div>
-          <div class="ms-now-chip">
-            <span class="ms-now-dot" style="background:#14B8A6" />
-            <span class="ms-now-label">Medidor</span>
-            <span class="ms-now-val">{{ fmtKw(latestMed) }}</span>
-          </div>
-        </div>
-
-        <!-- Gráfica combinada -->
-        <div class="ms-chart">
-          <div v-if="loadingDetail && !currentDetail" class="ms-chart-loading">
-            <i class="pi pi-spin pi-spinner" /> <span>Cargando datos…</span>
-          </div>
-          <ProjectLiveChart v-else :detail="currentDetail" />
-        </div>
-
-        <!-- Pie: actualizado + reconectar -->
-        <div class="ms-footer">
-          <span class="ms-updated"><i class="pi pi-clock" /> {{ lastUpdated || '—' }}</span>
-          <button v-if="hasRelay" class="ms-reconnect" @click="openSheet">
-            <span :class="['ms-relay-badge', relayBadgeClass]">{{ relayBadgeText }}</span>
-            <i class="pi pi-power-off" /> Reconectar
-          </button>
-        </div>
-
-        <!-- hint deslizar -->
-        <div class="ms-swipe-hint">‹ desliza para cambiar de proyecto ›</div>
       </template>
-    </main>
+    </div>
 
-    <!-- Hoja de reconexión -->
     <ReconnectSheet
       :open="sheetOpen"
-      :proyecto-id="current?.proyecto_id"
-      :nombre="current?.nombre || ''"
-      :active="currentRelay?.active ?? null"
+      :proyecto-id="sheetTarget?.proyecto_id"
+      :nombre="sheetTarget?.nombre || ''"
+      :active="(sheetTarget && rcnMap[sheetTarget.proyecto_id]?.active) ?? null"
       @close="sheetOpen = false"
       @done="onReconnectDone"
     />
@@ -115,7 +110,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import api from '@/api/client'
@@ -135,30 +130,71 @@ const STATUS_COLORS = {
 function statusColor(s) { return STATUS_COLORS[s] || '#9ca3af' }
 
 // ── Estado ──────────────────────────────────────────────────────────────────
-const proyectos    = ref([])
-const idx          = ref(0)
-const detailMap    = reactive({})         // proyecto_id → detalle
-const rcnMap        = reactive({})        // proyecto_id → { active }
-const loadingList  = ref(false)
+const proyectos     = ref([])
+const idx           = ref(0)
+const detailMap     = reactive({})  // proyecto_id → detalle
+const nowMap        = reactive({})  // proyecto_id → { inv, med } (potencia "ahora")
+const rcnMap        = reactive({})  // proyecto_id → { active }
+const loadingList   = ref(false)
 const loadingDetail = ref(false)
-const lastUpdated  = ref('')
-const menuOpen     = ref(false)
-const pickerOpen   = ref(false)
-const sheetOpen    = ref(false)
-let refreshTimer   = null
+const lastUpdated   = ref('')
+const menuOpen      = ref(false)
+const pickerOpen    = ref(false)
+const sheetOpen     = ref(false)
+const sheetTarget   = ref(null)
+let refreshTimer    = null
 
-const current        = computed(() => proyectos.value[idx.value] || null)
-const currentDetail  = computed(() => (current.value ? detailMap[current.value.proyecto_id] : null) || null)
-const currentRelay   = computed(() => (current.value ? rcnMap[current.value.proyecto_id] : null) || null)
-const hasRelay       = computed(() => !!current.value && !!rcnMap[current.value.proyecto_id])
+const current = computed(() => proyectos.value[idx.value] || null)
 
-const latestInv = computed(() => latest(inverterSeries(currentDetail.value)))
-const latestMed = computed(() => latest(meterSeries(currentDetail.value)))
+function relayBadgeText(p)  { const a = rcnMap[p.proyecto_id]?.active; return a === true ? 'ON' : a === false ? 'OFF' : '—' }
+function relayBadgeClass(p) { const a = rcnMap[p.proyecto_id]?.active; return a === true ? 'ms-relay-badge--on' : a === false ? 'ms-relay-badge--off' : 'ms-relay-badge--unk' }
 
-const relayBadgeText  = computed(() => currentRelay.value?.active === true ? 'ON'
-  : currentRelay.value?.active === false ? 'OFF' : '—')
-const relayBadgeClass = computed(() => currentRelay.value?.active === true ? 'ms-relay-badge--on'
-  : currentRelay.value?.active === false ? 'ms-relay-badge--off' : 'ms-relay-badge--unk')
+// ── Swipe deck ───────────────────────────────────────────────────────────────
+const deckRef  = ref(null)
+const slideW   = ref(typeof window !== 'undefined' ? window.innerWidth : 360)
+const dragX    = ref(0)
+const dragging = ref(false)
+let startX = 0, startY = 0, horizontal = null
+
+const trackStyle = computed(() => ({
+  transform: `translate3d(${-idx.value * slideW.value + dragX.value}px, 0, 0)`,
+  transition: dragging.value ? 'none' : 'transform .34s cubic-bezier(.22,.61,.36,1)',
+}))
+
+function measure() { slideW.value = deckRef.value?.clientWidth || window.innerWidth }
+
+function onTouchStart(e) {
+  startX = e.touches[0].clientX
+  startY = e.touches[0].clientY
+  horizontal = null
+  dragging.value = true
+}
+function onTouchMove(e) {
+  const dx = e.touches[0].clientX - startX
+  const dy = e.touches[0].clientY - startY
+  if (horizontal === null && (Math.abs(dx) > 6 || Math.abs(dy) > 6)) horizontal = Math.abs(dx) > Math.abs(dy)
+  if (!horizontal) return
+  let d = dx
+  // resistencia en los extremos
+  if ((idx.value === 0 && d > 0) || (idx.value === proyectos.value.length - 1 && d < 0)) d *= 0.35
+  dragX.value = d
+}
+function onTouchEnd() {
+  dragging.value = false
+  const th = slideW.value * 0.18
+  if (dragX.value <= -th && idx.value < proyectos.value.length - 1) {
+    idx.value++
+    dragX.value += slideW.value
+    requestAnimationFrame(() => { dragX.value = 0 })
+  } else if (dragX.value >= th && idx.value > 0) {
+    idx.value--
+    dragX.value -= slideW.value
+    requestAnimationFrame(() => { dragX.value = 0 })
+  } else {
+    dragX.value = 0
+  }
+  horizontal = null
+}
 
 // ── Carga ───────────────────────────────────────────────────────────────────
 async function cargarLista() {
@@ -167,18 +203,19 @@ async function cargarLista() {
     const res = await api.get('/generacion-solar/monitoring')
     proyectos.value = res.data.projects ?? []
     if (idx.value >= proyectos.value.length) idx.value = 0
-  } catch { /* el estado vacío maneja el error */ } finally {
+  } catch { /* el estado vacío lo maneja */ } finally {
     loadingList.value = false
   }
+  await nextTick(); measure()
   cargarEstados()
-  if (current.value) loadDetail(current.value.proyecto_id, true)
+  prefetchAround()
 }
 
 async function cargarEstados() {
   try {
     const { data } = await api.get('/reconectadores/estados')
     for (const r of data) rcnMap[r.proyecto_id] = { active: r.active }
-  } catch { /* silencioso — si falla, simplemente no se muestra el botón */ }
+  } catch { /* silencioso */ }
 }
 
 async function loadDetail(id, force = false) {
@@ -188,10 +225,18 @@ async function loadDetail(id, force = false) {
   try {
     const res = await api.get(`/generacion-solar/monitoring/${id}`)
     detailMap[id] = res.data
+    nowMap[id] = { inv: latest(inverterSeries(res.data)), med: latest(meterSeries(res.data)) }
     lastUpdated.value = new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
   } catch { if (!detailMap[id]) detailMap[id] = {} } finally {
     loadingDetail.value = false
   }
+}
+
+// carga el proyecto actual + sus vecinos (para que el swipe ya tenga datos)
+function prefetchAround() {
+  const ids = [idx.value, idx.value - 1, idx.value + 1]
+    .map((i) => proyectos.value[i]?.proyecto_id).filter(Boolean)
+  ids.forEach((id) => loadDetail(id))
 }
 
 function refrescar() {
@@ -199,57 +244,36 @@ function refrescar() {
   cargarEstados()
 }
 
-// ── Navegación entre proyectos ────────────────────────────────────────────────
-function selectIdx(i) {
-  idx.value = i
-  pickerOpen.value = false
-}
-function goPrev() { if (idx.value > 0) idx.value-- }
-function goNext() { if (idx.value < proyectos.value.length - 1) idx.value++ }
+watch(idx, prefetchAround)
 
-// carga perezosa al cambiar de proyecto (+ prefetch del vecino siguiente)
-watch(idx, () => {
-  if (current.value) loadDetail(current.value.proyecto_id)
-  const next = proyectos.value[idx.value + 1]
-  if (next) loadDetail(next.proyecto_id)
-})
-
-// ── Swipe ──────────────────────────────────────────────────────────────────
-let touchX = 0, touchY = 0
-function onTouchStart(e) { touchX = e.changedTouches[0].clientX; touchY = e.changedTouches[0].clientY }
-function onTouchEnd(e) {
-  const dx = e.changedTouches[0].clientX - touchX
-  const dy = e.changedTouches[0].clientY - touchY
-  if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
-    if (dx < 0) goNext(); else goPrev()
-  }
-}
+// ── Navegación ───────────────────────────────────────────────────────────────
+function selectIdx(i) { idx.value = i; pickerOpen.value = false }
 
 // ── Reconexión ───────────────────────────────────────────────────────────────
-function openSheet() { sheetOpen.value = true }
+function openSheet(p) { sheetTarget.value = p; sheetOpen.value = true }
 function onReconnectDone({ active }) {
-  if (current.value) {
-    rcnMap[current.value.proyecto_id] = { active }
-    window.__primeToast?.({ severity: 'success', summary: 'Comando enviado',
-      detail: `${current.value.nombre}: ${active ? 'ON' : 'OFF'}`, life: 3500 })
-    // refrescar estado real tras unos segundos
-    cargarEstados()
-  }
+  const p = sheetTarget.value
+  if (!p) return
+  rcnMap[p.proyecto_id] = { active }
+  window.__primeToast?.({ severity: 'success', summary: 'Comando enviado',
+    detail: `${p.nombre}: ${active ? 'ON' : 'OFF'}`, life: 3500 })
+  cargarEstados()
 }
 
 // ── Sesión ─────────────────────────────────────────────────────────────────
-function cerrarSesion() {
-  auth.logout()
-  router.replace('/m/login')
-}
+function cerrarSesion() { auth.logout(); router.replace('/m/login') }
 
 // ── Ciclo de vida ─────────────────────────────────────────────────────────
 onMounted(() => {
   register()
   cargarLista()
   refreshTimer = setInterval(refrescar, 60000)
+  window.addEventListener('resize', measure)
 })
-onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer) })
+onUnmounted(() => {
+  if (refreshTimer) clearInterval(refreshTimer)
+  window.removeEventListener('resize', measure)
+})
 </script>
 
 <style scoped>
@@ -266,107 +290,107 @@ onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer) })
   padding: calc(10px + env(safe-area-inset-top)) 14px 10px;
   background: #2C2039; color: #fff; position: relative;
 }
-.ms-brand { flex: 1; text-align: center; font-size: 15px; font-weight: 700; letter-spacing: .3px; }
+.ms-brand { flex: 1; text-align: center; font-size: clamp(15px, 4.6vw, 19px); font-weight: 700; letter-spacing: .3px; }
 .ms-brand .pi { color: #F6FF72; margin-right: 5px; }
 .ms-icon-btn {
-  width: 38px; height: 38px; border-radius: 10px; border: none;
-  background: rgba(255,255,255,0.1); color: #fff; font-size: 16px; flex-shrink: 0;
+  width: 40px; height: 40px; border-radius: 11px; border: none;
+  background: rgba(255,255,255,0.1); color: #fff; font-size: 17px; flex-shrink: 0;
 }
 .ms-icon-btn:disabled { opacity: .5; }
 
 .ms-menu { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,0.2); }
 .ms-menu-card {
-  position: absolute; top: calc(54px + env(safe-area-inset-top)); left: 12px;
-  background: #fff; border-radius: 14px; padding: 8px; min-width: 220px;
+  position: absolute; top: calc(56px + env(safe-area-inset-top)); left: 12px;
+  background: #fff; border-radius: 14px; padding: 8px; min-width: 230px;
   box-shadow: 0 12px 30px rgba(0,0,0,0.25);
 }
 .ms-menu-user { display: flex; align-items: center; gap: 10px; padding: 10px 10px 12px; border-bottom: 1px solid #f0ebf7; }
-.ms-menu-user .pi { font-size: 20px; color: #915BD8; }
-.ms-menu-name { font-size: 14px; font-weight: 700; color: #2C2039; }
-.ms-menu-email { font-size: 12px; color: #9ca3af; }
+.ms-menu-user .pi { font-size: 22px; color: #915BD8; }
+.ms-menu-name { font-size: 15px; font-weight: 700; color: #2C2039; }
+.ms-menu-email { font-size: 12.5px; color: #9ca3af; }
 .ms-menu-item {
   display: flex; align-items: center; gap: 9px; width: 100%; margin-top: 6px;
-  padding: 11px 10px; border: none; background: none; border-radius: 9px;
-  font-size: 14px; color: #b91c1c; font-weight: 600; text-align: left;
+  padding: 12px 10px; border: none; background: none; border-radius: 9px;
+  font-size: 15px; color: #b91c1c; font-weight: 600; text-align: left;
 }
-.ms-menu-item:hover { background: #fef2f2; }
 
 /* Selector */
 .ms-selector {
-  display: flex; align-items: center; gap: 8px; flex-shrink: 0;
-  padding: 12px 14px; background: #fff; border-bottom: 1px solid #eceaf2; position: relative;
+  display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+  padding: 12px 16px; background: #fff; border-bottom: 1px solid #eceaf2; position: relative;
 }
-.ms-nav {
-  width: 38px; height: 44px; border-radius: 11px; border: 1px solid #eceaf2;
-  background: #faf8fd; color: #915BD8; font-size: 15px; flex-shrink: 0;
-}
-.ms-nav:disabled { opacity: .35; }
 .ms-current {
-  flex: 1; display: flex; align-items: center; gap: 8px; min-width: 0;
-  padding: 8px 12px; border: 1px solid #eceaf2; border-radius: 11px; background: #fff;
+  flex: 1; display: flex; align-items: center; gap: 9px; min-width: 0;
+  padding: 10px 14px; border: 1px solid #eceaf2; border-radius: 13px; background: #faf8fd;
 }
-.ms-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
-.ms-name { flex: 1; min-width: 0; font-size: 15px; font-weight: 700; text-align: left;
+.ms-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.ms-name { flex: 1; min-width: 0; font-size: clamp(16px, 4.6vw, 20px); font-weight: 700; text-align: left;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ms-caret { font-size: 11px; color: #9ca3af; }
-.ms-count { font-size: 11px; color: #9ca3af; font-weight: 600; flex-shrink: 0; }
+.ms-caret { font-size: 12px; color: #9ca3af; }
+.ms-count { font-size: 13px; color: #9ca3af; font-weight: 700; flex-shrink: 0; white-space: nowrap; }
 
 .ms-picker { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,0.25); }
 .ms-picker-card {
-  position: absolute; top: 0; left: 0; right: 0; max-height: 75vh; overflow-y: auto;
+  position: absolute; top: 0; left: 0; right: 0; max-height: 78vh; overflow-y: auto;
   background: #fff; border-radius: 0 0 18px 18px; padding: 8px;
   box-shadow: 0 12px 30px rgba(0,0,0,0.25);
 }
 .ms-picker-head { font-size: 12px; font-weight: 700; color: #9ca3af; padding: 12px 12px 8px; text-transform: uppercase; letter-spacing: .5px; }
 .ms-picker-item {
-  display: flex; align-items: center; gap: 10px; width: 100%;
-  padding: 13px 12px; border: none; background: none; border-radius: 10px;
-  font-size: 14.5px; color: #2C2039; text-align: left;
+  display: flex; align-items: center; gap: 11px; width: 100%;
+  padding: 14px 12px; border: none; background: none; border-radius: 10px;
+  font-size: 15.5px; color: #2C2039; text-align: left;
 }
 .ms-picker-item--active { background: #f3edfb; font-weight: 700; }
 .ms-picker-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ms-picker-relay { color: #F6B100; font-size: 13px; }
+.ms-picker-relay { color: #EAB308; font-size: 14px; }
 
-/* Body */
-.ms-body { flex: 1; display: flex; flex-direction: column; overflow: hidden; padding: 14px; }
+/* Deck swipeable */
+.ms-deck { flex: 1; overflow: hidden; touch-action: pan-y; }
+.ms-track { display: flex; height: 100%; will-change: transform; }
+.ms-slide {
+  flex: 0 0 100%; width: 100%; height: 100%;
+  display: flex; flex-direction: column; padding: 14px 16px 16px;
+}
+
 .ms-state {
   flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 12px; color: #6b5a8a; font-size: 14px;
+  gap: 12px; color: #6b5a8a; font-size: 15px;
 }
 .ms-state .pi-spinner { font-size: 26px; color: #915BD8; }
-.ms-retry { margin-top: 4px; padding: 9px 18px; border: none; border-radius: 10px; background: #915BD8; color: #fff; font-weight: 600; }
+.ms-retry { margin-top: 4px; padding: 10px 20px; border: none; border-radius: 11px; background: #915BD8; color: #fff; font-weight: 600; font-size: 15px; }
 
-.ms-now { display: flex; gap: 10px; margin-bottom: 12px; flex-shrink: 0; }
+/* Chips "ahora" */
+.ms-now { display: flex; gap: 12px; margin-bottom: 14px; flex-shrink: 0; }
 .ms-now-chip {
-  flex: 1; display: flex; align-items: center; gap: 8px;
-  background: #fff; border: 1px solid #eceaf2; border-radius: 13px; padding: 11px 13px;
+  flex: 1; display: flex; align-items: center; gap: 11px;
+  background: #fff; border: 1px solid #eceaf2; border-radius: 16px; padding: 13px 16px;
 }
-.ms-now-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-.ms-now-label { font-size: 12px; color: #6b5a8a; flex: 1; }
-.ms-now-val { font-size: 16px; font-weight: 800; color: #2C2039; }
+.ms-now-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+.ms-now-text { display: flex; flex-direction: column; min-width: 0; }
+.ms-now-label { font-size: clamp(12px, 3.4vw, 14px); color: #6b5a8a; font-weight: 600; }
+.ms-now-val { font-size: clamp(20px, 6.2vw, 30px); font-weight: 800; color: #2C2039; line-height: 1.1; letter-spacing: -0.5px; }
 
 .ms-chart {
   flex: 1; min-height: 0; position: relative;
-  background: #fff; border: 1px solid #eceaf2; border-radius: 16px; padding: 12px 10px 6px;
+  background: #fff; border: 1px solid #eceaf2; border-radius: 18px; padding: 14px 12px 8px;
 }
 .ms-chart-loading {
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-  gap: 10px; color: #6b5a8a; font-size: 13px;
+  gap: 10px; color: #6b5a8a; font-size: 14px;
 }
 .ms-chart-loading .pi-spinner { font-size: 22px; color: #915BD8; }
 
-.ms-footer { display: flex; align-items: center; gap: 12px; margin-top: 12px; flex-shrink: 0; }
-.ms-updated { font-size: 12px; color: #9ca3af; display: flex; align-items: center; gap: 6px; }
+.ms-footer { display: flex; align-items: center; gap: 12px; margin-top: 14px; flex-shrink: 0; }
+.ms-updated { font-size: 13px; color: #9ca3af; display: flex; align-items: center; gap: 6px; }
 .ms-reconnect {
-  margin-left: auto; display: flex; align-items: center; gap: 8px;
-  padding: 12px 18px; border: none; border-radius: 13px;
-  background: #915BD8; color: #fff; font-size: 14px; font-weight: 700;
+  margin-left: auto; display: flex; align-items: center; gap: 9px;
+  padding: 13px 20px; border: none; border-radius: 14px;
+  background: #915BD8; color: #fff; font-size: clamp(14px, 4vw, 16px); font-weight: 700;
   box-shadow: 0 6px 16px rgba(145,91,216,0.35);
 }
-.ms-relay-badge { font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 5px; }
+.ms-relay-badge { font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: 6px; }
 .ms-relay-badge--on  { background: #dcfce7; color: #15803d; }
 .ms-relay-badge--off { background: #fee2e2; color: #b91c1c; }
 .ms-relay-badge--unk { background: rgba(255,255,255,0.2); color: #fff; }
-
-.ms-swipe-hint { text-align: center; font-size: 11px; color: #c4b8d8; margin-top: 10px; flex-shrink: 0; }
 </style>
