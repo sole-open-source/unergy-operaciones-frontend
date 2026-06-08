@@ -4,6 +4,10 @@
     <header class="ms-topbar">
       <button class="ms-icon-btn" @click="menuOpen = !menuOpen" title="Menú"><i class="pi pi-bars" /></button>
       <span class="ms-brand"><i class="pi pi-sun" /> Unergy Solar</span>
+      <button class="ms-icon-btn ms-bell" @click="notifOpen = true" title="Notificaciones">
+        <i class="pi pi-bell" />
+        <span v-if="unreadCount > 0" class="ms-bell-badge">{{ unreadCount > 9 ? '9+' : unreadCount }}</span>
+      </button>
       <button class="ms-icon-btn" :disabled="loadingDetail" @click="refrescar" title="Actualizar">
         <i :class="loadingDetail ? 'pi pi-spin pi-spinner' : 'pi pi-refresh'" />
       </button>
@@ -106,6 +110,8 @@
       @close="sheetOpen = false"
       @done="onReconnectDone"
     />
+
+    <NotificationsSheet :open="notifOpen" @close="notifOpen = false" @changed="fetchUnread" />
   </div>
 </template>
 
@@ -118,6 +124,7 @@ import { usePwa } from '@/mobile/usePwa'
 import { inverterSeries, meterSeries, latest, fmtKw } from '@/mobile/solarSeries'
 import ProjectLiveChart from '@/mobile/components/ProjectLiveChart.vue'
 import ReconnectSheet from '@/mobile/components/ReconnectSheet.vue'
+import NotificationsSheet from '@/mobile/components/NotificationsSheet.vue'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -142,7 +149,16 @@ const menuOpen      = ref(false)
 const pickerOpen    = ref(false)
 const sheetOpen     = ref(false)
 const sheetTarget   = ref(null)
+const notifOpen     = ref(false)
+const unreadCount   = ref(0)
 let refreshTimer    = null
+
+async function fetchUnread() {
+  try {
+    const { data } = await api.get('/notificaciones/count')
+    unreadCount.value = data.count ?? data.unread ?? 0
+  } catch { /* silencioso */ }
+}
 
 const current = computed(() => proyectos.value[idx.value] || null)
 
@@ -242,6 +258,7 @@ function prefetchAround() {
 function refrescar() {
   if (current.value) loadDetail(current.value.proyecto_id, true)
   cargarEstados()
+  fetchUnread()
 }
 
 watch(idx, prefetchAround)
@@ -267,6 +284,7 @@ function cerrarSesion() { auth.logout(); router.replace('/m/login') }
 onMounted(() => {
   register()
   cargarLista()
+  fetchUnread()
   refreshTimer = setInterval(refrescar, 60000)
   window.addEventListener('resize', measure)
 })
@@ -297,6 +315,13 @@ onUnmounted(() => {
   background: rgba(255,255,255,0.1); color: #fff; font-size: 17px; flex-shrink: 0;
 }
 .ms-icon-btn:disabled { opacity: .5; }
+.ms-bell { position: relative; }
+.ms-bell-badge {
+  position: absolute; top: 1px; right: 1px; min-width: 17px; height: 17px; padding: 0 4px;
+  display: flex; align-items: center; justify-content: center;
+  background: #dc2626; color: #fff; font-size: 10px; font-weight: 800;
+  border-radius: 9px; border: 2px solid #2C2039;
+}
 
 .ms-menu { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,0.2); }
 .ms-menu-card {
