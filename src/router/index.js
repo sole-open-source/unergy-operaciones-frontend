@@ -7,6 +7,11 @@ const routes = [
   { path: '/forgot-password',         name: 'ForgotPassword', component: () => import('@/views/ForgotPasswordView.vue'),  meta: { public: true } },
   { path: '/reset-password/:token',   name: 'ResetPassword',  component: () => import('@/views/ResetPasswordView.vue'),   meta: { public: true } },
 
+  // ── App móvil (PWA) — aparte de la plataforma ────────────────────
+  { path: '/m',           redirect: '/m/solar' },
+  { path: '/m/login',     name: 'MobileLogin',  component: () => import('@/mobile/MobileLoginView.vue'), meta: { public: true, mobile: true } },
+  { path: '/m/solar',     name: 'MobileSolar',  component: () => import('@/mobile/MobileSolarView.vue'),  meta: { mobile: true } },
+
   // ── General ──────────────────────────────────────────────────────
   { path: '/', redirect: '/dashboard' },
   { path: '/dashboard',    name: 'Dashboard',    component: () => import('@/views/DashboardView.vue') },
@@ -70,10 +75,11 @@ const router = createRouter({
 router.beforeEach((to) => {
   const auth = useAuthStore()
 
-  // No autenticado → login
-  if (!to.meta.public && !auth.isAuthenticated) return '/login'
+  // No autenticado → login (la app móvil tiene su propio login)
+  if (!to.meta.public && !auth.isAuthenticated) return to.meta.mobile ? '/m/login' : '/login'
 
-  // Ya logueado intentando ir a /login → dashboard
+  // Ya logueado intentando ir a un login → su home correspondiente
+  if (to.path === '/m/login' && auth.isAuthenticated) return '/m/solar'
   if (to.path === '/login' && auth.isAuthenticated) return '/dashboard'
 
   // Autenticado pero sin datos de usuario (localStorage.user borrado mientras

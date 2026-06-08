@@ -17,7 +17,9 @@ api.interceptors.response.use(
     if (err.response?.status === 401) {
       localStorage.removeItem('token')
       localStorage.removeItem('user')
-      window.location.href = '/login'
+      // En la app móvil (rutas /m/...) volvemos a su propio login, no al de la plataforma.
+      const enMovil = window.location.pathname.startsWith('/m/') || window.location.pathname === '/m'
+      window.location.href = enMovil ? '/m/login' : '/login'
     }
     if (err.response?.status === 403) {
       const msg = err.response.data?.detail || 'No tienes permisos para esta acción'
