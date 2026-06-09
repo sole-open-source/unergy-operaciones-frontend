@@ -102,6 +102,8 @@
       </template>
     </div>
 
+    <MobileTabBar />
+
     <ReconnectSheet
       :open="sheetOpen"
       :proyecto-id="sheetTarget?.proyecto_id"
@@ -125,6 +127,7 @@ import { inverterSeries, meterSeries, latest, fmtKw } from '@/mobile/solarSeries
 import ProjectLiveChart from '@/mobile/components/ProjectLiveChart.vue'
 import ReconnectSheet from '@/mobile/components/ReconnectSheet.vue'
 import NotificationsSheet from '@/mobile/components/NotificationsSheet.vue'
+import MobileTabBar from '@/mobile/components/MobileTabBar.vue'
 
 const router = useRouter()
 const auth = useAuthStore()

@@ -16,13 +16,21 @@ layout propios). Ver diseño en `docs/superpowers/specs/2026-06-08-app-movil-sol
 ```
 src/mobile/
 ├── MobileLoginView.vue      # login (token de larga duración, 30 días)
-├── MobileSolarView.vue      # vista principal: selector + gráfica + reconectar
+├── MobileSolarView.vue      # Generación: selector + gráfica + reconectar
+├── MobileFallasView.vue     # Fallas: lista + filtros + registrar (bitácora de monitoreo)
 ├── solarSeries.js           # extractores de series (inversores/medidor)
 ├── usePwa.js                # registra el service worker (solo en PROD, scope /m/)
 └── components/
-    ├── ProjectLiveChart.vue # gráfica combinada inversores + medidor
-    └── ReconnectSheet.vue   # hoja inferior de reconexión (lógica de Laura)
+    ├── ProjectLiveChart.vue   # gráfica combinada inversores + medidor (+ línea "ahora")
+    ├── ReconnectSheet.vue     # hoja inferior de reconexión (lógica de Laura)
+    ├── NotificationsSheet.vue # campana: notificaciones del día
+    ├── FallaDetailSheet.vue   # detalle de falla: estado/prioridad/asignado + seguimientos
+    ├── FallaCreateSheet.vue   # registrar falla (form móvil)
+    └── MobileTabBar.vue       # navegación inferior (Generación / Fallas)
 ```
+Rutas: `/m/solar` (Generación), `/m/fallas` (Fallas). Las fallas reusan los endpoints
+`/fallas`, `/fallas/catalogos`, `/fallas/{id}`, `/fallas/{id}/seguimientos` — los mismos
+que la vista web `operaciones/gestión de fallas`.
 Assets PWA (deben ir en `public/` para servirse en la raíz):
 - `public/manifest.webmanifest`
 - `public/sw-mobile.js`
