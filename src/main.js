@@ -30,6 +30,12 @@ import App from './App.vue'
 import router from './router'
 import InfoField from './components/InfoField.vue'
 import PageHeader from './components/PageHeader.vue'
+import { sanitizeLogObject } from './utils/securityUtils'
+
+// Wrapper de logging seguro disponible globalmente para depuración: enmascara
+// secretos (API keys, tokens, contraseñas, cadenas de conexión) antes de
+// imprimir. Usar window.safeLog(...) en lugar de console.log con payloads.
+window.safeLog = (...args) => console.log(...args.map(sanitizeLogObject))
 
 const app = createApp(App)
 

@@ -148,6 +148,7 @@ import { ref, onMounted } from 'vue'
 import api from '@/api/client'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
+import { sanitizeLogObject } from '@/utils/securityUtils'
 
 const data = ref(null)
 const loading = ref(false)
@@ -168,7 +169,12 @@ async function load() {
     const { data: d } = await api.get('/cumplimiento/diagnostico')
     data.value = d
   } catch (e) {
-    console.error('Failed to load diagnostic', e)
+    // No volcar el objeto de error completo: puede contener cabeceras de auth
+    // o cadenas de conexión en la config/response.
+    console.error('Failed to load diagnostic', sanitizeLogObject({
+      status: e.response?.status,
+      detail: e.response?.data?.detail,
+    }))
   } finally {
     loading.value = false
   }
@@ -182,7 +188,10 @@ async function fixEnlaces() {
     fixResult.value = d
     await load()
   } catch (e) {
-    console.error('Fix failed', e)
+    console.error('Fix failed', sanitizeLogObject({
+      status: e.response?.status,
+      detail: e.response?.data?.detail,
+    }))
     fixResult.value = { actions: [{ action: 'error', reason: e.response?.data?.detail || e.message, contrato: '—' }] }
   } finally {
     fixing.value = false

@@ -13,11 +13,13 @@
           API Key creada — copia ahora, no se mostrará de nuevo
         </div>
         <div class="flex items-center gap-2">
-          <code class="flex-1 bg-white border rounded px-3 py-2 text-xs font-mono break-all select-all">{{ newKey }}</code>
+          <code class="flex-1 bg-white border rounded px-3 py-2 text-xs font-mono break-all select-all">{{ displayedKey }}</code>
+          <Button :icon="revealed ? 'pi pi-eye-slash' : 'pi pi-eye'" text rounded size="small"
+            v-tooltip.top="revealed ? 'Ocultar' : 'Mostrar'" @click="revealed = !revealed" />
           <Button icon="pi pi-copy" text rounded size="small" v-tooltip.top="'Copiar'" @click="copyKey" />
         </div>
         <div class="text-xs text-gray-500 mt-2 space-y-1">
-          <p><strong>Uso:</strong> Enviar en header <code class="bg-gray-100 px-1 rounded">X-API-Key: {{ newKey }}</code></p>
+          <p><strong>Uso:</strong> Enviar en header <code class="bg-gray-100 px-1 rounded">X-API-Key: {{ displayedKey }}</code></p>
           <p><strong>Base URL:</strong> <code class="bg-gray-100 px-1 rounded">{{ baseUrl }}/api/v1</code></p>
         </div>
       </div>
@@ -85,7 +87,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
@@ -93,6 +95,7 @@ import Tag from 'primevue/tag'
 import Divider from 'primevue/divider'
 import { useToast } from 'primevue/usetoast'
 import api from '@/api/client'
+import { maskSecret } from '@/utils/securityUtils'
 
 const props = defineProps({ usuario: Object })
 const visible = defineModel('visible', { type: Boolean })
@@ -103,6 +106,10 @@ const loadingKeys = ref(false)
 const creating = ref(false)
 const newKeyName = ref('')
 const newKey = ref(null)
+const revealed = ref(false)
+// La key se muestra enmascarada por defecto; el usuario puede revelarla con el
+// botón del ojo. El botón "Copiar" siempre copia el valor completo.
+const displayedKey = computed(() => (revealed.value ? newKey.value : maskSecret(newKey.value)))
 const deleteConfirmVisible = ref(false)
 const deletingKey = ref(null)
 const deleting = ref(false)
@@ -112,6 +119,7 @@ const baseUrl = window.location.origin
 watch(visible, async (v) => {
   if (v && props.usuario) {
     newKey.value = null
+    revealed.value = false
     newKeyName.value = ''
     await loadKeys()
   }
@@ -137,6 +145,7 @@ async function createKey() {
       nombre: newKeyName.value.trim(),
     })
     newKey.value = data.api_key
+    revealed.value = false
     newKeyName.value = ''
     toast.add({ severity: 'success', summary: 'API Key creada', life: 3000 })
     await loadKeys()
@@ -188,5 +197,6 @@ function formatDate(d) {
 
 function onHide() {
   newKey.value = null
+  revealed.value = false
 }
 </script>

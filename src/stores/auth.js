@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 
 const BASE = import.meta.env.VITE_API_URL || ''
 
@@ -51,6 +51,14 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   const user = ref(initialUser)
+
+  // ── API key efímera ───────────────────────────────────────────────────────────
+  // Las API keys nunca se persisten en localStorage (serían legibles desde JS y
+  // sobrevivirían al cierre de sesión). Se guardan solo en memoria, durante la
+  // vida de la sesión, y se limpian al cerrar sesión mediante el watch de abajo.
+  const apiKey = ref(null)
+  function setApiKey(key) { apiKey.value = key || null }
+  function clearApiKey() { apiKey.value = null }
 
   // Si el token expiró, limpiar estado
   if (!token.value) {
@@ -106,5 +114,11 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('user')
   }
 
-  return { token, user, isAuthenticated, role, can, login, logout }
+  // Limpiar cualquier estado sensible en memoria cuando el token desaparece
+  // (logout, expiración o invalidación desde otra pestaña).
+  watch(token, (t) => {
+    if (!t) clearApiKey()
+  })
+
+  return { token, user, apiKey, isAuthenticated, role, can, login, logout, setApiKey, clearApiKey }
 })
