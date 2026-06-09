@@ -63,16 +63,17 @@ onMounted(() => { register() })
 <style scoped>
 .ml-root {
   min-height: 100vh; min-height: 100dvh;
+  width: 100%; max-width: 100%; overflow-x: hidden;
   display: flex; align-items: center; justify-content: center;
-  padding: 24px;
+  padding: 16px; box-sizing: border-box;
   background: linear-gradient(160deg, #2C2039 0%, #4C1D95 60%, #915BD8 130%);
 }
 .ml-card {
-  width: 100%; max-width: 380px;
+  width: 100%; max-width: 360px; box-sizing: border-box;
   background: rgba(255,255,255,0.06);
   border: 1px solid rgba(255,255,255,0.12);
   backdrop-filter: blur(10px);
-  border-radius: 24px; padding: 34px 26px 28px;
+  border-radius: 24px; padding: 30px 22px 24px;
   text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.3);
 }
 .ml-logo { height: 34px; margin: 0 auto 18px; display: block; }

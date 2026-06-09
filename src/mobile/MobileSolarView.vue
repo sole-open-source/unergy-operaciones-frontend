@@ -33,7 +33,8 @@
         <span class="ms-name">{{ current?.nombre || '—' }}</span>
         <i class="pi pi-chevron-down ms-caret" />
       </button>
-      <span class="ms-count">{{ idx + 1 }} / {{ proyectos.length }}</span>
+      <button class="ms-add-falla" @click="openCreate" title="Reportar falla en esta planta"><i class="pi pi-plus" /></button>
+      <span class="ms-count">{{ idx + 1 }}/{{ proyectos.length }}</span>
 
       <div v-if="pickerOpen" class="ms-picker" @click.self="pickerOpen = false">
         <div class="ms-picker-card">
@@ -80,6 +81,20 @@
             <ProjectLiveChart v-else :detail="detailMap[p.proyecto_id]" />
           </div>
 
+          <!-- Falla(s) activa(s) del proyecto -->
+          <div v-if="(fallasMap[p.proyecto_id] || []).length" class="ms-fallas">
+            <button v-for="f in (fallasMap[p.proyecto_id] || []).slice(0, 2)" :key="f.id"
+              class="ms-falla" @click="openFalla(f)">
+              <span class="ms-falla-stripe" :style="{ background: f.prioridad?.color_hex || '#9ca3af' }" />
+              <span class="ms-falla-estado" :style="{ background: (f.estado?.color_hex || '#915BD8') + '22', color: f.estado?.color_hex || '#915BD8' }">{{ f.estado?.etiqueta }}</span>
+              <span class="ms-falla-tipo">{{ f.tipo?.etiqueta || f.tipo_libre || 'Falla' }}</span>
+              <i class="pi pi-chevron-right ms-falla-arrow" />
+            </button>
+            <span v-if="(fallasMap[p.proyecto_id] || []).length > 2" class="ms-falla-more">
+              +{{ (fallasMap[p.proyecto_id] || []).length - 2 }} fallas más
+            </span>
+          </div>
+
           <!-- Pie -->
           <div class="ms-footer">
             <span class="ms-updated"><i class="pi pi-clock" /> {{ lastUpdated || '—' }}</span>
@@ -114,6 +129,11 @@
     />
 
     <NotificationsSheet :open="notifOpen" @close="notifOpen = false" @changed="fetchUnread" />
+
+    <FallaCreateSheet :open="createOpen" :catalogos="catalogos" :proyectos="proyectosFalla"
+      :prefill-proyecto-id="createProyectoId" @close="createOpen = false" @created="onFallaCreated" />
+    <FallaDetailSheet :open="fallaDetailOpen" :falla="fallaDetail" :catalogos="catalogos" :usuarios="usuarios"
+      @close="fallaDetailOpen = false" @updated="onFallaUpdated" />
   </div>
 </template>
 
@@ -128,6 +148,8 @@ import ProjectLiveChart from '@/mobile/components/ProjectLiveChart.vue'
 import ReconnectSheet from '@/mobile/components/ReconnectSheet.vue'
 import NotificationsSheet from '@/mobile/components/NotificationsSheet.vue'
 import MobileTabBar from '@/mobile/components/MobileTabBar.vue'
+import FallaCreateSheet from '@/mobile/components/FallaCreateSheet.vue'
+import FallaDetailSheet from '@/mobile/components/FallaDetailSheet.vue'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -155,6 +177,49 @@ const sheetTarget   = ref(null)
 const notifOpen     = ref(false)
 const unreadCount   = ref(0)
 let refreshTimer    = null
+
+// ── Fallas (falla activa por proyecto + reportar) ────────────────────────────
+const catalogos       = reactive({ estados: [], prioridades: [], tipos: [], resoluciones: [] })
+const usuarios        = ref([])
+const fallasMap       = reactive({})   // proyecto_id → [fallas activas]
+const createOpen      = ref(false)
+const createProyectoId = ref(null)
+const fallaDetailOpen = ref(false)
+const fallaDetail     = ref(null)
+
+const proyectosFalla = computed(() =>
+  proyectos.value.map((p) => ({ id: p.proyecto_id, nombre_comercial: p.nombre })))
+
+async function cargarCatalogos() {
+  try {
+    const [cat, usr] = await Promise.all([
+      api.get('/fallas/catalogos'),
+      api.get('/usuarios', { params: { size: 200 } }).catch(() => ({ data: { items: [] } })),
+    ])
+    Object.assign(catalogos, cat.data)
+    usuarios.value = usr.data.items ?? []
+  } catch { /* no crítico — la generación funciona igual */ }
+}
+
+async function loadFallas(proyectoId, force = false) {
+  if (!proyectoId) return
+  if (fallasMap[proyectoId] && !force) return
+  try {
+    const { data } = await api.get('/fallas', { params: { proyecto_id: proyectoId, size: 100 } })
+    fallasMap[proyectoId] = (data.items ?? []).filter((f) => !f.estado?.es_estado_final)
+  } catch { if (!fallasMap[proyectoId]) fallasMap[proyectoId] = [] }
+}
+
+function openCreate() {
+  if (!current.value) return
+  createProyectoId.value = current.value.proyecto_id
+  createOpen.value = true
+}
+function onFallaCreated() {
+  if (createProyectoId.value) loadFallas(createProyectoId.value, true)
+}
+function openFalla(f) { fallaDetail.value = f; fallaDetailOpen.value = true }
+function onFallaUpdated(f) { if (f?.proyecto_id) loadFallas(f.proyecto_id, true) }
 
 async function fetchUnread() {
   try {
@@ -255,11 +320,11 @@ async function loadDetail(id, force = false) {
 function prefetchAround() {
   const ids = [idx.value, idx.value - 1, idx.value + 1]
     .map((i) => proyectos.value[i]?.proyecto_id).filter(Boolean)
-  ids.forEach((id) => loadDetail(id))
+  ids.forEach((id) => { loadDetail(id); loadFallas(id) })
 }
 
 function refrescar() {
-  if (current.value) loadDetail(current.value.proyecto_id, true)
+  if (current.value) { loadDetail(current.value.proyecto_id, true); loadFallas(current.value.proyecto_id, true) }
   cargarEstados()
   fetchUnread()
 }
@@ -287,6 +352,7 @@ function cerrarSesion() { auth.logout(); router.replace('/m/login') }
 onMounted(() => {
   register()
   cargarLista()
+  cargarCatalogos()
   fetchUnread()
   refreshTimer = setInterval(refrescar, 60000)
   window.addEventListener('resize', measure)
@@ -311,11 +377,11 @@ onUnmounted(() => {
   padding: calc(10px + env(safe-area-inset-top)) 14px 10px;
   background: #2C2039; color: #fff; position: relative;
 }
-.ms-brand { flex: 1; text-align: center; font-size: clamp(15px, 4.6vw, 19px); font-weight: 700; letter-spacing: .3px; }
+.ms-brand { flex: 1; text-align: center; font-size: clamp(14px, 3.9vw, 16px); font-weight: 700; letter-spacing: .2px; }
 .ms-brand .pi { color: #F6FF72; margin-right: 5px; }
 .ms-icon-btn {
-  width: 40px; height: 40px; border-radius: 11px; border: none;
-  background: rgba(255,255,255,0.1); color: #fff; font-size: 17px; flex-shrink: 0;
+  width: 36px; height: 36px; border-radius: 10px; border: none;
+  background: rgba(255,255,255,0.1); color: #fff; font-size: 15px; flex-shrink: 0;
 }
 .ms-icon-btn:disabled { opacity: .5; }
 .ms-bell { position: relative; }
@@ -344,18 +410,24 @@ onUnmounted(() => {
 
 /* Selector */
 .ms-selector {
-  display: flex; align-items: center; gap: 10px; flex-shrink: 0;
-  padding: 12px 16px; background: #fff; border-bottom: 1px solid #eceaf2; position: relative;
+  display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+  padding: 9px 12px; background: #fff; border-bottom: 1px solid #eceaf2; position: relative;
 }
 .ms-current {
-  flex: 1; display: flex; align-items: center; gap: 9px; min-width: 0;
-  padding: 10px 14px; border: 1px solid #eceaf2; border-radius: 13px; background: #faf8fd;
+  flex: 1; display: flex; align-items: center; gap: 8px; min-width: 0;
+  padding: 9px 12px; border: 1px solid #eceaf2; border-radius: 12px; background: #faf8fd;
 }
-.ms-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-.ms-name { flex: 1; min-width: 0; font-size: clamp(16px, 4.6vw, 20px); font-weight: 700; text-align: left;
+.ms-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.ms-name { flex: 1; min-width: 0; font-size: clamp(14px, 4vw, 16px); font-weight: 700; text-align: left;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ms-caret { font-size: 12px; color: #9ca3af; }
-.ms-count { font-size: 13px; color: #9ca3af; font-weight: 700; flex-shrink: 0; white-space: nowrap; }
+.ms-caret { font-size: 11px; color: #9ca3af; }
+.ms-count { font-size: 12px; color: #9ca3af; font-weight: 700; flex-shrink: 0; white-space: nowrap; }
+.ms-add-falla {
+  width: 38px; height: 38px; flex-shrink: 0; border: none; border-radius: 11px;
+  background: #F6FF72; color: #2C2039; font-size: 17px; font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 3px 10px rgba(246,255,114,0.5);
+}
 
 .ms-picker { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,0.25); }
 .ms-picker-card {
@@ -378,7 +450,7 @@ onUnmounted(() => {
 .ms-track { display: flex; height: 100%; will-change: transform; }
 .ms-slide {
   flex: 0 0 100%; width: 100%; height: 100%;
-  display: flex; flex-direction: column; padding: 14px 16px 16px;
+  display: flex; flex-direction: column; padding: 11px 13px 12px;
 }
 
 .ms-state {
@@ -389,33 +461,46 @@ onUnmounted(() => {
 .ms-retry { margin-top: 4px; padding: 10px 20px; border: none; border-radius: 11px; background: #915BD8; color: #fff; font-weight: 600; font-size: 15px; }
 
 /* Chips "ahora" */
-.ms-now { display: flex; gap: 12px; margin-bottom: 14px; flex-shrink: 0; }
+.ms-now { display: flex; gap: 10px; margin-bottom: 10px; flex-shrink: 0; }
 .ms-now-chip {
-  flex: 1; display: flex; align-items: center; gap: 11px;
-  background: #fff; border: 1px solid #eceaf2; border-radius: 16px; padding: 13px 16px;
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 9px;
+  background: #fff; border: 1px solid #eceaf2; border-radius: 14px; padding: 10px 12px;
 }
-.ms-now-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+.ms-now-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
 .ms-now-text { display: flex; flex-direction: column; min-width: 0; }
-.ms-now-label { font-size: clamp(12px, 3.4vw, 14px); color: #6b5a8a; font-weight: 600; }
-.ms-now-val { font-size: clamp(20px, 6.2vw, 30px); font-weight: 800; color: #2C2039; line-height: 1.1; letter-spacing: -0.5px; }
+.ms-now-label { font-size: clamp(10.5px, 3vw, 12px); color: #6b5a8a; font-weight: 600; }
+.ms-now-val { font-size: clamp(16px, 4.8vw, 21px); font-weight: 800; color: #2C2039; line-height: 1.15; letter-spacing: -0.3px; white-space: nowrap; }
 
 .ms-chart {
   flex: 1; min-height: 0; position: relative;
-  background: #fff; border: 1px solid #eceaf2; border-radius: 18px; padding: 14px 12px 8px;
+  background: #fff; border: 1px solid #eceaf2; border-radius: 16px; padding: 12px 10px 6px;
 }
+
+/* Franja de fallas activas */
+.ms-fallas { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; flex-shrink: 0; }
+.ms-falla {
+  display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+  background: #fff; border: 1px solid #f0e4e4; border-left: 3px solid #f59e0b;
+  border-radius: 11px; padding: 8px 10px;
+}
+.ms-falla-stripe { display: none; }
+.ms-falla-estado { font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: 6px; flex-shrink: 0; }
+.ms-falla-tipo { flex: 1; min-width: 0; font-size: 12.5px; font-weight: 600; color: #2C2039; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ms-falla-arrow { font-size: 11px; color: #c4b8d8; flex-shrink: 0; }
+.ms-falla-more { font-size: 11px; color: #9ca3af; text-align: center; }
 .ms-chart-loading {
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
   gap: 10px; color: #6b5a8a; font-size: 14px;
 }
 .ms-chart-loading .pi-spinner { font-size: 22px; color: #915BD8; }
 
-.ms-footer { display: flex; align-items: center; gap: 12px; margin-top: 14px; flex-shrink: 0; }
-.ms-updated { font-size: 13px; color: #9ca3af; display: flex; align-items: center; gap: 6px; }
+.ms-footer { display: flex; align-items: center; gap: 10px; margin-top: 10px; flex-shrink: 0; }
+.ms-updated { font-size: 12px; color: #9ca3af; display: flex; align-items: center; gap: 6px; }
 .ms-reconnect {
-  margin-left: auto; display: flex; align-items: center; gap: 9px;
-  padding: 13px 20px; border: none; border-radius: 14px;
-  background: #915BD8; color: #fff; font-size: clamp(14px, 4vw, 16px); font-weight: 700;
-  box-shadow: 0 6px 16px rgba(145,91,216,0.35);
+  margin-left: auto; display: flex; align-items: center; gap: 8px;
+  padding: 11px 16px; border: none; border-radius: 12px;
+  background: #915BD8; color: #fff; font-size: clamp(13px, 3.6vw, 14.5px); font-weight: 700;
+  box-shadow: 0 5px 14px rgba(145,91,216,0.32);
 }
 .ms-relay-badge { font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: 6px; }
 .ms-relay-badge--on  { background: #dcfce7; color: #15803d; }

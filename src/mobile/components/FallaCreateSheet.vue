@@ -86,9 +86,10 @@ import { ref, reactive, computed, watch } from 'vue'
 import api from '@/api/client'
 
 const props = defineProps({
-  open:       { type: Boolean, default: false },
-  catalogos:  { type: Object, default: () => ({ estados: [], prioridades: [], tipos: [] }) },
-  proyectos:  { type: Array, default: () => [] },
+  open:            { type: Boolean, default: false },
+  catalogos:       { type: Object, default: () => ({ estados: [], prioridades: [], tipos: [] }) },
+  proyectos:       { type: Array, default: () => [] },
+  prefillProyectoId: { type: [Number, String], default: null },
 })
 const emit = defineEmits(['close', 'created'])
 
@@ -121,7 +122,7 @@ function chipOn(color) {
 // Al abrir, default estado = no final (abierta) y limpia
 watch(() => props.open, (o) => {
   if (!o) return
-  Object.assign(f, { proyecto_id: null, tipo_id: null, tipo_libre: '', prioridad_id: null,
+  Object.assign(f, { proyecto_id: props.prefillProyectoId ?? null, tipo_id: null, tipo_libre: '', prioridad_id: null,
     estado_id: null, descripcion: '', fecha_identificacion: today, nota: '' })
   Object.keys(err).forEach((k) => delete err[k])
   error.value = ''

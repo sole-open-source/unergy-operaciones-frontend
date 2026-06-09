@@ -18,11 +18,13 @@
         <i v-if="search" class="pi pi-times mf-clear" @click="search = ''" />
       </div>
       <div class="mf-chips">
-        <button :class="['mf-fchip', filtroEstado === null && 'mf-fchip--on']" @click="filtroEstado = null">Todas</button>
+        <button :class="['mf-fchip', filtro === 'activas' && 'mf-fchip--on']" @click="filtro = 'activas'">Activas</button>
+        <button :class="['mf-fchip', filtro === 'programadas' && 'mf-fchip--on']" @click="filtro = 'programadas'">Programadas</button>
+        <button :class="['mf-fchip', filtro === null && 'mf-fchip--on']" @click="filtro = null">Todas</button>
         <button v-for="e in catalogos.estados" :key="e.id"
-          :class="['mf-fchip', filtroEstado === e.id && 'mf-fchip--on']"
-          :style="filtroEstado === e.id ? { background: e.color_hex || '#915BD8', borderColor: e.color_hex || '#915BD8', color: '#fff' } : {}"
-          @click="filtroEstado = e.id">{{ e.etiqueta }}</button>
+          :class="['mf-fchip', filtro === e.id && 'mf-fchip--on']"
+          :style="filtro === e.id ? { background: e.color_hex || '#915BD8', borderColor: e.color_hex || '#915BD8', color: '#fff' } : {}"
+          @click="filtro = e.id">{{ e.etiqueta }}</button>
       </div>
     </div>
 
@@ -79,7 +81,7 @@ const usuarios = ref([])
 const loading = ref(false)
 
 const search = ref('')
-const filtroEstado = ref(null)
+const filtro = ref('activas')  // 'activas' | 'programadas' | null (todas) | <estado_id>
 
 const detailOpen = ref(false)
 const detailFalla = ref(null)
@@ -87,10 +89,21 @@ const createOpen = ref(false)
 const notifOpen = ref(false)
 const unreadCount = ref(0)
 
+function esProgramado(f) {
+  return (f.estado?.codigo || '').toLowerCase() === 'programado'
+    || (f.estado?.etiqueta || '').toLowerCase().startsWith('program')
+}
+
 const filtradas = computed(() => {
   const q = search.value.trim().toLowerCase()
   let list = fallas.value
-  if (filtroEstado.value !== null) list = list.filter((f) => f.estado?.id === filtroEstado.value)
+  if (filtro.value === 'activas') {
+    list = list.filter((f) => !f.estado?.es_estado_final && !esProgramado(f))
+  } else if (filtro.value === 'programadas') {
+    list = list.filter((f) => esProgramado(f))
+  } else if (typeof filtro.value === 'number') {
+    list = list.filter((f) => f.estado?.id === filtro.value)
+  }
   if (q) {
     list = list.filter((f) =>
       (f.codigo_interno || '').toLowerCase().includes(q)
@@ -180,9 +193,9 @@ onMounted(() => { cargar(); fetchUnread() })
   padding: calc(10px + env(safe-area-inset-top)) 14px 10px;
   background: #2C2039; color: #fff;
 }
-.mf-brand { flex: 1; font-size: clamp(16px, 4.6vw, 20px); font-weight: 700; }
+.mf-brand { flex: 1; font-size: clamp(15px, 4vw, 17px); font-weight: 700; }
 .mf-brand .pi { color: #F6FF72; margin-right: 6px; }
-.mf-icon-btn { width: 40px; height: 40px; border-radius: 11px; border: none; background: rgba(255,255,255,0.1); color: #fff; font-size: 17px; position: relative; }
+.mf-icon-btn { width: 36px; height: 36px; border-radius: 10px; border: none; background: rgba(255,255,255,0.1); color: #fff; font-size: 15px; position: relative; }
 .mf-add { background: #915BD8; }
 .mf-bell-badge {
   position: absolute; top: 1px; right: 1px; min-width: 17px; height: 17px; padding: 0 4px;
@@ -215,8 +228,8 @@ onMounted(() => { cargar(); fetchUnread() })
 .mf-card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 5px; }
 .mf-card-code { font-family: ui-monospace, monospace; font-size: 12px; color: #6E3FB8; background: #f3edfb; padding: 1px 7px; border-radius: 6px; }
 .mf-card-estado { font-size: 11px; font-weight: 800; padding: 3px 9px; border-radius: 7px; }
-.mf-card-tipo { font-size: 15.5px; font-weight: 700; color: #2C2039; line-height: 1.25; }
-.mf-card-proj { font-size: 13px; color: #6b5a8a; margin-top: 3px; display: flex; align-items: center; gap: 5px; }
+.mf-card-tipo { font-size: 14px; font-weight: 700; color: #2C2039; line-height: 1.25; }
+.mf-card-proj { font-size: 12.5px; color: #6b5a8a; margin-top: 3px; display: flex; align-items: center; gap: 5px; }
 .mf-card-proj .pi { font-size: 11px; color: #915BD8; }
 .mf-card-foot { display: flex; align-items: center; gap: 10px; margin-top: 9px; }
 .mf-prio { font-size: 12.5px; font-weight: 700; }
