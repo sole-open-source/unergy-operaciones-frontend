@@ -29,7 +29,7 @@
           ref="fileInputRef"
           type="file"
           class="fa-hidden-input"
-          accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv"
+          accept="*"
           multiple
           @change="onFileInputChange"
         />
@@ -158,7 +158,7 @@ async function subirArchivo(file) {
     `/fallas/${props.fallaId}/archivos`,
     form,
     {
-      headers: { 'Content-Type': 'multipart/form-data' },
+      headers: { 'Content-Type': null },
       onUploadProgress(event) {
         if (event.lengthComputable) {
           uploadProgress.value = Math.round((event.loaded / event.total) * 100)

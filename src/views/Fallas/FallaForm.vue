@@ -195,7 +195,7 @@
         <span class="ff-dropzone-text">Arrastra archivos aquí o <span class="ff-dropzone-link">haz clic</span></span>
         <span class="ff-dropzone-hint">Imágenes, PDF, Excel, Word, CSV</span>
         <input ref="fileInputRef" type="file" class="ff-hidden-input"
-          accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv" multiple
+          accept="*" multiple
           @change="onFileInputChange" />
       </div>
       <!-- Lista de archivos staged -->
