@@ -90,6 +90,18 @@
 
           <!-- Vista lectura -->
           <template v-if="!isEditMode">
+            <!-- Ubicación -->
+            <div v-if="proyecto.direccion_vereda || proyecto.info_tecnica?.url_ubicacion">
+              <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Ubicación</p>
+              <div class="space-y-1">
+                <p v-if="proyecto.direccion_vereda" class="text-gray-700">{{ proyecto.direccion_vereda }}</p>
+                <a v-if="proyecto.info_tecnica?.url_ubicacion" :href="proyecto.info_tecnica.url_ubicacion"
+                   target="_blank" rel="noopener"
+                   class="inline-flex items-center gap-1 text-blue-600 hover:underline text-xs">
+                  <i class="pi pi-map-marker" /> Ver en Google Maps
+                </a>
+              </div>
+            </div>
             <!-- Eléctrico general -->
             <div>
               <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">General</p>
@@ -158,6 +170,20 @@
 
           <!-- Vista edición -->
           <template v-else>
+            <!-- Ubicación -->
+            <div>
+              <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Ubicación</p>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="flex flex-col gap-1">
+                  <label class="field-label">Dirección</label>
+                  <InputText v-model="editForm.direccion_vereda" class="w-full" />
+                </div>
+                <div class="flex flex-col gap-1">
+                  <label class="field-label">Link Google Maps</label>
+                  <InputText v-model="editInfoTecnica.url_ubicacion" class="w-full" placeholder="https://maps.app.goo.gl/..." />
+                </div>
+              </div>
+            </div>
             <!-- Eléctrico general -->
             <div>
               <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">General</p>
@@ -756,6 +782,7 @@ const editInfoTecnica = reactive({
   marca_modem_reconectador: null,
   marca_modems_frontera: null,
   ip_modem_reconectador: null,
+  url_ubicacion: null,
   cctv_estado: null,
   marca_cctv: null,
   seguridad_fisica: null,
