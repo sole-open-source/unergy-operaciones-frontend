@@ -46,7 +46,10 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
+import { useToast } from 'primevue/usetoast'
 import api from '@/api/client'
+
+const toast = useToast()
 
 const kpis = ref({})
 const ppaAlerts = ref({ huerfanos: [], duplicados: [] })
@@ -132,6 +135,11 @@ onMounted(async () => {
     ])
     if (kpiRes?.data) kpis.value = kpiRes.data
     if (ppaRes?.data) ppaAlerts.value = ppaRes.data
+    // Si ambas peticiones fallaron (401/403 ya los maneja el interceptor global),
+    // avisamos al usuario en vez de dejar la pantalla vacía sin contexto.
+    if (!kpiRes && !ppaRes) {
+      toast.add({ severity: 'warn', summary: 'No se pudieron cargar las alertas', life: 3000 })
+    }
   } catch {
     // degrade gracefully
   }

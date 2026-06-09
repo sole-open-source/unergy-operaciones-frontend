@@ -82,17 +82,26 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
+const route  = useRoute()
 const auth = useAuthStore()
 
 const email    = ref('')
 const password = ref('')
 const loading  = ref(false)
 const error    = ref('')
+
+// El interceptor global redirige aquí con ?expired=1 cuando el token
+// caduca o el backend responde 401 a mitad de sesión.
+onMounted(() => {
+  if (route.query.expired) {
+    error.value = 'Tu sesión expiró. Inicia sesión de nuevo.'
+  }
+})
 
 async function submit() {
   loading.value = true
