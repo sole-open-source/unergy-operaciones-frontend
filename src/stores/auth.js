@@ -116,5 +116,17 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('user')
   }
 
-  return { token, user, isAuthenticated, role, can, login, loginMobile, logout }
+  // Solo en desarrollo: simula login sin backend para preview de vistas
+  function previewLogin(rol) {
+    if (!import.meta.env.DEV) return
+    const h = btoa('{"alg":"HS256","typ":"JWT"}').replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_')
+    const p = btoa(`{"sub":"99","rol":"${rol}","nombre":"Preview ${rol}","email":"preview@unergy.io","exp":9999999999}`).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_')
+    const fakeToken = `${h}.${p}.preview`
+    token.value = fakeToken
+    user.value = { id: '99', rol, nombre: `Preview ${rol}`, email: 'preview@unergy.io' }
+    localStorage.setItem('token', fakeToken)
+    localStorage.setItem('user', JSON.stringify(user.value))
+  }
+
+  return { token, user, isAuthenticated, role, can, login, loginMobile, logout, previewLogin }
 })

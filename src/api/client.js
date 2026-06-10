@@ -18,6 +18,8 @@ api.interceptors.response.use(
   (r) => r,
   (err) => {
     if (err.response?.status === 401) {
+      const token = localStorage.getItem('token')
+      if (import.meta.env.DEV && token?.endsWith('.preview')) return Promise.reject(err)
       localStorage.removeItem('token')
       localStorage.removeItem('user')
       // En la app móvil (rutas /m/...) volvemos a su propio login, no al de la plataforma.

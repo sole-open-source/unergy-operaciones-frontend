@@ -1,19 +1,42 @@
 <template>
   <nav class="mtb">
-    <RouterLink to="/m/solar" class="mtb-item" active-class="mtb-item--active">
-      <i class="pi pi-sun" /><span>Generación</span>
-    </RouterLink>
-    <RouterLink to="/m/fallas" class="mtb-item" active-class="mtb-item--active">
-      <i class="pi pi-wrench" /><span>Fallas</span>
-    </RouterLink>
-    <RouterLink to="/m/resumen" class="mtb-item" active-class="mtb-item--active">
-      <i class="pi pi-chart-bar" /><span>Resumen</span>
-    </RouterLink>
+    <!-- Coordinador y técnico no tienen acceso a generación/resumen -->
+    <template v-if="rol === 'coordinador' || rol === 'tecnico'">
+      <RouterLink :to="fallasPath" class="mtb-item" active-class="mtb-item--active">
+        <i class="pi pi-wrench" /><span>Fallas</span>
+      </RouterLink>
+      <button class="mtb-item mtb-item--logout" @click="logout">
+        <i class="pi pi-sign-out" /><span>Salir</span>
+      </button>
+    </template>
+    <template v-else>
+      <RouterLink to="/m/solar" class="mtb-item" active-class="mtb-item--active">
+        <i class="pi pi-sun" /><span>Generación</span>
+      </RouterLink>
+      <RouterLink to="/m/fallas" class="mtb-item" active-class="mtb-item--active">
+        <i class="pi pi-wrench" /><span>Fallas</span>
+      </RouterLink>
+      <RouterLink to="/m/resumen" class="mtb-item" active-class="mtb-item--active">
+        <i class="pi pi-chart-bar" /><span>Resumen</span>
+      </RouterLink>
+    </template>
   </nav>
 </template>
 
 <script setup>
-// Barra de navegación inferior de la app móvil. Compartida por las vistas /m/*.
+import { computed } from 'vue'
+import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
+
+const auth = useAuthStore()
+const router = useRouter()
+const rol = computed(() => auth.role)
+const fallasPath = computed(() => rol.value === 'coordinador' ? '/m/coordinador' : '/m/tecnico')
+
+function logout() {
+  auth.logout()
+  router.push('/m/login')
+}
 </script>
 
 <style scoped>

@@ -53,6 +53,8 @@ const ROLES = [
   { label: 'Liquidaciones', value: 'liquidaciones' },
   { label: 'CGM', value: 'cgm' },
   { label: 'Solo lectura', value: 'solo_lectura' },
+  { label: 'Coordinador', value: 'coordinador' },
+  { label: 'Técnico', value: 'tecnico' },
 ]
 
 const saving = ref(false)

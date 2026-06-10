@@ -12,6 +12,8 @@ const routes = [
   { path: '/m/login',     name: 'MobileLogin',  component: () => import('@/mobile/MobileLoginView.vue'), meta: { public: true, mobile: true } },
   { path: '/m/solar',     name: 'MobileSolar',  component: () => import('@/mobile/MobileSolarView.vue'),  meta: { mobile: true } },
   { path: '/m/fallas',    name: 'MobileFallas', component: () => import('@/mobile/MobileFallasView.vue'), meta: { mobile: true } },
+  { path: '/m/coordinador', name: 'MobileCoordinador', component: () => import('@/mobile/MobileCoordinadorFallasView.vue'), meta: { mobile: true, roles: ['coordinador', 'admin'] } },
+  { path: '/m/tecnico',     name: 'MobileTecnico',     component: () => import('@/mobile/MobileTecnicoFallasView.vue'),    meta: { mobile: true, roles: ['tecnico'] } },
   { path: '/m/resumen',   name: 'MobileResumen', component: () => import('@/mobile/MobileResumenView.vue'), meta: { mobile: true } },
 
   // ── General ──────────────────────────────────────────────────────
@@ -63,7 +65,7 @@ const routes = [
   { path: '/mem/cumplimiento-v2', redirect: '/mem/cumplimiento' },
 
   // ── Admin ────────────────────────────────────────────────────────
-  { path: '/admin/usuarios',    name: 'AdminUsuarios',   component: () => import('@/views/Admin/AdminUsuariosView.vue'),     meta: { roles: ['admin'], requireEmail: 'juanjose@unergy.io' } },
+  { path: '/admin/usuarios',    name: 'AdminUsuarios',   component: () => import('@/views/Admin/AdminUsuariosView.vue'),     meta: { roles: ['admin', 'operaciones'] } },
   { path: '/admin/diagnostico', name: 'AdminDiagnostico',component: () => import('@/views/Admin/DiagnosticoEnlacesView.vue'), meta: { roles: ['admin'], requireEmail: 'juanjose@unergy.io' } },
 
   // ── Fallback ─────────────────────────────────────────────────────
@@ -78,19 +80,39 @@ const router = createRouter({
 router.beforeEach((to) => {
   const auth = useAuthStore()
 
+  // Modo preview local (solo DEV): ?preview=tecnico o ?preview=coordinador
+  if (import.meta.env.DEV && to.query.preview) {
+    auth.previewLogin(String(to.query.preview))
+  }
+
   // No autenticado → login (la app móvil tiene su propio login)
   if (!to.meta.public && !auth.isAuthenticated) return to.meta.mobile ? '/m/login' : '/login'
 
   // Ya logueado intentando ir a un login → su home correspondiente
-  if (to.path === '/m/login' && auth.isAuthenticated) return '/m/solar'
+  if (to.path === '/m/login' && auth.isAuthenticated) {
+    const rol = auth.role
+    if (rol === 'coordinador') return '/m/coordinador'
+    if (rol === 'tecnico') return '/m/tecnico'
+    return '/m/solar'
+  }
   if (to.path === '/login' && auth.isAuthenticated) return '/dashboard'
+
+  // Roles móviles dedicados: redirigir /m/solar y /m/fallas al home correcto
+  if (to.meta.mobile && auth.isAuthenticated) {
+    const rol = auth.role
+    if (rol === 'coordinador' && to.path === '/m/solar') return '/m/coordinador'
+    if (rol === 'tecnico'     && to.path === '/m/solar') return '/m/tecnico'
+    // Bloquear rutas de coordinador/tecnico a quien no tenga ese rol
+    if (to.name === 'MobileCoordinador' && rol !== 'coordinador' && rol !== 'admin') return '/m/solar'
+    if (to.name === 'MobileTecnico'     && rol !== 'tecnico')                         return '/m/solar'
+  }
 
   // Autenticado pero sin datos de usuario (localStorage.user borrado mientras
   // el JWT sigue vivo) → forzar re-login para reconstruir el estado
   if (to.meta.roles && auth.isAuthenticated && !auth.user) return '/login'
 
-  // Verificación de rol
-  if (to.meta.roles && !auth.can(...to.meta.roles)) return '/dashboard'
+  // Verificación de rol (rutas web)
+  if (to.meta.roles && to.meta.mobile !== true && !auth.can(...to.meta.roles)) return '/dashboard'
 
   // Verificación de email específico (rutas admin restringidas)
   if (to.meta.requireEmail && auth.user?.email !== to.meta.requireEmail) return '/dashboard'

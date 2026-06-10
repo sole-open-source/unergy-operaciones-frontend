@@ -25,6 +25,17 @@
       </form>
 
       <p class="ml-hint">La sesión se mantiene activa en este dispositivo.</p>
+
+      <!-- Botones de preview solo en desarrollo -->
+      <div v-if="isDev" class="ml-preview">
+        <p class="ml-preview-label">— Vista previa local —</p>
+        <button class="ml-preview-btn ml-preview-btn--coord" @click="previsualizarComo('coordinador')">
+          <i class="pi pi-briefcase" /> Ver como Coordinador
+        </button>
+        <button class="ml-preview-btn ml-preview-btn--tec" @click="previsualizarComo('tecnico')">
+          <i class="pi pi-wrench" /> Ver como Técnico
+        </button>
+      </div>
     </div>
   </div>
 </template>
@@ -43,6 +54,7 @@ const email = ref('')
 const password = ref('')
 const loading = ref(false)
 const error = ref('')
+const isDev = import.meta.env.DEV
 
 async function onSubmit() {
   loading.value = true
@@ -55,6 +67,11 @@ async function onSubmit() {
   } finally {
     loading.value = false
   }
+}
+
+function previsualizarComo(rol) {
+  auth.previewLogin(rol)
+  router.replace(rol === 'coordinador' ? '/m/coordinador' : '/m/tecnico')
 }
 
 onMounted(() => { register() })
@@ -101,4 +118,14 @@ onMounted(() => { register() })
 }
 .ml-submit:disabled { opacity: .5; }
 .ml-hint { font-size: 11px; color: rgba(255,255,255,0.45); margin: 18px 0 0; }
+
+.ml-preview { margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 16px; }
+.ml-preview-label { font-size: 10px; color: rgba(255,255,255,0.35); text-align: center; margin: 0 0 10px; letter-spacing: 1px; }
+.ml-preview-btn {
+  width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 13px; border: 1.5px solid; border-radius: 12px; font-size: 14px; font-weight: 600;
+  margin-bottom: 8px;
+}
+.ml-preview-btn--coord { border-color: #93c5fd; color: #93c5fd; background: rgba(147,197,253,.1); }
+.ml-preview-btn--tec  { border-color: #6ee7b7; color: #6ee7b7; background: rgba(110,231,183,.1); }
 </style>
