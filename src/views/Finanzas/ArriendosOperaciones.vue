@@ -328,51 +328,39 @@ function calcularFila(proyecto) {
     }
   }
 
-  const [yyyy, mm]  = periodoActual.value.split('-').map(Number)
-  const lastDay     = new Date(yyyy, mm, 0)       // último día del mes del período
-  const fechaFirma  = new Date(proyecto['Fecha firma contrato'])
+  const [yyyy]    = periodoActual.value.split('-').map(Number)
+  const añoPeriodo = yyyy
+  const añoFirma   = new Date(proyecto['Fecha firma contrato']).getFullYear()
 
   let valorActual    = valorBase
   let factorAcum     = 1
   let nIndexaciones  = 0
   let ipcFaltante    = false
   const histItems    = []
-  const histDetalle  = [`Base (${proyecto['Fecha firma contrato']}): ${formatCOP(valorBase)}`]
+  const histDetalle  = [`Base ${añoFirma} (${proyecto['Fecha firma contrato']}): ${formatCOP(valorBase)}`]
 
-  let añoAniv = fechaFirma.getFullYear() + 1
-
-  while (true) {
-    const fechaAniv = new Date(fechaFirma)
-    fechaAniv.setFullYear(añoAniv)
-
-    if (fechaAniv > lastDay) break
-
-    const añoIPC = añoAniv - 1
-    const ipc    = getIPC(añoIPC)
+  // Indexación por año calendario: 1 ene de cada año desde año_firma+1 hasta año_periodo
+  for (let añoCorriente = añoFirma + 1; añoCorriente <= añoPeriodo; añoCorriente++) {
+    const añoDic = añoCorriente - 1   // IPC de diciembre del año anterior
+    const ipc    = getIPC(añoDic)
 
     if (ipc === undefined) {
       ipcFaltante = true
-      histDetalle.push(`Aniv. ${fmtFecha(fechaAniv)}: IPC ${añoIPC} no disponible ⚠️`)
+      histDetalle.push(`Ene ${añoCorriente}: IPC dic ${añoDic} no disponible ⚠️`)
       break
     }
 
-    const valorAnterior = valorActual
     valorActual  = valorActual * (1 + ipc)
     factorAcum  *= (1 + ipc)
     nIndexaciones++
 
-    const label = `Aniv. ${fmtFecha(fechaAniv)}: IPC ${(ipc * 100).toFixed(2)}% → ${formatCOP(valorActual)}`
-    histItems.push(label)
-    histDetalle.push(label + (fechaAniv <= hoy ? ' [Vigente]' : ' [Proyectado]'))
-
-    añoAniv++
+    const label = `Ene ${añoCorriente} (IPC dic ${añoDic}: ${(ipc * 100).toFixed(2)}%) → ${formatCOP(valorActual)}`
+    histItems.push(`IPC dic ${añoDic}: ${(ipc * 100).toFixed(2)}%`)
+    histDetalle.push(label + (añoCorriente <= hoy.getFullYear() ? '' : ' [Proyectado]'))
   }
 
-  // Siguiente aniversario (para detectar IPC faltante futuro próximo)
-  const fechaProxAniv = new Date(fechaFirma)
-  fechaProxAniv.setFullYear(añoAniv)
-  const mesesHastaAniv = (fechaProxAniv - hoy) / (1000 * 60 * 60 * 24 * 30)
-  if (!ipcFaltante && mesesHastaAniv < 6 && getIPC(añoAniv - 1) === undefined) {
+  // Detectar si el próximo año necesita IPC aún no disponible
+  if (!ipcFaltante && getIPC(añoPeriodo) === undefined) {
     ipcFaltante = true
   }
 

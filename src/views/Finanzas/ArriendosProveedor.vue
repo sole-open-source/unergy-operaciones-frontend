@@ -179,22 +179,18 @@ function calcularCanon(proyecto) {
   const valorBase = proyecto['Valor base']
   if (!proyecto['Fecha firma contrato'] || valorBase == null) return { canon: null, historial: '—' }
 
-  const [yyyy, mm] = periodoActual.value.split('-').map(Number)
-  const lastDay    = new Date(yyyy, mm, 0)
-  const fechaFirma = new Date(proyecto['Fecha firma contrato'])
+  const [yyyy]     = periodoActual.value.split('-').map(Number)
+  const añoPeriodo = yyyy
+  const añoFirma   = new Date(proyecto['Fecha firma contrato']).getFullYear()
   let valor        = valorBase
   const histItems  = []
-  let añoAniv      = fechaFirma.getFullYear() + 1
 
-  while (true) {
-    const fechaAniv = new Date(fechaFirma)
-    fechaAniv.setFullYear(añoAniv)
-    if (fechaAniv > lastDay) break
-    const ipc = getIPC(añoAniv - 1)
+  // Indexación por año calendario: 1 ene de cada año desde año_firma+1 hasta año_periodo
+  for (let añoCorriente = añoFirma + 1; añoCorriente <= añoPeriodo; añoCorriente++) {
+    const ipc = getIPC(añoCorriente - 1)  // IPC dic del año anterior
     if (ipc === undefined) break
     valor *= (1 + ipc)
-    histItems.push(`IPC ${((ipc) * 100).toFixed(2)}% (${añoAniv})`)
-    añoAniv++
+    histItems.push(`IPC dic ${añoCorriente - 1}: ${(ipc * 100).toFixed(2)}%`)
   }
 
   return {
