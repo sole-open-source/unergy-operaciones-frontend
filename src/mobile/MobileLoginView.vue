@@ -61,7 +61,10 @@ async function onSubmit() {
   error.value = ''
   try {
     await auth.loginMobile(email.value.trim(), password.value)
-    router.replace('/m/solar')
+    const rol = auth.role
+    if (rol === 'coordinador') router.replace('/m/coordinador')
+    else if (rol === 'tecnico') router.replace('/m/tecnico')
+    else router.replace('/m/solar')
   } catch (err) {
     error.value = err.response?.data?.detail || 'No se pudo ingresar. Verifica tus datos.'
   } finally {

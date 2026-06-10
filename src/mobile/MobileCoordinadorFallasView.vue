@@ -187,8 +187,8 @@ async function cargar() {
   loading.value = true
   try {
     const [cat, proy, usr] = await Promise.all([
-      api.get('/fallas/catalogos'),
-      api.get('/proyectos', { params: { size: 500 } }),
+      api.get('/fallas/catalogos').catch(() => ({ data: { estados: [], prioridades: [], tipos: [], resoluciones: [] } })),
+      api.get('/proyectos', { params: { size: 500 } }).catch(() => ({ data: { items: [] } })),
       api.get('/usuarios', { params: { size: 200 } }).catch(() => ({ data: { items: [] } })),
     ])
     Object.assign(catalogos, cat.data)
@@ -196,6 +196,8 @@ async function cargar() {
     const todos = usr.data.items ?? []
     tecnicos.value = todos.filter((u) => u.rol === 'tecnico')
     await cargarFallas()
+  } catch (e) {
+    window.__primeToast?.({ severity: 'error', summary: 'Error al cargar fallas', detail: e.response?.data?.detail || e.message, life: 4000 })
   } finally {
     loading.value = false
   }

@@ -141,11 +141,13 @@ function relativeTime(s) {
 async function cargar() {
   loading.value = true
   try {
-    const [cat, fallasRes] = await Promise.all([
-      api.get('/fallas/catalogos'),
+    const [cat] = await Promise.all([
+      api.get('/fallas/catalogos').catch(() => ({ data: { estados: [], prioridades: [], tipos: [], resoluciones: [] } })),
       cargarFallas(),
     ])
     Object.assign(catalogos, cat.data)
+  } catch (e) {
+    window.__primeToast?.({ severity: 'error', summary: 'Error al cargar fallas', detail: e.response?.data?.detail || e.message, life: 4000 })
   } finally {
     loading.value = false
   }
