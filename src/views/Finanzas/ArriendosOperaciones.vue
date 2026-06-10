@@ -124,7 +124,7 @@
                   <i v-if="fila.difiere_archivo"
                     class="pi pi-exclamation-triangle flex-shrink-0 cursor-help"
                     style="font-size:11px;color:#f59e0b"
-                    :title="`Valor calculado por IPC: ${formatCOP(fila.canon_calculado)}`" />
+                    v-tooltip.top="`Valor calculado por IPC: ${formatCOP(fila.canon_calculado)}`" />
                 </span>
               </td>
               <td v-if="colsVisibles.historial" class="px-3 py-2 text-xs text-gray-400"
