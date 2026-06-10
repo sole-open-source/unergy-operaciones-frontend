@@ -2,6 +2,9 @@
   <div class="space-y-4">
     <PageHeader title="GESCON — Contratos ASIC" :subtitle="`${total} registros`">
       <template #actions>
+        <Button label="Descargar Excel" icon="pi pi-file-excel" size="small" outlined
+          @click="descargarGesconExcel" :loading="exportando"
+          style="color:#915BD8; border-color:#915BD8;" />
         <Button label="Registrar" icon="pi pi-plus" @click="abrirNuevo"
           style="background:#915BD8; border-color:#915BD8;" size="small" />
       </template>
@@ -368,6 +371,131 @@ async function cargar() {
   }
 }
 function limpiar() { filtroTexto.value = ''; filtroTipo.value = null }
+
+// ── Exportar a Excel (identidad de marca Unergy) ──────────────────
+const exportando = ref(false)
+async function descargarGesconExcel() {
+  if (exportando.value) return
+  if (!rows.value.length) {
+    toast.add({ severity: 'warn', summary: 'Sin datos', detail: 'No hay registros GESCON para exportar.', life: 3000 })
+    return
+  }
+  exportando.value = true
+  try {
+    const XLSX = await import('xlsx-js-style')
+
+    // Paleta de marca Unergy
+    const C = { morado: '915BD8', oscuro: '2C2039', lila: 'F4F1FA', blanco: 'FFFFFF', gris: '6B5A8A', borde: 'ECE4F5', rojo: 'D64455', rojoBg: 'FBE9EC' }
+    const bf = { style: 'thin', color: { rgb: C.borde } }
+    const bAll = { top: bf, bottom: bf, left: bf, right: bf }
+    const siNo = v => (v ? 'Sí' : 'No')
+    const fechaFmt = d => {
+      if (!d) return ''
+      const [y, m, day] = String(d).slice(0, 10).split('-')
+      return `${day}/${m}/${y}`
+    }
+
+    // Definición de columnas (todos los campos GESCON)
+    const COLS = [
+      { h: 'SIC contrato', w: 12, get: r => r.codigo_sic_contrato || '' },
+      { h: 'Contrato interno', w: 18, get: r => r.contrato_interno || '' },
+      { h: 'Nombre interno', w: 18, get: r => r.nombre_interno || '' },
+      { h: 'Planta', w: 24, get: r => r.planta_nombre || '' },
+      { h: 'Tipo solicitud', w: 14, get: r => tipoLabel(r.tipo_solicitud) },
+      { h: 'Estado', w: 12, get: r => estadoLabel(r.estado_solicitud) },
+      { h: 'SIC vendedor', w: 12, get: r => r.codigo_sic_vendedor || '' },
+      { h: 'SIC comprador', w: 13, get: r => r.codigo_sic_comprador || '' },
+      { h: 'Prioridad (P.S)', w: 13, get: r => r.prioridad_limitacion, num: true, align: 'center' },
+      { h: 'Fecha solicitud', w: 13, get: r => fechaFmt(r.fecha_solicitud), align: 'center' },
+      { h: 'Fecha inicio', w: 12, get: r => fechaFmt(r.fecha_inicio), align: 'center' },
+      { h: 'Fecha fin', w: 12, get: r => fechaFmt(r.fecha_fin), align: 'center', venc: true },
+      { h: 'Tipo mercado', w: 14, get: r => r.tipo_mercado || '' },
+      { h: 'Tipo asignación', w: 15, get: r => r.tipo_asignacion || '' },
+      { h: '% FNCER', w: 10, get: r => r.porcentaje_fncer, num: true, pct: true, align: 'right' },
+      { h: '% Despacho', w: 11, get: r => r.porcentaje_despacho, num: true, pct: true, align: 'right' },
+      { h: 'Req. ASIC', w: 15, get: r => r.requerimiento_asic || '' },
+      { h: 'Contacto solicitante', w: 22, get: r => r.nombre_contacto_solicitante || '' },
+      { h: 'Coexiste', w: 9, get: r => siNo(!r.reemplaza_anterior), align: 'center' },
+      { h: 'Duplicado', w: 10, get: r => siNo(r.es_duplicado), align: 'center', dup: true },
+      { h: 'Link archivo', w: 32, get: r => r.link_archivo || '' },
+      { h: 'Observaciones', w: 40, get: r => r.observaciones || '' },
+    ]
+    const ncols = COLS.length
+    const data = rows.value
+    const fechaExport = new Date().toLocaleString('es-CO')
+
+    // Filas: 0 título · 1 subtítulo · 2 vacía · 3 encabezados · 4+ datos
+    const HEADER_ROW = 3
+    const FIRST_DATA = 4
+    const aoa = [
+      ['UNERGY — GESCON · Contratos ASIC'],
+      [`${data.length} registros · Exportado: ${fechaExport}`],
+      [],
+      COLS.map(c => c.h),
+      ...data.map(r => COLS.map(c => {
+        const v = c.get(r)
+        if (c.num) return (v == null || v === '') ? null : Number(v)
+        return v
+      })),
+    ]
+
+    const ws = XLSX.utils.aoa_to_sheet(aoa)
+    const enc = (r, c) => XLSX.utils.encode_cell({ r, c })
+    const setStyle = (r, c, s) => { const ref = enc(r, c); if (!ws[ref]) ws[ref] = { t: 's', v: '' }; ws[ref].s = s }
+
+    // Banner + subtítulo
+    setStyle(0, 0, { font: { bold: true, sz: 14, color: { rgb: C.blanco } }, fill: { fgColor: { rgb: C.oscuro } }, alignment: { vertical: 'center' } })
+    setStyle(1, 0, { font: { sz: 10, color: { rgb: C.gris } } })
+
+    // Encabezados
+    COLS.forEach((c, ci) => setStyle(HEADER_ROW, ci, {
+      font: { bold: true, sz: 10, color: { rgb: C.blanco } },
+      fill: { fgColor: { rgb: C.morado } },
+      alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+      border: bAll,
+    }))
+
+    // Datos (zebra + resaltados semánticos)
+    data.forEach((r, ri) => {
+      const rowIdx = FIRST_DATA + ri
+      const zebra = ri % 2 === 1
+      COLS.forEach((c, ci) => {
+        const style = {
+          font: { sz: 10, color: { rgb: C.oscuro } },
+          alignment: { horizontal: c.align || (c.num ? 'right' : 'left'), vertical: 'center', wrapText: c.h === 'Observaciones' },
+          border: bAll,
+        }
+        if (zebra) style.fill = { fgColor: { rgb: C.lila } }
+        if (c.pct) style.numFmt = '0.##"%"'
+        if (c.venc && r.fecha_fin && String(r.fecha_fin).slice(0, 10) < hoy)
+          style.font = { sz: 10, bold: true, color: { rgb: C.rojo } }
+        if (c.dup && r.es_duplicado) {
+          style.font = { sz: 10, bold: true, color: { rgb: C.rojo } }
+          style.fill = { fgColor: { rgb: C.rojoBg } }
+        }
+        setStyle(rowIdx, ci, style)
+      })
+    })
+
+    // Merges, anchos, alturas, autofiltro
+    ws['!merges'] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: ncols - 1 } },
+      { s: { r: 1, c: 0 }, e: { r: 1, c: ncols - 1 } },
+    ]
+    ws['!cols'] = COLS.map(c => ({ wch: c.w }))
+    ws['!rows'] = [{ hpt: 26 }, { hpt: 16 }, { hpt: 6 }, { hpt: 30 }]
+    ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: HEADER_ROW, c: 0 }, e: { r: FIRST_DATA + data.length - 1, c: ncols - 1 } }) }
+
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'GESCON')
+    XLSX.writeFile(wb, `GESCON_Contratos_ASIC_${hoy}.xlsx`)
+    toast.add({ severity: 'success', summary: 'Excel descargado', detail: `${data.length} registros exportados`, life: 2500 })
+  } catch (e) {
+    toast.add({ severity: 'error', summary: 'No se pudo generar el Excel', detail: e?.message, life: 4000 })
+  } finally {
+    exportando.value = false
+  }
+}
 
 function confirmarEliminar(row) {
   const label = row.codigo_sic_contrato || row.contrato_interno || `ID ${row.id}`
