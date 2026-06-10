@@ -46,10 +46,17 @@
           </div>
         </template>
 
-        <!-- Project name -->
+        <!-- Commercial name (editable) -->
         <Column header="Proyecto" frozen style="min-width: 180px;">
           <template #body="{ data }">
-            <InputText v-model="data.name" class="w-full" />
+            <InputText v-model="data.commercialName" class="w-full" />
+          </template>
+        </Column>
+
+        <!-- Origina project code (read-only) -->
+        <Column header="Código" style="min-width: 170px;">
+          <template #body="{ data }">
+            <span class="text-xs font-mono" style="color: rgba(44,32,57,0.5);">{{ data.name || '—' }}</span>
           </template>
         </Column>
 

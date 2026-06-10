@@ -17,6 +17,8 @@ const LOCAL_STORAGE_KEY = 'unergy_energization_projects'
 function rehydrate(p) {
   return {
     ...p,
+    // Compat con copias viejas en localStorage que solo guardaban `name`.
+    commercialName: p.commercialName ?? p.name ?? '',
     energizationDate: p.energizationDate ? new Date(p.energizationDate) : new Date(),
     contracts: Array.isArray(p.contracts) ? p.contracts : [],
     monthlyMwh: Number(p.monthlyMwh) || 0,
@@ -26,7 +28,8 @@ function rehydrate(p) {
 function defaultProject() {
   return {
     id: Date.now(),
-    name: 'Nuevo Proyecto',
+    name: '',                       // código origina (vacío en altas manuales)
+    commercialName: 'Nuevo Proyecto',
     status: 'En construcción',
     energizationDate: new Date(),
     contracts: [],
