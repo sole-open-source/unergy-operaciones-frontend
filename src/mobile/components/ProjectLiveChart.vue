@@ -12,12 +12,12 @@
 import { computed, ref, onBeforeUnmount } from 'vue'
 import {
   Chart as ChartJS, CategoryScale, LinearScale,
-  PointElement, LineElement, Title, Tooltip, Legend, Filler,
+  PointElement, LineElement, Title, Legend, Filler,
 } from 'chart.js'
 import { Line } from 'vue-chartjs'
 import { TIME_LABELS, inverterSeries, meterSeries } from '@/mobile/solarSeries'
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler)
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Legend, Filler)
 
 const props = defineProps({
   detail: { type: Object, default: null },
@@ -120,7 +120,8 @@ const nowLinePlugin = {
 const chartOptions = {
   responsive: true,
   maintainAspectRatio: false,
-  interaction: { mode: 'index', intersect: false },
+  // sin tooltip: tocar la gráfica solo muestra la etiqueta "ahora" 3 s
+  events: [],
   layout: { padding: { top: 6 } },
   plugins: {
     legend: {
@@ -132,17 +133,7 @@ const chartOptions = {
         font: { size: 11.5, weight: '500' }, color: '#787774', padding: 12,
       },
     },
-    tooltip: {
-      backgroundColor: '#ffffff', titleColor: '#37352f', bodyColor: '#787774',
-      borderColor: '#e9e7e4', borderWidth: 1, padding: 10, cornerRadius: 8,
-      displayColors: true, boxWidth: 7, boxHeight: 7, usePointStyle: true,
-      titleFont: { size: 11, weight: '600' }, bodyFont: { size: 12 },
-      callbacks: {
-        label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y != null
-          ? ctx.parsed.y.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
-          : '—'} kW`,
-      },
-    },
+    tooltip: { enabled: false },
   },
   scales: {
     x: {
