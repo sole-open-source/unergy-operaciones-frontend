@@ -96,8 +96,9 @@
 
         <Column field="porcentaje_despacho" header="Desp." style="width:68px;">
           <template #body="{ data }">
-            <span class="text-xs" style="color:#6b5a8a;">
-              {{ data.porcentaje_despacho != null ? data.porcentaje_despacho + '%' : '—' }}
+            <span class="text-xs" :style="{ color: despachoAnomalo(data.porcentaje_despacho) ? '#D64455' : '#6b5a8a' }"
+              v-tooltip.top="despachoAnomalo(data.porcentaje_despacho) ? 'Valor fuera de escala canónica (0-1). Revisar: rompe el cálculo de cumplimiento.' : ''">
+              {{ data.porcentaje_despacho != null ? despachoPct(data.porcentaje_despacho) + '%' : '—' }}
             </span>
           </template>
         </Column>
@@ -412,7 +413,7 @@ async function descargarGesconExcel() {
       { h: 'Tipo mercado', w: 14, get: r => r.tipo_mercado || '' },
       { h: 'Tipo asignación', w: 15, get: r => r.tipo_asignacion || '' },
       { h: '% FNCER', w: 10, get: r => r.porcentaje_fncer, num: true, pct: true, align: 'right' },
-      { h: '% Despacho', w: 11, get: r => r.porcentaje_despacho, num: true, pct: true, align: 'right' },
+      { h: '% Despacho', w: 11, get: r => despachoPct(r.porcentaje_despacho), num: true, pct: true, align: 'right' },
       { h: 'Req. ASIC', w: 15, get: r => r.requerimiento_asic || '' },
       { h: 'Contacto solicitante', w: 22, get: r => r.nombre_contacto_solicitante || '' },
       { h: 'Coexiste', w: 9, get: r => siNo(!r.reemplaza_anterior), align: 'center' },
@@ -604,7 +605,8 @@ function abrirEditar(row) {
     tipo_mercado: row.tipo_mercado || '',
     tipo_asignacion: row.tipo_asignacion || '',
     porcentaje_fncer: row.porcentaje_fncer,
-    porcentaje_despacho: row.porcentaje_despacho,
+    // despacho se almacena como fracción 0-1; el form lo edita en escala 0-100
+    porcentaje_despacho: row.porcentaje_despacho != null ? Number((row.porcentaje_despacho * 100).toFixed(2)) : null,
     requerimiento_asic: row.requerimiento_asic || '',
     nombre_contacto_solicitante: row.nombre_contacto_solicitante || '',
     link_archivo: row.link_archivo || '',
@@ -645,6 +647,9 @@ async function guardar() {
       fecha_solicitud: toIso(form.value.fecha_solicitud),
       fecha_inicio: toIso(form.value.fecha_inicio),
       fecha_fin: toIso(form.value.fecha_fin),
+      // despacho: el form usa escala 0-100 pero la BD/cumplimiento usa fracción 0-1
+      porcentaje_despacho: form.value.porcentaje_despacho != null
+        ? Number((form.value.porcentaje_despacho / 100).toFixed(4)) : null,
     }
 
     if (editandoId.value) {
@@ -674,6 +679,19 @@ function fmt(d) {
   return `${day}/${m}/${y.slice(2)}`
 }
 function esVencido(d) { return d && d < hoy }
+
+// porcentaje_despacho se almacena como fracción 0-1 (1 = 100%); el backend de
+// cumplimiento lo usa como multiplicador directo (gen × pct_despacho). Para mostrar
+// se multiplica ×100, igual que en CumplimientoV2View.
+function despachoPct(v) {
+  if (v == null || v === '') return null
+  const n = Number(v) * 100
+  if (Number.isNaN(n)) return null
+  return Number.isInteger(n) ? n : Number(n.toFixed(2))
+}
+// Valor fuera de la escala canónica 0-1 (p.ej. un 100 guardado por el formulario
+// antiguo). Se resalta para que se corrija: rompe el cálculo de cumplimiento.
+function despachoAnomalo(v) { return v != null && v !== '' && Number(v) > 1 }
 
 const TIPO_LABELS = { registro: 'Registro', modificacion: 'Modificación', terminacion: 'Terminación', desistimiento: 'Desistimiento' }
 const TIPO_SEV = { registro: 'success', modificacion: 'info', terminacion: 'warn', desistimiento: 'secondary' }
