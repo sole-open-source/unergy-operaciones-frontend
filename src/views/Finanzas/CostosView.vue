@@ -223,10 +223,29 @@
 
     <!-- ══ TAB 1 — ARRIENDOS ══════════════════════════════════════════════ -->
     <div v-if="activeTab === 1" class="mon-tab-view">
-      <div class="mon-tab-empty">
-        <i class="pi pi-building" style="font-size:2.5rem; color:#c4b8d4;" />
-        <p class="mt-3 text-sm font-semibold" style="color:#6b5a8a;">Arriendos</p>
-        <p class="mt-1 text-xs" style="color:#a094b8;">Próximamente — registros de costos de arriendos</p>
+      <div class="om-panel-card">
+        <div class="om-panel-header">
+          <div class="flex items-center gap-2">
+            <i class="pi pi-building text-sm" style="color:#915BD8" />
+            <span class="text-sm font-semibold" style="color:#2C2039">Panel Arriendos Mensual</span>
+          </div>
+          <div class="mon-tab-group">
+            <button
+              v-for="(tab, i) in SUBTABS_ARR"
+              :key="i"
+              class="mon-tab"
+              :class="{ 'mon-tab--active': activeSubTabArr === i }"
+              @click="activeSubTabArr = i"
+            >
+              <i :class="tab.icon" style="font-size:12px" />
+              {{ tab.label }}
+            </button>
+          </div>
+        </div>
+        <div class="om-panel-body">
+          <ArriendosOperaciones v-if="activeSubTabArr === 0" />
+          <ArriendosProveedor   v-if="activeSubTabArr === 1" />
+        </div>
       </div>
     </div>
 
@@ -248,8 +267,10 @@ import Select from 'primevue/select'
 import { useToast } from 'primevue/usetoast'
 import api from '@/api/client'
 import FacturasMantenimiento from '@/views/Servicios/FacturasMantenimiento.vue'
-import OMAOperaciones from './OMAOperaciones.vue'
-import OMAProveedor from './OMAProveedor.vue'
+import OMAOperaciones       from './OMAOperaciones.vue'
+import OMAProveedor          from './OMAProveedor.vue'
+import ArriendosOperaciones  from './ArriendosOperaciones.vue'
+import ArriendosProveedor    from './ArriendosProveedor.vue'
 
 const toast = useToast()
 
@@ -258,6 +279,12 @@ const SUBTABS_OM = [
   { label: 'Proveedor',   icon: 'pi pi-truck' },
 ]
 const activeSubTabOM = ref(0)
+
+const SUBTABS_ARR = [
+  { label: 'Operaciones', icon: 'pi pi-users' },
+  { label: 'Proveedor',   icon: 'pi pi-building' },
+]
+const activeSubTabArr = ref(0)
 
 const TABS = [
   { label: 'Mantenimiento',         icon: 'pi pi-wrench' },
