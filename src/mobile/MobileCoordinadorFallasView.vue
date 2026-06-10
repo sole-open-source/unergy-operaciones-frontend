@@ -123,7 +123,7 @@ const tecnicos = ref([])   // solo usuarios con rol tecnico
 const loading = ref(false)
 
 const search = ref('')
-const filtro = ref('sin_asignar')
+const filtro = ref('activas')
 
 const detailOpen = ref(false)
 const detailFalla = ref(null)
