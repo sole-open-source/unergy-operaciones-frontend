@@ -739,6 +739,112 @@
       </template>
     </div>
 
+    <!-- ═══════════════ ENERGÍA TRANSADA TAB ═══════════════ -->
+    <div v-show="activeTab === 3" class="space-y-5">
+
+      <!-- Selectors -->
+      <div class="flex flex-wrap items-end gap-4">
+        <div class="flex flex-col gap-1">
+          <label class="text-xs font-semibold uppercase tracking-wider" style="color: #915BD8;">Año</label>
+          <Select v-model="etYear" :options="etYearOptions" class="w-24" @change="onEtPeriodChange" />
+        </div>
+        <div class="flex flex-col gap-1">
+          <label class="text-xs font-semibold uppercase tracking-wider" style="color: #915BD8;">Mes</label>
+          <Select v-model="etMonth" :options="etMonthOptions" optionLabel="label" optionValue="value" class="w-40" @change="onEtPeriodChange" />
+        </div>
+        <span v-if="etData" class="text-xs px-2 py-1 rounded" style="background: rgba(145,91,216,0.08); color: #915BD8;">
+          {{ etPeriodoLabel }}
+        </span>
+        <span v-if="etFromCache" class="text-xs px-2 py-1 rounded" style="background: rgba(44,32,57,0.06); color: #7a6e8a;" title="Datos del histórico guardado en este navegador">
+          <i class="pi pi-history text-xs mr-1" />histórico local
+        </span>
+      </div>
+
+      <div v-if="etLoading" class="flex flex-col items-center justify-center py-20 gap-3">
+        <ProgressSpinner style="width:48px;height:48px;" strokeWidth="4" animationDuration=".8s" />
+        <p class="text-sm" style="color: #7a6e8a;">Consultando energía transada de {{ MESES[etMonth - 1] }}…</p>
+      </div>
+
+      <Message v-else-if="etError" severity="error" :closable="false">{{ etError }}</Message>
+
+      <template v-else-if="etData">
+
+        <Message v-if="etData.warning" severity="warn" :closable="false">{{ etData.warning }}</Message>
+
+        <!-- Summary cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div class="cv-card px-4 py-3">
+            <p class="text-xs font-semibold uppercase tracking-wider mb-1" style="color: #7a6e8a;">Total transada</p>
+            <p class="text-2xl font-bold font-mono" style="color: #2C2039;">{{ fmtMwh(etData.totales.gen_mwh) }} <span class="text-sm font-normal">MWh</span></p>
+            <p class="text-xs mt-0.5" style="color: #7a6e8a;">{{ etData.totales.n_plantas }} proyectos con datos</p>
+          </div>
+          <div class="cv-card px-4 py-3">
+            <p class="text-xs font-semibold uppercase tracking-wider mb-1" style="color: #915BD8;">Vía PPA</p>
+            <p class="text-2xl font-bold font-mono" style="color: #915BD8;">{{ fmtMwh(etData.totales.ppa_mwh) }} <span class="text-sm font-normal">MWh</span></p>
+            <p class="text-xs mt-0.5" style="color: #7a6e8a;">{{ etPct(etData.totales.ppa_mwh) }}% del total</p>
+          </div>
+          <div class="cv-card px-4 py-3">
+            <p class="text-xs font-semibold uppercase tracking-wider mb-1" style="color: #2C2039;">En bolsa</p>
+            <p class="text-2xl font-bold font-mono" style="color: #2C2039;">{{ fmtMwh(etData.totales.bolsa_mwh) }} <span class="text-sm font-normal">MWh</span></p>
+            <p class="text-xs mt-0.5" style="color: #7a6e8a;">{{ etPct(etData.totales.bolsa_mwh) }}% del total</p>
+          </div>
+        </div>
+
+        <!-- Tabla por proyecto -->
+        <div class="cv-card overflow-hidden">
+          <table class="w-full text-sm">
+            <thead>
+              <tr style="color: #7a6e8a; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; background: rgba(145,91,216,0.04);">
+                <th class="text-left px-4 py-3">Proyecto</th>
+                <th class="text-left px-2 py-3">Cómo se transó</th>
+                <th class="text-right px-2 py-3">PPA (MWh)</th>
+                <th class="text-right px-2 py-3">Bolsa (MWh)</th>
+                <th class="text-right px-4 py-3">Total (MWh)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="p in etData.plantas" :key="p.id" style="border-top: 1px solid rgba(44,32,57,0.06);">
+                <td class="px-4 py-2.5 font-medium" style="color: #2C2039;">
+                  {{ p.nombre }}
+                  <span v-if="p.modo === 'sin_datos'" class="ml-1 text-[10px] font-semibold px-1.5 py-0.5 rounded" style="background: rgba(214,68,85,0.12); color: #D64455;">sin datos</span>
+                </td>
+                <td class="px-2 py-2.5">
+                  <div class="flex flex-wrap gap-1">
+                    <span v-for="c in p.contratos.filter(c => !c.es_duplicado)" :key="c.id"
+                      class="text-xs px-1.5 py-0.5 rounded font-medium"
+                      style="background: rgba(145,91,216,0.10); color: #915BD8;"
+                      :title="`${c.dias_activos} días activos`">
+                      {{ c.nombre }} · {{ (c.pct * 100).toFixed(0) }}%
+                    </span>
+                    <span v-if="p.modo === 'bolsa' || p.modo === 'mixto'"
+                      class="text-xs px-1.5 py-0.5 rounded font-medium"
+                      style="background: rgba(44,32,57,0.08); color: #2C2039;">Bolsa</span>
+                    <span v-if="p.modo === 'sin_datos'" class="text-xs" style="color: #7a6e8a;">—</span>
+                  </div>
+                </td>
+                <td class="px-2 py-2.5 text-right font-mono" style="color: #915BD8;">{{ p.ppa_mwh !== null ? fmtMwh(p.ppa_mwh) : '—' }}</td>
+                <td class="px-2 py-2.5 text-right font-mono" style="color: #2C2039;">{{ p.bolsa_mwh !== null ? fmtMwh(p.bolsa_mwh) : '—' }}</td>
+                <td class="px-4 py-2.5 text-right font-mono font-semibold" style="color: #2C2039;">{{ p.gen_mwh !== null ? fmtMwh(p.gen_mwh) : '—' }}</td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr style="border-top: 2px solid rgba(44,32,57,0.12); background: rgba(145,91,216,0.04);">
+                <td class="px-4 py-3 font-bold" style="color: #2C2039;">TOTAL ENERGÍA TRANSADA</td>
+                <td></td>
+                <td class="px-2 py-3 text-right font-mono font-bold" style="color: #915BD8;">{{ fmtMwh(etData.totales.ppa_mwh) }}</td>
+                <td class="px-2 py-3 text-right font-mono font-bold" style="color: #2C2039;">{{ fmtMwh(etData.totales.bolsa_mwh) }}</td>
+                <td class="px-4 py-3 text-right font-mono font-bold text-base" style="color: #2C2039;">{{ fmtMwh(etData.totales.gen_mwh) }}</td>
+              </tr>
+            </tfoot>
+          </table>
+          <div v-if="!etData.plantas.length" class="px-4 py-10 text-sm text-center" style="color: rgba(44,32,57,0.35);">
+            Sin proyectos con energía transada en {{ MESES[etMonth - 1] }} {{ etYear }}
+          </div>
+        </div>
+
+      </template>
+    </div>
+
     <!-- Floating month breakdown -->
     <Teleport to="body">
       <template v-if="selectedMonthIdx !== null && anualData && anualData.meses[selectedMonthIdx]">
@@ -885,11 +991,13 @@ async function clearCacheAndReload() {
   anualData.value = null
   simData.value = null
   pcData.value = null
+  etData.value = null
   tableData.value = []
   try {
     await Promise.all([loadAnnualData(), loadTableData()])
     if (activeTab.value === 0) await loadSimulator()
     if (activeTab.value === 2) await loadPlantasContratos()
+    if (activeTab.value === 3) await loadEnergiaTransada()
   } finally {
     cacheClearing.value = false
     updateCacheSize()
@@ -897,7 +1005,7 @@ async function clearCacheAndReload() {
 }
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
-const TABS      = ['Estrategia', 'Cumplimiento', 'Proyectos']
+const TABS      = ['Estrategia', 'Cumplimiento', 'Proyectos', 'Energía transada']
 const activeTab = ref(0)
 
 // ── Chart constants ───────────────────────────────────────────────────────────
@@ -979,6 +1087,132 @@ const pcMode    = ref('venta')
 const pcData    = ref(null)
 const pcLoading = ref(false)
 const pcError   = ref(null)
+
+// ── Energía transada state ────────────────────────────────────────────────────
+// Histórico por mes en localStorage: los meses cerrados son inmutables y se
+// guardan sin TTL; el mes actual siempre se consulta fresco y se va guardando
+// como parcial. Un prefetch silencioso completa el histórico del año.
+const ET_PREFIX  = 'cumpl_et_'
+const etYear     = ref(now.getFullYear())
+const etMonth    = ref(now.getMonth() + 1)
+const etData     = ref(null)
+const etLoading  = ref(false)
+const etError    = ref(null)
+const etFromCache = ref(false)
+let etPrefetching = false
+
+const etYearOptions = computed(() => years.filter(y => y <= now.getFullYear()))
+
+const etMonthOptions = computed(() => {
+  const maxMonth = etYear.value === now.getFullYear() ? now.getMonth() + 1 : 12
+  return MESES_OPTIONS.filter(o => o.value <= maxMonth)
+})
+
+const etPeriodoLabel = computed(() => {
+  const p = etData.value?.periodo
+  if (!p) return ''
+  return p.es_mes_actual
+    ? `Del 1 al ${p.dia_corte} de ${MESES[p.month - 1].toLowerCase()} ${p.year}`
+    : `Mes completo · ${MESES[p.month - 1]} ${p.year}`
+})
+
+function etPct(val) {
+  const total = etData.value?.totales?.gen_mwh
+  if (!total || val === null) return '0'
+  return (val / total * 100).toFixed(1)
+}
+
+function etIsCurrentMonth(y, m) {
+  return y === now.getFullYear() && m === now.getMonth() + 1
+}
+
+function etCacheKey(y, m) { return `${ET_PREFIX}${y}_${String(m).padStart(2, '0')}` }
+
+function etCacheGet(y, m) {
+  try {
+    const raw = localStorage.getItem(etCacheKey(y, m))
+    if (!raw) return null
+    const { data, partial } = JSON.parse(raw)
+    // Un mes guardado como parcial (era el mes en curso) deja de valer cuando el mes cierra
+    if (partial && !etIsCurrentMonth(y, m)) {
+      localStorage.removeItem(etCacheKey(y, m))
+      return null
+    }
+    return data
+  } catch { return null }
+}
+
+function etCacheSet(y, m, data) {
+  try {
+    localStorage.setItem(etCacheKey(y, m), JSON.stringify({
+      ts: Date.now(),
+      partial: etIsCurrentMonth(y, m),
+      data,
+    }))
+  } catch { /* quota exceeded — ignorar */ }
+}
+
+async function etFetch(y, m) {
+  const res = await client.get('/cumplimiento/energia-transada', { params: { year: y, month: m }, timeout: 180000 })
+  etCacheSet(y, m, res.data)
+  return res.data
+}
+
+async function loadEnergiaTransada() {
+  const y = etYear.value, m = etMonth.value
+  etError.value = null
+  etFromCache.value = false
+
+  // Mes cerrado ya guardado → instantáneo desde el histórico local
+  if (!etIsCurrentMonth(y, m)) {
+    const cached = etCacheGet(y, m)
+    if (cached) {
+      etData.value = cached
+      etFromCache.value = true
+      prefetchEtHistory()
+      return
+    }
+  }
+
+  etLoading.value = true
+  try {
+    etData.value = await etFetch(y, m)
+    updateCacheSize()
+    prefetchEtHistory()
+  } catch (e) {
+    const status = e.response?.status
+    etError.value = e.response?.data?.detail
+      || (status === 401 ? 'Sesión expirada — inicia sesión de nuevo.'
+         : e.code === 'ECONNABORTED' ? 'Tiempo de espera agotado — el servidor tardó demasiado.'
+         : 'Error al consultar la energía transada.')
+  } finally {
+    etLoading.value = false
+  }
+}
+
+// Completa en segundo plano el histórico del año (meses cerrados que falten),
+// secuencial para no saturar el backend. El usuario no ve nada de esto.
+async function prefetchEtHistory() {
+  if (etPrefetching) return
+  etPrefetching = true
+  try {
+    const y = etYear.value
+    const lastClosed = y === now.getFullYear() ? now.getMonth() : (y < now.getFullYear() ? 12 : 0)
+    for (let m = 1; m <= lastClosed; m++) {
+      if (etCacheGet(y, m)) continue
+      try { await etFetch(y, m) } catch { break /* backend con problemas — reintentar en próxima visita */ }
+    }
+    updateCacheSize()
+  } finally {
+    etPrefetching = false
+  }
+}
+
+function onEtPeriodChange() {
+  const maxMonth = etYear.value === now.getFullYear() ? now.getMonth() + 1 : 12
+  if (etMonth.value > maxMonth) etMonth.value = maxMonth
+  loadEnergiaTransada()
+}
 
 const allContratos = computed(() => {
   if (!simData.value) return []
@@ -1495,6 +1729,7 @@ watch(activeTab, (tab) => {
   if (tab === 0 && !simData.value) loadSimulator()
   if (tab === 1 && !anualData.value) { loadAnnualData(); loadTableData() }
   if (tab === 2 && !pcData.value) loadPlantasContratos()
+  if (tab === 3 && !etData.value) loadEnergiaTransada()
 })
 
 onMounted(async () => {
