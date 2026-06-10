@@ -23,6 +23,7 @@ const UnergPreset = definePreset(Aura, {
 })
 import ToastService from 'primevue/toastservice'
 import ConfirmationService from 'primevue/confirmationservice'
+import Tooltip from 'primevue/tooltip'
 import 'primeicons/primeicons.css'
 import './assets/main.css'
 
@@ -43,6 +44,7 @@ app.use(PrimeVue, {
 })
 app.use(ToastService)
 app.use(ConfirmationService)
+app.directive('tooltip', Tooltip)
 app.component('InfoField', InfoField)
 app.component('PageHeader', PageHeader)
 
