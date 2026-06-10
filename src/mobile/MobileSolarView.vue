@@ -473,6 +473,8 @@ onUnmounted(() => {
 
 .ms-chart {
   flex: 1; min-height: 0; position: relative;
+  /* tope de alto ≈ 58% del ancho: la gráfica siempre queda más ancha que alta */
+  max-height: min(58vw, 44vh);
   background: #fff; border: 1px solid #eceaf2; border-radius: 16px; padding: 12px 10px 6px;
 }
 
