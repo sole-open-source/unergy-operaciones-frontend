@@ -12,6 +12,7 @@ const routes = [
   { path: '/m/login',     name: 'MobileLogin',  component: () => import('@/mobile/MobileLoginView.vue'), meta: { public: true, mobile: true } },
   { path: '/m/solar',     name: 'MobileSolar',  component: () => import('@/mobile/MobileSolarView.vue'),  meta: { mobile: true } },
   { path: '/m/fallas',    name: 'MobileFallas', component: () => import('@/mobile/MobileFallasView.vue'), meta: { mobile: true } },
+  { path: '/m/resumen',   name: 'MobileResumen', component: () => import('@/mobile/MobileResumenView.vue'), meta: { mobile: true } },
 
   // ── General ──────────────────────────────────────────────────────
   { path: '/', redirect: '/dashboard' },

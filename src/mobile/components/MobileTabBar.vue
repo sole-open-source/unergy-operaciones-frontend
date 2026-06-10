@@ -6,6 +6,9 @@
     <RouterLink to="/m/fallas" class="mtb-item" active-class="mtb-item--active">
       <i class="pi pi-wrench" /><span>Fallas</span>
     </RouterLink>
+    <RouterLink to="/m/resumen" class="mtb-item" active-class="mtb-item--active">
+      <i class="pi pi-chart-bar" /><span>Resumen</span>
+    </RouterLink>
   </nav>
 </template>
 
