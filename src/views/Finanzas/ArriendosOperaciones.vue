@@ -102,15 +102,21 @@
               </td>
               <td class="px-3 py-2 text-right tabular-nums bg-purple-50/30"
                 :style="fila.habilitado && seleccion[fila.id] ? 'color:#7c3aed' : 'color:#9ca3af'">
-                <span v-if="fila.canon_calculado != null" class="font-semibold">
-                  {{ formatCOP(fila.canon_calculado) }}
+                <span class="inline-flex items-center justify-end gap-1">
+                  <span v-if="fila.canon_archivo != null" class="font-semibold">
+                    {{ formatCOP(fila.canon_archivo) }}
+                  </span>
+                  <span v-else-if="fila.canon_calculado != null" class="font-semibold">
+                    {{ formatCOP(fila.canon_calculado) }}
+                  </span>
+                  <span v-else class="text-gray-300">—</span>
+                  <span v-if="fila.difiere_archivo"
+                    :title="`Valor calculado por IPC: ${formatCOP(fila.canon_calculado)}`"
+                    class="cursor-help text-amber-500 flex-shrink-0"
+                    style="font-size:11px">
+                    ⚠️
+                  </span>
                 </span>
-                <span v-if="fila.difiere_archivo"
-                  class="ml-1 text-amber-600 font-normal text-[10px] whitespace-nowrap"
-                  :title="`Valor en archivo: ${formatCOP(fila.canon_archivo)}`">
-                  ⚠️ Difiere del archivo: {{ formatCOP(fila.canon_archivo) }}
-                </span>
-                <span v-if="fila.canon_calculado == null" class="text-gray-300">—</span>
               </td>
               <td v-if="colsVisibles.historial" class="px-3 py-2 text-xs text-gray-400"
                 style="white-space:nowrap;max-width:320px;overflow:hidden;text-overflow:ellipsis"
@@ -422,8 +428,8 @@ const filasSeleccionadas = computed(() =>
 )
 const totalSeleccionado  = computed(() =>
   filas.value
-    .filter(f => f.habilitado && seleccion[f.id] && f.canon_calculado != null)
-    .reduce((s, f) => s + f.canon_calculado, 0)
+    .filter(f => f.habilitado && seleccion[f.id])
+    .reduce((s, f) => s + (f.canon_archivo ?? f.canon_calculado ?? 0), 0)
 )
 
 function toggleTodos(e) {
