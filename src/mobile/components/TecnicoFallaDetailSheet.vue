@@ -217,14 +217,16 @@ async function cargarArchivos() {
 }
 
 async function patch(payload) {
-  if (!fa.value) return
+  if (!fa.value) return false
   saving.value = true
   try {
     const { data } = await api.patch(`/fallas/${fa.value.id}`, payload)
     fa.value = data
     emit('updated', data)
+    return true
   } catch (e) {
     window.__primeToast?.({ severity: 'error', summary: 'No se pudo guardar', detail: e.response?.data?.detail, life: 3000 })
+    return false
   } finally {
     saving.value = false
   }
@@ -317,8 +319,8 @@ async function cerrarFalla() {
     window.__primeToast?.({ severity: 'warn', summary: 'Sin estado final configurado', life: 3000 })
     return
   }
-  await patch({ estado_id: final.id, fecha_resolucion: new Date().toISOString() })
-  window.__primeToast?.({ severity: 'success', summary: '¡Falla resuelta!', life: 2500 })
+  const ok = await patch({ estado_id: final.id, fecha_resolucion: new Date().toISOString() })
+  if (ok) window.__primeToast?.({ severity: 'success', summary: '¡Falla resuelta!', life: 2500 })
 }
 
 async function reabrirFalla() {
