@@ -194,7 +194,7 @@ async function cargar() {
     Object.assign(catalogos, cat.data)
     proyectos.value = proy.data.items ?? []
     const todos = usr.data.items ?? []
-    tecnicos.value = todos.filter((u) => u.rol === 'tecnico' || u.rol === 'monitoreo' || u.rol === 'operaciones')
+    tecnicos.value = todos.filter((u) => u.rol === 'tecnico')
     await cargarFallas()
   } finally {
     loading.value = false
