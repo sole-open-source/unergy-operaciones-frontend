@@ -47,6 +47,20 @@
 
     <!-- Tabla -->
     <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+      <!-- Toolbar de selección múltiple -->
+      <div v-if="liqIdsVisibles.length"
+        class="flex items-center gap-3 px-4 py-2.5 border-b" style="border-color:#F0ECF6;">
+        <span @click.stop>
+          <Checkbox :modelValue="allVisiblesSelected" binary @update:modelValue="toggleSelectAll" />
+        </span>
+        <span class="text-xs font-semibold" style="color:#6b5a8a;">Seleccionar todas</span>
+        <span v-if="seleccionadas.size" class="text-xs font-semibold" style="color:#915BD8;">
+          · {{ seleccionadas.size }} seleccionada(s)
+        </span>
+        <Button v-if="seleccionadas.size" label="Cambiar estado" icon="pi pi-pencil"
+          size="small" class="ml-auto" @click="abrirDialogEstado" />
+      </div>
+
       <DataTable
         :value="filasResumenFiltradas"
         :loading="loadingVista"
@@ -87,6 +101,10 @@
             <div v-else
               class="flex items-center gap-4 px-10 py-2 cursor-pointer hover:bg-purple-50 border-b border-gray-100"
               @click="router.push(`/liquidaciones/${data.liq_id}`)">
+              <span @click.stop>
+                <Checkbox :modelValue="seleccionadas.has(data.liq_id)" binary
+                  @update:modelValue="() => toggleSel(data.liq_id)" />
+              </span>
               <span class="w-20 text-gray-700 text-sm">{{ data.periodoLabel }}</span>
               <Tag :value="data.estado" :severity="estadoSeverity(data.estado)" class="text-[10px]" />
               <span v-if="tipoFilter === 'autoconsumo'" class="text-xs text-gray-600 truncate max-w-[180px]">
@@ -128,6 +146,25 @@
         </div>
       </div>
     </Dialog>
+
+    <!-- Dialog cambio masivo de estado -->
+    <Dialog v-model:visible="dialogEstado" header="Cambiar estado" modal class="w-full max-w-md">
+      <div class="space-y-3 py-2">
+        <p class="text-sm" style="color:#6b5a8a;">
+          Se aplicará a <b style="color:#2C2039;">{{ seleccionadas.size }}</b> liquidación(es) seleccionada(s).
+        </p>
+        <div>
+          <label class="field-label">Nuevo estado</label>
+          <Select v-model="nuevoEstado" :options="estadosOpciones" placeholder="Seleccionar estado" class="w-full" />
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <Button label="Cancelar" severity="secondary" size="small" @click="dialogEstado = false" />
+          <Button :label="`Aplicar a ${seleccionadas.size} liquidaciones seleccionadas`"
+            size="small" :loading="aplicandoEstado" :disabled="!nuevoEstado"
+            @click="aplicarEstadoMasivo" />
+        </div>
+      </div>
+    </Dialog>
   </div>
 </template>
 
@@ -137,6 +174,7 @@ import { useRouter, useRoute } from 'vue-router'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Button from 'primevue/button'
+import Checkbox from 'primevue/checkbox'
 import Dialog from 'primevue/dialog'
 import Tag from 'primevue/tag'
 import Select from 'primevue/select'
@@ -271,6 +309,66 @@ function toggleAnio(key) {
   expandedAnios.value = new Set(expandedAnios.value)
 }
 
+// ─── Selección múltiple + cambio masivo de estado ─────────────────────────────
+const seleccionadas = ref(new Set())
+const dialogEstado = ref(false)
+const nuevoEstado = ref(null)
+const aplicandoEstado = ref(false)
+
+// liquidaciones (filas mes) actualmente visibles tras filtros/expansión
+const liqIdsVisibles = computed(() =>
+  filasResumenFiltradas.value.filter(f => f.tipo === 'mes').map(f => f.liq_id)
+)
+const allVisiblesSelected = computed(() =>
+  liqIdsVisibles.value.length > 0 &&
+  liqIdsVisibles.value.every(id => seleccionadas.value.has(id))
+)
+
+function toggleSel(id) {
+  seleccionadas.value.has(id) ? seleccionadas.value.delete(id) : seleccionadas.value.add(id)
+  seleccionadas.value = new Set(seleccionadas.value)
+}
+
+function toggleSelectAll() {
+  if (allVisiblesSelected.value) {
+    liqIdsVisibles.value.forEach(id => seleccionadas.value.delete(id))
+  } else {
+    liqIdsVisibles.value.forEach(id => seleccionadas.value.add(id))
+  }
+  seleccionadas.value = new Set(seleccionadas.value)
+}
+
+function abrirDialogEstado() {
+  nuevoEstado.value = null
+  dialogEstado.value = true
+}
+
+async function aplicarEstadoMasivo() {
+  if (!nuevoEstado.value || !seleccionadas.value.size) return
+  aplicandoEstado.value = true
+  const ids = [...seleccionadas.value]
+  let ok = 0, fail = 0
+  for (const id of ids) {
+    try {
+      await api.patch(`/liquidaciones/${id}`, { estado: nuevoEstado.value })
+      ok++
+    } catch {
+      fail++
+    }
+  }
+  aplicandoEstado.value = false
+  dialogEstado.value = false
+  seleccionadas.value = new Set()
+  nuevoEstado.value = null
+  toast.add({
+    severity: fail ? 'warn' : 'success',
+    summary: 'Estados actualizados',
+    detail: `${ok} liquidación(es) actualizada(s)${fail ? ` · ${fail} con error` : ''}`,
+    life: 3000,
+  })
+  loadVistas()
+}
+
 // ─── Helpers de estilo ────────────────────────────────────────────────────────
 function badgeTipoVenta(tv) {
   return { ppa: 'badge-ppa', autoconsumo: 'badge-auto', bolsa: 'badge-bolsa' }[tv] || 'badge-bolsa'
@@ -301,6 +399,7 @@ function toISOMonth(d) {
 
 async function loadVistas() {
   loadingVista.value = true
+  seleccionadas.value = new Set()
   try {
     const { data } = await api.get('/liquidaciones/vistas/por-proyecto', { params: buildParams() })
     vistaProyectos.value = data
