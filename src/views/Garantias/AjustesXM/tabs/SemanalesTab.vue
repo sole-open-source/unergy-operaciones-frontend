@@ -81,10 +81,14 @@
         </div>
 
         <!-- Panel custodia -->
-        <div class="grid grid-cols-3 gap-3 mt-4">
+        <div v-if="resultado.custodia" class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
           <div class="bg-white rounded-xl p-4 shadow-sm text-center" style="border:1px solid #e8e0f0">
             <p class="text-xs font-semibold uppercase tracking-wide mb-1" style="color:#6b5a8a">Disponible</p>
-            <p class="text-lg font-bold" style="color:#10B981">{{ fmtCOP(resultado.custodia.disponible) }}</p>
+            <p class="text-lg font-bold" :style="resultado.custodia.disponible < 0 ? 'color:#D64455' : 'color:#10B981'">{{ fmtCOP(resultado.custodia.disponible) }}</p>
+          </div>
+          <div class="bg-white rounded-xl p-4 shadow-sm text-center" style="border:1px solid #e8e0f0">
+            <p class="text-xs font-semibold uppercase tracking-wide mb-1" style="color:#6b5a8a">Disponible (Aplic. garantía)</p>
+            <p class="text-lg font-bold" style="color:#10B981">{{ fmtCOP(disponibleAplicacion) }}</p>
           </div>
           <div class="bg-white rounded-xl p-4 shadow-sm text-center" style="border:1px solid #e8e0f0">
             <p class="text-xs font-semibold uppercase tracking-wide mb-1" style="color:#6b5a8a">Congelado</p>
@@ -193,6 +197,12 @@ const files = ref({ garantia: null, saldo: null, web: null })
 const allFilesLoaded = computed(
   () => files.value.garantia && files.value.saldo && files.value.web,
 )
+
+const disponibleAplicacion = computed(() => {
+  const c = resultado.value?.custodia
+  if (!c) return 0
+  return (c.disponible ?? 0) + (resultado.value.totalUNGG ?? 0) + (resultado.value.totalUNGC ?? 0)
+})
 
 const montoEditable = ref(0)
 const variacionPb = ref(null)
