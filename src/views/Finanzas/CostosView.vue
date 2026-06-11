@@ -229,9 +229,22 @@
             <i class="pi pi-building text-sm" style="color:#915BD8" />
             <span class="text-sm font-semibold" style="color:#2C2039">Panel Arriendos Mensual</span>
           </div>
+          <div class="mon-tab-group">
+            <button
+              v-for="(tab, i) in SUBTABS_ARR"
+              :key="i"
+              class="mon-tab"
+              :class="{ 'mon-tab--active': activeSubTabArr === i }"
+              @click="activeSubTabArr = i"
+            >
+              <i :class="tab.icon" style="font-size:12px" />
+              {{ tab.label }}
+            </button>
+          </div>
         </div>
         <div class="om-panel-body">
-          <ArriendosOperaciones />
+          <ArriendosOperaciones v-if="activeSubTabArr === 0" />
+          <ArriendosInfo        v-if="activeSubTabArr === 1" />
         </div>
       </div>
     </div>
@@ -257,6 +270,7 @@ import FacturasMantenimiento from '@/views/Servicios/FacturasMantenimiento.vue'
 import OMAOperaciones       from './OMAOperaciones.vue'
 import OMAProveedor          from './OMAProveedor.vue'
 import ArriendosOperaciones  from './ArriendosOperaciones.vue'
+import ArriendosInfo          from './ArriendosInfo.vue'
 
 const toast = useToast()
 
@@ -265,6 +279,12 @@ const SUBTABS_OM = [
   { label: 'Proveedor',   icon: 'pi pi-truck' },
 ]
 const activeSubTabOM = ref(0)
+
+const SUBTABS_ARR = [
+  { label: 'Panel',       icon: 'pi pi-table' },
+  { label: 'Información', icon: 'pi pi-info-circle' },
+]
+const activeSubTabArr = ref(0)
 
 
 const TABS = [
