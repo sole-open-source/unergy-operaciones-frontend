@@ -38,17 +38,47 @@
 
         <transition name="sb-collapse">
           <div v-show="!group.label || !isGroupCollapsed(group.label)">
-            <RouterLink
-              v-for="item in group.items"
-              :key="item.to"
-              :to="item.to"
-              class="sb-item"
-              active-class="sb-item--active"
-              @click="mobileOpen = false"
-            >
-              <i :class="[item.icon, 'sb-item-ico']" />
-              <span class="truncate">{{ item.label }}</span>
-            </RouterLink>
+            <template v-for="item in group.items" :key="item.to || item.label">
+              <!-- Item con submenú expandible -->
+              <template v-if="item.children">
+                <button
+                  type="button"
+                  class="sb-item sb-item--parent"
+                  @click="toggleItem(item.label)"
+                >
+                  <i :class="[item.icon, 'sb-item-ico']" />
+                  <span class="truncate flex-1 text-left">{{ item.label }}</span>
+                  <i class="pi pi-chevron-down sb-item-chev"
+                    :class="{ 'sb-item-chev--open': isItemExpanded(item.label) }" />
+                </button>
+                <transition name="sb-collapse">
+                  <div v-show="isItemExpanded(item.label)" class="sb-subitems">
+                    <RouterLink
+                      v-for="child in item.children"
+                      :key="child.to"
+                      :to="child.to"
+                      class="sb-item sb-subitem"
+                      active-class="sb-item--active"
+                      @click="mobileOpen = false"
+                    >
+                      <span class="truncate">{{ child.label }}</span>
+                    </RouterLink>
+                  </div>
+                </transition>
+              </template>
+
+              <!-- Item simple -->
+              <RouterLink
+                v-else
+                :to="item.to"
+                class="sb-item"
+                active-class="sb-item--active"
+                @click="mobileOpen = false"
+              >
+                <i :class="[item.icon, 'sb-item-ico']" />
+                <span class="truncate">{{ item.label }}</span>
+              </RouterLink>
+            </template>
           </div>
         </transition>
       </template>
@@ -261,9 +291,15 @@ const ALL_GROUPS = [
   {
     label: 'Finanzas',
     items: [
-      { to: '/liquidaciones', label: 'Liquidaciones', icon: 'pi pi-dollar', roles: ['admin', 'liquidaciones'] },
-      { to: '/liquidaciones?tab=inversionistas', label: 'Por Inversionista', icon: 'pi pi-users', roles: ['admin', 'liquidaciones'] },
-      { to: '/liquidaciones?tab=cargar', label: 'Cargar Excel', icon: 'pi pi-upload', roles: ['admin', 'liquidaciones'] },
+      {
+        label: 'Liquidaciones', icon: 'pi pi-dollar', roles: ['admin', 'liquidaciones'],
+        children: [
+          { to: '/liquidaciones?tipo=minigranja', label: 'Minigranjas' },
+          { to: '/liquidaciones?tipo=autoconsumo', label: 'Autoconsumo' },
+        ],
+      },
+      { to: '/liquidaciones/inversionista', label: 'Por Inversionista', icon: 'pi pi-users', roles: ['admin', 'liquidaciones'] },
+      { to: '/liquidaciones/cargar-excel', label: 'Cargar Excel', icon: 'pi pi-upload', roles: ['admin', 'liquidaciones'] },
       { to: '/finanzas/costos', label: 'Costos', icon: 'pi pi-credit-card', roles: ['admin', 'liquidaciones'] },
     ],
   },
@@ -281,6 +317,16 @@ const ALL_GROUPS = [
     ],
   },
 ]
+
+// Submenús expandibles dentro de un grupo (ej. Liquidaciones)
+const expandedItems = ref(new Set(['Liquidaciones']))
+function isItemExpanded(label) { return expandedItems.value.has(label) }
+function toggleItem(label) {
+  expandedItems.value.has(label)
+    ? expandedItems.value.delete(label)
+    : expandedItems.value.add(label)
+  expandedItems.value = new Set(expandedItems.value)
+}
 
 const navGroups = computed(() =>
   ALL_GROUPS.map(g => ({
@@ -348,6 +394,18 @@ const navGroups = computed(() =>
 .sb-item:hover .sb-item-ico { color: #6D28D9; }
 .sb-item--active { background: #F1EAF9 !important; color: #2C2039 !important; font-weight: 700; }
 .sb-item--active .sb-item-ico { color: #6D28D9; }
+
+/* Item padre con submenú */
+.sb-item--parent { width: 100%; background: transparent; border: none; cursor: pointer; }
+.sb-item-chev { font-size: 10px; color: #9990ad; flex-shrink: 0; transition: transform .18s ease; }
+.sb-item-chev--open { transform: rotate(180deg); }
+.sb-subitems { padding-left: 18px; }
+.sb-subitem { font-size: 12.5px; font-weight: 600; padding: 6px 10px; }
+.sb-subitem::before {
+  content: ''; width: 4px; height: 4px; border-radius: 50%;
+  background: #c4b8d4; margin-right: 9px; flex-shrink: 0;
+}
+.sb-subitem.sb-item--active::before { background: #6D28D9; }
 
 /* Footer usuario */
 .sb-footer { border-top: 1px solid #F0ECF6; padding: 10px 12px; flex-shrink: 0; }

@@ -9,17 +9,11 @@
       <Button label="Nueva liquidación" icon="pi pi-plus" size="small" @click="dialogNueva = true" />
     </div>
 
-    <!-- Tabs -->
-    <div class="flex gap-0 border-b" style="border-color: rgba(44,32,57,0.10);">
-      <button
-        v-for="(tab, i) in TABS"
-        :key="i"
-        @click="tabActivo = i"
-        class="px-5 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors"
-        :style="tabActivo === i
-          ? 'color: #915BD8; border-color: #915BD8;'
-          : 'color: #7a6e8a; border-color: transparent;'"
-      >{{ tab.label }}</button>
+    <!-- Indicador de filtro por tipo (vía query ?tipo=) -->
+    <div v-if="tipoLabel" class="flex items-center gap-2">
+      <span class="text-sm font-semibold" style="color:#915BD8;">{{ tipoLabel }}</span>
+      <RouterLink to="/liquidaciones?tab=proyectos"
+        class="text-xs hover:underline" style="color:#9b8fb0;">Ver todas</RouterLink>
     </div>
 
     <!-- Filtros -->
@@ -95,7 +89,10 @@
               @click="router.push(`/liquidaciones/${data.liq_id}`)">
               <span class="w-20 text-gray-700 text-sm">{{ data.periodoLabel }}</span>
               <Tag :value="data.estado" :severity="estadoSeverity(data.estado)" class="text-[10px]" />
-              <span :class="badgeTipoVenta(data.tipo_venta)">{{ data.tipo_venta || '—' }}</span>
+              <span v-if="tipoFilter === 'autoconsumo'" class="text-xs text-gray-600 truncate max-w-[180px]">
+                {{ data.cliente || '—' }}
+              </span>
+              <span v-else :class="badgeTipoVenta(data.tipo_venta)">{{ data.tipo_venta || '—' }}</span>
               <span class="ml-auto font-mono text-gray-800 text-sm">
                 {{ data.ingreso_neto != null ? fmt(data.ingreso_neto) : '—' }}
               </span>
@@ -136,7 +133,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Button from 'primevue/button'
@@ -153,15 +150,18 @@ import { proyectoActivoEnMes } from '@/utils/proyectoActivo'
 
 defineProps({ embedded: { type: Boolean, default: false } })
 
-const TABS = [
-  { label: 'Todas',       filter: null },
-  { label: 'Minigranjas', filter: 'minigranja' },
-  { label: 'Autoconsumo', filter: 'autoconsumo' },
-]
-const tabActivo = ref(0)
-
 const toast = useToast()
 const router = useRouter()
+const route = useRoute()
+
+// Filtro por tipo de proyecto vía query ?tipo= (minigranja | autoconsumo | null)
+const tipoFilter = computed(() => {
+  const t = route.query.tipo
+  return (t === 'minigranja' || t === 'autoconsumo') ? t : null
+})
+const tipoLabel = computed(() =>
+  ({ minigranja: 'Minigranjas', autoconsumo: 'Autoconsumo' }[tipoFilter.value] || '')
+)
 
 const vistaProyectos = ref([])
 const loadingVista = ref(false)
@@ -195,6 +195,7 @@ const filasResumen = computed(() => {
   const filas = []
   for (const proy of vistaProyectos.value) {
     const proyKey = String(proy.proyecto_id)
+    const cliente = (proy.inversionistas_registrados || [])[0]?.inversionista_nombre || ''
     filas.push({ tipo: 'proyecto', proyKey, proyecto: proy.proyecto_nombre })
 
     const porAnio = {}
@@ -218,6 +219,7 @@ const filasResumen = computed(() => {
           periodoLabel: formatPeriodo(liq.periodo),
           estado:       liq.estado,
           tipo_venta:   liq.tipo_venta,
+          cliente,
           ingreso_neto: mandatoTotal?.valor_neto_cop ?? null,
         })
       }
@@ -230,7 +232,7 @@ const filasResumen = computed(() => {
 const filasResumenFiltradas = computed(() => {
   const q = (filtros.value.q || '').toLowerCase().trim()
   const tv = filtros.value.tipo_venta
-  const tabFilter = TABS[tabActivo.value].filter
+  const tipo = tipoFilter.value
 
   const proyTipo = {}
   for (const p of vistaProyectos.value) proyTipo[String(p.proyecto_id)] = p.tipo_proyecto
@@ -240,7 +242,7 @@ const filasResumenFiltradas = computed(() => {
       .filter(f => f.tipo === 'mes'
         && (!q || f.proyecto.toLowerCase().includes(q))
         && (!tv || f.tipo_venta === tv)
-        && (!tabFilter || proyTipo[f.proyKey] === tabFilter))
+        && (!tipo || proyTipo[f.proyKey] === tipo))
       .map(f => f.proyKey)
   )
 
@@ -366,13 +368,12 @@ try {
   if (saved.q != null) filtros.value.q = saved.q
   if (saved.estado != null) filtros.value.estado = saved.estado
   if (saved.tipo_venta != null) filtros.value.tipo_venta = saved.tipo_venta
-  if (Number.isInteger(saved.tab) && saved.tab >= 0 && saved.tab < TABS.length) tabActivo.value = saved.tab
 } catch { /* ignora json corrupto */ }
 
-watch([filtros, tabActivo], () => {
+watch(filtros, () => {
   localStorage.setItem(LS_KEY, JSON.stringify({
     q: filtros.value.q, estado: filtros.value.estado,
-    tipo_venta: filtros.value.tipo_venta, tab: tabActivo.value,
+    tipo_venta: filtros.value.tipo_venta,
   }))
 }, { deep: true })
 

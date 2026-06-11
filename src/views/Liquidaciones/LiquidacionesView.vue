@@ -59,12 +59,23 @@ const VALID = TABS.map(t => t.key)
 const route = useRoute()
 const router = useRouter()
 
-const tab = ref(VALID.includes(route.query.tab) ? route.query.tab : 'resumen')
+function tabInicial() {
+  if (VALID.includes(route.query.tab)) return route.query.tab
+  if (route.query.tipo) return 'proyectos'   // sidebar: /liquidaciones?tipo=...
+  return 'resumen'
+}
+const tab = ref(tabInicial())
 watch(tab, (val) => {
   const q = { ...route.query }
   if (val === 'resumen') delete q.tab
   else q.tab = val
   router.replace({ query: q })
+})
+
+// Navegación desde el sidebar (?tipo= o ?tab=) estando ya montada la vista
+watch(() => route.query, (q) => {
+  if (q.tipo && tab.value !== 'proyectos') tab.value = 'proyectos'
+  else if (VALID.includes(q.tab) && q.tab !== tab.value) tab.value = q.tab
 })
 
 // Período del dashboard

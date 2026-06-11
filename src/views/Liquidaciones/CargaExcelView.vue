@@ -12,6 +12,34 @@
       <div class="bg-white rounded-xl shadow-sm p-6 space-y-5">
         <h2 class="text-xs font-bold uppercase tracking-widest" style="color: #915BD8;">Configuración de carga</h2>
 
+        <!-- Selector de tipo -->
+        <div>
+          <label class="block text-xs font-semibold mb-1.5" style="color: #6b5a8a;">Tipo de liquidación</label>
+          <div class="tipo-switch">
+            <button
+              type="button"
+              class="tipo-opt"
+              :class="{ 'tipo-opt--on': tipoVenta === 'ppa' }"
+              @click="setTipoVenta('ppa')"
+            >
+              <i class="pi pi-sun" /> Minigranjas/PPA
+            </button>
+            <button
+              type="button"
+              class="tipo-opt"
+              :class="{ 'tipo-opt--on': tipoVenta === 'autoconsumo' }"
+              @click="setTipoVenta('autoconsumo')"
+            >
+              <i class="pi pi-building" /> Autoconsumo
+            </button>
+          </div>
+          <p v-if="tipoVenta === 'autoconsumo'" class="text-xs mt-2 flex items-center gap-1.5"
+            style="color: #915BD8;">
+            <i class="pi pi-info-circle" />
+            Todos los proyectos se asignan a SUNO
+          </p>
+        </div>
+
         <!-- Dropzone -->
         <div
           class="dropzone"
@@ -223,6 +251,7 @@ const hojas = ref([])
 const hoja = ref('')
 const periodo = ref('')
 const limpiar = ref(false)
+const tipoVenta = ref('ppa')   // 'ppa' | 'autoconsumo'
 const dragOver = ref(false)
 const loading = ref(false)
 const step = ref('')         // 'preview' | 'cargar'
@@ -280,7 +309,15 @@ function buildFormData(dry) {
   fd.append('periodo', periodo.value)
   fd.append('limpiar', limpiar.value ? 'true' : 'false')
   fd.append('dry_run', dry ? 'true' : 'false')
+  fd.append('tipo_venta', tipoVenta.value)
   return fd
+}
+
+function setTipoVenta(t) {
+  tipoVenta.value = t
+  // El cambio de estructura invalida la vista previa generada
+  previewData.value = null
+  result.value = null
 }
 
 async function runPreview() {
@@ -332,6 +369,7 @@ function resetAll() {
   hoja.value = ''
   periodo.value = ''
   limpiar.value = false
+  tipoVenta.value = 'ppa'
   previewData.value = null
   result.value = null
   if (document.querySelector('input[type=file]')) {
@@ -364,6 +402,34 @@ function resetAll() {
   border-color: #10B981;
   background: #f0fdf4;
 }
+
+/* Selector tipo de liquidación */
+.tipo-switch {
+  display: inline-flex;
+  gap: 4px;
+  background: #F4F1FA;
+  border: 1px solid #E5E2EC;
+  border-radius: 10px;
+  padding: 3px;
+}
+.tipo-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #6B5A8A;
+  background: transparent;
+  border: none;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: all .15s;
+  font-family: 'Sora', system-ui, sans-serif;
+}
+.tipo-opt:hover:not(.tipo-opt--on) { color: #2C2039; background: rgba(145,91,216,.08); }
+.tipo-opt--on { background: #915BD8; color: #FDFAF7; box-shadow: 0 1px 4px rgba(145,91,216,.3); }
+.tipo-opt i { font-size: 13px; }
 
 .input-field {
   border: 1px solid #e0d7ee;
