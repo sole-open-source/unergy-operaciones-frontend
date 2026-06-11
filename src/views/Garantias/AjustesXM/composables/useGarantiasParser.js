@@ -41,27 +41,6 @@ function firstSheet(wb) {
   return sheetToRows(wb, wb.SheetNames[0])
 }
 
-function copiarPorCodigo(rows, codigo) {
-  // rows is 0-indexed (from sheet_to_json header:1)
-  // Headers at row idx 8 (cols from idx 3); data starts at row idx 9
-  // Col idx 0 = código de agente
-  const resultado = []
-  for (let i = 9; i < rows.length; i++) {
-    const row = rows[i]
-    if (!row) continue
-    const cod = row[0]
-    if (cod === codigo) {
-      // Found the block start — collect 8 rows (7 days + TIE overwrite)
-      // But we need to collect col B (idx 1) = label, col C (idx 2) = valor
-      // Actually the spec says col B=label, col C=value (indices from Apps Script colInicio=3 meaning D is first data col)
-      // Re-reading spec: headers from col D (idx 3); labels in col B (idx 1), values in col C (idx 2)?
-      // From Apps Script: copiarPorCodigo copies rows where col A = code, and returns label (col B idx 1) + value (col C idx 2)
-      resultado.push({ label: row[1], valor: row[2] })
-    }
-  }
-  return resultado
-}
-
 function extractBloque(rows, codigo) {
   // Find the start row where col A === codigo
   // Collect next 8 rows (7 days + 1 sum/TIE row)
@@ -223,6 +202,10 @@ export async function parseTxr(file) {
   if (codigoIdx === -1) {
     errors.push('Columna "CÓDIGO" no encontrada en hoja Ajuste')
     return { rows: [], totalAjuste: 0, errors }
+  }
+
+  if (ajusteIdx === -1) {
+    errors.push('Columna "Total Ajuste" no encontrada en hoja Ajuste')
   }
 
   // Filter rows where CÓDIGO === UNGC or UNGG
