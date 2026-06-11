@@ -56,7 +56,7 @@ import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
 import Textarea from 'primevue/textarea'
-import { useGarantiasHistorial } from '../../composables/useGarantiasHistorial.js'
+import { useGarantiasHistorial } from './composables/useGarantiasHistorial.js'
 
 const props = defineProps({ visible: Boolean })
 const emit = defineEmits(['close'])
