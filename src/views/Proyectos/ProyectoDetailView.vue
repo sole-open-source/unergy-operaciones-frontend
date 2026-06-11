@@ -86,22 +86,258 @@
 
       <!-- ══ TÉCNICO ══ -->
       <TabPanel header="Técnico">
-        <div class="grid grid-cols-2 md:grid-cols-3 gap-4 p-4 text-sm">
+        <div class="p-4 space-y-6 text-sm">
+
+          <!-- Vista lectura -->
           <template v-if="!isEditMode">
-            <InfoField label="Potencia instalada (kWp)" :value="proyecto.potencia_instalada_kwp" />
-            <InfoField label="Cantidad de paneles" :value="proyecto.cantidad_total_paneles" />
-            <InfoField label="Producción específica (kWh/kWp)" :value="proyecto.produccion_especifica_kwh_kwp" />
+            <!-- Ubicación -->
+            <div v-if="proyecto.direccion_vereda || proyecto.info_tecnica?.url_ubicacion">
+              <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Ubicación</p>
+              <div class="space-y-1">
+                <p v-if="proyecto.direccion_vereda" class="text-gray-700">{{ proyecto.direccion_vereda }}</p>
+                <a v-if="proyecto.info_tecnica?.url_ubicacion" :href="proyecto.info_tecnica.url_ubicacion"
+                   target="_blank" rel="noopener"
+                   class="inline-flex items-center gap-1 text-blue-600 hover:underline text-xs">
+                  <i class="pi pi-map-marker" /> Ver en Google Maps
+                </a>
+              </div>
+            </div>
+            <!-- Eléctrico general -->
+            <div>
+              <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">General</p>
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <InfoField label="Potencia instalada (kWp)" :value="proyecto.potencia_instalada_kwp" />
+                <InfoField label="Potencia AC (kW)" :value="proyecto.info_tecnica?.potencia_ac_kw" />
+                <InfoField label="Capacidad instalada (kWp)" :value="proyecto.info_tecnica?.capacidad_instalada_kwp" />
+                <InfoField label="Voltaje red" :value="proyecto.info_tecnica?.voltaje_red" />
+                <InfoField label="Tipo tracker" :value="proyecto.info_tecnica?.tipo_tracker" />
+                <InfoField label="Producción específica (kWh/kWp)" :value="proyecto.produccion_especifica_kwh_kwp" />
+              </div>
+            </div>
+            <!-- Paneles -->
+            <div>
+              <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Paneles</p>
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <InfoField label="Cantidad de paneles" :value="proyecto.info_tecnica?.cantidad_total_paneles ?? proyecto.cantidad_total_paneles" />
+                <InfoField label="Potencia panel (kWp)" :value="proyecto.info_tecnica?.potencia_panel_kwp" />
+                <InfoField label="Marca paneles" :value="proyecto.info_tecnica?.marca_paneles" />
+              </div>
+            </div>
+            <!-- Inversores -->
+            <div>
+              <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Inversores</p>
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <InfoField label="Cantidad inversores" :value="proyecto.info_tecnica?.cantidad_inversores" />
+                <InfoField label="Potencia inversores (kWp)" :value="proyecto.info_tecnica?.potencia_inversores_kwp" />
+                <InfoField label="Marca inversores" :value="proyecto.info_tecnica?.marca_inversores" />
+                <InfoField label="Cantidad strings" :value="proyecto.info_tecnica?.cantidad_strings" />
+              </div>
+            </div>
+            <!-- Equipos -->
+            <div>
+              <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Marcas de equipos</p>
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <InfoField label="Transformador" :value="proyecto.info_tecnica?.marca_transformador" />
+                <InfoField label="Reconectador / Relé" :value="proyecto.info_tecnica?.marca_reconectador_rele" />
+                <InfoField label="Totalizador" :value="proyecto.info_tecnica?.marca_totalizador" />
+                <InfoField label="Seguidor solar" :value="proyecto.info_tecnica?.marca_seguidor_solar" />
+                <InfoField label="Medidores frontera" :value="proyecto.info_tecnica?.marca_medidores_frontera" />
+                <InfoField label="Módem reconectador/relé" :value="proyecto.info_tecnica?.marca_modem_reconectador" />
+                <InfoField label="Módems frontera" :value="proyecto.info_tecnica?.marca_modems_frontera" />
+                <InfoField label="IP módem reconectador" :value="proyecto.info_tecnica?.ip_modem_reconectador" />
+              </div>
+            </div>
+            <!-- CCTV y seguridad -->
+            <div>
+              <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">CCTV y seguridad</p>
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <InfoField label="Estado CCTV" :value="proyecto.info_tecnica?.cctv_estado" />
+                <InfoField label="Marca CCTV" :value="proyecto.info_tecnica?.marca_cctv" />
+                <InfoField label="Seguridad física" :value="proyecto.info_tecnica?.seguridad_fisica" />
+                <InfoField label="Internet" :value="proyecto.info_tecnica?.tiene_internet" />
+              </div>
+            </div>
+            <!-- Almacenamiento -->
+            <div v-if="proyecto.info_tecnica?.tiene_almacenamiento">
+              <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Almacenamiento</p>
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <InfoField label="Capacidad (kWh)" :value="proyecto.info_tecnica?.capacidad_almacenamiento_kwh" />
+                <InfoField label="Marca" :value="proyecto.info_tecnica?.marca_almacenamiento" />
+                <InfoField label="Modelo" :value="proyecto.info_tecnica?.modelo_almacenamiento" />
+              </div>
+            </div>
           </template>
+
+          <!-- Vista edición -->
           <template v-else>
-            <div class="flex flex-col gap-1">
-              <label class="field-label">Cantidad de paneles</label>
-              <InputNumber v-model="editForm.cantidad_total_paneles" :useGrouping="false" class="w-full" />
+            <!-- Ubicación -->
+            <div>
+              <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Ubicación</p>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="flex flex-col gap-1">
+                  <label class="field-label">Dirección</label>
+                  <InputText v-model="editForm.direccion_vereda" class="w-full" />
+                </div>
+                <div class="flex flex-col gap-1">
+                  <label class="field-label">Link Google Maps</label>
+                  <InputText v-model="editInfoTecnica.url_ubicacion" class="w-full" placeholder="https://maps.app.goo.gl/..." />
+                </div>
+              </div>
             </div>
-            <div class="flex flex-col gap-1">
-              <label class="field-label">Producción específica (kWh/kWp)</label>
-              <InputNumber v-model="editForm.produccion_especifica_kwh_kwp" :maxFractionDigits="2" class="w-full" />
+            <!-- Eléctrico general -->
+            <div>
+              <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">General</p>
+              <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div class="flex flex-col gap-1">
+                  <label class="field-label">Potencia instalada (kWp)</label>
+                  <InputNumber v-model="editForm.potencia_instalada_kwp" :maxFractionDigits="3" class="w-full" />
+                </div>
+                <div class="flex flex-col gap-1">
+                  <label class="field-label">Potencia AC (kW)</label>
+                  <InputNumber v-model="editInfoTecnica.potencia_ac_kw" :maxFractionDigits="3" class="w-full" />
+                </div>
+                <div class="flex flex-col gap-1">
+                  <label class="field-label">Capacidad instalada (kWp)</label>
+                  <InputNumber v-model="editInfoTecnica.capacidad_instalada_kwp" :maxFractionDigits="3" class="w-full" />
+                </div>
+                <div class="flex flex-col gap-1">
+                  <label class="field-label">Voltaje red</label>
+                  <InputText v-model="editInfoTecnica.voltaje_red" class="w-full" placeholder="ej: 13.8/800" />
+                </div>
+                <div class="flex flex-col gap-1">
+                  <label class="field-label">Tipo tracker</label>
+                  <Select v-model="editInfoTecnica.tipo_tracker" :options="['1P','2P']" class="w-full" showClear placeholder="Seleccionar" />
+                </div>
+                <div class="flex flex-col gap-1">
+                  <label class="field-label">Producción específica (kWh/kWp)</label>
+                  <InputNumber v-model="editForm.produccion_especifica_kwh_kwp" :maxFractionDigits="2" class="w-full" />
+                </div>
+              </div>
+            </div>
+            <!-- Paneles -->
+            <div>
+              <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Paneles</p>
+              <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div class="flex flex-col gap-1">
+                  <label class="field-label">Cantidad de paneles</label>
+                  <InputNumber v-model="editInfoTecnica.cantidad_total_paneles" :useGrouping="false" class="w-full" />
+                </div>
+                <div class="flex flex-col gap-1">
+                  <label class="field-label">Potencia panel (kWp)</label>
+                  <InputText v-model="editInfoTecnica.potencia_panel_kwp" class="w-full" placeholder="ej: 0.58" />
+                </div>
+                <div class="flex flex-col gap-1">
+                  <label class="field-label">Marca paneles</label>
+                  <InputText v-model="editInfoTecnica.marca_paneles" class="w-full" />
+                </div>
+              </div>
+            </div>
+            <!-- Inversores -->
+            <div>
+              <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Inversores</p>
+              <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div class="flex flex-col gap-1">
+                  <label class="field-label">Cantidad inversores</label>
+                  <InputNumber v-model="editInfoTecnica.cantidad_inversores" :useGrouping="false" class="w-full" />
+                </div>
+                <div class="flex flex-col gap-1">
+                  <label class="field-label">Potencia inversores (kWp)</label>
+                  <InputText v-model="editInfoTecnica.potencia_inversores_kwp" class="w-full" placeholder="ej: 300, 50 y 40" />
+                </div>
+                <div class="flex flex-col gap-1">
+                  <label class="field-label">Marca inversores</label>
+                  <InputText v-model="editInfoTecnica.marca_inversores" class="w-full" />
+                </div>
+                <div class="flex flex-col gap-1">
+                  <label class="field-label">Cantidad strings</label>
+                  <InputNumber v-model="editInfoTecnica.cantidad_strings" :useGrouping="false" class="w-full" />
+                </div>
+              </div>
+            </div>
+            <!-- Equipos -->
+            <div>
+              <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Marcas de equipos</p>
+              <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div class="flex flex-col gap-1">
+                  <label class="field-label">Transformador</label>
+                  <InputText v-model="editInfoTecnica.marca_transformador" class="w-full" />
+                </div>
+                <div class="flex flex-col gap-1">
+                  <label class="field-label">Reconectador / Relé</label>
+                  <InputText v-model="editInfoTecnica.marca_reconectador_rele" class="w-full" />
+                </div>
+                <div class="flex flex-col gap-1">
+                  <label class="field-label">Totalizador</label>
+                  <InputText v-model="editInfoTecnica.marca_totalizador" class="w-full" />
+                </div>
+                <div class="flex flex-col gap-1">
+                  <label class="field-label">Seguidor solar</label>
+                  <InputText v-model="editInfoTecnica.marca_seguidor_solar" class="w-full" />
+                </div>
+                <div class="flex flex-col gap-1">
+                  <label class="field-label">Medidores frontera</label>
+                  <InputText v-model="editInfoTecnica.marca_medidores_frontera" class="w-full" />
+                </div>
+                <div class="flex flex-col gap-1">
+                  <label class="field-label">Módem reconectador/relé</label>
+                  <InputText v-model="editInfoTecnica.marca_modem_reconectador" class="w-full" />
+                </div>
+                <div class="flex flex-col gap-1">
+                  <label class="field-label">Módems frontera</label>
+                  <InputText v-model="editInfoTecnica.marca_modems_frontera" class="w-full" />
+                </div>
+                <div class="flex flex-col gap-1">
+                  <label class="field-label">IP módem reconectador</label>
+                  <InputText v-model="editInfoTecnica.ip_modem_reconectador" class="w-full" />
+                </div>
+              </div>
+            </div>
+            <!-- CCTV y seguridad -->
+            <div>
+              <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">CCTV y seguridad</p>
+              <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div class="flex flex-col gap-1 md:col-span-2">
+                  <label class="field-label">Estado CCTV</label>
+                  <InputText v-model="editInfoTecnica.cctv_estado" class="w-full" />
+                </div>
+                <div class="flex flex-col gap-1">
+                  <label class="field-label">Marca CCTV</label>
+                  <InputText v-model="editInfoTecnica.marca_cctv" class="w-full" />
+                </div>
+                <div class="flex flex-col gap-1">
+                  <label class="field-label">Seguridad física</label>
+                  <InputText v-model="editInfoTecnica.seguridad_fisica" class="w-full" />
+                </div>
+                <div class="flex flex-col gap-1">
+                  <label class="field-label">Internet</label>
+                  <Select v-model="editInfoTecnica.tiene_internet" :options="['Sí','No']" class="w-full" showClear placeholder="Seleccionar" />
+                </div>
+              </div>
+            </div>
+            <!-- Almacenamiento -->
+            <div>
+              <div class="flex items-center gap-2 mb-3">
+                <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Almacenamiento</p>
+                <Checkbox v-model="editInfoTecnica.tiene_almacenamiento" binary />
+                <span class="text-xs text-gray-500">{{ editInfoTecnica.tiene_almacenamiento ? 'Sí' : 'No' }}</span>
+              </div>
+              <div v-if="editInfoTecnica.tiene_almacenamiento" class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div class="flex flex-col gap-1">
+                  <label class="field-label">Capacidad (kWh)</label>
+                  <InputNumber v-model="editInfoTecnica.capacidad_almacenamiento_kwh" :maxFractionDigits="3" class="w-full" />
+                </div>
+                <div class="flex flex-col gap-1">
+                  <label class="field-label">Marca</label>
+                  <InputText v-model="editInfoTecnica.marca_almacenamiento" class="w-full" />
+                </div>
+                <div class="flex flex-col gap-1">
+                  <label class="field-label">Modelo</label>
+                  <InputText v-model="editInfoTecnica.modelo_almacenamiento" class="w-full" />
+                </div>
+              </div>
             </div>
           </template>
+
         </div>
       </TabPanel>
 
@@ -438,6 +674,7 @@ import Row from 'primevue/row'
 import Select from 'primevue/select'
 import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
+import Checkbox from 'primevue/checkbox'
 import Divider from 'primevue/divider'
 import { useToast } from 'primevue/usetoast'
 import * as XLSX from 'xlsx'
@@ -525,6 +762,37 @@ const editForm = reactive({
   produccion_especifica_kwh_kwp: null,
 })
 
+const editInfoTecnica = reactive({
+  voltaje_red: null,
+  potencia_ac_kw: null,
+  capacidad_instalada_kwp: null,
+  tipo_tracker: null,
+  cantidad_total_paneles: null,
+  potencia_panel_kwp: null,
+  marca_paneles: null,
+  cantidad_inversores: null,
+  potencia_inversores_kwp: null,
+  marca_inversores: null,
+  cantidad_strings: null,
+  marca_transformador: null,
+  marca_reconectador_rele: null,
+  marca_totalizador: null,
+  marca_seguidor_solar: null,
+  marca_medidores_frontera: null,
+  marca_modem_reconectador: null,
+  marca_modems_frontera: null,
+  ip_modem_reconectador: null,
+  url_ubicacion: null,
+  cctv_estado: null,
+  marca_cctv: null,
+  seguridad_fisica: null,
+  tiene_internet: null,
+  tiene_almacenamiento: false,
+  capacidad_almacenamiento_kwh: null,
+  marca_almacenamiento: null,
+  modelo_almacenamiento: null,
+})
+
 // ── Simulación P90 / P50 / P99 ───────────────────────────────────────────────
 const editP90 = ref(Array(12).fill(null))
 const editP50 = ref(Array(12).fill(null))
@@ -602,6 +870,8 @@ function populateEditForm() {
   if (!proyecto.value) return
   const p = proyecto.value
   Object.keys(editForm).forEach(k => { if (k in p) editForm[k] = p[k] ?? null })
+  const it = p.info_tecnica
+  if (it) Object.keys(editInfoTecnica).forEach(k => { if (k in it) editInfoTecnica[k] = it[k] ?? null })
   editP90.value = parseMonthArray(p.p90_mensual_kwh)
   editP50.value = parseMonthArray(p.p50_mensual_kwh)
   editP99.value = parseMonthArray(p.p99_mensual_kwh)
@@ -634,6 +904,11 @@ async function saveEdit() {
     if (p99json !== null) payload.p99_mensual_kwh = p99json
 
     await api.patch(`/proyectos/${route.params.id}`, payload)
+    const itPayload = {}
+    for (const [k, v] of Object.entries(editInfoTecnica)) {
+      if (v !== null && v !== undefined && v !== '') itPayload[k] = v
+    }
+    if (Object.keys(itPayload).length) await api.put(`/proyectos/${route.params.id}/info-tecnica`, itPayload)
     const [proyRes, invRes] = await Promise.all([
       api.get(`/proyectos/${route.params.id}`),
       api.get(`/proyectos/${route.params.id}/inversionistas`),

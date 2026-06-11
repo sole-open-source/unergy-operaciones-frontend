@@ -17,6 +17,8 @@ const LOCAL_STORAGE_KEY = 'unergy_energization_projects'
 function rehydrate(p) {
   return {
     ...p,
+    // Compat con copias viejas en localStorage que solo guardaban `name`.
+    commercialName: p.commercialName ?? p.name ?? '',
     energizationDate: p.energizationDate ? new Date(p.energizationDate) : new Date(),
     contracts: Array.isArray(p.contracts) ? p.contracts : [],
     monthlyMwh: Number(p.monthlyMwh) || 0,
@@ -26,7 +28,8 @@ function rehydrate(p) {
 function defaultProject() {
   return {
     id: Date.now(),
-    name: 'Nuevo Proyecto',
+    name: '',                       // código origina (vacío en altas manuales)
+    commercialName: 'Nuevo Proyecto',
     status: 'En construcción',
     energizationDate: new Date(),
     contracts: [],
@@ -38,6 +41,8 @@ export function useEnergizationProjects() {
   const projects = ref([])
   const loading = ref(false)
   const error = ref(null)
+  const warning = ref(null)   // aviso del backend (config faltante / fuente caída)
+  const source = ref(null)    // 'originabotdb' | 'unavailable' | null
 
   function loadFromLocalStorage() {
     try {
@@ -60,11 +65,14 @@ export function useEnergizationProjects() {
       const { data } = await api.get('/proximos-energizar')
       const list = Array.isArray(data?.projects) ? data.projects : []
       projects.value = list.map(rehydrate)
+      warning.value = data?.warning || null
+      source.value = data?.source || null
       if (data?.warning) console.warn('proximos-energizar:', data.warning)
       return true
     } catch (e) {
       console.error('Error loading proyectos próximos a energizar from API', e)
       error.value = e
+      warning.value = e?.response?.data?.detail || 'No se pudo cargar el pipeline desde la API.'
       // Degradación: última copia local; si no hay, deja lo que haya.
       loadFromLocalStorage()
       return false
@@ -101,5 +109,5 @@ export function useEnergizationProjects() {
   // Persist any change (add / remove / inline edit) as a local override/cache.
   watch(projects, saveProjects, { deep: true })
 
-  return { projects, loading, error, addProject, removeProject, updateProject, loadProjects, saveProjects }
+  return { projects, loading, error, warning, source, addProject, removeProject, updateProject, loadProjects, saveProjects }
 }

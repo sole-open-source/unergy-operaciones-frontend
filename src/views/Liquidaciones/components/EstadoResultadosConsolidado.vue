@@ -1,5 +1,5 @@
 <template>
-  <div v-if="columnas.length > 1" class="bg-white rounded-xl shadow-sm border overflow-hidden" style="border-color:#e8e0f0">
+  <div v-if="columnas.length && grupos.length" class="bg-white rounded-xl shadow-sm border overflow-hidden" style="border-color:#e8e0f0">
     <div class="px-3 py-2 flex items-center gap-2 border-b" style="border-color:#f0ebf6">
       <i class="pi pi-users text-sm" style="color:#915BD8" />
       <h3 class="text-sm font-bold" style="color:#2C2039">Estado de Resultados por inversionista</h3>
@@ -89,7 +89,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import { fmtCOP, pct, construirEstadoResultados, indiceSoportesProyecto } from '@/utils/liquidaciones'
+import { fmtCOP, pct, normPct, construirEstadoResultados, indiceSoportesProyecto } from '@/utils/liquidaciones'
 
 const props = defineProps({
   liq: { type: Object, required: true },
@@ -136,7 +136,11 @@ const columnas = computed(() => {
     const ingresosMandatos = mandatos.filter(m => m.tipo === 'ingresos' && esDelInv(m, pi.id))
     const costosMandatos = mandatos.filter(m => m.tipo === 'costos' && esDelInv(m, pi.id))
     if (!ingresosMandatos.length && !costosMandatos.length) continue
-    const er = construirEstadoResultados({ ingresosMandatos, costosMandatos, esAutoconsumo, soportes })
+    // Facturas de servicio (rep/CGM/admin) son a nivel proyecto → se prorratean por
+    // participación para que aparezca la parte de cada inversionista (columna propia).
+    const frac = normPct(pi.porcentaje_participacion)
+    const facturas = (liq.facturas || []).map(f => ({ ...f, valor_cop: (Number(f.valor_cop) || 0) * frac }))
+    const er = construirEstadoResultados({ ingresosMandatos, costosMandatos, facturas, esAutoconsumo, soportes })
     if (!er.grupos.length) continue
     cols.push({
       id: 'inv' + pi.id,

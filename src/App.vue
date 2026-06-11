@@ -1,5 +1,6 @@
 <template>
-  <div v-if="isLoginPage" class="h-screen">
+  <!-- App móvil (PWA) y páginas de login: pantalla completa, sin chrome de la plataforma -->
+  <div v-if="isLoginPage || isMobileApp" class="h-screen">
     <RouterView />
   </div>
   <div v-else-if="routeReady" class="flex h-screen overflow-hidden bg-gray-100">
@@ -40,6 +41,7 @@ const toast = useToast()
 const { mobileOpen, toggle, collapsed, toggleCollapsed } = useSidebar()
 const routeReady = computed(() => !!route.name)
 const isLoginPage = computed(() => ['Login', 'ForgotPassword', 'ResetPassword'].includes(route.name))
+const isMobileApp = computed(() => !!route.meta.mobile)
 const isSolar     = computed(() => route.name === 'SolarLive')
 
 onMounted(() => {

@@ -3,6 +3,9 @@
 
     <!-- Header -->
     <PageHeader title="Cumplimiento PPA" subtitle="Generación vs. compromisos contractuales de energía">
+      <template #lead>
+        <div class="cv-icon-tile"><i class="pi pi-bolt" /></div>
+      </template>
       <template #actions>
         <span v-if="cacheSize" class="text-xs font-mono px-2 py-1 rounded" style="background: rgba(145,91,216,0.08); color: #915BD8;">
           caché: {{ cacheSize }}
@@ -18,15 +21,13 @@
     </PageHeader>
 
     <!-- Tab bar -->
-    <div class="flex gap-0 border-b -mt-2" style="border-color: rgba(44,32,57,0.10);">
+    <div class="flex gap-1 border-b -mt-1" style="border-color: rgba(44,32,57,0.08);">
       <button
         v-for="(tab, i) in TABS"
         :key="i"
         @click="activeTab = i"
-        class="px-5 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors"
-        :style="activeTab === i
-          ? 'color: #915BD8; border-color: #915BD8;'
-          : 'color: #7a6e8a; border-color: transparent;'"
+        class="cv-tab"
+        :class="{ active: activeTab === i }"
       >{{ tab }}</button>
     </div>
 
@@ -77,7 +78,7 @@
           </span>
         </div>
 
-        <div class="rounded-xl border p-4" style="background: white; border-color: rgba(44,32,57,0.12);">
+        <div class="cv-panel p-4">
           <div ref="chartBox" class="relative select-none" style="width: 100%; height: 360px;">
             <svg
               :viewBox="`0 0 ${SVG_W} ${SVG_H}`"
@@ -118,7 +119,7 @@
                     fill="rgba(214,68,85,0.32)" />
                   <rect v-if="mes.estado === 'excedente' && mes.max_mwh !== null && cierreVal(mes) > mes.max_mwh"
                     :x="dualBarRightX(i)" :y="toY(cierreVal(mes))" :width="dualBarW" :height="toY(mes.max_mwh) - toY(cierreVal(mes))"
-                    fill="rgba(240,192,64,0.55)" />
+                    fill="rgba(20,184,166,0.5)" />
                 </template>
 
                 <!-- PAST / FUTURE months: single bar -->
@@ -132,7 +133,7 @@
                     fill="rgba(214,68,85,0.32)" />
                   <rect v-if="mes.estado === 'excedente' && mes.max_mwh !== null && genVal(mes) > mes.max_mwh"
                     :x="barX(i)" :y="toY(genVal(mes))" :width="barW" :height="toY(mes.max_mwh) - toY(genVal(mes))"
-                    fill="rgba(240,192,64,0.55)" />
+                    fill="rgba(20,184,166,0.5)" />
                 </template>
 
                 <!-- Min/max lines -->
@@ -201,8 +202,8 @@
                   <span class="font-mono font-bold" style="color: #D64455;">{{ fmtMwh(anualData.meses[hovered].compras_bolsa_mwh) }}</span>
                 </div>
                 <div v-if="anualData.meses[hovered].estado === 'excedente'" class="flex justify-between gap-6 mt-2 pt-2" style="border-top: 1px solid rgba(255,255,255,0.1);">
-                  <span style="color: #F0C040;">Excedente (proy.)</span>
-                  <span class="font-mono font-bold" style="color: #F0C040;">{{ fmtMwh(anualData.meses[hovered].excedentes_bolsa_mwh) }}</span>
+                  <span style="color: #2DD4BF;">Excedente (proy.)</span>
+                  <span class="font-mono font-bold" style="color: #2DD4BF;">{{ fmtMwh(anualData.meses[hovered].excedentes_bolsa_mwh) }}</span>
                 </div>
               </div>
               <div class="mt-2 pt-1 text-xs" style="color: rgba(253,250,247,0.35);">Clic para ver desglose</div>
@@ -215,13 +216,13 @@
             <div class="flex items-center gap-2 text-xs" style="color: #7a6e8a;"><div class="w-4 h-4 rounded-sm" style="background: #915BD8;"></div>Generación real</div>
             <div class="flex items-center gap-2 text-xs" style="color: #7a6e8a;"><div class="w-4 h-4 rounded-sm" style="background: rgba(59,186,220,0.65); border: 1px dashed rgba(59,186,220,0.9);"></div>Proyección cierre (prom. 30d)</div>
             <div class="flex items-center gap-2 text-xs" style="color: #7a6e8a;"><div class="w-4 h-4 rounded-sm" style="background: rgba(214,68,85,0.38);"></div>Brecha de déficit</div>
-            <div class="flex items-center gap-2 text-xs" style="color: #7a6e8a;"><div class="w-4 h-4 rounded-sm" style="background: rgba(240,192,64,0.6);"></div>Excedente contractual</div>
+            <div class="flex items-center gap-2 text-xs" style="color: #7a6e8a;"><div class="w-4 h-4 rounded-sm" style="background: rgba(20,184,166,0.6);"></div>Excedente contractual</div>
           </div>
         </div>
       </template>
 
       <!-- Empty chart state -->
-      <div v-else-if="!chartLoading && !chartError" class="text-center py-16 rounded-xl border" style="color: #7a6e8a; border-color: rgba(44,32,57,0.10);">
+      <div v-else-if="!chartLoading && !chartError" class="text-center py-16 cv-panel" style="color: #7a6e8a;">
         <i class="pi pi-chart-bar text-4xl mb-3 block" style="color: #915BD8;" />
         <p>Selecciona un año y un contrato para ver el cumplimiento anual.</p>
       </div>
@@ -236,8 +237,7 @@
           :value="tableDataWithTotal"
           size="small"
           stripedRows
-          class="border rounded-xl overflow-hidden cursor-pointer"
-          style="border-color: rgba(44,32,57,0.12);"
+          class="cv-panel overflow-hidden cursor-pointer"
           @row-click="e => selectContrato(e.data.id)"
           :rowClass="row => row.id === selectedContratoId ? 'row-selected' : row.id === CONSOLIDADO_ID ? 'row-consolidado' : ''"
         >
@@ -292,38 +292,25 @@
           <label class="text-xs font-semibold uppercase tracking-wider" style="color: #915BD8;">Mes</label>
           <Select v-model="simMonth" :options="MESES_OPTIONS" optionLabel="label" optionValue="value" class="w-36" @change="loadSimulator" />
         </div>
-        <button
-          @click="resetSim"
-          class="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm border transition"
-          style="border-color: rgba(145,91,216,0.35); color: #915BD8; background: transparent;"
-        >
-          <i class="pi pi-refresh text-xs" />Resetear
+        <button @click="resetSim" class="cv-btn">
+          <i class="pi pi-refresh text-xs" style="color: #915BD8;" />Resetear
         </button>
-        <button
-          v-if="hiddenContratos.size > 0"
-          @click="showAllContratos"
-          class="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm border transition"
-          style="border-color: rgba(46,125,50,0.35); color: #2e7d32; background: transparent;"
-        >
-          <i class="pi pi-eye text-xs" />Mostrar ocultos ({{ hiddenContratos.size }})
-        </button>
-        <button
-          @click="showNuevoForm = true"
-          class="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm border transition"
-          style="border-color: rgba(240,192,64,0.5); color: #9a6700; background: rgba(240,192,64,0.08);"
-        >
-          <i class="pi pi-plus text-xs" />PPA nuevo
+        <button v-if="hiddenContratos.size > 0" @click="showAllContratos" class="cv-btn">
+          <i class="pi pi-eye text-xs" style="color: #2e7d32;" />Mostrar ocultos ({{ hiddenContratos.size }})
         </button>
         <button
           @click="sortDesc = !sortDesc"
-          class="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm border transition"
-          style="border-color: rgba(145,91,216,0.25); color: #915BD8; background: transparent;"
+          class="cv-btn"
           v-tooltip="sortDesc ? 'Mayor cumplimiento primero' : 'Menor cumplimiento primero'"
         >
-          <i class="pi text-xs" :class="sortDesc ? 'pi-sort-amount-down' : 'pi-sort-amount-up'" />
+          <i class="pi text-xs" :class="sortDesc ? 'pi-sort-amount-down' : 'pi-sort-amount-up'" style="color: #915BD8;" />
           {{ sortDesc ? '↓ Mayor %' : '↑ Menor %' }}
         </button>
-        <span class="text-xs" style="color: #7a6e8a;">Arrastra las plantas entre contratos para simular</span>
+        <div class="flex-1"></div>
+        <button @click="showNuevoForm = true" class="cv-btn-cta">
+          <i class="pi pi-plus text-xs" />PPA nuevo
+        </button>
+        <span class="w-full text-xs" style="color: #9b8fb0;">Arrastra las plantas entre contratos para simular</span>
       </div>
 
       <!-- Formulario PPA nuevo -->
@@ -386,9 +373,8 @@
             <div
               v-for="c in visibleContratos"
               :key="c.id"
-              class="rounded-xl border transition-shadow flex flex-col"
-              style="border-color: rgba(44,32,57,0.12); background: white;"
-              :style="dragOver === c.id ? 'border-color: #915BD8; box-shadow: 0 0 0 2px rgba(145,91,216,0.18);' : ''"
+              class="cv-card flex flex-col"
+              :class="{ 'cv-card-dragover': dragOver === c.id }"
               @dragover.prevent="onDragOver(c.id)"
               @drop.prevent="onDrop(c.id)"
             >
@@ -411,11 +397,7 @@
                       <span class="text-xs font-mono flex-shrink-0" style="color: #7a6e8a;">{{ (simAssignments[c.id] || []).length }} plantas</span>
                       <span v-if="simResults[c.id]?.pct !== null && simResults[c.id]?.pct !== undefined"
                         class="text-xs font-semibold px-1.5 py-0.5 rounded flex-shrink-0"
-                        :style="simResults[c.id].estado === 'ok'
-                          ? 'background: rgba(46,125,50,0.12); color: #2e7d32;'
-                          : simResults[c.id].estado === 'deficit'
-                          ? 'background: rgba(214,68,85,0.12); color: #D64455;'
-                          : 'background: rgba(240,192,64,0.18); color: #9a6700;'"
+                        :style="estadoBadge(simResults[c.id].estado)"
                       >{{ Math.round(simResults[c.id].pct) }}%</span>
                     </div>
                     <div class="text-xs mt-0.5 truncate" style="color: #7a6e8a;">{{ c.comprador_nombre }}</div>
@@ -442,101 +424,77 @@
                 </div>
               </div>
 
-              <!-- Compliance meter -->
+              <!-- Cumplimiento — tabla de energías + barras consecutivas -->
               <div class="px-4 py-3 border-b" style="border-color: rgba(44,32,57,0.07);" v-if="simResults[c.id]">
-                <div class="relative h-2 rounded-full overflow-hidden mb-1.5" style="background: rgba(44,32,57,0.08);">
-                  <div
-                    class="absolute left-0 top-0 h-full rounded-full transition-all duration-300"
-                    :style="{
-                      width: simResults[c.id].pct !== null ? Math.min(simResults[c.id].pct, 100) + '%' : '0%',
-                      background: simResults[c.id].estado === 'ok' ? '#2e7d32' : simResults[c.id].estado === 'deficit' ? '#D64455' : '#F0C040',
-                    }"
-                  />
-                  <!-- Duplicado segment (red, stacked after real gen) -->
-                  <div
-                    v-if="simResults[c.id].dupPct"
-                    class="absolute top-0 h-full transition-all duration-300"
-                    style="background: repeating-linear-gradient(135deg, #D64455, #D64455 2px, #e8697a 2px, #e8697a 4px); opacity: 0.85;"
-                    :style="{
-                      left: simResults[c.id].pct !== null ? Math.min(simResults[c.id].pct, 100) + '%' : '0%',
-                      width: Math.min(simResults[c.id].dupPct, 100 - Math.min(simResults[c.id].pct || 0, 100)) + '%',
-                    }"
-                  />
-                  <!-- Min marker -->
-                  <div
-                    v-if="simResults[c.id].min !== null && simResults[c.id].min > 0"
-                    class="absolute top-0 h-full w-0.5"
-                    style="background: rgba(44,32,57,0.35);"
-                    :style="{ left: simResults[c.id].max != null ? Math.min(simResults[c.id].min / simResults[c.id].max * 100, 100) + '%' : '100%' }"
-                  />
-                </div>
-                <div class="flex items-center justify-between gap-2">
-                  <div class="flex items-center gap-1.5">
-                    <span class="font-mono text-xs font-bold" style="color: #2C2039;">{{ fmtMwh(simResults[c.id].gen) }}</span>
-                    <span v-if="simResults[c.id].genDup > 0"
-                      class="font-mono text-[10px] font-semibold px-1.5 py-0.5 rounded"
-                      style="background: rgba(214,68,85,0.12); color: #D64455;"
-                      v-tooltip="'Exposición bolsa por duplicados'"
-                    >+{{ fmtMwh(simResults[c.id].genDup) }} dup</span>
+                <!-- Tabla: títulos + valores -->
+                <div class="grid grid-cols-3 gap-x-3 mb-3">
+                  <div>
+                    <div class="text-[10px] font-semibold uppercase tracking-wide leading-tight" style="color: #7a6e8a;">Energía entregada</div>
+                    <div class="flex items-baseline gap-1 mt-1 flex-wrap">
+                      <span class="font-mono text-xs font-bold" style="color: #2C2039;">{{ fmtMwh(simResults[c.id].gen) }}</span>
+                      <span v-if="simResults[c.id].genDup > 0"
+                        class="font-mono text-[10px] font-semibold px-1.5 py-0.5 rounded"
+                        style="background: rgba(214,68,85,0.12); color: #D64455;"
+                        v-tooltip="'Exposición bolsa por duplicados'"
+                      >+{{ fmtMwh(simResults[c.id].genDup) }} dup</span>
+                    </div>
                   </div>
-                  <span
-                    class="text-xs font-semibold px-2 py-0.5 rounded-full"
-                    :style="simResults[c.id].estado === 'ok'
-                      ? 'background: rgba(46,125,50,0.12); color: #2e7d32;'
-                      : simResults[c.id].estado === 'deficit'
-                      ? 'background: rgba(214,68,85,0.12); color: #D64455;'
-                      : simResults[c.id].estado === 'excedente'
-                      ? 'background: rgba(240,192,64,0.18); color: #9a6700;'
-                      : 'background: rgba(44,32,57,0.06); color: #7a6e8a;'"
-                  >
-                    {{ simResults[c.id].estado === 'ok' ? '✓ OK'
-                     : simResults[c.id].estado === 'deficit' ? '↓ Déficit'
-                     : simResults[c.id].estado === 'excedente' ? '↑ Excedente'
-                     : '— Sin datos' }}
-                  </span>
+                  <div>
+                    <div class="text-[10px] font-semibold uppercase tracking-wide leading-tight" style="color: #7a6e8a;">Energía mínima</div>
+                    <div class="font-mono text-xs font-bold mt-1" style="color: #2C2039;">{{ simResults[c.id].min !== null ? fmtMwh(simResults[c.id].min) : '—' }}</div>
+                  </div>
+                  <div>
+                    <div class="text-[10px] font-semibold uppercase tracking-wide leading-tight" style="color: #7a6e8a;">Energía proyectada</div>
+                    <div class="font-mono text-xs font-bold mt-1" style="color: #2C2039;">{{ simResults[c.id].genProy != null && simResults[c.id].genProy > 0 ? fmtMwh(simResults[c.id].genProy) : '—' }}</div>
+                  </div>
                 </div>
-                <div v-if="simResults[c.id].min !== null || simResults[c.id].max !== null" class="text-xs mt-0.5" style="color: #7a6e8a;">
-                  <template v-if="simResults[c.id].min !== null && simResults[c.id].max !== null">{{ fmtMwh(simResults[c.id].min) }} – {{ fmtMwh(simResults[c.id].max) }}</template>
-                  <template v-else-if="simResults[c.id].min !== null">Mín: {{ fmtMwh(simResults[c.id].min) }}</template>
-                  <template v-else>Máx: {{ fmtMwh(simResults[c.id].max) }}</template>
-                </div>
-              </div>
 
-              <!-- Projection bar (current month only) -->
-              <div class="px-4 pb-3 border-b" style="border-color: rgba(44,32,57,0.07);" v-if="simResults[c.id]?.genProy != null && simResults[c.id].genProy > 0">
-                <span class="text-[10px] font-medium" style="color: #7a6e8a;">Proy. cierre</span>
-                <div class="relative h-1.5 rounded-full overflow-hidden mt-0.5 mb-1" style="background: rgba(44,32,57,0.06);">
-                  <div
-                    class="absolute left-0 top-0 h-full rounded-full transition-all duration-300"
-                    :style="{
-                      width: simResults[c.id].proyPct !== null ? Math.min(simResults[c.id].proyPct, 100) + '%' : '0%',
-                      background: simResults[c.id].estadoProy === 'ok' ? '#2e7d32' : simResults[c.id].estadoProy === 'deficit' ? '#D64455' : '#F0C040',
-                    }"
-                  />
-                  <div
-                    v-if="simResults[c.id].min !== null && simResults[c.id].min > 0"
-                    class="absolute top-0 h-full w-0.5"
-                    style="background: rgba(44,32,57,0.25);"
-                    :style="{ left: simResults[c.id].max != null ? Math.min(simResults[c.id].min / simResults[c.id].max * 100, 100) + '%' : '100%' }"
-                  />
-                </div>
-                <div class="flex items-center justify-between">
-                  <span class="font-mono text-xs font-bold" style="color: #2C2039;">{{ fmtMwh(simResults[c.id].genProy) }}</span>
-                  <span
-                    class="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
-                    :style="simResults[c.id].estadoProy === 'ok'
-                      ? 'background: rgba(46,125,50,0.12); color: #2e7d32;'
-                      : simResults[c.id].estadoProy === 'deficit'
-                      ? 'background: rgba(214,68,85,0.12); color: #D64455;'
-                      : simResults[c.id].estadoProy === 'excedente'
-                      ? 'background: rgba(240,192,64,0.18); color: #9a6700;'
-                      : 'background: rgba(44,32,57,0.06); color: #7a6e8a;'"
-                  >
-                    {{ simResults[c.id].estadoProy === 'ok' ? '✓ OK'
-                     : simResults[c.id].estadoProy === 'deficit' ? '↓ Déficit'
-                     : simResults[c.id].estadoProy === 'excedente' ? '↑ Excedente'
-                     : '— Sin datos' }}
-                  </span>
+                <!-- Bullet chart: una barra con zonas déficit / en rango / excedente -->
+                <div class="space-y-1.5">
+                  <div class="relative rounded-md overflow-hidden" style="height: 26px; background: rgba(44,32,57,0.04);">
+                    <!-- Zonas de fondo -->
+                    <template v-if="simResults[c.id].bullet.hasZones">
+                      <div v-if="simResults[c.id].bullet.hasMin" class="absolute inset-y-0"
+                        :style="{ left: '0', width: simResults[c.id].bullet.minPct + '%', background: 'rgba(214,68,85,0.10)' }" />
+                      <div class="absolute inset-y-0"
+                        :style="{ left: simResults[c.id].bullet.minPct + '%', width: (simResults[c.id].bullet.maxPct - simResults[c.id].bullet.minPct) + '%', background: 'rgba(46,125,50,0.11)' }" />
+                      <div v-if="simResults[c.id].bullet.hasMax" class="absolute inset-y-0"
+                        :style="{ left: simResults[c.id].bullet.maxPct + '%', right: '0', background: 'rgba(20,184,166,0.14)' }" />
+                    </template>
+                    <!-- Energía entregada (color = estado) -->
+                    <div class="absolute rounded-sm transition-all duration-300"
+                      style="top: 50%; transform: translateY(-50%); height: 10px; left: 0;"
+                      :style="{ width: simResults[c.id].bullet.measurePct + '%', background: estadoColor(simResults[c.id].estado) }" />
+                    <!-- Duplicados (exposición bolsa) -->
+                    <div v-if="simResults[c.id].bullet.dupW"
+                      class="absolute transition-all duration-300"
+                      style="top: 50%; transform: translateY(-50%); height: 10px; background: repeating-linear-gradient(135deg, #D64455, #D64455 2px, #e8697a 2px, #e8697a 4px); opacity: 0.85;"
+                      :style="{ left: simResults[c.id].bullet.measurePct + '%', width: simResults[c.id].bullet.dupW + '%' }"
+                      v-tooltip="'Exposición bolsa por duplicados'" />
+                    <!-- Marcas mín / máx -->
+                    <div v-if="simResults[c.id].bullet.hasMin" class="absolute rounded"
+                      style="top: -1px; bottom: -1px; width: 2px; background: #2C2039; opacity: 0.45;"
+                      :style="{ left: simResults[c.id].bullet.minPct + '%' }" v-tooltip="'Mínimo: ' + fmtMwh(simResults[c.id].min)" />
+                    <div v-if="simResults[c.id].bullet.hasMax" class="absolute rounded"
+                      style="top: -1px; bottom: -1px; width: 2px; background: #2C2039; opacity: 0.45;"
+                      :style="{ left: simResults[c.id].bullet.maxPct + '%' }" v-tooltip="'Máximo: ' + fmtMwh(simResults[c.id].max)" />
+                    <!-- Proyección de cierre (diamante) -->
+                    <div v-if="simResults[c.id].bullet.proyPct != null" class="absolute"
+                      style="top: 50%; width: 11px; height: 11px; transform: translate(-50%,-50%) rotate(45deg); background: #fff; border: 2px solid #2C2039; border-radius: 2px;"
+                      :style="{ left: simResults[c.id].bullet.proyPct + '%' }"
+                      v-tooltip="'Proyección de cierre: ' + fmtMwh(simResults[c.id].genProy)" />
+                  </div>
+                  <!-- Estados -->
+                  <div class="flex items-center gap-1.5 flex-wrap">
+                    <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap" :style="estadoBadge(simResults[c.id].estado)">
+                      {{ estadoLabel(simResults[c.id].estado) }}
+                    </span>
+                    <span v-if="simResults[c.id].genProy != null && simResults[c.id].genProy > 0"
+                      class="text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+                      :style="estadoBadge(simResults[c.id].estadoProy)">
+                      ◆ proy. {{ estadoLabel(simResults[c.id].estadoProy) }}
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -692,8 +650,7 @@
 
         <!-- VENTA mode -->
         <template v-if="pcMode === 'venta'">
-          <div v-for="c in pcData.venta" :key="c.id"
-            class="rounded-xl border overflow-hidden" style="border-color: rgba(44,32,57,0.12); background: white;">
+          <div v-for="c in pcData.venta" :key="c.id" class="cv-card">
             <div class="px-4 py-3 flex items-center justify-between"
               style="background: rgba(145,91,216,0.04); border-bottom: 1px solid rgba(44,32,57,0.07);">
               <div>
@@ -733,8 +690,7 @@
           <div v-if="!pcData.compra.length" class="text-center py-12 text-sm" style="color: #7a6e8a;">
             No hay contratos de compra vigentes en {{ MESES[pcMonth - 1] }} {{ pcYear }}
           </div>
-          <div v-for="c in pcData.compra" :key="c.id"
-            class="rounded-xl border overflow-hidden" style="border-color: rgba(240,192,64,0.4); background: white;">
+          <div v-for="c in pcData.compra" :key="c.id" class="cv-card-gold">
             <div class="px-4 py-3 flex items-center justify-between"
               style="background: rgba(240,192,64,0.08); border-bottom: 1px solid rgba(240,192,64,0.2);">
               <div>
@@ -761,7 +717,7 @@
 
         <!-- BOLSA mode -->
         <template v-if="pcMode === 'bolsa'">
-          <div class="rounded-xl border overflow-hidden" style="border-color: rgba(44,32,57,0.12); background: white;">
+          <div class="cv-card">
             <div class="px-4 py-3" style="background: rgba(44,32,57,0.04); border-bottom: 1px solid rgba(44,32,57,0.07);">
               <span class="font-bold text-sm" style="color: #2C2039;">Plantas en bolsa</span>
               <span class="ml-2 text-xs" style="color: #7a6e8a;">Sin asignación GESCON en {{ MESES[pcMonth - 1] }} {{ pcYear }}</span>
@@ -779,6 +735,112 @@
             </div>
           </div>
         </template>
+
+      </template>
+    </div>
+
+    <!-- ═══════════════ ENERGÍA TRANSADA TAB ═══════════════ -->
+    <div v-show="activeTab === 3" class="space-y-5">
+
+      <!-- Selectors -->
+      <div class="flex flex-wrap items-end gap-4">
+        <div class="flex flex-col gap-1">
+          <label class="text-xs font-semibold uppercase tracking-wider" style="color: #915BD8;">Año</label>
+          <Select v-model="etYear" :options="etYearOptions" class="w-24" @change="onEtPeriodChange" />
+        </div>
+        <div class="flex flex-col gap-1">
+          <label class="text-xs font-semibold uppercase tracking-wider" style="color: #915BD8;">Mes</label>
+          <Select v-model="etMonth" :options="etMonthOptions" optionLabel="label" optionValue="value" class="w-40" @change="onEtPeriodChange" />
+        </div>
+        <span v-if="etData" class="text-xs px-2 py-1 rounded" style="background: rgba(145,91,216,0.08); color: #915BD8;">
+          {{ etPeriodoLabel }}
+        </span>
+        <span v-if="etFromCache" class="text-xs px-2 py-1 rounded" style="background: rgba(44,32,57,0.06); color: #7a6e8a;" title="Datos del histórico guardado en este navegador">
+          <i class="pi pi-history text-xs mr-1" />histórico local
+        </span>
+      </div>
+
+      <div v-if="etLoading" class="flex flex-col items-center justify-center py-20 gap-3">
+        <ProgressSpinner style="width:48px;height:48px;" strokeWidth="4" animationDuration=".8s" />
+        <p class="text-sm" style="color: #7a6e8a;">Consultando energía transada de {{ MESES[etMonth - 1] }}…</p>
+      </div>
+
+      <Message v-else-if="etError" severity="error" :closable="false">{{ etError }}</Message>
+
+      <template v-else-if="etData">
+
+        <Message v-if="etData.warning" severity="warn" :closable="false">{{ etData.warning }}</Message>
+
+        <!-- Summary cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div class="cv-card px-4 py-3">
+            <p class="text-xs font-semibold uppercase tracking-wider mb-1" style="color: #7a6e8a;">Total transada</p>
+            <p class="text-2xl font-bold font-mono" style="color: #2C2039;">{{ fmtMwh(etData.totales.gen_mwh) }} <span class="text-sm font-normal">MWh</span></p>
+            <p class="text-xs mt-0.5" style="color: #7a6e8a;">{{ etData.totales.n_plantas }} proyectos con datos</p>
+          </div>
+          <div class="cv-card px-4 py-3">
+            <p class="text-xs font-semibold uppercase tracking-wider mb-1" style="color: #915BD8;">Vía PPA</p>
+            <p class="text-2xl font-bold font-mono" style="color: #915BD8;">{{ fmtMwh(etData.totales.ppa_mwh) }} <span class="text-sm font-normal">MWh</span></p>
+            <p class="text-xs mt-0.5" style="color: #7a6e8a;">{{ etPct(etData.totales.ppa_mwh) }}% del total</p>
+          </div>
+          <div class="cv-card px-4 py-3">
+            <p class="text-xs font-semibold uppercase tracking-wider mb-1" style="color: #2C2039;">En bolsa</p>
+            <p class="text-2xl font-bold font-mono" style="color: #2C2039;">{{ fmtMwh(etData.totales.bolsa_mwh) }} <span class="text-sm font-normal">MWh</span></p>
+            <p class="text-xs mt-0.5" style="color: #7a6e8a;">{{ etPct(etData.totales.bolsa_mwh) }}% del total</p>
+          </div>
+        </div>
+
+        <!-- Tabla por proyecto -->
+        <div class="cv-card overflow-hidden">
+          <table class="w-full text-sm">
+            <thead>
+              <tr style="color: #7a6e8a; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; background: rgba(145,91,216,0.04);">
+                <th class="text-left px-4 py-3">Proyecto</th>
+                <th class="text-left px-2 py-3">Cómo se transó</th>
+                <th class="text-right px-2 py-3">PPA (MWh)</th>
+                <th class="text-right px-2 py-3">Bolsa (MWh)</th>
+                <th class="text-right px-4 py-3">Total (MWh)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="p in etData.plantas" :key="p.id" style="border-top: 1px solid rgba(44,32,57,0.06);">
+                <td class="px-4 py-2.5 font-medium" style="color: #2C2039;">
+                  {{ p.nombre }}
+                  <span v-if="p.modo === 'sin_datos'" class="ml-1 text-[10px] font-semibold px-1.5 py-0.5 rounded" style="background: rgba(214,68,85,0.12); color: #D64455;">sin datos</span>
+                </td>
+                <td class="px-2 py-2.5">
+                  <div class="flex flex-wrap gap-1">
+                    <span v-for="c in p.contratos.filter(c => !c.es_duplicado)" :key="c.id"
+                      class="text-xs px-1.5 py-0.5 rounded font-medium"
+                      style="background: rgba(145,91,216,0.10); color: #915BD8;"
+                      :title="`${c.dias_activos} días activos`">
+                      {{ c.nombre }} · {{ (c.pct * 100).toFixed(0) }}%
+                    </span>
+                    <span v-if="p.modo === 'bolsa' || p.modo === 'mixto'"
+                      class="text-xs px-1.5 py-0.5 rounded font-medium"
+                      style="background: rgba(44,32,57,0.08); color: #2C2039;">Bolsa</span>
+                    <span v-if="p.modo === 'sin_datos'" class="text-xs" style="color: #7a6e8a;">—</span>
+                  </div>
+                </td>
+                <td class="px-2 py-2.5 text-right font-mono" style="color: #915BD8;">{{ p.ppa_mwh !== null ? fmtMwh(p.ppa_mwh) : '—' }}</td>
+                <td class="px-2 py-2.5 text-right font-mono" style="color: #2C2039;">{{ p.bolsa_mwh !== null ? fmtMwh(p.bolsa_mwh) : '—' }}</td>
+                <td class="px-4 py-2.5 text-right font-mono font-semibold" style="color: #2C2039;">{{ p.gen_mwh !== null ? fmtMwh(p.gen_mwh) : '—' }}</td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr style="border-top: 2px solid rgba(44,32,57,0.12); background: rgba(145,91,216,0.04);">
+                <td class="px-4 py-3 font-bold" style="color: #2C2039;">TOTAL ENERGÍA TRANSADA</td>
+                <td></td>
+                <td class="px-2 py-3 text-right font-mono font-bold" style="color: #915BD8;">{{ fmtMwh(etData.totales.ppa_mwh) }}</td>
+                <td class="px-2 py-3 text-right font-mono font-bold" style="color: #2C2039;">{{ fmtMwh(etData.totales.bolsa_mwh) }}</td>
+                <td class="px-4 py-3 text-right font-mono font-bold text-base" style="color: #2C2039;">{{ fmtMwh(etData.totales.gen_mwh) }}</td>
+              </tr>
+            </tfoot>
+          </table>
+          <div v-if="!etData.plantas.length" class="px-4 py-10 text-sm text-center" style="color: rgba(44,32,57,0.35);">
+            Sin proyectos con energía transada en {{ MESES[etMonth - 1] }} {{ etYear }}
+          </div>
+        </div>
 
       </template>
     </div>
@@ -929,11 +991,13 @@ async function clearCacheAndReload() {
   anualData.value = null
   simData.value = null
   pcData.value = null
+  etData.value = null
   tableData.value = []
   try {
     await Promise.all([loadAnnualData(), loadTableData()])
     if (activeTab.value === 0) await loadSimulator()
     if (activeTab.value === 2) await loadPlantasContratos()
+    if (activeTab.value === 3) await loadEnergiaTransada()
   } finally {
     cacheClearing.value = false
     updateCacheSize()
@@ -941,7 +1005,7 @@ async function clearCacheAndReload() {
 }
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
-const TABS      = ['Estrategia', 'Cumplimiento', 'Proyectos']
+const TABS      = ['Estrategia', 'Cumplimiento', 'Proyectos', 'Energía transada']
 const activeTab = ref(0)
 
 // ── Chart constants ───────────────────────────────────────────────────────────
@@ -1023,6 +1087,132 @@ const pcMode    = ref('venta')
 const pcData    = ref(null)
 const pcLoading = ref(false)
 const pcError   = ref(null)
+
+// ── Energía transada state ────────────────────────────────────────────────────
+// Histórico por mes en localStorage: los meses cerrados son inmutables y se
+// guardan sin TTL; el mes actual siempre se consulta fresco y se va guardando
+// como parcial. Un prefetch silencioso completa el histórico del año.
+const ET_PREFIX  = 'cumpl_et_'
+const etYear     = ref(now.getFullYear())
+const etMonth    = ref(now.getMonth() + 1)
+const etData     = ref(null)
+const etLoading  = ref(false)
+const etError    = ref(null)
+const etFromCache = ref(false)
+let etPrefetching = false
+
+const etYearOptions = computed(() => years.filter(y => y <= now.getFullYear()))
+
+const etMonthOptions = computed(() => {
+  const maxMonth = etYear.value === now.getFullYear() ? now.getMonth() + 1 : 12
+  return MESES_OPTIONS.filter(o => o.value <= maxMonth)
+})
+
+const etPeriodoLabel = computed(() => {
+  const p = etData.value?.periodo
+  if (!p) return ''
+  return p.es_mes_actual
+    ? `Del 1 al ${p.dia_corte} de ${MESES[p.month - 1].toLowerCase()} ${p.year}`
+    : `Mes completo · ${MESES[p.month - 1]} ${p.year}`
+})
+
+function etPct(val) {
+  const total = etData.value?.totales?.gen_mwh
+  if (!total || val === null) return '0'
+  return (val / total * 100).toFixed(1)
+}
+
+function etIsCurrentMonth(y, m) {
+  return y === now.getFullYear() && m === now.getMonth() + 1
+}
+
+function etCacheKey(y, m) { return `${ET_PREFIX}${y}_${String(m).padStart(2, '0')}` }
+
+function etCacheGet(y, m) {
+  try {
+    const raw = localStorage.getItem(etCacheKey(y, m))
+    if (!raw) return null
+    const { data, partial } = JSON.parse(raw)
+    // Un mes guardado como parcial (era el mes en curso) deja de valer cuando el mes cierra
+    if (partial && !etIsCurrentMonth(y, m)) {
+      localStorage.removeItem(etCacheKey(y, m))
+      return null
+    }
+    return data
+  } catch { return null }
+}
+
+function etCacheSet(y, m, data) {
+  try {
+    localStorage.setItem(etCacheKey(y, m), JSON.stringify({
+      ts: Date.now(),
+      partial: etIsCurrentMonth(y, m),
+      data,
+    }))
+  } catch { /* quota exceeded — ignorar */ }
+}
+
+async function etFetch(y, m) {
+  const res = await client.get('/cumplimiento/energia-transada', { params: { year: y, month: m }, timeout: 180000 })
+  etCacheSet(y, m, res.data)
+  return res.data
+}
+
+async function loadEnergiaTransada() {
+  const y = etYear.value, m = etMonth.value
+  etError.value = null
+  etFromCache.value = false
+
+  // Mes cerrado ya guardado → instantáneo desde el histórico local
+  if (!etIsCurrentMonth(y, m)) {
+    const cached = etCacheGet(y, m)
+    if (cached) {
+      etData.value = cached
+      etFromCache.value = true
+      prefetchEtHistory()
+      return
+    }
+  }
+
+  etLoading.value = true
+  try {
+    etData.value = await etFetch(y, m)
+    updateCacheSize()
+    prefetchEtHistory()
+  } catch (e) {
+    const status = e.response?.status
+    etError.value = e.response?.data?.detail
+      || (status === 401 ? 'Sesión expirada — inicia sesión de nuevo.'
+         : e.code === 'ECONNABORTED' ? 'Tiempo de espera agotado — el servidor tardó demasiado.'
+         : 'Error al consultar la energía transada.')
+  } finally {
+    etLoading.value = false
+  }
+}
+
+// Completa en segundo plano el histórico del año (meses cerrados que falten),
+// secuencial para no saturar el backend. El usuario no ve nada de esto.
+async function prefetchEtHistory() {
+  if (etPrefetching) return
+  etPrefetching = true
+  try {
+    const y = etYear.value
+    const lastClosed = y === now.getFullYear() ? now.getMonth() : (y < now.getFullYear() ? 12 : 0)
+    for (let m = 1; m <= lastClosed; m++) {
+      if (etCacheGet(y, m)) continue
+      try { await etFetch(y, m) } catch { break /* backend con problemas — reintentar en próxima visita */ }
+    }
+    updateCacheSize()
+  } finally {
+    etPrefetching = false
+  }
+}
+
+function onEtPeriodChange() {
+  const maxMonth = etYear.value === now.getFullYear() ? now.getMonth() + 1 : 12
+  if (etMonth.value > maxMonth) etMonth.value = maxMonth
+  loadEnergiaTransada()
+}
 
 const allContratos = computed(() => {
   if (!simData.value) return []
@@ -1164,12 +1354,30 @@ const simResults = computed(() => {
       else if (max !== null && genProy > max) estadoProy = 'excedente'
       else estadoProy = 'ok'
     }
+    // ── Geometría del bullet chart (zonas déficit/rango/excedente sobre un eje común) ──
+    const hasMin = min !== null
+    const hasMax = max !== null
+    let axisMax
+    if (hasMax)      axisMax = Math.max(max * 1.2, gen * 1.06, (genProy || 0) * 1.06)
+    else if (hasMin) axisMax = Math.max(min * 1.4, gen * 1.1, (genProy || 0) * 1.1)
+    else             axisMax = Math.max(gen, genProy || 0, 1) * 1.1
+    const clampPct = v => Math.max(0, Math.min(100, (v / axisMax) * 100))
+    const bullet = {
+      hasMin, hasMax,
+      hasZones: hasMin || hasMax,
+      minPct: hasMin ? clampPct(min) : 0,
+      maxPct: hasMax ? clampPct(max) : 100,
+      measurePct: clampPct(gen),
+      dupW: genDup > 0 ? Math.max(0, clampPct(gen + genDup) - clampPct(gen)) : 0,
+      proyPct: (esActual && genProy > 0) ? clampPct(genProy) : null,
+    }
+
     out[c.id] = {
       gen: Math.round(gen * 10) / 10,
       genDup: Math.round(genDup * 10) / 10,
       genProy: esActual ? Math.round(genProy * 10) / 10 : null,
       estado, estadoProy, pct, dupPct, proyPct, min, max,
-      diaActual: diaAct, diasRestantes: diasRest,
+      diaActual: diaAct, diasRestantes: diasRest, bullet,
     }
   }
   return out
@@ -1291,6 +1499,26 @@ function fmtFecha(iso) {
   if (!iso) return '—'
   const [y, m] = iso.split('-')
   return `${MESES_CORTOS[parseInt(m) - 1]} ${y}`
+}
+
+// ── Helpers de barras de cumplimiento (simulador) ─────────────────────────────
+function estadoColor(estado) {
+  return estado === 'ok'        ? '#2e7d32'
+       : estado === 'deficit'   ? '#D64455'
+       : estado === 'excedente' ? '#14B8A6'
+       : '#b0a0c0'
+}
+function estadoBadge(estado) {
+  return estado === 'ok'        ? 'background: rgba(46,125,50,0.12); color: #2e7d32;'
+       : estado === 'deficit'   ? 'background: rgba(214,68,85,0.12); color: #D64455;'
+       : estado === 'excedente' ? 'background: rgba(20,184,166,0.16); color: #0F766E;'
+       : 'background: rgba(44,32,57,0.06); color: #7a6e8a;'
+}
+function estadoLabel(estado) {
+  return estado === 'ok'        ? '✓ OK'
+       : estado === 'deficit'   ? '↓ Déficit'
+       : estado === 'excedente' ? '↑ Excedente'
+       : '— Sin datos'
 }
 
 // ── Data loading ──────────────────────────────────────────────────────────────
@@ -1501,6 +1729,7 @@ watch(activeTab, (tab) => {
   if (tab === 0 && !simData.value) loadSimulator()
   if (tab === 1 && !anualData.value) { loadAnnualData(); loadTableData() }
   if (tab === 2 && !pcData.value) loadPlantasContratos()
+  if (tab === 3 && !etData.value) loadEnergiaTransada()
 })
 
 onMounted(async () => {
@@ -1510,6 +1739,60 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+/* ── Rediseño Notion + brand Unergy (header, tabs, toolbar, tarjetas) ── */
+.cv-icon-tile {
+  width: 40px; height: 40px; border-radius: 12px; flex-shrink: 0;
+  display: grid; place-items: center;
+  background: rgba(145,91,216,0.12); color: #915BD8; font-size: 17px;
+}
+.cv-tab {
+  font-size: 13.5px; font-weight: 700; color: #9b8fb0;
+  padding: 9px 13px; border: 0; background: none; cursor: pointer;
+  border-radius: 8px 8px 0 0; border-bottom: 2px solid transparent;
+  margin-bottom: -1px; transition: background .12s, color .12s;
+}
+.cv-tab:hover { background: rgba(44,32,57,0.04); color: #2C2039; }
+.cv-tab.active { color: #2C2039; border-bottom-color: #915BD8; }
+
+.cv-btn {
+  display: inline-flex; align-items: center; gap: 6px; height: 34px;
+  padding: 0 12px; border-radius: 9px; border: 1px solid rgba(44,32,57,0.12);
+  background: #fff; color: #2C2039; font-size: 13px; cursor: pointer;
+  transition: background .12s, border-color .12s;
+}
+.cv-btn:hover { background: rgba(44,32,57,0.04); border-color: rgba(145,91,216,0.40); }
+.cv-btn-cta {
+  display: inline-flex; align-items: center; gap: 6px; height: 34px;
+  padding: 0 14px; border-radius: 9px; border: 0;
+  background: #F6FF72; color: #2C2039; font-size: 13px; font-weight: 700; cursor: pointer;
+  box-shadow: 0 1px 0 rgba(44,32,57,0.04); transition: filter .12s, box-shadow .12s;
+}
+.cv-btn-cta:hover { filter: brightness(0.97); box-shadow: 0 3px 12px rgba(246,255,114,0.55); }
+
+.cv-card {
+  background: #fff; border: 1px solid rgba(44,32,57,0.07); border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(44,32,57,0.04), 0 2px 10px rgba(44,32,57,0.035);
+  transition: border-color .15s, box-shadow .15s, transform .15s;
+}
+.cv-card:hover {
+  border-color: rgba(145,91,216,0.32);
+  box-shadow: 0 10px 28px rgba(44,32,57,0.11);
+  transform: translateY(-2px);
+}
+.cv-card-dragover { border-color: #915BD8 !important; box-shadow: 0 0 0 2px rgba(145,91,216,0.18) !important; }
+.cv-panel {
+  background: #fff; border: 1px solid rgba(44,32,57,0.07); border-radius: 16px;
+  box-shadow: 0 1px 2px rgba(44,32,57,0.04), 0 2px 10px rgba(44,32,57,0.035);
+}
+.cv-card-gold {
+  background: #fff; border: 1px solid rgba(240,192,64,0.5); border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(154,103,0,0.05), 0 2px 10px rgba(154,103,0,0.04);
+  transition: border-color .15s, box-shadow .15s, transform .15s;
+}
+.cv-card-gold:hover { border-color: rgba(240,192,64,0.9); box-shadow: 0 10px 28px rgba(154,103,0,0.12); transform: translateY(-2px); }
+
 :deep(.p-datatable .p-datatable-thead th) {
   background: rgba(44,32,57,0.05);
   color: #7a6e8a;

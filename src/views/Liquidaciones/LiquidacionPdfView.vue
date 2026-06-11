@@ -8,7 +8,7 @@
     <!-- Toolbar (no se imprime) -->
     <div class="liqpdf-toolbar">
       <div class="flex items-center gap-2">
-        <Button icon="pi pi-arrow-left" text size="small" @click="volver" />
+        <Button icon="pi pi-arrow-left" label="Volver" text size="small" @click="volver" />
         <div>
           <div class="text-sm font-bold" style="color:#2C2039">Informe PDF — Estado de Resultados</div>
           <div class="text-[11px]" style="color:#9b8fb0">
@@ -31,6 +31,8 @@
           severity="secondary" @click="regenerar" :disabled="editMode" title="Reconstruir el informe desde los datos actuales" />
         <Button label="Descargar PDF" icon="pi pi-file-pdf" size="small"
           style="background:#F6FF72; border-color:#F6FF72; color:#2C2039" @click="descargar" />
+        <Button label="Descargar Excel" icon="pi pi-file-excel" size="small"
+          style="background:#1D6F42; border-color:#1D6F42" @click="descargarExcel" />
       </div>
     </div>
 
@@ -56,7 +58,7 @@ import Select from 'primevue/select'
 import ProgressSpinner from 'primevue/progressspinner'
 import api from '@/api/client'
 import {
-  fmtCOP, pct, formatPeriodo,
+  fmtCOP, pct, normPct, formatPeriodo,
   construirEstadoResultados, indiceSoportesProyecto,
 } from '@/utils/liquidaciones'
 
@@ -96,12 +98,20 @@ const opcionesInv = computed(() => [
 const fmtKwh = (v) => v == null ? '—' : (Math.abs(v) >= 1000 ? (v / 1000).toFixed(1) + ' MWh' : Math.round(v) + ' kWh')
 const _cop2 = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const fmtTarifa = (v) => v == null ? '—' : _cop2.format(v)
+// Administración se cobra como % (no $/kWh). Acepta fracción (0.02) o número (2).
+const fmtAdminPct = (v) => v == null ? '—' : `${(Math.abs(Number(v)) < 1 ? Number(v) * 100 : Number(v)).toFixed(2)}%`
 
 function toast(msg, err = false) {
   toastMsg.value = msg; toastErr.value = err
   clearTimeout(_t); _t = setTimeout(() => { toastMsg.value = '' }, 4000)
 }
-function volver() { router.push(`/liquidaciones/${route.params.id}`) }
+function volver() {
+  // Si hay edición sin guardar, confirmar antes de salir.
+  if (editMode.value && !window.confirm('Tienes cambios sin guardar. ¿Salir de todos modos?')) return
+  // Navegación determinística hacia arriba (el padre del informe es su detalle).
+  // Evita el ping-pong/loop que causa mezclar history.back() con push.
+  router.push(`/liquidaciones/${route.params.id}`)
+}
 
 // ── Construcción del informe (bloques verticales: Total + cada inversionista) ──
 // Una matriz ancha se desborda en el PDF; en su lugar cada entidad (Total e
@@ -129,12 +139,31 @@ function columnasDe(l, invs) {
     const ing = mandatos.filter(m => m.tipo === 'ingresos' && esDel(m, pi.id))
     const cos = mandatos.filter(m => m.tipo === 'costos' && esDel(m, pi.id))
     if (!ing.length && !cos.length) continue
+    // er SIN facturas: en la vista "Todos" las facturas de servicio van solo en el Total
+    // (se prorratean por inversionista solo cuando se selecciona uno — ver erConFacturas).
     const er = construirEstadoResultados({ ingresosMandatos: ing, costosMandatos: cos, esAutoconsumo: esAuto, soportes })
     if (!er.grupos.length) continue
-    cols.push({ id: 'inv' + pi.id, nombre: pi.cliente_nombre || 'Inversionista', pct: pct(pi.porcentaje_participacion), er })
+    cols.push({
+      id: 'inv' + pi.id, nombre: pi.cliente_nombre || 'Inversionista',
+      pct: pct(pi.porcentaje_participacion), er,
+      _ing: ing, _cos: cos, _frac: normPct(pi.porcentaje_participacion),
+    })
   }
   for (const c of cols) c.neto = c.er.neto
   return cols
+}
+
+// er del informe para una columna: Total tal cual; inversionista con SUS facturas
+// de servicio prorrateadas (para informe/Excel individual completo).
+function erConFacturas(col) {
+  if (!col || col.es_total) return col?.er
+  const l = liq.value || {}
+  const soportes = indiceSoportesProyecto(l)
+  const facturasInv = (l.facturas || []).map(f => ({ ...f, valor_cop: (Number(f.valor_cop) || 0) * (col._frac || 0) }))
+  return construirEstadoResultados({
+    ingresosMandatos: col._ing || [], costosMandatos: col._cos || [],
+    facturas: facturasInv, esAutoconsumo: l.tipo_venta === 'autoconsumo', soportes,
+  })
 }
 
 // Tabla angosta (Concepto · Valor · Soporte) para un estado de resultados.
@@ -158,9 +187,11 @@ function detalleHtml(er) {
 }
 
 function kpisHtml(er) {
+  // "Ingresos" = ingreso bruto (total del grupo Ingresos), no el valor a pagar.
+  const ingresos = er.grupos.find(g => g.key === 'ingresos')?.total ?? er.valorAPagar
   const costosTot = (er.costosOperativos || 0) + (er.facturasTotal || 0)
   const k = [
-    { lbl: 'Valor a pagar (ingresos)', val: fmtCOP(er.valorAPagar) },
+    { lbl: 'Ingresos', val: fmtCOP(ingresos) },
     { lbl: 'Costos y facturas', val: fmtCOP(costosTot) },
     { lbl: 'Ingreso neto', val: fmtCOP(er.neto), big: true },
   ]
@@ -217,9 +248,9 @@ function generacionSectionHtml() {
   const t = tarifas.value
   const hayTar = t.representacion != null || t.cgm != null || t.admin != null
   const tarifasHtml = hayTar ? `<div class="rpt-tarifas">
-      <div class="rpt-tar"><span>Representación</span><b>${fmtTarifa(t.representacion)}</b></div>
-      <div class="rpt-tar"><span>CGM</span><b>${fmtTarifa(t.cgm)}</b></div>
-      <div class="rpt-tar"><span>Administración</span><b>${fmtTarifa(t.admin)}</b></div>
+      <div class="rpt-tar"><span>Representación ($/kWh)</span><b>${fmtTarifa(t.representacion)}</b></div>
+      <div class="rpt-tar"><span>CGM ($/kWh)</span><b>${fmtTarifa(t.cgm)}</b></div>
+      <div class="rpt-tar"><span>Administración (%)</span><b>${fmtAdminPct(t.admin)}</b></div>
     </div>` : ''
   return `<section class="rpt-block">
       <h2 class="rpt-h2">Generación del mes</h2>
@@ -241,11 +272,12 @@ function buildHtml() {
   const selCol = sel != null ? cs.find(c => c.id === 'inv' + sel) : null
   let estado = ''
   if (selCol) {
+    const erSel = erConFacturas(selCol)
     estado = `
     <section class="rpt-block rpt-inv">
       <div class="rpt-inv-head"><span class="rpt-inv-name">${esc(selCol.nombre)}</span><span class="rpt-inv-pct">${selCol.pct}</span></div>
-      ${kpisHtml(selCol.er)}
-      ${detalleHtml(selCol.er)}
+      ${kpisHtml(erSel)}
+      ${detalleHtml(erSel)}
     </section>`
   } else {
     const total = cs.find(c => c.es_total)
@@ -388,10 +420,14 @@ async function loadComparativo() {
     const liqs = proy?.liquidaciones || []
     const sum = (arr, k) => (arr || []).reduce((s, x) => s + (Number(x?.[k]) || 0), 0)
     const itemsDe = (q) => {
-      const ing = sum(q.mandatos_total_ingresos, 'valor_neto_cop') || Number(q.resumen?.total_ingresos_cop) || 0
-      const cos = sum(q.mandatos_total_costos, 'valor_neto_cop') || Number(q.resumen?.total_costos_cop) || 0
-      const fac = sum(q.facturas_servicio, 'valor_cop') || Number(q.resumen?.total_facturas_cop) || 0
-      return { ingresos: ing, costosOp: cos, facturas: fac, neto: ing - cos - fac }
+      // "Ingresos" = ingreso bruto; el neto se calcula sobre el valor a pagar.
+      const gross = Number(q.resumen?.total_ingresos_cop) || sum(q.mandatos_total_ingresos, 'total_ingresos_cop') || 0
+      const vap = sum(q.mandatos_total_ingresos, 'valor_neto_cop') || 0
+      const ingresos = gross || vap
+      const cos = Number(q.resumen?.total_costos_cop) || sum(q.mandatos_total_costos, 'valor_neto_cop') || 0
+      const fac = Number(q.resumen?.total_facturas_cop) || sum(q.facturas_servicio, 'valor_cop') || 0
+      const neto = Number(q.resumen?.ingreso_neto_cop) || ((vap || ingresos) - cos - fac)
+      return { ingresos, costosOp: cos, facturas: fac, neto }
     }
     const conV = (it) => it.ingresos !== 0 || it.costosOp !== 0 || it.facturas !== 0
     const per = liq.value.periodo
@@ -474,12 +510,119 @@ function descargar() {
   const titulo = `Estado de Resultados — ${liq.value?.proyecto_nombre || ''} ${periodoLabel.value}`
   const w = window.open('', '_blank')
   if (!w) { toast('Permite las ventanas emergentes para descargar el PDF', true); return }
+  const barCSS = `.liq-bar{position:sticky;top:0;z-index:50;display:flex;gap:8px;justify-content:flex-end;align-items:center;padding:8px 14px;background:#2C2039;font-family:'Sora',sans-serif}
+.liq-bar .t{margin-right:auto;color:#cdbfe2;font-size:12px;font-weight:600}
+.liq-bar button{font-family:'Sora',sans-serif;font-size:12px;font-weight:700;border:none;border-radius:7px;padding:7px 13px;cursor:pointer;background:#4a3560;color:#fff}
+.liq-bar button.prim{background:#F6FF72;color:#2C2039}
+@media print{.liq-bar{display:none!important}}`
   w.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>${esc(titulo)}</title>` +
     `<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>` +
     `<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&display=swap" rel="stylesheet">` +
-    `<style>${REPORT_CSS}${PRINT_PAGE_CSS}</style></head><body><div class="liq-doc">${inner}</div>` +
-    `<script>window.onload=function(){setTimeout(function(){window.print();},400);};<\/script></body></html>`)
+    `<style>${REPORT_CSS}${PRINT_PAGE_CSS}${barCSS}</style></head><body>` +
+    `<div class="liq-bar"><span class="t">${esc(titulo)}</span>` +
+    `<button onclick="window.close()">✕ Cerrar</button>` +
+    `<button class="prim" onclick="window.print()">Imprimir / Guardar PDF</button></div>` +
+    `<div class="liq-doc">${inner}</div>` +
+    `<script>window.onload=function(){setTimeout(function(){window.print();},500);};<\/script></body></html>`)
   w.document.close()
+}
+
+// ── Descargar Excel (identidad de marca + fórmulas + multi-hoja) ───────────────
+async function descargarExcel() {
+  if (!liq.value) return
+  try {
+    const XLSX = await import('xlsx-js-style')
+    const cs = cols.value
+    const sel = selInv.value
+    const list = sel != null ? cs.filter(c => c.id === 'inv' + sel) : cs
+    if (!list.length) { toast('No hay datos para exportar', true); return }
+    const wb = XLSX.utils.book_new()
+    const usados = new Set()
+    for (const c of list) {
+      let base = (c.es_total ? 'Total' : (c.nombre || 'Inversionista')).replace(/[\[\]\*\?\/\\:]/g, ' ').slice(0, 28).trim() || 'Hoja'
+      let name = base, i = 2
+      while (usados.has(name)) { name = `${base.slice(0, 25)} ${i++}` }
+      usados.add(name)
+      XLSX.utils.book_append_sheet(wb, sheetForEr(XLSX, c), name)
+    }
+    const slug = (liq.value.proyecto_nombre || 'liquidacion').replace(/[^a-z0-9]+/gi, '_')
+    XLSX.writeFile(wb, `Estado_Resultados_${slug}_${(liq.value.periodo || '').slice(0, 7)}.xlsx`)
+  } catch (e) {
+    toast('⚠️ No se pudo generar el Excel', true)
+  }
+}
+
+function sheetForEr(XLSX, col) {
+  const er = erConFacturas(col)
+  const proyecto = liq.value?.proyecto_nombre || ''
+  const periodo = formatPeriodo(liq.value?.periodo)
+  const entidad = col.es_total ? 'Total del proyecto' : `${col.nombre} (${col.pct})`
+
+  // Paleta de marca Unergy
+  const C = { morado: '915BD8', moradoOsc: '6E3FB8', oscuro: '2C2039', lila: 'F4F1FA', neto: 'EAE0FB', blanco: 'FFFFFF', gris: '6B5A8A', borde: 'ECE4F5' }
+  const COP = '"$"#,##0'
+  const bf = { style: 'thin', color: { rgb: C.borde } }
+  const bAll = { top: bf, bottom: bf, left: bf, right: bf }
+  const bTop = { ...bAll, top: { style: 'medium', color: { rgb: C.morado } } }
+
+  const rows = [
+    ['UNERGY — Estado de Resultados', '', ''],
+    [proyecto, '', ''],
+    [`${periodo}  ·  ${entidad}`, '', ''],
+    ['', '', ''],
+    ['Concepto', 'Valor (COP)', 'Soporte / Ref.'],
+  ]
+  const grupos = []
+  er.grupos.forEach(g => {
+    const hdr = rows.length
+    rows.push([g.label, null, ''])
+    const start = rows.length
+    g.lineas.forEach(l => rows.push([`    ${l.label}`, Number(l.valor) || 0, l.refCodigo || l.referencia || '']))
+    grupos.push({ hdr, sign: g.sign, start, end: rows.length - 1 })
+  })
+  const netoRow = rows.length
+  rows.push(['Valor a pagar (neto)', null, ''])
+
+  const ws = XLSX.utils.aoa_to_sheet(rows)
+  const enc = (r, c) => XLSX.utils.encode_cell({ r, c })
+  const setCell = (r, c, patch) => { const ref = enc(r, c); ws[ref] = { ...(ws[ref] || { t: 's', v: '' }), ...patch } }
+  const setStyle = (r, c, s) => { const ref = enc(r, c); if (!ws[ref]) ws[ref] = { t: 's', v: '' }; ws[ref].s = s }
+
+  // Fórmulas: subtotal por grupo = SUM(líneas); neto = Σ signo·subtotal
+  grupos.forEach(g => {
+    if (g.end >= g.start) setCell(g.hdr, 1, { t: 'n', f: `SUM(${enc(g.start, 1)}:${enc(g.end, 1)})` })
+    else setCell(g.hdr, 1, { t: 'n', v: 0 })
+  })
+  const terms = grupos.map(g => `${g.sign < 0 ? '-' : '+'}${enc(g.hdr, 1)}`).join('').replace(/^\+/, '')
+  setCell(netoRow, 1, { t: 'n', f: terms || '0' })
+
+  // Estilos de marca
+  setStyle(0, 0, { font: { bold: true, sz: 14, color: { rgb: C.blanco } }, fill: { fgColor: { rgb: C.oscuro } }, alignment: { vertical: 'center' } })
+  setStyle(1, 0, { font: { bold: true, sz: 12, color: { rgb: C.moradoOsc } } })
+  setStyle(2, 0, { font: { sz: 10, color: { rgb: C.gris } } })
+  for (let c = 0; c < 3; c++) setStyle(4, c, { font: { bold: true, sz: 10, color: { rgb: C.blanco } }, fill: { fgColor: { rgb: C.morado } }, alignment: { horizontal: c === 1 ? 'right' : (c === 2 ? 'center' : 'left') }, border: bAll })
+  grupos.forEach(g => {
+    setStyle(g.hdr, 0, { font: { bold: true, sz: 10, color: { rgb: C.moradoOsc } }, fill: { fgColor: { rgb: C.lila } }, border: bAll })
+    setStyle(g.hdr, 1, { font: { bold: true, color: { rgb: C.oscuro } }, fill: { fgColor: { rgb: C.lila } }, numFmt: COP, alignment: { horizontal: 'right' }, border: bAll })
+    setStyle(g.hdr, 2, { fill: { fgColor: { rgb: C.lila } }, border: bAll })
+    for (let r = g.start; r <= g.end; r++) {
+      setStyle(r, 0, { font: { color: { rgb: C.oscuro } }, border: bAll })
+      setStyle(r, 1, { numFmt: COP, alignment: { horizontal: 'right' }, font: { color: { rgb: C.oscuro } }, border: bAll })
+      setStyle(r, 2, { font: { sz: 9, color: { rgb: C.moradoOsc } }, alignment: { horizontal: 'center' }, border: bAll })
+    }
+  })
+  setStyle(netoRow, 0, { font: { bold: true, sz: 11, color: { rgb: C.oscuro } }, fill: { fgColor: { rgb: C.neto } }, border: bTop })
+  setStyle(netoRow, 1, { font: { bold: true, sz: 11, color: { rgb: C.moradoOsc } }, fill: { fgColor: { rgb: C.neto } }, numFmt: COP, alignment: { horizontal: 'right' }, border: bTop })
+  setStyle(netoRow, 2, { fill: { fgColor: { rgb: C.neto } }, border: bTop })
+
+  ws['!merges'] = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: 2 } },
+    { s: { r: 1, c: 0 }, e: { r: 1, c: 2 } },
+    { s: { r: 2, c: 0 }, e: { r: 2, c: 2 } },
+  ]
+  ws['!cols'] = [{ wch: 42 }, { wch: 18 }, { wch: 22 }]
+  ws['!rows'] = [{ hpt: 24 }]
+  return ws
 }
 
 // ── CSS del informe (inyectado para preview + usado en la ventana de impresión) ─

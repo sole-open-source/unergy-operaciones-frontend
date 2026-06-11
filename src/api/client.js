@@ -8,6 +8,9 @@ const api = axios.create({
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token')
   if (token) config.headers.Authorization = `Bearer ${token}`
+  if (config.data instanceof FormData) {
+    delete config.headers['Content-Type']
+  }
   return config
 })
 
@@ -15,9 +18,13 @@ api.interceptors.response.use(
   (r) => r,
   (err) => {
     if (err.response?.status === 401) {
+      const token = localStorage.getItem('token')
+      if (import.meta.env.DEV && token?.endsWith('.preview')) return Promise.reject(err)
       localStorage.removeItem('token')
       localStorage.removeItem('user')
-      window.location.href = '/login'
+      // En la app móvil (rutas /m/...) volvemos a su propio login, no al de la plataforma.
+      const enMovil = window.location.pathname.startsWith('/m/') || window.location.pathname === '/m'
+      window.location.href = enMovil ? '/m/login' : '/login'
     }
     if (err.response?.status === 403) {
       const msg = err.response.data?.detail || 'No tienes permisos para esta acción'

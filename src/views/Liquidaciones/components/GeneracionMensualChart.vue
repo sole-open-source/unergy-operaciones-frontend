@@ -25,20 +25,20 @@
     <!-- Tarifas de servicio del cliente para ese mes -->
     <div class="border-t px-3 py-2" style="border-color:#f0ebf6; background:#fcfbfe">
       <p class="text-[10px] uppercase tracking-wide font-semibold mb-1.5" style="color:#9b8fb0">
-        Tarifas de servicio · {{ periodoLabel }} <span class="normal-case font-normal">($/kWh)</span>
+        Tarifas de servicio · {{ periodoLabel }}
       </p>
       <div class="grid grid-cols-3 gap-2">
         <div class="rounded-lg px-2 py-1.5 text-center" style="background:#F4F1FA">
-          <p class="text-[10px] uppercase tracking-wide font-semibold" style="color:#6E3FB8">Representación</p>
+          <p class="text-[10px] uppercase tracking-wide font-semibold" style="color:#6E3FB8">Representación ($/kWh)</p>
           <p class="text-sm font-bold tabular-nums" style="color:#2C2039">{{ fmtTarifa(tarifas.representacion) }}</p>
         </div>
         <div class="rounded-lg px-2 py-1.5 text-center" style="background:#F4F1FA">
-          <p class="text-[10px] uppercase tracking-wide font-semibold" style="color:#6E3FB8">CGM</p>
+          <p class="text-[10px] uppercase tracking-wide font-semibold" style="color:#6E3FB8">CGM ($/kWh)</p>
           <p class="text-sm font-bold tabular-nums" style="color:#2C2039">{{ fmtTarifa(tarifas.cgm) }}</p>
         </div>
         <div class="rounded-lg px-2 py-1.5 text-center" style="background:#F4F1FA">
-          <p class="text-[10px] uppercase tracking-wide font-semibold" style="color:#6E3FB8">Administración</p>
-          <p class="text-sm font-bold tabular-nums" style="color:#2C2039">{{ fmtTarifa(tarifas.admin) }}</p>
+          <p class="text-[10px] uppercase tracking-wide font-semibold" style="color:#6E3FB8">Administración (%)</p>
+          <p class="text-sm font-bold tabular-nums" style="color:#2C2039">{{ fmtAdminPct(tarifas.admin) }}</p>
         </div>
       </div>
     </div>
@@ -79,6 +79,12 @@ const _cop2 = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP
 function fmtTarifa(v) {
   if (v == null) return '—'
   return _cop2.format(v)
+}
+// Administración se cobra como % (no $/kWh). Acepta fracción (0.02) o número (2).
+function fmtAdminPct(v) {
+  if (v == null) return '—'
+  const n = Number(v)
+  return `${(Math.abs(n) < 1 ? n * 100 : n).toFixed(2)}%`
 }
 
 const norm = (s) => (s || '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim()

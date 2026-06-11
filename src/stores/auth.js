@@ -71,8 +71,9 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   // ── Login ────────────────────────────────────────────────────────────────────
-  async function login(email, password) {
-    const resp = await fetch(`${BASE}/api/v1/auth/token`, {
+  // `endpoint` permite usar el login de larga duración para la app móvil (PWA).
+  async function _doLogin(email, password, endpoint) {
+    const resp = await fetch(`${BASE}${endpoint}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({ username: email, password }),
@@ -98,6 +99,15 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.setItem('user', JSON.stringify(user.value))
   }
 
+  async function login(email, password) {
+    return _doLogin(email, password, '/api/v1/auth/token')
+  }
+
+  // Login para la app móvil: token de larga duración (30 días).
+  async function loginMobile(email, password) {
+    return _doLogin(email, password, '/api/v1/auth/token/mobile')
+  }
+
   // ── Logout ───────────────────────────────────────────────────────────────────
   function logout() {
     token.value = null
@@ -106,5 +116,17 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('user')
   }
 
-  return { token, user, isAuthenticated, role, can, login, logout }
+  // Solo en desarrollo: simula login sin backend para preview de vistas
+  function previewLogin(rol) {
+    if (!import.meta.env.DEV) return
+    const h = btoa('{"alg":"HS256","typ":"JWT"}').replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_')
+    const p = btoa(`{"sub":"99","rol":"${rol}","nombre":"Preview ${rol}","email":"preview@unergy.io","exp":9999999999}`).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_')
+    const fakeToken = `${h}.${p}.preview`
+    token.value = fakeToken
+    user.value = { id: '99', rol, nombre: `Preview ${rol}`, email: 'preview@unergy.io' }
+    localStorage.setItem('token', fakeToken)
+    localStorage.setItem('user', JSON.stringify(user.value))
+  }
+
+  return { token, user, isAuthenticated, role, can, login, loginMobile, logout, previewLogin }
 })
