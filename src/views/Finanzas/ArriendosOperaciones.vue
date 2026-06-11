@@ -38,6 +38,10 @@
         <Button label="IPC" icon="pi pi-chart-line" size="small" outlined
           @click="showIPCDialog = true"
           style="border-color:#915BD8;color:#915BD8" />
+        <ArriendosZipUpload
+          :proyectos="filasParaZip"
+          :periodo="periodoActual"
+          :periodo-label="periodoLabel" />
         <Button label="Agregar proyecto" icon="pi pi-plus" size="small" outlined
           @click="openAgregar"
           style="border-color:#915BD8;color:#915BD8" />
@@ -73,6 +77,7 @@
               </th>
               <th v-if="colsVisibles.historial"
                 class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500">Historial IPC</th>
+              <th class="px-3 py-2.5 text-center text-xs font-semibold text-gray-500">Documento</th>
               <th class="px-3 py-2.5 text-center text-xs font-semibold text-gray-500">Facturado</th>
             </tr>
           </thead>
@@ -132,6 +137,18 @@
                 :title="fila.historial_detalle">
                 {{ fila.historial_texto || '—' }}
               </td>
+              <!-- Documento adjunto -->
+              <td class="px-3 py-2 text-center">
+                <button v-if="docsMeta[docKey(fila.id, periodoActual)]"
+                  type="button"
+                  class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium hover:opacity-80 transition-opacity"
+                  style="background:#ede9fe;color:#6d28d9"
+                  v-tooltip.top="docsMeta[docKey(fila.id, periodoActual)].filename"
+                  @click="downloadDoc(docKey(fila.id, periodoActual))">
+                  <i class="pi pi-file-pdf text-[10px]" />PDF
+                </button>
+                <span v-else class="text-xs text-gray-200">—</span>
+              </td>
               <td class="px-3 py-2 text-center">
                 <button type="button" @click="toggleFacturado(fila.id)">
                   <span v-if="facturadoActual[fila.id]"
@@ -156,6 +173,7 @@
                 {{ formatCOP(totalSeleccionado) }}
               </td>
               <td v-if="colsVisibles.historial"></td>
+              <td></td>
               <td></td>
             </tr>
           </tbody>
@@ -283,6 +301,8 @@ import InputNumber from 'primevue/inputnumber'
 import InputText   from 'primevue/inputtext'
 import { useToast } from 'primevue/usetoast'
 import arriendosRaw from '@/data/pagoarriendos.json'
+import ArriendosZipUpload from './ArriendosZipUpload.vue'
+import { docsMeta, loadDocsMeta, downloadDoc, docKey } from '@/composables/useArriendosDocs'
 
 const toast = useToast()
 
@@ -656,6 +676,11 @@ function eliminarProyecto() {
   toast.add({ severity: 'info', summary: 'Proyecto eliminado', life: 2500 })
 }
 
+// ── Proyectos para el componente ZipUpload ─────────────────────────────────────
+const filasParaZip = computed(() =>
+  filas.value.map(f => ({ id: f.id, proyecto: f.proyecto, codigo: f.id }))
+)
+
 watch(periodoActual, () => { cargarStorage() })
-onMounted(() => { cargarIPCStorage(); cargarProyectosStorage(); cargarStorage() })
+onMounted(() => { cargarIPCStorage(); cargarProyectosStorage(); loadDocsMeta(); cargarStorage() })
 </script>
