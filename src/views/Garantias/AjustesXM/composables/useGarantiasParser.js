@@ -37,145 +37,147 @@ function sheetToRows(wb, sheetName) {
   return XLSX.utils.sheet_to_json(ws, { header: 1, defval: null })
 }
 
-function firstSheet(wb) {
-  return sheetToRows(wb, wb.SheetNames[0])
+const HEADER_ROW = 8
+const DATA_START = 9
+
+function sheetRows(ws) {
+  return XLSX.utils.sheet_to_json(ws, { header: 1, defval: null })
 }
 
-function extractBloque(rows, codigo) {
-  // Find the start row where col A === codigo
-  // Collect next 8 rows (7 days + 1 sum/TIE row)
-  const bloque = []
-  let found = false
-  let count = 0
-  for (let i = 9; i < rows.length; i++) {
+function findSheetByPattern(wb, pattern) {
+  const name = wb.SheetNames.find((n) => pattern.test(n))
+  return wb.Sheets[name] || wb.Sheets[wb.SheetNames[0]]
+}
+
+function findSheetByName(wb, target) {
+  const found = wb.SheetNames.find((n) => n.trim().toUpperCase() === target.toUpperCase())
+  return found ? wb.Sheets[found] : null
+}
+
+// Las celdas numéricas de Excel ya vienen como Number; null-safe.
+function num(v) {
+  if (v == null || v === '') return null
+  const n = typeof v === 'number' ? v : parseFloat(String(v).replace(/,/g, ''))
+  return isNaN(n) ? null : n
+}
+
+function parseGarantiaSheet(wb) {
+  const ws = findSheetByPattern(wb, /dep[oó]sito\s*sem/i)
+  const rows = sheetRows(ws)
+  const header = rows[HEADER_ROW] || []
+
+  const adjColNames = []
+  const adjCols = []
+  for (let c = 3; c < header.length; c++) {
+    const name = String(header[c] ?? '').trim()
+    if (name) { adjCols.push({ idx: c, name }); adjColNames.push(name) }
+  }
+
+  const agents = {}
+  let totalRowIdx = -1
+  for (let i = DATA_START; i < rows.length; i++) {
     const row = rows[i]
+    const c0 = String(row?.[0] ?? '').trim()
+    if (c0.toUpperCase() === 'TOTAL') { totalRowIdx = i; break }
     if (!row) continue
-    if (!found && row[0] === codigo) {
-      found = true
-    }
-    if (found) {
-      bloque.push({ label: row[1] ?? `Día ${count + 1}`, valor: row[2] })
-      count++
-      if (count >= 8) break
+    if (c0 === 'UNGC' || c0 === 'UNGG') {
+      const vals = {}
+      for (const { idx, name } of adjCols) vals[name] = num(row[idx]) ?? 0
+      agents[c0] = vals
     }
   }
-  return bloque
+
+  const precios = { pb: null, restricciones: null, stn: null, trm: null, ptb: null }
+  if (totalRowIdx !== -1) {
+    for (let i = totalRowIdx; i < rows.length; i++) {
+      const row = rows[i]
+      if (!row) continue
+      const label = String(row[1] ?? '').trim()
+      const val = num(row[2])
+      if (/^PB$/i.test(label)) precios.pb = val
+      else if (/^Restricciones$/i.test(label)) precios.restricciones = val
+      else if (/^STN$/i.test(label)) precios.stn = val
+      else if (/^TRM\s*del/i.test(label)) precios.trm = val
+      else if (/^PTB$/i.test(label)) precios.ptb = val
+    }
+  }
+  return { adjColNames, agents, precios }
 }
 
-function extractPrecios(rows) {
-  // Search for price labels in the first sheet
-  const labels = { pb: ['PB'], restricciones: ['Restricciones'], stn: ['STN'], trm: ['TRM'], ptb: ['PTB'] }
-  const precios = { pb: null, restricciones: null, stn: null, trm: null, ptb: null }
-  for (const row of rows) {
+function parseWebTie(wb) {
+  const ws = findSheetByName(wb, 'DEPÓSITO') || wb.Sheets[wb.SheetNames[0]]
+  const rows = sheetRows(ws)
+  const tie = {}
+  for (let i = 10; i < rows.length; i++) {
+    const row = rows[i]
     if (!row) continue
-    for (let c = 0; c < row.length; c++) {
-      const cell = String(row[c] ?? '').trim()
-      for (const [key, names] of Object.entries(labels)) {
-        if (names.includes(cell)) {
-          // Value is in adjacent cell (c+1 or c-1)
-          const next = row[c + 1]
-          if (next != null && !isNaN(parseFloat(next))) {
-            precios[key] = parseFloat(next)
-          }
-        }
+    const code = String(row[1] ?? '').trim()
+    if (code === 'UNGC' || code === 'UNGG') tie[code] = num(row[4]) ?? 0
+  }
+  return tie
+}
+
+function parseCustodia(wb) {
+  const ws = findSheetByName(wb, 'WebBalancePubrdl') || wb.Sheets[wb.SheetNames[0]]
+  const rows = sheetRows(ws)
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i]
+    if (!row) continue
+    if (String(row[1] ?? '').trim() === '3050200006371') {
+      return {
+        disponible: num(row[9]) ?? 0,
+        congelado: (num(row[3]) ?? 0) + (num(row[4]) ?? 0),
+        saldo: num(row[2]) ?? 0,
+        transferencias: num(row[7]) ?? 0,
       }
     }
   }
-  return precios
+  return null
+}
+
+function buildBlock(adjColNames, agentVals, tieVal) {
+  const rows = adjColNames.map((name) => ({ label: name, valor: agentVals ? (agentVals[name] ?? 0) : 0 }))
+  rows.push({ label: 'TIE', valor: tieVal ?? 0 })
+  const total = rows.reduce((s, r) => s + (Number(r.valor) || 0), 0)
+  return { rows, total }
 }
 
 export async function parseSemanales(garantiaFile, saldoFile, webFile) {
   const errors = []
+  let gWb, sWb, wWb
+  try { gWb = await readWorkbook(garantiaFile) } catch (e) { errors.push(`Error leyendo Garantía: ${e.message}`) }
+  try { sWb = await readWorkbook(saldoFile) } catch (e) { errors.push(`Error leyendo Saldo: ${e.message}`) }
+  try { wWb = await readWorkbook(webFile) } catch (e) { errors.push(`Error leyendo WEB: ${e.message}`) }
 
-  let garantiaRows, saldoRows, webRows
-  try {
-    const wb = await readWorkbook(garantiaFile)
-    garantiaRows = firstSheet(wb)
-  } catch (e) {
-    errors.push(`Error leyendo Garantía: ${e.message}`)
-    return { ungc: [], ungg: [], custodia: {}, precios: {}, totalUNGC: 0, totalUNGG: 0, totalConsignar: 0, fechaNombre: '', errors }
+  if (!gWb) {
+    return { ungc: [], ungg: [], custodia: null, precios: {}, totalUNGC: 0, totalUNGG: 0, totalConsignar: 0, fechaNombre: '', errors }
   }
 
-  try {
-    const wb = await readWorkbook(saldoFile)
-    saldoRows = firstSheet(wb)
-  } catch (e) {
-    errors.push(`Error leyendo Saldo: ${e.message}`)
+  const { adjColNames, agents, precios } = parseGarantiaSheet(gWb)
+  const tie = wWb ? parseWebTie(wWb) : {}
+  if (!agents.UNGC) errors.push('No se encontró la fila UNGC en Garantía (se muestra en $0)')
+  if (!agents.UNGG) errors.push('No se encontró la fila UNGG en Garantía')
+
+  const blkUNGC = buildBlock(adjColNames, agents.UNGC, tie.UNGC)
+  const blkUNGG = buildBlock(adjColNames, agents.UNGG, tie.UNGG)
+
+  let custodia = null
+  if (sWb) {
+    custodia = parseCustodia(sWb)
+    if (!custodia) errors.push('No se encontró la cuenta 3050200006371 en Saldo Cuenta Custodia')
   }
 
-  try {
-    const wb = await readWorkbook(webFile)
-    const ws = wb.Sheets['Depósito']
-    if (!ws) {
-      errors.push('Hoja "Depósito" no encontrada en WEB Garantías')
-      webRows = []
-    } else {
-      webRows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null })
-    }
-  } catch (e) {
-    errors.push(`Error leyendo WEB: ${e.message}`)
-    webRows = []
-  }
-
-  // Extract UNGC and UNGG blocks from Garantía
-  const ungc = extractBloque(garantiaRows, 'UNGC')
-  const ungg = extractBloque(garantiaRows, 'UNGG')
-
-  // Override last row of each block with TIE value from WEB Garantías
-  // WEB: sheet 'Depósito', data from row idx 10, col B (idx 1) = code, col E (idx 4) = TIE value
-  const tieMap = {}
-  if (webRows && webRows.length) {
-    for (let i = 10; i < webRows.length; i++) {
-      const row = webRows[i]
-      if (!row) continue
-      const code = row[1]
-      const tieVal = row[4]
-      if (code && tieVal != null) tieMap[code] = tieVal
-    }
-  }
-
-  if (tieMap['UNGC'] != null && ungc.length > 0) {
-    ungc[ungc.length - 1] = { label: 'TIE', valor: tieMap['UNGC'] }
-  }
-  if (tieMap['UNGG'] != null && ungg.length > 0) {
-    ungg[ungg.length - 1] = { label: 'TIE', valor: tieMap['UNGG'] }
-  }
-
-  // Custodia from Saldo file
-  // Data from row idx 11; find col B (idx 1) === '3050200006371'
-  // col J (idx 9) = disponible; cols D+E (idx 3+4) = congelado; col H (idx 7) = valorTransferencia
-  let custodia = { disponible: null, congelado: null, saldo: null }
-  if (saldoRows) {
-    for (let i = 11; i < saldoRows.length; i++) {
-      const row = saldoRows[i]
-      if (!row) continue
-      const cuentaStr = String(row[1] ?? '').trim()
-      if (cuentaStr === '3050200006371') {
-        const disponible = parseFloat(row[9]) || 0
-        const congelado = (parseFloat(row[3]) || 0) + (parseFloat(row[4]) || 0)
-        const valorTransferencia = parseFloat(row[7]) || 0
-        const saldo = disponible + congelado + valorTransferencia
-        custodia = { disponible, congelado, saldo }
-        break
-      }
-    }
-    if (custodia.disponible === null) {
-      errors.push('No se encontró la cuenta 3050200006371 en Saldo Cuenta Custodia')
-    }
-  }
-
-  // Precios
-  const precios = extractPrecios(garantiaRows)
-
-  // Totals: sum of valores in each block
-  const totalUNGC = ungc.reduce((s, r) => s + (parseFloat(r.valor) || 0), 0)
-  const totalUNGG = ungg.reduce((s, r) => s + (parseFloat(r.valor) || 0), 0)
+  const totalUNGC = blkUNGC.total
+  const totalUNGG = blkUNGG.total
   const totalConsignar = totalUNGC + totalUNGG
-
-  // fecha from filename
   const fechaNombre = garantiaFile.name.replace(/\.[^.]+$/, '')
 
-  return { ungc, ungg, custodia, precios, totalUNGC, totalUNGG, totalConsignar, fechaNombre, errors }
+  return {
+    ungc: blkUNGC.rows, ungg: blkUNGG.rows,
+    custodia, precios,
+    totalUNGC, totalUNGG, totalConsignar,
+    fechaNombre, errors,
+  }
 }
 
 export async function parseTxr(file) {
