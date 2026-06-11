@@ -10,7 +10,7 @@
     <div v-if="store.loading" class="text-center py-4">Cargando...</div>
 
     <!-- Tabla resumen -->
-    <div v-if="store.historial.value.length" class="bg-white rounded-xl shadow-sm overflow-hidden"
+    <div v-if="store.historial.length" class="bg-white rounded-xl shadow-sm overflow-hidden"
       style="border:1px solid #e8e0f0">
       <table class="w-full text-sm">
         <thead>
@@ -27,7 +27,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="r in store.historial.value" :key="r.id"
+          <tr v-for="r in store.historial" :key="r.id"
             class="border-b last:border-b-0 hover:bg-gray-50/50">
             <td class="px-3 py-2 tabular-nums" style="color:#2C2039">{{ r.fecha }}</td>
             <td class="px-3 py-2">
