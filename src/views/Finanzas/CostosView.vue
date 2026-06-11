@@ -251,10 +251,16 @@
 
     <!-- ══ TAB 2 — SERVICIOS DE INTERNET ══════════════════════════════════ -->
     <div v-if="activeTab === 2" class="mon-tab-view">
-      <div class="mon-tab-empty">
-        <i class="pi pi-wifi" style="font-size:2.5rem; color:#c4b8d4;" />
-        <p class="mt-3 text-sm font-semibold" style="color:#6b5a8a;">Servicios de Internet</p>
-        <p class="mt-1 text-xs" style="color:#a094b8;">Próximamente — registros de costos de servicios de internet</p>
+      <div class="om-panel-card">
+        <div class="om-panel-header">
+          <div class="flex items-center gap-2">
+            <i class="pi pi-wifi text-sm" style="color:#915BD8" />
+            <span class="text-sm font-semibold" style="color:#2C2039">Starlink — Procesador de facturas PDF</span>
+          </div>
+        </div>
+        <div class="om-panel-body">
+          <StarlinkPDF />
+        </div>
       </div>
     </div>
 
@@ -271,6 +277,7 @@ import OMAOperaciones       from './OMAOperaciones.vue'
 import OMAProveedor          from './OMAProveedor.vue'
 import ArriendosOperaciones  from './ArriendosOperaciones.vue'
 import ArriendosInfo          from './ArriendosInfo.vue'
+import StarlinkPDF            from './StarlinkPDF.vue'
 
 const toast = useToast()
 
