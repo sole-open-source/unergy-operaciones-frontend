@@ -278,26 +278,30 @@ function exportar() {
   exportTablaExcel(rows, `semanales_${resultado.value.fechaNombre || 'resultado'}.xlsx`)
 }
 
-function guardarRegistro() {
+async function guardarRegistro() {
   if (!resultado.value) return
   const p = resultado.value.precios
-  store.guardar({
-    tipo: 'semanal',
-    fecha: fmtISODate(new Date()),
-    pb: p?.pb ?? null,
-    restricciones: p?.restricciones ?? null,
-    stn: p?.stn ?? null,
-    trm: p?.trm ?? null,
-    ptb: p?.ptb ?? null,
-    totalUNGC: resultado.value.totalUNGC,
-    totalUNGG: resultado.value.totalUNGG,
-    totalConsignar: montoEditable.value,
-    disponibleCustodia: resultado.value.custodia?.disponible ?? null,
-    congelado: resultado.value.custodia?.congelado ?? null,
-    saldo: resultado.value.custodia?.saldo ?? null,
-    totalAjusteTXR: null,
-  })
-  if (p?.pb != null) store.setPbAnterior(p.pb)
-  toast.add({ severity: 'success', summary: 'Guardado en historial', life: 3000 })
+  try {
+    await store.guardar({
+      tipo: 'semanal',
+      fecha: fmtISODate(new Date()),
+      pb: p?.pb ?? null,
+      restricciones: p?.restricciones ?? null,
+      stn: p?.stn ?? null,
+      trm: p?.trm ?? null,
+      ptb: p?.ptb ?? null,
+      totalUNGC: resultado.value.totalUNGC,
+      totalUNGG: resultado.value.totalUNGG,
+      totalConsignar: montoEditable.value,
+      disponibleCustodia: resultado.value.custodia?.disponible ?? null,
+      congelado: resultado.value.custodia?.congelado ?? null,
+      saldo: resultado.value.custodia?.saldo ?? null,
+      totalAjusteTXR: null,
+    })
+    if (p?.pb != null) store.setPbAnterior(p.pb)
+    toast.add({ severity: 'success', summary: 'Guardado en historial', life: 3000 })
+  } catch (e) {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo guardar el registro', life: 4000 })
+  }
 }
 </script>

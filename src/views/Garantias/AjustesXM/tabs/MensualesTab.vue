@@ -199,15 +199,19 @@ function exportar() {
   exportTablaExcel(resultado.value.rows, 'mensual.xlsx')
 }
 
-function guardarRegistro() {
-  store.guardar({
-    tipo: 'mensual',
-    fecha: fmtISODate(new Date()),
-    pb: null, restricciones: null, stn: null, trm: null, ptb: null,
-    totalUNGC: null, totalUNGG: null, totalConsignar: null,
-    disponibleCustodia: null, congelado: null, saldo: null,
-    totalAjusteTXR: montoEditable.value,
-  })
-  toast.add({ severity: 'success', summary: 'Guardado en historial', life: 3000 })
+async function guardarRegistro() {
+  try {
+    await store.guardar({
+      tipo: 'mensual',
+      fecha: fmtISODate(new Date()),
+      pb: null, restricciones: null, stn: null, trm: null, ptb: null,
+      totalUNGC: null, totalUNGG: null, totalConsignar: null,
+      disponibleCustodia: null, congelado: null, saldo: null,
+      totalAjusteTXR: montoEditable.value,
+    })
+    toast.add({ severity: 'success', summary: 'Guardado en historial', life: 3000 })
+  } catch (e) {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo guardar el registro', life: 4000 })
+  }
 }
 </script>

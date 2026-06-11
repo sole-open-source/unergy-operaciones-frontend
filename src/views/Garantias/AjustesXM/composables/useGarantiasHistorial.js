@@ -1,65 +1,92 @@
 import { ref } from 'vue'
-import { uuid } from '../utils/formatters.js'
+import api from '@/api/client.js'
 
-const STORAGE_KEY = 'garantias_historial'
+function toFrontend(r) {
+  return {
+    id: r.id,
+    tipo: r.tipo,
+    fecha: r.fecha,
+    pb: r.pb,
+    restricciones: r.restricciones,
+    stn: r.stn,
+    trm: r.trm,
+    ptb: r.ptb,
+    totalUNGC: r.total_ungc,
+    totalUNGG: r.total_ungg,
+    totalConsignar: r.total_consignar,
+    disponibleCustodia: r.disponible_custodia,
+    congelado: r.congelado,
+    saldo: r.saldo,
+    totalAjusteTXR: r.total_ajuste_txr,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  }
+}
+
+function toBackend(r) {
+  const map = {
+    tipo: 'tipo',
+    fecha: 'fecha',
+    pb: 'pb',
+    restricciones: 'restricciones',
+    stn: 'stn',
+    trm: 'trm',
+    ptb: 'ptb',
+    totalUNGC: 'total_ungc',
+    totalUNGG: 'total_ungg',
+    totalConsignar: 'total_consignar',
+    disponibleCustodia: 'disponible_custodia',
+    congelado: 'congelado',
+    saldo: 'saldo',
+    totalAjusteTXR: 'total_ajuste_txr',
+  }
+  const out = {}
+  for (const [feKey, beKey] of Object.entries(map)) {
+    if (feKey in r) out[beKey] = r[feKey]
+  }
+  return out
+}
+
 const PB_KEY = 'garantias_pb_anterior'
 const MENCIONES_KEY = 'garantias_menciones'
 
-function loadHistorial() {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')
-  } catch {
-    return []
-  }
-}
-
-function saveHistorial(data) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
-}
-
 export function useGarantiasHistorial() {
-  const historial = ref(loadHistorial())
+  const historial = ref([])
+  const loading = ref(false)
 
-  function guardar(registro) {
-    const entry = { id: uuid(), ...registro }
-    historial.value = [entry, ...historial.value]
-    saveHistorial(historial.value)
+  async function cargar() {
+    loading.value = true
+    try {
+      const { data } = await api.get('/garantias-ajustes')
+      historial.value = data.map(toFrontend)
+    } finally {
+      loading.value = false
+    }
   }
 
-  function eliminar(id) {
-    historial.value = historial.value.filter((r) => r.id !== id)
-    saveHistorial(historial.value)
+  async function guardar(registro) {
+    const { data } = await api.post('/garantias-ajustes', toBackend(registro))
+    historial.value.unshift(toFrontend(data))
   }
 
-  function exportarJSON() {
-    const blob = new Blob([JSON.stringify(historial.value, null, 2)], {
-      type: 'application/json',
-    })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'historial_garantias.json'
-    a.click()
-    URL.revokeObjectURL(url)
+  async function actualizar(id, campos) {
+    const { data } = await api.patch(`/garantias-ajustes/${id}`, toBackend(campos))
+    const idx = historial.value.findIndex(r => r.id === id)
+    if (idx !== -1) historial.value[idx] = toFrontend(data)
   }
 
-  function importarJSON(jsonStr) {
-    const incoming = JSON.parse(jsonStr)
-    if (!Array.isArray(incoming)) throw new Error('El JSON debe ser un array')
-    const existingIds = new Set(historial.value.map((r) => r.id))
-    const nuevos = incoming.filter((r) => r.id && !existingIds.has(r.id))
-    historial.value = [...historial.value, ...nuevos]
-    saveHistorial(historial.value)
-    return nuevos.length
+  async function eliminar(id) {
+    await api.delete(`/garantias-ajustes/${id}`)
+    historial.value = historial.value.filter(r => r.id !== id)
   }
 
   function getPbAnterior() {
     const v = localStorage.getItem(PB_KEY)
-    return v != null ? parseFloat(v) : null
+    return v !== null ? parseFloat(v) : null
   }
 
   function setPbAnterior(v) {
-    if (v != null) localStorage.setItem(PB_KEY, String(v))
+    localStorage.setItem(PB_KEY, String(v))
   }
 
   function getMenciones() {
@@ -67,18 +94,8 @@ export function useGarantiasHistorial() {
   }
 
   function setMenciones(v) {
-    localStorage.setItem(MENCIONES_KEY, v || '')
+    localStorage.setItem(MENCIONES_KEY, v)
   }
 
-  return {
-    historial,
-    guardar,
-    eliminar,
-    exportarJSON,
-    importarJSON,
-    getPbAnterior,
-    setPbAnterior,
-    getMenciones,
-    setMenciones,
-  }
+  return { historial, loading, cargar, guardar, actualizar, eliminar, getPbAnterior, setPbAnterior, getMenciones, setMenciones }
 }
