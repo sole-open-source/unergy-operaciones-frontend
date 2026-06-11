@@ -93,12 +93,10 @@ const props = defineProps({
 })
 const emit = defineEmits(['close', 'created'])
 
-const today = new Date(Date.now() - 5 * 3600 * 1000).toISOString().slice(0, 10)
-
 const f = reactive({
   proyecto_id: null, tipo_id: null, tipo_libre: '',
   prioridad_id: null, estado_id: null, descripcion: '',
-  fecha_identificacion: today, nota: '',
+  fecha_identificacion: '', nota: '',
 })
 const err = reactive({})
 const error = ref('')
@@ -122,6 +120,7 @@ function chipOn(color) {
 // Al abrir, default estado = no final (abierta) y limpia
 watch(() => props.open, (o) => {
   if (!o) return
+  const today = new Date(Date.now() - 5 * 3600 * 1000).toISOString().slice(0, 10)
   Object.assign(f, { proyecto_id: props.prefillProyectoId ?? null, tipo_id: null, tipo_libre: '', prioridad_id: null,
     estado_id: null, descripcion: '', fecha_identificacion: today, nota: '' })
   Object.keys(err).forEach((k) => delete err[k])

@@ -154,13 +154,14 @@ async function cargar() {
 }
 
 async function cargarFallas() {
-  const primera = await api.get('/fallas', { params: { page: 1, size: 500 } })
+  const tecnicoId = miId.value || undefined
+  const primera = await api.get('/fallas', { params: { page: 1, size: 500, asignado_a_id: tecnicoId } })
   let items = primera.data.items ?? []
   const total = primera.data.total ?? items.length
   const pages = Math.ceil(total / 500)
   if (pages > 1) {
     const rest = await Promise.all(
-      Array.from({ length: pages - 1 }, (_, i) => api.get('/fallas', { params: { page: i + 2, size: 500 } })))
+      Array.from({ length: pages - 1 }, (_, i) => api.get('/fallas', { params: { page: i + 2, size: 500, asignado_a_id: tecnicoId } })))
     for (const r of rest) items = items.concat(r.data.items ?? [])
   }
   fallas.value = items
@@ -174,7 +175,7 @@ function onUpdated(falla) {
 }
 
 async function fetchUnread() {
-  try { const { data } = await api.get('/notificaciones/count'); unreadCount.value = data.no_leidas ?? data.count ?? 0 }
+  try { const { data } = await api.get('/notificaciones/count'); unreadCount.value = data.no_leidas ?? data.count ?? data.unread ?? 0 }
   catch { /* silencioso */ }
 }
 

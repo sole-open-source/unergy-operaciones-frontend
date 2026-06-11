@@ -168,7 +168,7 @@ const detailMap     = reactive({})  // proyecto_id → detalle
 const nowMap        = reactive({})  // proyecto_id → { inv, med } (potencia "ahora")
 const rcnMap        = reactive({})  // proyecto_id → { active }
 const loadingList   = ref(false)
-const loadingDetail = ref(false)
+const loadingDetail = ref(0)  // contador: >0 = cargando (permite cargas paralelas)
 const lastUpdated   = ref('')
 const menuOpen      = ref(false)
 const pickerOpen    = ref(false)
@@ -224,7 +224,7 @@ function onFallaUpdated(f) { if (f?.proyecto_id) loadFallas(f.proyecto_id, true)
 async function fetchUnread() {
   try {
     const { data } = await api.get('/notificaciones/count')
-    unreadCount.value = data.count ?? data.unread ?? 0
+    unreadCount.value = data.no_leidas ?? data.count ?? data.unread ?? 0
   } catch { /* silencioso */ }
 }
 
@@ -305,14 +305,14 @@ async function cargarEstados() {
 async function loadDetail(id, force = false) {
   if (!id) return
   if (detailMap[id] && !force) return
-  loadingDetail.value = true
+  loadingDetail.value++
   try {
     const res = await api.get(`/generacion-solar/monitoring/${id}`)
     detailMap[id] = res.data
     nowMap[id] = { inv: latest(inverterSeries(res.data)), med: latest(meterSeries(res.data)) }
     lastUpdated.value = new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
   } catch { if (!detailMap[id]) detailMap[id] = {} } finally {
-    loadingDetail.value = false
+    loadingDetail.value = Math.max(0, loadingDetail.value - 1)
   }
 }
 

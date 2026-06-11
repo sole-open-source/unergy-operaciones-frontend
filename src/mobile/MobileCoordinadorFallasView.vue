@@ -224,7 +224,7 @@ function onUpdated(falla) {
 function onCreated() { cargarFallas() }
 
 async function fetchUnread() {
-  try { const { data } = await api.get('/notificaciones/count'); unreadCount.value = data.no_leidas ?? data.count ?? 0 }
+  try { const { data } = await api.get('/notificaciones/count'); unreadCount.value = data.no_leidas ?? data.count ?? data.unread ?? 0 }
   catch { /* silencioso */ }
 }
 

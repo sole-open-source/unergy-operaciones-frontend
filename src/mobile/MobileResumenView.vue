@@ -68,7 +68,7 @@
             <span class="rs-group-count">{{ fallas.cambios_estado?.length || 0 }}</span>
           </div>
           <div v-if="(fallas.cambios_estado?.length || 0) === 0" class="rs-empty-row">Ningún cambio hoy</div>
-          <button v-for="(c, i) in (fallas.cambios_estado || [])" :key="'ch'+i" class="rs-falla" @click="openFalla(c.falla)">
+          <button v-for="(c, i) in (fallas.cambios_estado || [])" :key="'ch' + (c.falla?.id ?? i) + '_' + (c.hora || i)" class="rs-falla" @click="openFalla(c.falla)">
             <span class="rs-falla-main">
               <span class="rs-falla-proj">{{ c.falla?.proyecto?.nombre_comercial || '—' }}</span>
               <span class="rs-falla-transition">
