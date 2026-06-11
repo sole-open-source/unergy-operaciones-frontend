@@ -2,16 +2,12 @@
   <div class="space-y-5">
     <!-- Controles de respaldo -->
     <div class="flex flex-wrap gap-2 justify-end">
-      <Button label="Exportar JSON" icon="pi pi-download" text severity="secondary" size="small"
-        @click="store.exportarJSON()" />
-      <label class="cursor-pointer">
-        <Button label="Importar JSON" icon="pi pi-upload" text severity="secondary" size="small"
-          tag="span" as="span" />
-        <input type="file" accept=".json" class="hidden" @change="onImport" />
-      </label>
       <Button label="Exportar a Excel" icon="pi pi-file-excel" severity="secondary" outlined size="small"
         @click="exportarExcel" />
     </div>
+
+    <!-- Loading -->
+    <div v-if="store.loading" class="text-center py-4">Cargando...</div>
 
     <!-- Tabla resumen -->
     <div v-if="store.historial.value.length" class="bg-white rounded-xl shadow-sm overflow-hidden"
@@ -51,6 +47,7 @@
             <td class="px-3 py-2 text-right tabular-nums text-xs">{{ r.disponibleCustodia != null ? fmtCOP(r.disponibleCustodia) : '—' }}</td>
             <td class="px-3 py-2 text-right tabular-nums text-xs">{{ r.saldo != null ? fmtCOP(r.saldo) : '—' }}</td>
             <td class="px-3 py-2 text-center">
+              <Button icon="pi pi-pencil" text rounded severity="secondary" size="small" @click="abrirEditar(r)" />
               <Button icon="pi pi-trash" text rounded size="small" severity="danger"
                 @click="store.eliminar(r.id)" />
             </td>
@@ -59,7 +56,7 @@
       </table>
     </div>
 
-    <div v-else class="py-12 text-center" style="color:#6b5a8a">
+    <div v-else-if="!store.loading" class="py-12 text-center" style="color:#6b5a8a">
       <i class="pi pi-inbox text-3xl mb-2 block" style="color:#c4b8d4" />
       No hay registros en el historial. Confirma un reporte desde Semanales, TXR o Mensuales.
     </div>
@@ -93,11 +90,17 @@
         <Line :data="chartData" :options="chartOptions" />
       </div>
     </div>
+
+    <EditAjusteDialog
+      v-model:visible="editVisible"
+      :ajuste="editAjuste"
+      @saved="store.cargar()"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { Line } from 'vue-chartjs'
 import {
   Chart as ChartJS,
@@ -108,12 +111,21 @@ import { useGarantiasHistorial } from '../composables/useGarantiasHistorial.js'
 import { fmtCOP } from '../utils/formatters.js'
 import { exportHistorialExcel } from '../utils/excelExport.js'
 import Button from 'primevue/button'
-import { useToast } from 'primevue/usetoast'
+import EditAjusteDialog from '../EditAjusteDialog.vue'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler)
 
-const toast = useToast()
 const store = useGarantiasHistorial()
+
+onMounted(() => store.cargar())
+
+const editVisible = ref(false)
+const editAjuste = ref(null)
+
+function abrirEditar(ajuste) {
+  editAjuste.value = ajuste
+  editVisible.value = true
+}
 
 const rangoActivo = ref('4w')
 const seriesVisible = ref({
@@ -224,19 +236,5 @@ function tipoBadge(tipo) {
 
 function exportarExcel() {
   exportHistorialExcel(store.historial.value)
-}
-
-async function onImport(e) {
-  const file = e.target.files[0]
-  if (!file) return
-  try {
-    const text = await file.text()
-    const count = store.importarJSON(text)
-    toast.add({ severity: 'success', summary: `${count} registros importados`, life: 3000 })
-  } catch (err) {
-    toast.add({ severity: 'error', summary: 'Error al importar', detail: err.message, life: 4000 })
-  } finally {
-    e.target.value = ''
-  }
 }
 </script>
