@@ -6,23 +6,46 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl
 const MESES = { ene:0, feb:1, mar:2, abr:3, may:4, jun:5, jul:6, ago:7, sep:8, sept:8, oct:9, nov:10, dic:11 }
 const DATE_RE = /(\d{1,2})-([a-zA-Záéíóú]+)\.?-(\d{2,4})/
 
+// Clasificación primaria por prefijo del número de documento (inequívoco).
+const PREFIX_MAP = {
+  ASIC: { tipo: 'DÉBITO',       concepto: 'Factura de venta',  descuenta: true },
+  NDAS: { tipo: 'DÉBITO',       concepto: 'Factura de venta',  descuenta: true },
+  OSE:  { tipo: 'DÉBITO',       concepto: 'Factura de venta',  descuenta: true },
+  ASNC: { tipo: 'CRÉDITO',      concepto: 'Nota crédito',      descuenta: false },
+  ASIV: { tipo: 'INFORME',      concepto: 'Informe de ventas', descuenta: false },
+  AAVC: { tipo: 'AJUSTE CARGO', concepto: 'Ajuste a cargo',    descuenta: false },
+  AAVF: { tipo: 'AJUSTE FAVOR', concepto: 'Ajuste a favor',    descuenta: false },
+}
+
+// Fallback por título — más específicos primero (la Nota Crédito contiene "factura electrónica de venta").
 const TIPO_RULES = [
-  { re: /FACTURA ELECTR[OÓ]NICA DE VENTA/i, tipo: 'DÉBITO',       concepto: 'Factura de venta',  descuenta: true },
   { re: /Nota\s*cr[eé]dito/i,               tipo: 'CRÉDITO',      concepto: 'Nota crédito',      descuenta: false },
   { re: /Informe de Ventas/i,               tipo: 'INFORME',      concepto: 'Informe de ventas', descuenta: false },
   { re: /Ajuste de Ventas a Cargo/i,        tipo: 'AJUSTE CARGO', concepto: 'Ajuste a cargo',    descuenta: false },
   { re: /Ajuste de Ventas a Favor/i,        tipo: 'AJUSTE FAVOR', concepto: 'Ajuste a favor',    descuenta: false },
+  { re: /FACTURA ELECTR[OÓ]NICA DE VENTA/i, tipo: 'DÉBITO',       concepto: 'Factura de venta',  descuenta: true },
 ]
 
-function classifyTipo(text) {
+function classify(numero, text) {
+  if (numero) {
+    const pre = (numero.match(/^[A-Z]+/) || [])[0]
+    if (pre && PREFIX_MAP[pre]) return PREFIX_MAP[pre]
+  }
   for (const r of TIPO_RULES) if (r.re.test(text)) return r
   return { tipo: 'DESCONOCIDO', concepto: '—', descuenta: false }
 }
 
-function parseCO(s) {
+// Detecta formato CO (9.755,00) o US/SAP (996,711.40) por el separador decimal más a la derecha.
+function parseAmount(s) {
   if (s == null) return null
-  const n = parseFloat(String(s).trim().replace(/\./g, '').replace(',', '.'))
-  return isNaN(n) ? null : n
+  s = String(s).trim()
+  const ld = s.lastIndexOf('.'), lc = s.lastIndexOf(',')
+  let n
+  if (ld > lc) n = s.replace(/,/g, '')
+  else if (lc > ld) n = s.replace(/\./g, '').replace(',', '.')
+  else n = s.replace(/[.,]/g, '')
+  const r = parseFloat(n)
+  return isNaN(r) ? null : r
 }
 
 function parseFechaES(s) {
@@ -84,13 +107,18 @@ export async function parseFacturas(files) {
         continue
       }
 
-      const cls = classifyTipo(text)
       const numero = (text.match(/\b([A-Z]{2,5}\d{4,})\b/) || [])[1] || null
+      const cls = classify(numero, text)
 
+      // Valor Total: cabecera con dos puntos (CO) — fallback a "VALOR TOTAL" resumen (OSE/SAP).
       const valMatches = [...text.matchAll(/Valor Total:\s*([\d.,]+)/g)]
-      const valorTotal = valMatches.length ? parseCO(valMatches[0][1]) : null
+      let valorTotal = valMatches.length ? parseAmount(valMatches[0][1]) : null
       if (valMatches.length > 1) warnings.push('multiple_valor')
-      if (!valMatches.length) warnings.push('sin_valor')
+      if (!valMatches.length) {
+        const m = text.match(/VALOR TOTAL\s+([\d.,]+)/)
+        if (m) valorTotal = parseAmount(m[1])
+        else warnings.push('sin_valor')
+      }
 
       let vStr = vencimientoDesdeItems(items)
       if (!vStr) {
