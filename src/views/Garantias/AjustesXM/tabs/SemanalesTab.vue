@@ -91,24 +91,31 @@
           <BloqueCodigo titulo="UNGG" :rows="resultado.ungg" :total="resultado.totalUNGG" />
         </div>
 
-        <!-- Panel custodia -->
-        <div v-if="resultado.custodia" class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+        <!-- Panel custodia (desglose auditable) -->
+        <div v-if="resultado.custodia" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mt-4">
           <div class="bg-white rounded-xl p-4 shadow-sm text-center" style="border:1px solid #e8e0f0">
-            <p class="text-xs font-semibold uppercase tracking-wide mb-1" style="color:#6b5a8a">Disponible</p>
-            <p class="text-lg font-bold" :style="(effectiveDisponible ?? 0) < 0 ? 'color:#D64455' : 'color:#10B981'">{{ fmtCOP(effectiveDisponible) }}</p>
-            <p v-if="facturas?.documentos?.length" class="text-[10px] mt-0.5" style="color:#9ca3af">orig: {{ fmtCOP(resultado.custodia.disponible) }}</p>
+            <p class="text-xs font-semibold uppercase tracking-wide mb-1" style="color:#6b5a8a">Disponible (crudo)</p>
+            <p class="text-base font-bold" style="color:#2C2039">{{ fmtCOP(disponibleCrudo) }}</p>
           </div>
           <div class="bg-white rounded-xl p-4 shadow-sm text-center" style="border:1px solid #e8e0f0">
-            <p class="text-xs font-semibold uppercase tracking-wide mb-1" style="color:#6b5a8a">Disponible (Aplic. garantía)</p>
-            <p class="text-lg font-bold" style="color:#10B981">{{ fmtCOP(disponibleAplicacion) }}</p>
+            <p class="text-xs font-semibold uppercase tracking-wide mb-1" style="color:#6b5a8a">(−) Facturas descontadas</p>
+            <p class="text-base font-bold" style="color:#D64455">{{ fmtCOP(facturasDescontadas) }}</p>
+          </div>
+          <div class="bg-white rounded-xl p-4 shadow-sm text-center" style="border:1px solid #e8e0f0">
+            <p class="text-xs font-semibold uppercase tracking-wide mb-1" style="color:#6b5a8a">Disponible neto</p>
+            <p class="text-base font-bold" :style="(disponibleNeto ?? 0) < 0 ? 'color:#D64455' : 'color:#10B981'">{{ fmtCOP(disponibleNeto) }}</p>
+          </div>
+          <div class="rounded-xl p-4 shadow-sm text-center" style="border:1px solid #a7e8c4; background:#ECFDF3">
+            <p class="text-xs font-semibold uppercase tracking-wide mb-1" style="color:#047857">Disponible (Aplic. garantía)</p>
+            <p class="text-base font-bold" style="color:#047857">{{ fmtCOP(disponibleAplicacion) }}</p>
           </div>
           <div class="bg-white rounded-xl p-4 shadow-sm text-center" style="border:1px solid #e8e0f0">
             <p class="text-xs font-semibold uppercase tracking-wide mb-1" style="color:#6b5a8a">Congelado</p>
-            <p class="text-lg font-bold" style="color:#2C2039">{{ fmtCOP(resultado.custodia.congelado) }}</p>
+            <p class="text-base font-bold" style="color:#2C2039">{{ fmtCOP(resultado.custodia.congelado) }}</p>
           </div>
           <div class="bg-white rounded-xl p-4 shadow-sm text-center" style="border:1px solid #e8e0f0">
             <p class="text-xs font-semibold uppercase tracking-wide mb-1" style="color:#6b5a8a">Saldo</p>
-            <p class="text-lg font-bold" style="color:#915BD8">{{ fmtCOP(resultado.custodia.saldo) }}</p>
+            <p class="text-base font-bold" style="color:#915BD8">{{ fmtCOP(resultado.custodia.saldo) }}</p>
           </div>
         </div>
 
@@ -121,7 +128,6 @@
             :documentos="facturas.documentos"
             :disponible="resultado.custodia?.disponible ?? 0"
             :fechaObjetivo="fechaObjetivo"
-            v-model:disponibleAjustado="disponibleAjustado"
             v-model:totalDescontado="totalDescontado"
           />
         </div>
@@ -222,7 +228,6 @@ const resultado = ref(null)
 
 const facturas = ref(null)
 const fechaObjetivo = ref(fmtISODate(viernesDeEstaSemana()))
-const disponibleAjustado = ref(null)
 const totalDescontado = ref(0)
 
 const files = ref({ garantia: null, saldo: null, web: null, pdfs: [] })
@@ -231,18 +236,24 @@ const allFilesLoaded = computed(
   () => files.value.garantia && files.value.saldo && files.value.web,
 )
 
-const effectiveDisponible = computed(() => {
-  const orig = resultado.value?.custodia?.disponible
-  if (facturas.value?.documentos?.length && disponibleAjustado.value != null) return disponibleAjustado.value
-  return orig ?? null
-})
+// Disponible (cuenta custodia, col 9 del Saldo) sin descuento.
+const disponibleCrudo = computed(() => resultado.value?.custodia?.disponible ?? null)
+
+// Suma neta de las facturas marcadas para descontar (0 si no hay facturas).
+const facturasDescontadas = computed(() =>
+  facturas.value?.documentos?.length ? (Number(totalDescontado.value) || 0) : 0,
+)
+
+// Disponible neto = crudo − facturas descontadas.
+const disponibleNeto = computed(() =>
+  disponibleCrudo.value == null ? null : disponibleCrudo.value - facturasDescontadas.value,
+)
 
 const disponibleAplicacion = computed(() => {
-  const base = effectiveDisponible.value
-  if (base == null) return 0
-  // F10 − C24: Disponible menos el TOTAL A PAGAR (UNGG+UNGC). Ese total suele ser
-  // negativo, por lo que restarlo aumenta el disponible.
-  return base - ((resultado.value?.totalUNGG ?? 0) + (resultado.value?.totalUNGC ?? 0))
+  if (disponibleNeto.value == null) return 0
+  // Disponible neto − TOTAL A PAGAR (UNGG+UNGC). Ese total suele ser negativo,
+  // por lo que restarlo aumenta el disponible.
+  return disponibleNeto.value - ((resultado.value?.totalUNGG ?? 0) + (resultado.value?.totalUNGC ?? 0))
 })
 
 const montoEditable = ref(0)
@@ -320,7 +331,7 @@ UNGC: ${fmtCOP(resultado.value.totalUNGC)}
 UNGG: ${fmtCOP(resultado.value.totalUNGG)}
 Total a consignar: ${fmtCOP(montoEditable.value)}
 
-Disponible custodia: ${fmtCOP(effectiveDisponible.value)}${totalDescontado.value > 0 ? `\nDescontado facturas: ${fmtCOP(totalDescontado.value)}` : ''}
+Disponible custodia (neto): ${fmtCOP(disponibleNeto.value)}${facturasDescontadas.value ? `\n  (crudo ${fmtCOP(disponibleCrudo.value)} − facturas ${fmtCOP(facturasDescontadas.value)})` : ''}
 Congelado: ${fmtCOP(resultado.value.custodia?.congelado)}
 Saldo custodia: ${fmtCOP(resultado.value.custodia?.saldo)}${p ? `
 
@@ -343,6 +354,9 @@ function exportar() {
     ungg: resultado.value.ungg,
     totalConsignar: resultado.value.totalConsignar,
     custodia: resultado.value.custodia,
+    disponibleCrudo: disponibleCrudo.value,
+    facturasDescontadas: facturasDescontadas.value,
+    disponibleNeto: disponibleNeto.value,
     disponibleAplicacion: disponibleAplicacion.value,
   }, `garantias_semanal_${resultado.value.fechaNombre || 'resultado'}.xlsx`)
 }

@@ -24,7 +24,12 @@ export function exportHojaMadreExcel(data, filename = 'garantias_hoja_madre.xlsx
     totalConsignar = 0,
     custodia = null,
     disponibleAplicacion = 0,
+    disponibleCrudo = null,
+    facturasDescontadas = 0,
+    disponibleNeto = null,
   } = data || {}
+  const crudo = disponibleCrudo ?? custodia?.disponible ?? 0
+  const neto = disponibleNeto ?? (crudo - (facturasDescontadas || 0))
 
   const aoa = []
   const merges = []
@@ -58,14 +63,17 @@ export function exportHojaMadreExcel(data, filename = 'garantias_hoja_madre.xlsx
   const combinedRow = r
   r++
 
-  // Panel lateral (columnas E-F)
+  // Panel lateral (columnas E-F) — desglose auditable
   const panelStart = 1
   const panel = [
-    ['Disponible (3050200006371)', custodia?.disponible ?? 0],
+    ['Disponible (crudo)', crudo],
+    ['(−) Facturas descontadas', facturasDescontadas || 0],
+    ['Disponible (3050200006371)', neto],
     ['Disponible (Aplicación de garantía)', disponibleAplicacion ?? 0],
     ['Congelado', custodia?.congelado ?? 0],
     ['Saldo', custodia?.saldo ?? 0],
   ]
+  const aplIdx = 3 // índice (0-based) de la fila "Aplicación de garantía" dentro del panel
   panel.forEach(([lbl, val], i) => { set(panelStart + i, 4, lbl); set(panelStart + i, 5, val) })
   const panelEnd = panelStart + panel.length - 1
 
@@ -106,7 +114,7 @@ export function exportHojaMadreExcel(data, filename = 'garantias_hoja_madre.xlsx
     money(rr, 5)
   }
   for (const cc of [4, 5]) {
-    const c = cellAt(panelStart + 1, cc)
+    const c = cellAt(panelStart + aplIdx, cc)
     c.s.fill = { patternType: 'solid', fgColor: { rgb: GREEN } }
   }
 
