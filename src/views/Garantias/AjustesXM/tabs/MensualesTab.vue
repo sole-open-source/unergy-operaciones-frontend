@@ -103,7 +103,7 @@ import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
 import Textarea from 'primevue/textarea'
 import { useToast } from 'primevue/usetoast'
-import { parseTxr } from '../composables/useGarantiasParser.js'
+import { parseMensual } from '../composables/useGarantiasParser.js'
 import { useGarantiasHistorial } from '../composables/useGarantiasHistorial.js'
 import { fmtCOP, fmtISODate } from '../utils/formatters.js'
 import { exportTablaExcel } from '../utils/excelExport.js'
@@ -130,7 +130,11 @@ const contexto = ref('')
 const mensajeEditable = ref('')
 
 const fechaVencimiento = computed(() => {
-  const d = addBusinessDays(new Date(), 2)
+  if (resultado.value?.fechaVencimiento) return resultado.value.fechaVencimiento
+  // Respaldo: próximo jueves (día 4)
+  const d = new Date()
+  const diff = (4 - d.getDay() + 7) % 7 || 7
+  d.setDate(d.getDate() + diff)
   return fmtISODate(d)
 })
 
@@ -149,11 +153,11 @@ async function procesar() {
   loading.value = true
   errors.value = []
   try {
-    const res = await parseTxr(pendingFile.value)
+    const res = await parseMensual(pendingFile.value)
     if (res.errors.length) errors.value = res.errors
     if (res.rows.length || !res.errors.length) {
       resultado.value = res
-      montoEditable.value = res.totalAjuste
+      montoEditable.value = res.monto
       generarMensaje()
     }
   } catch (e) {
@@ -170,7 +174,14 @@ function reset() {
 }
 
 function generarMensaje() {
-  mensajeEditable.value = `Ajuste Mensual: el monto a consignar es de ${fmtCOP(montoEditable.value)}.${contexto.value ? '\n\n' + contexto.value : ''}`
+  const r = resultado.value
+  const mes = r?.mesReporte ? ` ${r.mesReporte}` : ''
+  const extra = contexto.value ? '\n\n' + contexto.value : ''
+  if (r?.noConsigna) {
+    mensajeEditable.value = `Garantías mensuales${mes}: la exposición es negativa; no se requiere consignación de garantía mensual.${extra}`
+    return
+  }
+  mensajeEditable.value = `Garantías mensuales${mes} — vencimiento ${fechaVencimiento.value}: el monto a consignar es de ${fmtCOP(montoEditable.value)}.${extra}`
 }
 
 async function copiar() {

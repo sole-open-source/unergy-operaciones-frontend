@@ -274,3 +274,116 @@ export async function parseTxr(file) {
 
   return { rows: dataRows, headers: rawHeaders.filter(Boolean), totalAjuste, fechaVencimiento: findVencimiento(wb), errors }
 }
+
+// ---------- Mensual (distinto al TXR) ----------
+
+const empiezaGarantia = (s) => /^garant[ií]a/i.test(txt(s))
+
+// Hoja de detalle: CÓDIGO en col 0 + columna que empiece con GARANTIA. Entre varias
+// candidatas (hay una hoja resumen con solo CÓDIGO+GARANTIA), usar la de más columnas.
+function findMensualSheet(wb) {
+  const candidates = []
+  for (const name of wb.SheetNames) {
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, defval: null })
+    for (let i = 0; i < Math.min(rows.length, 40); i++) {
+      const row = rows[i]
+      if (!row) continue
+      if (normSheet(row[0]) !== 'CODIGO') continue
+      if (row.some((c) => empiezaGarantia(c))) {
+        candidates.push({ name, headerRowIdx: i, rows, ncols: row.filter((c) => txt(c)).length })
+        break
+      }
+    }
+  }
+  if (!candidates.length) return null
+  candidates.sort((a, b) => b.ncols - a.ncols)
+  return candidates[0]
+}
+
+// "Fecha límite de presentación: DD DE MM DE YYYY" (mes numérico). Respaldo: FECHA DE VENCIMIENTO (texto).
+function findFechaLimite(wb) {
+  const re = /Fecha l[ií]mite de presentaci[oó]n:\s*(\d{1,2})\s+DE\s+(\d{1,2})\s+DE\s+(\d{4})/i
+  for (const name of wb.SheetNames) {
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, defval: null })
+    for (const row of rows) {
+      if (!row) continue
+      for (const cell of row) {
+        const m = String(cell ?? '').match(re)
+        if (!m) continue
+        const z = (n) => String(n).padStart(2, '0')
+        return `${m[3]}-${z(parseInt(m[2], 10))}-${z(parseInt(m[1], 10))}`
+      }
+    }
+  }
+  return findVencimiento(wb)
+}
+
+// Mes del reporte desde el título "Garantías mensuales YYYY-MM".
+function findMesReporte(wb) {
+  const re = /Garant[ií]as mensuales\s+(\d{4})-(\d{1,2})/i
+  for (const name of wb.SheetNames) {
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, defval: null })
+    for (const row of rows) {
+      if (!row) continue
+      for (const cell of row) {
+        const m = String(cell ?? '').match(re)
+        if (m) return `${m[1]}-${String(m[2]).padStart(2, '0')}`
+      }
+    }
+  }
+  return null
+}
+
+export async function parseMensual(file) {
+  const errors = []
+  let wb
+  try {
+    wb = await readWorkbook(file)
+  } catch (e) {
+    errors.push(`Error leyendo archivo Mensual: ${e.message}`)
+    return { rows: [], headers: [], monto: 0, garantiaUNGC: 0, garantiaUNGG: 0, noConsigna: false, fechaVencimiento: null, mesReporte: null, errors }
+  }
+
+  const found = findMensualSheet(wb)
+  if (!found) {
+    errors.push(`No se encontró una hoja con encabezados esperados (CÓDIGO + columna GARANTIA). Hojas en el archivo: ${wb.SheetNames.join(', ')}`)
+    return { rows: [], headers: [], monto: 0, garantiaUNGC: 0, garantiaUNGG: 0, noConsigna: false, fechaVencimiento: findFechaLimite(wb), mesReporte: findMesReporte(wb), errors }
+  }
+
+  const { rows, headerRowIdx } = found
+  const rawHeaders = (rows[headerRowIdx] || []).map((h) => txt(h))
+  const codigoIdx = rawHeaders.findIndex((h) => normSheet(h) === 'CODIGO')
+  const garantiaHeader = rawHeaders.find((h) => empiezaGarantia(h))
+
+  const dataRows = []
+  for (let i = headerRowIdx + 1; i < rows.length; i++) {
+    const row = rows[i]
+    if (!row) continue
+    const cod = normSheet(row[codigoIdx])
+    if (cod === 'UNGC' || cod === 'UNGG') {
+      const obj = {}
+      rawHeaders.forEach((h, idx) => { if (h) obj[h] = row[idx] ?? null })
+      dataRows.push(obj)
+    }
+  }
+  if (!dataRows.length) errors.push('No se encontraron filas con código UNGC o UNGG')
+
+  const codHeader = rawHeaders[codigoIdx]
+  const valGarantia = (cod) => {
+    const r = dataRows.find((x) => normSheet(x[codHeader]) === cod)
+    return r && garantiaHeader ? (num(r[garantiaHeader]) ?? 0) : 0
+  }
+  const garantiaUNGG = valGarantia('UNGG')
+  const garantiaUNGC = valGarantia('UNGC')
+  const monto = garantiaUNGG || garantiaUNGC
+  const noConsigna = garantiaUNGG === 0 && garantiaUNGC === 0
+
+  return {
+    rows: dataRows,
+    headers: rawHeaders.filter(Boolean),
+    monto, garantiaUNGC, garantiaUNGG, noConsigna,
+    fechaVencimiento: findFechaLimite(wb),
+    mesReporte: findMesReporte(wb),
+    errors,
+  }
+}
