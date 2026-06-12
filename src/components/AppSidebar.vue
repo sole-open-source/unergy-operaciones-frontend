@@ -301,6 +301,7 @@ const ALL_GROUPS = [
       },
       { to: '/liquidaciones/inversionista', label: 'Por Inversionista', icon: 'pi pi-users', roles: ['admin', 'liquidaciones'] },
       { to: '/liquidaciones/cargar-excel', label: 'Cargar Excel', icon: 'pi pi-upload', roles: ['admin', 'liquidaciones'] },
+      { to: '/panel-contable', label: 'Panel Contable', icon: 'pi pi-calculator', roles: ['admin', 'liquidaciones'] },
       { to: '/finanzas/costos', label: 'Costos', icon: 'pi pi-credit-card', roles: ['admin', 'liquidaciones'] },
     ],
   },
