@@ -49,8 +49,18 @@ function findSheetByPattern(wb, pattern) {
   return wb.Sheets[name] || wb.Sheets[wb.SheetNames[0]]
 }
 
+// Normaliza acentos (compuestos o descompuestos) y mayúsculas para comparar nombres de hoja.
+function normSheet(s) {
+  return String(s).normalize('NFC').toUpperCase()
+    .replace(/[ÁÀÂÄ]/g, 'A').replace(/[ÉÈÊË]/g, 'E').replace(/[ÍÌÎÏ]/g, 'I')
+    .replace(/[ÓÒÔÖ]/g, 'O').replace(/[ÚÙÛÜ]/g, 'U').trim()
+}
+
 function findSheetByName(wb, target) {
-  const found = wb.SheetNames.find((n) => n.trim().toUpperCase() === target.toUpperCase())
+  const t = normSheet(target)
+  const found =
+    wb.SheetNames.find((n) => normSheet(n) === t) ||
+    wb.SheetNames.find((n) => normSheet(n).includes(t))
   return found ? wb.Sheets[found] : null
 }
 

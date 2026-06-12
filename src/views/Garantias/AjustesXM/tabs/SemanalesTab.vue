@@ -240,7 +240,9 @@ const effectiveDisponible = computed(() => {
 const disponibleAplicacion = computed(() => {
   const base = effectiveDisponible.value
   if (base == null) return 0
-  return base + (resultado.value?.totalUNGG ?? 0) + (resultado.value?.totalUNGC ?? 0)
+  // F10 − C24: Disponible menos el TOTAL A PAGAR (UNGG+UNGC). Ese total suele ser
+  // negativo, por lo que restarlo aumenta el disponible.
+  return base - ((resultado.value?.totalUNGG ?? 0) + (resultado.value?.totalUNGC ?? 0))
 })
 
 const montoEditable = ref(0)
