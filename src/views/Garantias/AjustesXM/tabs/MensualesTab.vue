@@ -34,12 +34,12 @@
         <Button label="Nuevo archivo" icon="pi pi-refresh" text severity="secondary" size="small" @click="reset" />
       </div>
 
-      <!-- Tabla scrollable -->
+      <!-- Tabla scrollable (columnas dinámicas según el archivo) -->
       <div class="overflow-x-auto rounded-xl shadow-sm" style="border:1px solid #e8e0f0">
         <table class="text-xs whitespace-nowrap">
           <thead>
             <tr class="bg-gray-50 border-b">
-              <th v-for="col in COLUMNS" :key="col"
+              <th v-for="col in resultado.headers" :key="col"
                 class="px-3 py-2 text-left font-semibold sticky top-0 bg-gray-50"
                 style="color:#6b5a8a">
                 {{ col }}
@@ -49,16 +49,13 @@
           <tbody>
             <tr v-for="(row, idx) in resultado.rows" :key="idx"
               class="border-b last:border-b-0 hover:bg-gray-50/50"
-              :style="row['CÓDIGO'] === 'UNGC' ? 'background:#faf8fd' : 'background:white'">
-              <td v-for="col in COLUMNS" :key="col" class="px-3 py-1.5 tabular-nums">
-                <span v-if="col === 'CÓDIGO'" class="px-2 py-0.5 rounded-full text-[10px] font-bold"
-                  :style="row[col] === 'UNGC' ? 'background:#f3f0f7;color:#915BD8' : 'background:#dbeafe;color:#1d4ed8'">
+              :style="esUNGC(row) ? 'background:#faf8fd' : 'background:white'">
+              <td v-for="col in resultado.headers" :key="col" class="px-3 py-1.5 tabular-nums">
+                <span v-if="esCodigo(col)" class="px-2 py-0.5 rounded-full text-[10px] font-bold"
+                  :style="esUNGC(row) ? 'background:#f3f0f7;color:#915BD8' : 'background:#dbeafe;color:#1d4ed8'">
                   {{ row[col] }}
                 </span>
-                <span v-else-if="isMoneyCol(col)" style="color:#2C2039">
-                  {{ row[col] != null ? fmtCOP(row[col]) : '—' }}
-                </span>
-                <span v-else style="color:#6b5a8a">{{ row[col] ?? '—' }}</span>
+                <span v-else style="color:#2C2039">{{ fmtCell(row[col]) }}</span>
               </td>
             </tr>
           </tbody>
@@ -108,31 +105,18 @@ import Textarea from 'primevue/textarea'
 import { useToast } from 'primevue/usetoast'
 import { parseTxr } from '../composables/useGarantiasParser.js'
 import { useGarantiasHistorial } from '../composables/useGarantiasHistorial.js'
-import { fmtCOP, addBusinessDays, fmtISODate } from '../utils/formatters.js'
+import { fmtCOP, fmtISODate } from '../utils/formatters.js'
 import { exportTablaExcel } from '../utils/excelExport.js'
 
 const toast = useToast()
 const store = useGarantiasHistorial()
 
-const COLUMNS = [
-  'CÓDIGO', 'Exposición Energía en Bolsa ($)', 'Restricciones ($)', 'Desviación ($)',
-  'Responsabilidad Comercial del AGC ($)', 'Regulación Primaria de Frecuencia ($)',
-  'Servicios AGC ($)', 'Compras Reconciliación ($)', 'Ventas Reconciliación ($)',
-  'Cargo por Confiabilidad ($)', 'VMOEFV', 'VDOEF', 'CDOEF', 'Ajustes SIC',
-  'Servicios CND-SIC-FAZNI', 'Ajustes Servicios CND-SIC-FAZNI', 'Cargos Uso STN ($)',
-  'Servicios LAC($)', 'LC', 'Ajustes LAC', 'FCDC', 'Valor Garantía',
-  'Garantías TIES', 'Valor Garantía Final', 'Estimado', 'Total Ajuste',
-]
-
-const MONEY_COLS = new Set([
-  'Exposición Energía en Bolsa ($)', 'Restricciones ($)', 'Desviación ($)',
-  'Responsabilidad Comercial del AGC ($)', 'Regulación Primaria de Frecuencia ($)',
-  'Servicios AGC ($)', 'Compras Reconciliación ($)', 'Ventas Reconciliación ($)',
-  'Cargo por Confiabilidad ($)', 'Cargos Uso STN ($)', 'Servicios LAC($)',
-  'Valor Garantía', 'Garantías TIES', 'Valor Garantía Final', 'Estimado', 'Total Ajuste',
-])
-
-const isMoneyCol = (col) => MONEY_COLS.has(col)
+const esCodigo = (col) => /^c[oó]digo$/i.test(col)
+const esUNGC = (row) => {
+  const k = Object.keys(row).find((h) => /^c[oó]digo$/i.test(h))
+  return k && String(row[k]).trim().toUpperCase() === 'UNGC'
+}
+const fmtCell = (v) => (v == null || v === '' ? '—' : (typeof v === 'number' ? fmtCOP(v) : v))
 
 const fileInput = ref(null)
 const pendingFile = ref(null)

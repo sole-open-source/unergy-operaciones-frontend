@@ -192,59 +192,85 @@ export async function parseSemanales(garantiaFile, saldoFile, webFile) {
   }
 }
 
+const MESES_TXR = { ene: 0, feb: 1, mar: 2, abr: 3, may: 4, jun: 5, jul: 6, ago: 7, sep: 8, sept: 8, oct: 9, nov: 10, dic: 11 }
+const txt = (s) => String(s ?? '').normalize('NFC').trim()
+const isTotalAjuste = (s) => /^total\s*ajuste$/i.test(txt(s))
+
+// Detecta la hoja de datos por contenido: la fila cuyo primer encabezado es CÓDIGO
+// y que contiene una columna "Total Ajuste". Devuelve { name, headerRowIdx, rows }.
+function findTxrSheet(wb) {
+  for (const name of wb.SheetNames) {
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, defval: null })
+    for (let i = 0; i < Math.min(rows.length, 40); i++) {
+      const row = rows[i]
+      if (!row) continue
+      if (normSheet(row[0]) !== 'CODIGO') continue
+      if (row.some((c) => isTotalAjuste(c))) return { name, headerRowIdx: i, rows }
+    }
+  }
+  return null
+}
+
+// Busca "FECHA DE VENCIMIENTO: DD DE MMM DE YYYY" en cualquier celda del libro → ISO.
+function findVencimiento(wb) {
+  const re = /FECHA DE VENCIMIENTO:\s*(\d{1,2})\s+DE\s+([A-Za-zÁÉÍÓÚáéíóú]+)\s+DE\s+(\d{4})/i
+  for (const name of wb.SheetNames) {
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, defval: null })
+    for (const row of rows) {
+      if (!row) continue
+      for (const cell of row) {
+        const m = String(cell ?? '').match(re)
+        if (!m) continue
+        const mes = MESES_TXR[m[2].toLowerCase().slice(0, 3)]
+        if (mes == null) continue
+        const z = (n) => String(n).padStart(2, '0')
+        return `${m[3]}-${z(mes + 1)}-${z(parseInt(m[1], 10))}`
+      }
+    }
+  }
+  return null
+}
+
 export async function parseTxr(file) {
   const errors = []
-  let rows
+  let wb
   try {
-    const wb = await readWorkbook(file)
-    rows = sheetToRows(wb, 'Ajuste')
+    wb = await readWorkbook(file)
   } catch (e) {
     errors.push(`Error leyendo archivo TXR/Mensual: ${e.message}`)
-    return { rows: [], totalAjuste: 0, errors }
+    return { rows: [], headers: [], totalAjuste: 0, fechaVencimiento: null, errors }
   }
 
-  if (!rows.length) {
-    errors.push('La hoja "Ajuste" está vacía')
-    return { rows: [], totalAjuste: 0, errors }
+  const found = findTxrSheet(wb)
+  if (!found) {
+    errors.push(`No se encontró una hoja con encabezados esperados (CÓDIGO + "Total Ajuste"). Hojas en el archivo: ${wb.SheetNames.join(', ')}`)
+    return { rows: [], headers: [], totalAjuste: 0, fechaVencimiento: findVencimiento(wb), errors }
   }
 
-  // First row = headers
-  const headers = (rows[0] || []).map((h) => String(h ?? '').trim())
-  const codigoIdx = headers.indexOf('CÓDIGO')
-  const ajusteIdx = headers.indexOf('Total Ajuste')
+  const { rows, headerRowIdx } = found
+  const rawHeaders = (rows[headerRowIdx] || []).map((h) => txt(h))
+  const codigoIdx = rawHeaders.findIndex((h) => normSheet(h) === 'CODIGO')
+  const ajusteHeader = rawHeaders.find((h) => isTotalAjuste(h))
 
-  if (codigoIdx === -1) {
-    errors.push('Columna "CÓDIGO" no encontrada en hoja Ajuste')
-    return { rows: [], totalAjuste: 0, errors }
-  }
-
-  if (ajusteIdx === -1) {
-    errors.push('Columna "Total Ajuste" no encontrada en hoja Ajuste')
-  }
-
-  // Filter rows where CÓDIGO === UNGC or UNGG
+  // Filas UNGC / UNGG por columna CÓDIGO; mapear todas las columnas por nombre.
   const dataRows = []
-  for (let i = 1; i < rows.length; i++) {
+  for (let i = headerRowIdx + 1; i < rows.length; i++) {
     const row = rows[i]
     if (!row) continue
-    const cod = String(row[codigoIdx] ?? '').trim()
+    const cod = normSheet(row[codigoIdx])
     if (cod === 'UNGC' || cod === 'UNGG') {
       const obj = {}
-      headers.forEach((h, idx) => {
-        obj[h] = row[idx] ?? null
-      })
+      rawHeaders.forEach((h, idx) => { if (h) obj[h] = row[idx] ?? null })
       dataRows.push(obj)
     }
   }
 
-  if (!dataRows.length) {
-    errors.push('No se encontraron filas con código UNGC o UNGG en hoja Ajuste')
-  }
+  if (!dataRows.length) errors.push('No se encontraron filas con código UNGC o UNGG')
 
-  const totalAjuste = dataRows.reduce((s, r) => {
-    const v = r['Total Ajuste']
-    return s + (v != null && !isNaN(parseFloat(v)) ? parseFloat(v) : 0)
-  }, 0)
+  // Monto a consignar = Total Ajuste de UNGG.
+  const ungg = dataRows.find((r) => normSheet(r[rawHeaders[codigoIdx]]) === 'UNGG')
+  const totalRaw = ungg && ajusteHeader ? ungg[ajusteHeader] : null
+  const totalAjuste = totalRaw != null && !isNaN(parseFloat(totalRaw)) ? parseFloat(totalRaw) : 0
 
-  return { rows: dataRows, totalAjuste, errors }
+  return { rows: dataRows, headers: rawHeaders.filter(Boolean), totalAjuste, fechaVencimiento: findVencimiento(wb), errors }
 }
