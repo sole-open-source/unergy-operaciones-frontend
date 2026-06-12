@@ -45,6 +45,17 @@
         </div>
       </div>
 
+      <div class="space-y-1">
+        <p class="text-xs font-semibold" style="color:#6b5a8a">Facturas XM (PDF) — opcional</p>
+        <label class="border-2 border-dashed rounded-xl p-4 flex items-center justify-center gap-2 cursor-pointer text-xs"
+          style="border-color:#c4b8d4;background:#fafafa;color:#6b5a8a">
+          <i class="pi pi-file-pdf" style="color:#D64455" />
+          <span v-if="!files.pdfs.length">Arrastra o haz clic para subir uno o varios PDF</span>
+          <span v-else>{{ files.pdfs.length }} PDF(s) seleccionado(s)</span>
+          <input type="file" accept=".pdf" multiple class="hidden" @change="onPdfsSelect" />
+        </label>
+      </div>
+
       <div v-if="parseErrors.length" class="rounded-lg p-3 space-y-1" style="background:#FEF2F2; border:1px solid rgba(214,68,85,0.2)">
         <p v-for="e in parseErrors" :key="e" class="text-xs" style="color:#D64455">{{ e }}</p>
       </div>
@@ -84,7 +95,8 @@
         <div v-if="resultado.custodia" class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
           <div class="bg-white rounded-xl p-4 shadow-sm text-center" style="border:1px solid #e8e0f0">
             <p class="text-xs font-semibold uppercase tracking-wide mb-1" style="color:#6b5a8a">Disponible</p>
-            <p class="text-lg font-bold" :style="resultado.custodia.disponible < 0 ? 'color:#D64455' : 'color:#10B981'">{{ fmtCOP(resultado.custodia.disponible) }}</p>
+            <p class="text-lg font-bold" :style="(effectiveDisponible ?? 0) < 0 ? 'color:#D64455' : 'color:#10B981'">{{ fmtCOP(effectiveDisponible) }}</p>
+            <p v-if="facturas?.documentos?.length" class="text-[10px] mt-0.5" style="color:#9ca3af">orig: {{ fmtCOP(resultado.custodia.disponible) }}</p>
           </div>
           <div class="bg-white rounded-xl p-4 shadow-sm text-center" style="border:1px solid #e8e0f0">
             <p class="text-xs font-semibold uppercase tracking-wide mb-1" style="color:#6b5a8a">Disponible (Aplic. garantía)</p>
@@ -98,6 +110,20 @@
             <p class="text-xs font-semibold uppercase tracking-wide mb-1" style="color:#6b5a8a">Saldo</p>
             <p class="text-lg font-bold" style="color:#915BD8">{{ fmtCOP(resultado.custodia.saldo) }}</p>
           </div>
+        </div>
+
+        <div v-if="facturas?.documentos?.length" class="mt-2">
+          <div class="flex items-center gap-2 justify-end mb-1">
+            <label class="text-xs font-semibold" style="color:#6b5a8a">Fecha objetivo (viernes):</label>
+            <input type="date" v-model="fechaObjetivo" class="rounded px-2 py-1 text-xs" style="border:1px solid #e8e0f0" />
+          </div>
+          <FacturasDescuento
+            :documentos="facturas.documentos"
+            :disponible="resultado.custodia?.disponible ?? 0"
+            :fechaObjetivo="fechaObjetivo"
+            v-model:disponibleAjustado="disponibleAjustado"
+            v-model:totalDescontado="totalDescontado"
+          />
         </div>
 
         <div class="flex justify-between mt-4">
@@ -167,6 +193,8 @@ import Textarea from 'primevue/textarea'
 import { useToast } from 'primevue/usetoast'
 import DropZone from '../DropZone.vue'
 import BloqueCodigo from '../BloqueCodigo.vue'
+import FacturasDescuento from '../FacturasDescuento.vue'
+import { parseFacturas, viernesDeEstaSemana } from '../composables/useFacturasPDF.js'
 import { parseSemanales } from '../composables/useGarantiasParser.js'
 import { useGarantiasHistorial } from '../composables/useGarantiasHistorial.js'
 import { fmtCOP, fmtISODate } from '../utils/formatters.js'
@@ -192,16 +220,27 @@ const loading = ref(false)
 const parseErrors = ref([])
 const resultado = ref(null)
 
-const files = ref({ garantia: null, saldo: null, web: null })
+const facturas = ref(null)
+const fechaObjetivo = ref(fmtISODate(viernesDeEstaSemana()))
+const disponibleAjustado = ref(null)
+const totalDescontado = ref(0)
+
+const files = ref({ garantia: null, saldo: null, web: null, pdfs: [] })
 
 const allFilesLoaded = computed(
   () => files.value.garantia && files.value.saldo && files.value.web,
 )
 
+const effectiveDisponible = computed(() => {
+  const orig = resultado.value?.custodia?.disponible
+  if (facturas.value?.documentos?.length && disponibleAjustado.value != null) return disponibleAjustado.value
+  return orig ?? null
+})
+
 const disponibleAplicacion = computed(() => {
-  const c = resultado.value?.custodia
-  if (!c) return 0
-  return (c.disponible ?? 0) + (resultado.value.totalUNGG ?? 0) + (resultado.value.totalUNGC ?? 0)
+  const base = effectiveDisponible.value
+  if (base == null) return 0
+  return base + (resultado.value?.totalUNGG ?? 0) + (resultado.value?.totalUNGC ?? 0)
 })
 
 const montoEditable = ref(0)
@@ -218,6 +257,11 @@ function stepCircleStyle(idx) {
   return 'background:#e8e0f0; color:#9ca3af'
 }
 
+function onPdfsSelect(e) {
+  files.value.pdfs = Array.from(e.target.files || [])
+  e.target.value = ''
+}
+
 async function procesar() {
   loading.value = true
   parseErrors.value = []
@@ -227,6 +271,17 @@ async function procesar() {
       parseErrors.value = res.errors
     }
     resultado.value = res
+    if (files.value.pdfs.length) {
+      try {
+        const f = await parseFacturas(files.value.pdfs)
+        facturas.value = f
+        if (f.errors.length) parseErrors.value = [...parseErrors.value, ...f.errors]
+      } catch (e) {
+        parseErrors.value = [...parseErrors.value, `Error leyendo PDFs: ${e.message}`]
+      }
+    } else {
+      facturas.value = null
+    }
     activeStep.value = 1
   } catch (e) {
     parseErrors.value = [`Error inesperado: ${e.message}`]
@@ -263,7 +318,7 @@ UNGC: ${fmtCOP(resultado.value.totalUNGC)}
 UNGG: ${fmtCOP(resultado.value.totalUNGG)}
 Total a consignar: ${fmtCOP(montoEditable.value)}
 
-Disponible custodia: ${fmtCOP(resultado.value.custodia?.disponible)}
+Disponible custodia: ${fmtCOP(effectiveDisponible.value)}${totalDescontado.value > 0 ? `\nDescontado facturas: ${fmtCOP(totalDescontado.value)}` : ''}
 Congelado: ${fmtCOP(resultado.value.custodia?.congelado)}
 Saldo custodia: ${fmtCOP(resultado.value.custodia?.saldo)}${p ? `
 
