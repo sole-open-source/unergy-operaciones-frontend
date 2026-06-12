@@ -7,23 +7,24 @@ const MESES = { ene:0, feb:1, mar:2, abr:3, may:4, jun:5, jul:6, ago:7, sep:8, s
 const DATE_RE = /(\d{1,2})-([a-zA-Záéíóú]+)\.?-(\d{2,4})/
 
 // Clasificación primaria por prefijo del número de documento (inequívoco).
+// signo: +1 suma al total a descontar (Unergy paga), -1 resta (a favor), 0 informativo.
 const PREFIX_MAP = {
-  ASIC: { tipo: 'DÉBITO',       concepto: 'Factura de venta',  descuenta: true },
-  NDAS: { tipo: 'DÉBITO',       concepto: 'Factura de venta',  descuenta: true },
-  OSE:  { tipo: 'DÉBITO',       concepto: 'Factura de venta',  descuenta: true },
-  ASNC: { tipo: 'CRÉDITO',      concepto: 'Nota crédito',      descuenta: false },
-  ASIV: { tipo: 'INFORME',      concepto: 'Informe de ventas', descuenta: false },
-  AAVC: { tipo: 'AJUSTE CARGO', concepto: 'Ajuste a cargo',    descuenta: false },
-  AAVF: { tipo: 'AJUSTE FAVOR', concepto: 'Ajuste a favor',    descuenta: false },
+  ASIC: { tipo: 'DÉBITO',       concepto: 'Factura de venta',  descuenta: true,  signo: 1 },
+  NDAS: { tipo: 'DÉBITO',       concepto: 'Factura de venta',  descuenta: true,  signo: 1 },
+  OSE:  { tipo: 'DÉBITO',       concepto: 'Factura de venta',  descuenta: true,  signo: 1 },
+  ASNC: { tipo: 'CRÉDITO',      concepto: 'Nota crédito',      descuenta: false, signo: -1 },
+  ASIV: { tipo: 'INFORME',      concepto: 'Informe de ventas', descuenta: false, signo: 0 },
+  AAVC: { tipo: 'AJUSTE CARGO', concepto: 'Ajuste a cargo',    descuenta: false, signo: 1 },
+  AAVF: { tipo: 'AJUSTE FAVOR', concepto: 'Ajuste a favor',    descuenta: false, signo: -1 },
 }
 
 // Fallback por título — más específicos primero (la Nota Crédito contiene "factura electrónica de venta").
 const TIPO_RULES = [
-  { re: /Nota\s*cr[eé]dito/i,               tipo: 'CRÉDITO',      concepto: 'Nota crédito',      descuenta: false },
-  { re: /Informe de Ventas/i,               tipo: 'INFORME',      concepto: 'Informe de ventas', descuenta: false },
-  { re: /Ajuste de Ventas a Cargo/i,        tipo: 'AJUSTE CARGO', concepto: 'Ajuste a cargo',    descuenta: false },
-  { re: /Ajuste de Ventas a Favor/i,        tipo: 'AJUSTE FAVOR', concepto: 'Ajuste a favor',    descuenta: false },
-  { re: /FACTURA ELECTR[OÓ]NICA DE VENTA/i, tipo: 'DÉBITO',       concepto: 'Factura de venta',  descuenta: true },
+  { re: /Nota\s*cr[eé]dito/i,               tipo: 'CRÉDITO',      concepto: 'Nota crédito',      descuenta: false, signo: -1 },
+  { re: /Informe de Ventas/i,               tipo: 'INFORME',      concepto: 'Informe de ventas', descuenta: false, signo: 0 },
+  { re: /Ajuste de Ventas a Cargo/i,        tipo: 'AJUSTE CARGO', concepto: 'Ajuste a cargo',    descuenta: false, signo: 1 },
+  { re: /Ajuste de Ventas a Favor/i,        tipo: 'AJUSTE FAVOR', concepto: 'Ajuste a favor',    descuenta: false, signo: -1 },
+  { re: /FACTURA ELECTR[OÓ]NICA DE VENTA/i, tipo: 'DÉBITO',       concepto: 'Factura de venta',  descuenta: true,  signo: 1 },
 ]
 
 function classify(numero, text) {
@@ -32,7 +33,7 @@ function classify(numero, text) {
     if (pre && PREFIX_MAP[pre]) return PREFIX_MAP[pre]
   }
   for (const r of TIPO_RULES) if (r.re.test(text)) return r
-  return { tipo: 'DESCONOCIDO', concepto: '—', descuenta: false }
+  return { tipo: 'DESCONOCIDO', concepto: '—', descuenta: false, signo: 0 }
 }
 
 // Detecta formato CO (9.755,00) o US/SAP (996,711.40) por el separador decimal más a la derecha.
@@ -102,7 +103,7 @@ export async function parseFacturas(files) {
 
       if (!text.trim()) {
         documentos.push({ archivo: file.name, pagina: p, tipo: 'DESCONOCIDO', concepto: '—',
-          descuenta: false, numero: null, valorTotal: null, vencimiento: null,
+          descuenta: false, signo: 0, numero: null, valorTotal: null, vencimiento: null,
           warnings: ['escaneada'] })
         continue
       }
@@ -130,7 +131,7 @@ export async function parseFacturas(files) {
 
       documentos.push({
         archivo: file.name, pagina: p,
-        tipo: cls.tipo, concepto: cls.concepto, descuenta: cls.descuenta,
+        tipo: cls.tipo, concepto: cls.concepto, descuenta: cls.descuenta, signo: cls.signo ?? 0,
         numero, valorTotal,
         vencimiento: fechaISO(vDate),
         warnings,

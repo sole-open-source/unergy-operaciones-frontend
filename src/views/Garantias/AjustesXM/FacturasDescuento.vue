@@ -33,8 +33,11 @@
             </td>
             <td class="px-3 py-1.5" style="color:#6b5a8a">{{ f.concepto }}</td>
             <td class="px-3 py-1.5 text-right">
-              <InputNumber v-model="f.valorTotal" :max-fraction-digits="2" :min-fraction-digits="0"
-                inputClass="text-right text-xs" style="width:130px" />
+              <div class="flex items-center justify-end gap-1">
+                <span v-if="f.signo !== 0" class="text-xs font-bold" :style="f.signo < 0 ? 'color:#10B981' : 'color:#D64455'">{{ f.signo < 0 ? '−' : '+' }}</span>
+                <InputNumber v-model="f.valorTotal" :max-fraction-digits="2" :min-fraction-digits="0"
+                  inputClass="text-right text-xs" style="width:120px" />
+              </div>
             </td>
             <td class="px-3 py-1.5">
               <input type="date" v-model="f.vencimiento"
@@ -59,8 +62,9 @@
         <p class="text-sm font-bold" style="color:#2C2039">{{ fmtCOP(disponible) }}</p>
       </div>
       <div class="text-center">
-        <p class="text-[10px] font-semibold uppercase tracking-wide" style="color:#6b5a8a">Total descontado</p>
-        <p class="text-sm font-bold" style="color:#D64455">− {{ fmtCOP(totalDescontado) }}</p>
+        <p class="text-[10px] font-semibold uppercase tracking-wide" style="color:#6b5a8a">Total a descontar (neto)</p>
+        <p class="text-sm font-bold" style="color:#D64455">{{ fmtCOP(totalDescontado) }}</p>
+        <p class="text-[9px]" style="color:#9ca3af">débitos suman · crédito/favor restan</p>
       </div>
       <div class="text-center">
         <p class="text-[10px] font-semibold uppercase tracking-wide" style="color:#6b5a8a">Disponible ajustado</p>
@@ -95,14 +99,16 @@ const filas = ref([])
 function initFilas() {
   filas.value = props.documentos.map((d) => ({
     ...d,
-    marcado: !!(d.descuenta && d.vencimiento && props.fechaObjetivo && d.vencimiento <= props.fechaObjetivo),
+    // Por defecto se marcan solo los DÉBITO (facturas) cuyo vencimiento sea exactamente la fecha objetivo.
+    marcado: !!(d.descuenta && d.vencimiento && props.fechaObjetivo && d.vencimiento === props.fechaObjetivo),
   }))
 }
 watch(() => props.documentos, initFilas, { immediate: true })
 watch(() => props.fechaObjetivo, initFilas)
 
+// Total NETO: débitos/cargos suman (+), notas crédito y ajustes a favor restan (−).
 const totalDescontado = computed(() =>
-  filas.value.filter((f) => f.marcado).reduce((s, f) => s + (Number(f.valorTotal) || 0), 0),
+  filas.value.filter((f) => f.marcado).reduce((s, f) => s + (Number(f.valorTotal) || 0) * (f.signo ?? 1), 0),
 )
 const disponibleAjustado = computed(() => (Number(props.disponible) || 0) - totalDescontado.value)
 
