@@ -18,6 +18,7 @@ function toFrontend(r) {
     congelado: r.congelado,
     saldo: r.saldo,
     totalAjusteTXR: r.total_ajuste_txr,
+    snapshot: r.snapshot ?? null,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   }
@@ -39,6 +40,7 @@ function toBackend(r) {
     congelado: 'congelado',
     saldo: 'saldo',
     totalAjusteTXR: 'total_ajuste_txr',
+    snapshot: 'snapshot',
   }
   const out = {}
   for (const [feKey, beKey] of Object.entries(map)) {

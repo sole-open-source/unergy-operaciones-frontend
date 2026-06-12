@@ -75,49 +75,8 @@
     <!-- Step 2: Revisar -->
     <div v-show="activeStep === 1" class="space-y-5">
       <div v-if="resultado">
-        <!-- Chips de precios -->
-        <div class="flex flex-wrap gap-2 mb-4">
-          <span v-for="(val, key) in resultado.precios" :key="key"
-            v-if="val != null"
-            class="px-3 py-1 rounded-full text-xs font-semibold"
-            style="background:#f3f0f7; color:#915BD8">
-            {{ key.toUpperCase() }}: {{ key === 'trm' ? fmtCOP(val) : val.toFixed(2) }}
-          </span>
-        </div>
-
-        <!-- UNGC + UNGG lado a lado -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <BloqueCodigo titulo="UNGC" :rows="resultado.ungc" :total="resultado.totalUNGC" />
-          <BloqueCodigo titulo="UNGG" :rows="resultado.ungg" :total="resultado.totalUNGG" />
-        </div>
-
-        <!-- Panel custodia (desglose auditable) -->
-        <div v-if="resultado.custodia" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mt-4">
-          <div class="bg-white rounded-xl p-4 shadow-sm text-center" style="border:1px solid #e8e0f0">
-            <p class="text-xs font-semibold uppercase tracking-wide mb-1" style="color:#6b5a8a">Disponible (crudo)</p>
-            <p class="text-base font-bold" style="color:#2C2039">{{ fmtCOP(disponibleCrudo) }}</p>
-          </div>
-          <div class="bg-white rounded-xl p-4 shadow-sm text-center" style="border:1px solid #e8e0f0">
-            <p class="text-xs font-semibold uppercase tracking-wide mb-1" style="color:#6b5a8a">(−) Facturas descontadas</p>
-            <p class="text-base font-bold" style="color:#D64455">{{ fmtCOP(facturasDescontadas) }}</p>
-          </div>
-          <div class="bg-white rounded-xl p-4 shadow-sm text-center" style="border:1px solid #e8e0f0">
-            <p class="text-xs font-semibold uppercase tracking-wide mb-1" style="color:#6b5a8a">Disponible neto</p>
-            <p class="text-base font-bold" :style="(disponibleNeto ?? 0) < 0 ? 'color:#D64455' : 'color:#10B981'">{{ fmtCOP(disponibleNeto) }}</p>
-          </div>
-          <div class="rounded-xl p-4 shadow-sm text-center" style="border:1px solid #a7e8c4; background:#ECFDF3">
-            <p class="text-xs font-semibold uppercase tracking-wide mb-1" style="color:#047857">Disponible (Aplic. garantía)</p>
-            <p class="text-base font-bold" style="color:#047857">{{ fmtCOP(disponibleAplicacion) }}</p>
-          </div>
-          <div class="bg-white rounded-xl p-4 shadow-sm text-center" style="border:1px solid #e8e0f0">
-            <p class="text-xs font-semibold uppercase tracking-wide mb-1" style="color:#6b5a8a">Congelado</p>
-            <p class="text-base font-bold" style="color:#2C2039">{{ fmtCOP(resultado.custodia.congelado) }}</p>
-          </div>
-          <div class="bg-white rounded-xl p-4 shadow-sm text-center" style="border:1px solid #e8e0f0">
-            <p class="text-xs font-semibold uppercase tracking-wide mb-1" style="color:#6b5a8a">Saldo</p>
-            <p class="text-base font-bold" style="color:#915BD8">{{ fmtCOP(resultado.custodia.saldo) }}</p>
-          </div>
-        </div>
+        <!-- Hoja madre (misma vista reutilizada en el Histórico) -->
+        <HojaMadreView :data="vistaActual" class="mb-2" />
 
         <div v-if="facturas?.documentos?.length" class="mt-2">
           <div class="flex items-center gap-2 justify-end mb-1">
@@ -198,7 +157,7 @@ import InputNumber from 'primevue/inputnumber'
 import Textarea from 'primevue/textarea'
 import { useToast } from 'primevue/usetoast'
 import DropZone from '../DropZone.vue'
-import BloqueCodigo from '../BloqueCodigo.vue'
+import HojaMadreView from '../HojaMadreView.vue'
 import FacturasDescuento from '../FacturasDescuento.vue'
 import { parseFacturas, viernesDeEstaSemana } from '../composables/useFacturasPDF.js'
 import { parseSemanales } from '../composables/useGarantiasParser.js'
@@ -261,6 +220,28 @@ const variacionPb = ref(null)
 const mencionesEditable = ref('')
 const contexto = ref('')
 const mensajeEditable = ref('')
+
+// Vista completa de la hoja madre (se muestra en vivo y se guarda como snapshot).
+const vistaActual = computed(() => {
+  if (!resultado.value) return null
+  return {
+    fechaNombre: resultado.value.fechaNombre,
+    precios: resultado.value.precios,
+    ungc: resultado.value.ungc,
+    ungg: resultado.value.ungg,
+    totalUNGC: resultado.value.totalUNGC,
+    totalUNGG: resultado.value.totalUNGG,
+    totalConsignar: resultado.value.totalConsignar,
+    disponibleCrudo: disponibleCrudo.value,
+    facturasDescontadas: facturasDescontadas.value,
+    disponibleNeto: disponibleNeto.value,
+    disponibleAplicacion: disponibleAplicacion.value,
+    congelado: resultado.value.custodia?.congelado ?? null,
+    saldo: resultado.value.custodia?.saldo ?? null,
+    pb: resultado.value.precios?.pb ?? null,
+    variacionPb: variacionPb.value,
+  }
+})
 
 function stepCircleStyle(idx) {
   if (activeStep.value > idx)
@@ -380,6 +361,7 @@ async function guardarRegistro() {
       congelado: resultado.value.custodia?.congelado ?? null,
       saldo: resultado.value.custodia?.saldo ?? null,
       totalAjusteTXR: null,
+      snapshot: vistaActual.value,
     })
     if (p?.pb != null) store.setPbAnterior(p.pb)
     toast.add({ severity: 'success', summary: 'Guardado en historial', life: 3000 })
