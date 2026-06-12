@@ -39,10 +39,10 @@
           <div class="card-h">
             <h3>Selección de liquidación</h3>
             <div class="pool-actions">
-              <button class="mini" @click="selAll('liquidar', true)">Liquidar todos</button>
-              <button class="mini" @click="selAll('liquidar', false)">Ninguno</button>
+              <button class="mini" @click="selAll('liquidar_ingresos', true)">Liq. ingresos todos</button>
+              <button class="mini" @click="selAll('liquidar_costos', true)">Liq. costos todos</button>
+              <button class="mini" @click="selNinguno">Ninguno</button>
               <button class="mini" @click="selAll('generar_mandatos', true)">Generar todos</button>
-              <button class="mini" @click="selAll('generar_mandatos', false)">Generar ninguno</button>
             </div>
           </div>
 
@@ -56,7 +56,8 @@
                 <th class="l">Proyecto</th>
                 <th>Inversionistas</th>
                 <th>Ingreso bruto</th>
-                <th>Liquidar</th>
+                <th>Liq. Ingresos</th>
+                <th>Liq. Costos</th>
                 <th>Generar mandatos</th>
               </tr></thead>
               <tbody>
@@ -68,7 +69,9 @@
                   </td>
                   <td><span class="pmeta">{{ p.inversionistas.map(i => i.nombre).join(', ') }}</span></td>
                   <td style="text-align:right;">{{ fmt(p.ingreso_bruto_cop) }}</td>
-                  <td><input type="checkbox" class="chk" v-model="p.liquidar" @change="onFlag(p)" /></td>
+                  <td><input type="checkbox" class="chk" v-model="p.liquidar_ingresos" @change="onFlag(p)" /></td>
+                  <td><input type="checkbox" class="chk" v-model="p.liquidar_costos" :disabled="!p.tiene_costos"
+                             :title="!p.tiene_costos ? 'sin costos' : ''" @change="onFlag(p)" /></td>
                   <td><input type="checkbox" class="gen-chk" v-model="p.generar_mandatos" @change="onFlag(p)" /></td>
                 </tr>
               </tbody>
@@ -85,25 +88,27 @@
               <input type="number" v-model.number="consCosIni" @change="reasignar" />
             </div>
             <div class="hint">
-              Solo los proyectos marcados <b>Liquidar</b> consumen consecutivo.
-              Costos numera únicamente si el proyecto tiene costos.
+              Ingresos y costos numeran por separado. Los costos solo consumen
+              consecutivo si el proyecto tiene costos.
             </div>
             <div class="summary">
-              <b>{{ nLiquidan }}</b>/{{ paneles.length }} liquidan · <b>{{ nGeneran }}</b> generan mandatos
+              <b>{{ nLiqIng }}</b> liq. ingresos · <b>{{ nLiqCost }}</b> liq. costos · <b>{{ nGeneran }}</b> generan mandatos
             </div>
           </div>
         </div>
 
         <!-- Detalle por proyecto -->
         <div class="sec-title">Detalle contable por proyecto</div>
-        <div v-for="p in paneles" :key="'d' + p.id" class="proj" :class="{ off: !p.liquidar, open: open[p.id] }">
+        <div v-for="p in paneles" :key="'d' + p.id" class="proj" :class="{ off: !esActivo(p), open: open[p.id] }">
           <div class="phead" @click="toggle(p.id)">
             <span class="chev">▶</span>
             <div class="pn">{{ p.proyecto }}</div>
             <span v-if="!p.tiene_costos" class="pill pill-warn">sin costos</span>
             <span v-if="p.tiene_bolsa" class="pill pill-bolsa">bolsa</span>
             <span v-if="p.generar_mandatos" class="pill pill-gen">genera mandatos</span>
-            <span v-if="!p.liquidar" class="pill pill-off">no liquida</span>
+            <span v-if="p.liquidar_ingresos && !p.liquidar_costos" class="pill pill-bolsa">solo ingresos</span>
+            <span v-if="!p.liquidar_ingresos && p.liquidar_costos" class="pill pill-bolsa">solo costos</span>
+            <span v-if="!esActivo(p)" class="pill pill-off">no liquida</span>
             <div class="pcons">
               <span>Ing: <b>{{ p.consecutivo_ingresos ?? '—' }}</b></span>
               <span>Cost: <b>{{ p.consecutivo_costos ?? '—' }}</b></span>
@@ -115,8 +120,8 @@
               <div class="inv-head">
                 <div class="inv-name">{{ inv.nombre }} · {{ (inv.porcentaje ?? 0).toFixed(2) }}%</div>
                 <div class="inv-cons">
-                  <span>Ing: <b>{{ p.liquidar ? (p.consecutivo_ingresos ?? '—') : '—' }}</b></span>
-                  <span>Cost: <b>{{ (p.liquidar && p.tiene_costos) ? (p.consecutivo_costos ?? '—') : '—' }}</b></span>
+                  <span>Ing: <b>{{ p.liquidar_ingresos ? (p.consecutivo_ingresos ?? '—') : '—' }}</b></span>
+                  <span>Cost: <b>{{ (p.liquidar_costos && p.tiene_costos) ? (p.consecutivo_costos ?? '—') : '—' }}</b></span>
                 </div>
               </div>
               <div class="tbl-wrap">
@@ -296,8 +301,10 @@ const periodoLabel = computed(() => {
   const [y, m] = periodo.value.split('-')
   return `${MESES[Number(m) - 1] || ''} ${y}`
 })
-const nLiquidan = computed(() => paneles.value.filter(p => p.liquidar).length)
+const nLiqIng = computed(() => paneles.value.filter(p => p.liquidar_ingresos).length)
+const nLiqCost = computed(() => paneles.value.filter(p => p.liquidar_costos && p.tiene_costos).length)
 const nGeneran = computed(() => paneles.value.filter(p => p.generar_mandatos).length)
+const esActivo = (p) => p.liquidar_ingresos || p.liquidar_costos
 
 const fmt = (n) => {
   const r = Math.round(Number(n) || 0)
@@ -329,7 +336,7 @@ async function cargarPaneles () {
   try {
     const { data } = await api.get('/panel-contable', { params: { periodo: periodo.value, tipo: tab.value } })
     paneles.value = data.paneles || []
-    paneles.value.forEach((p, i) => { if (open[p.id] === undefined) open[p.id] = (i === 0 && p.liquidar) })
+    paneles.value.forEach((p, i) => { if (open[p.id] === undefined) open[p.id] = (i === 0 && esActivo(p)) })
   } catch (e) {
     toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudieron cargar los paneles', life: 4000 })
   } finally {
@@ -376,14 +383,30 @@ async function onErSelected (e) {
 }
 
 function selAll (campo, val) {
-  paneles.value.forEach(p => { p[campo] = val })
-  Promise.all(paneles.value.map(p => api.patch(`/panel-contable/${p.id}`, { [campo]: val }).catch(() => {})))
-    .then(() => { if (campo === 'liquidar') reasignar() })
+  // 'liquidar_costos' solo aplica a proyectos con costos.
+  paneles.value.forEach(p => {
+    if (campo === 'liquidar_costos' && !p.tiene_costos) return
+    p[campo] = val
+  })
+  Promise.all(paneles.value.map(p => api.patch(`/panel-contable/${p.id}`, {
+    [campo]: p[campo],
+  }).catch(() => {}))).then(() => { if (campo !== 'generar_mandatos') reasignar() })
+}
+
+function selNinguno () {
+  paneles.value.forEach(p => { p.liquidar_ingresos = false; p.liquidar_costos = false })
+  Promise.all(paneles.value.map(p => api.patch(`/panel-contable/${p.id}`, {
+    liquidar_ingresos: false, liquidar_costos: false,
+  }).catch(() => {}))).then(() => reasignar())
 }
 
 async function onFlag (p) {
   try {
-    await api.patch(`/panel-contable/${p.id}`, { liquidar: p.liquidar, generar_mandatos: p.generar_mandatos })
+    await api.patch(`/panel-contable/${p.id}`, {
+      liquidar_ingresos: p.liquidar_ingresos,
+      liquidar_costos: p.liquidar_costos,
+      generar_mandatos: p.generar_mandatos,
+    })
     reasignar()
   } catch (e) { /* noop */ }
 }
