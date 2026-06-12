@@ -198,7 +198,7 @@ import { parseFacturas, viernesDeEstaSemana } from '../composables/useFacturasPD
 import { parseSemanales } from '../composables/useGarantiasParser.js'
 import { useGarantiasHistorial } from '../composables/useGarantiasHistorial.js'
 import { fmtCOP, fmtISODate } from '../utils/formatters.js'
-import { exportTablaExcel } from '../utils/excelExport.js'
+import { exportHojaMadreExcel } from '../utils/excelExport.js'
 
 const toast = useToast()
 const store = useGarantiasHistorial()
@@ -338,11 +338,13 @@ async function copiar() {
 
 function exportar() {
   if (!resultado.value) return
-  const rows = [
-    ...resultado.value.ungc.map(r => ({ Código: 'UNGC', Etiqueta: r.label, Valor: r.valor })),
-    ...resultado.value.ungg.map(r => ({ Código: 'UNGG', Etiqueta: r.label, Valor: r.valor })),
-  ]
-  exportTablaExcel(rows, `semanales_${resultado.value.fechaNombre || 'resultado'}.xlsx`)
+  exportHojaMadreExcel({
+    ungc: resultado.value.ungc,
+    ungg: resultado.value.ungg,
+    totalConsignar: resultado.value.totalConsignar,
+    custodia: resultado.value.custodia,
+    disponibleAplicacion: disponibleAplicacion.value,
+  }, `garantias_semanal_${resultado.value.fechaNombre || 'resultado'}.xlsx`)
 }
 
 async function guardarRegistro() {
