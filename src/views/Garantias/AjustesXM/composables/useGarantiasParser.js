@@ -115,14 +115,16 @@ function parseGarantiaSheet(wb) {
 }
 
 function parseWebTie(wb) {
+  // Hoja DEPÓSITO (verificado con archivo real): encabezados en fila 10, datos desde fila 11.
+  // Código en columna 0, valor "Valor a Pagar de TIES" en columna 3.
   const ws = findSheetByName(wb, 'DEPÓSITO') || wb.Sheets[wb.SheetNames[0]]
   const rows = sheetRows(ws)
   const tie = {}
-  for (let i = 10; i < rows.length; i++) {
+  for (let i = 11; i < rows.length; i++) {
     const row = rows[i]
     if (!row) continue
-    const code = String(row[1] ?? '').trim()
-    if (code === 'UNGC' || code === 'UNGG') tie[code] = num(row[4]) ?? 0
+    const code = String(row[0] ?? '').trim()
+    if (code === 'UNGC' || code === 'UNGG') tie[code] = num(row[3]) ?? 0
   }
   return tie
 }
