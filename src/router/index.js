@@ -49,6 +49,7 @@ const routes = [
   { path: '/liquidaciones/inversionista',    redirect: '/liquidaciones?tab=inversionistas' },
   { path: '/liquidaciones/cargar-excel',     redirect: '/liquidaciones?tab=cargar' },
   { path: '/finanzas/costos',             name: 'Costos',                     component: () => import('@/views/Finanzas/CostosView.vue'),                                meta: { roles: ['admin', 'liquidaciones'] } },
+  { path: '/panel-contable',              name: 'PanelContable',              component: () => import('@/views/PanelContable/PanelContableView.vue'),                    meta: { roles: ['admin', 'liquidaciones'] } },
   { path: '/liquidaciones/minigranjas',   redirect: '/liquidaciones' },
   { path: '/liquidaciones/:id',           name: 'LiquidacionDetalle',         component: () => import('@/views/Liquidaciones/LiquidacionDetailView.vue'),           meta: { roles: ['admin', 'liquidaciones'] } },
   { path: '/liquidaciones/:id/pdf',       name: 'LiquidacionPdf',             component: () => import('@/views/Liquidaciones/LiquidacionPdfView.vue'),              meta: { roles: ['admin', 'liquidaciones'] } },
