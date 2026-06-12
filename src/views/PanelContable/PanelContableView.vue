@@ -172,43 +172,84 @@
     <!-- ── DIFERENCIA ── -->
     <template v-else>
       <div v-if="loading" class="empty"><i class="pi pi-spin pi-spinner" /> Cargando…</div>
-      <template v-else>
-        <div class="cards-resumen">
-          <div class="rc">
-            <div class="rc-lbl">Utilidad estimada</div>
-            <div class="rc-val">{{ fmt(diff.resumen?.utilidad_estimada) }}</div>
-          </div>
-          <div class="rc">
-            <div class="rc-lbl">Utilidad real</div>
-            <div class="rc-val">{{ fmt(diff.resumen?.utilidad_real) }}</div>
-          </div>
-          <div class="rc">
-            <div class="rc-lbl">Diferencia</div>
-            <div class="rc-val" :class="diffClass(diff.resumen?.diferencia)">{{ fmt(diff.resumen?.diferencia) }}</div>
-          </div>
-        </div>
 
-        <div class="card">
-          <div class="tbl-wrap">
-            <table class="ptbl">
-              <thead><tr>
-                <th class="l">Proyecto</th>
-                <th>Preliquidación</th>
-                <th>Oficial</th>
-                <th>Diferencia</th>
-                <th>%</th>
-              </tr></thead>
-              <tbody>
-                <tr v-for="f in diff.filas" :key="f.proyecto_id">
-                  <td class="l"><span class="pname">{{ f.proyecto }}</span></td>
-                  <td style="text-align:right;">{{ fmt(f.preliquidacion) }}</td>
-                  <td style="text-align:right;">{{ fmt(f.oficial) }}</td>
-                  <td style="text-align:right;" :class="diffClass(f.diferencia)">{{ fmt(f.diferencia) }}</td>
-                  <td :class="diffClass(f.diferencia)">{{ f.porcentaje != null ? f.porcentaje.toFixed(1) + '%' : '—' }}</td>
-                </tr>
-                <tr v-if="!diff.filas?.length"><td colspan="5" class="empty sm">Sin datos para comparar.</td></tr>
-              </tbody>
-            </table>
+      <!-- Sin liquidación oficial todavía -->
+      <div v-else-if="!diff.tiene_oficial" class="card">
+        <div class="empty">
+          <i class="pi pi-clock" style="font-size:22px; display:block; margin-bottom:8px; color:var(--p2);" />
+          Aún no hay liquidación oficial para comparar.<br />
+          Carga el ER oficial en la pestaña <b>Oficial</b>.
+        </div>
+      </div>
+
+      <div v-else-if="!diff.proyectos?.length" class="card">
+        <div class="empty sm">Sin datos para comparar en {{ periodoLabel }}.</div>
+      </div>
+
+      <template v-else>
+        <div v-for="proy in diff.proyectos" :key="proy.proyecto_id" class="diff-proy">
+          <div class="diff-proy-h">{{ proy.proyecto_nombre }}</div>
+
+          <!-- KPIs por proyecto -->
+          <div class="cards-resumen">
+            <div class="rc">
+              <div class="rc-lbl">Utilidad estimada</div>
+              <div class="rc-val">{{ fmt(proy.utilidad_pre) }}</div>
+            </div>
+            <div class="rc">
+              <div class="rc-lbl">Utilidad real</div>
+              <div class="rc-val">{{ proy.tiene_oficial ? fmt(proy.utilidad_oficial) : 'pendiente' }}</div>
+            </div>
+            <div class="rc">
+              <div class="rc-lbl">Diferencia</div>
+              <div class="rc-val" :class="diffClass(proy.utilidad_dif)">
+                <span v-if="proy.utilidad_dif != null" class="arrow">{{ arrow(proy.utilidad_dif) }}</span>{{ fmt(proy.utilidad_dif) }}
+              </div>
+            </div>
+          </div>
+
+          <!-- Tabla por inversionista -->
+          <div v-for="inv in proy.inversionistas" :key="inv.proyecto_inversionista_id || inv.nombre" class="card">
+            <div class="inv-head">
+              <div class="inv-name">{{ inv.nombre }} · {{ (inv.porcentaje ?? 0).toFixed(2) }}%</div>
+            </div>
+            <div class="tbl-wrap">
+              <table class="dt diff-dt">
+                <thead><tr>
+                  <th class="l">Concepto</th>
+                  <th>Preliquidación</th>
+                  <th>Oficial</th>
+                  <th>Diferencia</th>
+                  <th>%</th>
+                </tr></thead>
+                <tbody>
+                  <template v-for="g in grupos" :key="g.key">
+                    <template v-if="lineasGrupo(inv, g.key).length">
+                      <tr class="grp"><td colspan="5">{{ g.label }}</td></tr>
+                      <tr v-for="(ln, i) in lineasGrupo(inv, g.key)" :key="g.key + i">
+                        <td class="l">{{ ln.concepto }}</td>
+                        <td>{{ fmt(ln.preliquidacion) }}</td>
+                        <td>{{ ln.oficial != null ? fmt(ln.oficial) : '—' }}</td>
+                        <td :class="diffClass(ln.diferencia)">
+                          <span v-if="ln.diferencia != null && ln.diferencia !== 0" class="arrow">{{ arrow(ln.diferencia) }}</span>{{ ln.diferencia != null ? fmt(ln.diferencia) : '—' }}
+                        </td>
+                        <td :class="diffClass(ln.diferencia)">{{ ln.pct_variacion != null ? ln.pct_variacion.toFixed(1) + '%' : '—' }}</td>
+                      </tr>
+                    </template>
+                  </template>
+                  <tr class="grp"><td colspan="5">RESULTADO</td></tr>
+                  <tr class="tot">
+                    <td class="l">Utilidad</td>
+                    <td>{{ fmt(inv.utilidad_pre) }}</td>
+                    <td>{{ inv.utilidad_oficial != null ? fmt(inv.utilidad_oficial) : '—' }}</td>
+                    <td :class="diffClass(inv.utilidad_dif)">
+                      <span v-if="inv.utilidad_dif != null && inv.utilidad_dif !== 0" class="arrow">{{ arrow(inv.utilidad_dif) }}</span>{{ inv.utilidad_dif != null ? fmt(inv.utilidad_dif) : '—' }}
+                    </td>
+                    <td></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </template>
@@ -265,6 +306,10 @@ const fmt = (n) => {
 }
 const shortName = (n) => (n || '').split(' ').slice(0, 2).join(' ')
 const diffClass = (v) => (v == null ? '' : (v > 0 ? 'pos' : (v < 0 ? 'neg' : '')))
+const arrow = (v) => (v == null || v === 0 ? '' : (v > 0 ? '▲ ' : '▼ '))
+
+// Diferencia: líneas de un inversionista por grupo (ya cruzadas en el backend).
+const lineasGrupo = (inv, grupo) => (inv.lineas || []).filter(l => l.grupo === grupo)
 
 const lineasDe = (inv, grupo) => inv.lineas.filter(l => l.grupo === grupo)
 const totalGrupo = (inv, grupo) => lineasDe(inv, grupo).reduce((s, l) => s + (Number(l.valor_cop) || 0), 0)
@@ -477,4 +522,10 @@ tr.tot td { background:var(--sec); font-weight:600; }
 .rc { background:#fff; border:1px solid var(--line); border-radius:12px; padding:16px 18px; }
 .rc-lbl { font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--txt2); margin-bottom:6px; }
 .rc-val { font-size:20px; font-weight:600; color:var(--p1); font-variant-numeric:tabular-nums; }
+
+.diff-proy { margin-bottom:26px; }
+.diff-proy-h { font-size:15px; font-weight:600; color:var(--p1); margin-bottom:10px; }
+.diff-dt th { text-align:right; }
+.diff-dt th.l { text-align:left; }
+.arrow { font-size:10px; }
 </style>
