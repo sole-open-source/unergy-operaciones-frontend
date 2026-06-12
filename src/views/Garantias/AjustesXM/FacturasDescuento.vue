@@ -6,7 +6,17 @@
     </div>
 
     <div class="overflow-x-auto">
-      <table class="w-full text-xs whitespace-nowrap">
+      <table class="text-xs" style="table-layout:fixed; width:100%; min-width:880px">
+        <colgroup>
+          <col style="width:44px" />
+          <col style="width:112px" />
+          <col style="width:110px" />
+          <col style="width:150px" />
+          <col style="width:168px" />
+          <col style="width:158px" />
+          <col style="width:48px" />
+          <col style="width:90px" />
+        </colgroup>
         <thead>
           <tr class="bg-gray-50 border-b">
             <th class="px-3 py-2 text-center font-semibold" style="color:#6b5a8a">✓</th>
@@ -24,27 +34,27 @@
             <td class="px-3 py-1.5 text-center">
               <Checkbox v-model="f.marcado" :binary="true" />
             </td>
-            <td class="px-3 py-1.5" style="color:#2C2039">{{ f.numero ?? '—' }}</td>
-            <td class="px-3 py-1.5">
+            <td class="px-3 py-1.5 truncate" style="color:#2C2039" :title="f.numero ?? ''">{{ f.numero ?? '—' }}</td>
+            <td class="px-3 py-1.5 truncate">
               <span class="px-2 py-0.5 rounded-full text-[10px] font-bold"
                 :style="f.descuenta ? 'background:#fde8ea;color:#D64455' : 'background:#dbeafe;color:#1d4ed8'">
                 {{ f.tipo }}
               </span>
             </td>
-            <td class="px-3 py-1.5" style="color:#6b5a8a">{{ f.concepto }}</td>
-            <td class="px-3 py-1.5 text-right">
-              <div class="flex items-center justify-end gap-1">
-                <span v-if="f.signo !== 0" class="text-xs font-bold" :style="f.signo < 0 ? 'color:#10B981' : 'color:#D64455'">{{ f.signo < 0 ? '−' : '+' }}</span>
+            <td class="px-3 py-1.5 truncate" style="color:#6b5a8a" :title="f.concepto">{{ f.concepto }}</td>
+            <td class="px-3 py-1.5">
+              <div class="flex items-center gap-1">
+                <span v-if="f.signo !== 0" class="text-xs font-bold shrink-0" :style="f.signo < 0 ? 'color:#10B981' : 'color:#D64455'">{{ f.signo < 0 ? '−' : '+' }}</span>
                 <InputNumber v-model="f.valorTotal" :max-fraction-digits="2" :min-fraction-digits="0"
-                  inputClass="text-right text-xs" style="width:120px" />
+                  fluid inputClass="text-right text-xs" class="flex-1 min-w-0" />
               </div>
             </td>
             <td class="px-3 py-1.5">
               <input type="date" v-model="f.vencimiento"
-                class="rounded px-2 py-1 text-xs" style="border:1px solid #e8e0f0" />
+                class="rounded px-2 py-1 text-xs w-full" style="border:1px solid #e8e0f0; box-sizing:border-box" />
             </td>
             <td class="px-3 py-1.5 text-center" style="color:#9ca3af">{{ f.pagina }}</td>
-            <td class="px-3 py-1.5">
+            <td class="px-3 py-1.5 truncate">
               <span v-if="f.warnings && f.warnings.length"
                 class="px-2 py-0.5 rounded-full text-[10px] font-semibold"
                 style="background:#FEF3C7;color:#92400E"
