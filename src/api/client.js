@@ -14,10 +14,22 @@ api.interceptors.request.use((config) => {
   return config
 })
 
+// Muestra un toast global de error si el componente Toast ya está montado.
+function toastError(summary, detail, life = 4000) {
+  if (typeof window.__primeToast === 'function') {
+    window.__primeToast({ severity: 'error', summary, detail, life })
+  }
+}
+
 api.interceptors.response.use(
   (r) => r,
   (err) => {
-    if (err.response?.status === 401) {
+    // Una vista puede desactivar el toast global con { skipErrorToast: true }
+    // en la config de la petición cuando quiere manejar el error a su manera.
+    const skipToast = err.config?.skipErrorToast
+    const status = err.response?.status
+
+    if (status === 401) {
       const token = localStorage.getItem('token')
       if (import.meta.env.DEV && token?.endsWith('.preview')) return Promise.reject(err)
       localStorage.removeItem('token')
@@ -25,13 +37,24 @@ api.interceptors.response.use(
       // En la app móvil (rutas /m/...) volvemos a su propio login, no al de la plataforma.
       const enMovil = window.location.pathname.startsWith('/m/') || window.location.pathname === '/m'
       window.location.href = enMovil ? '/m/login' : '/login'
-    }
-    if (err.response?.status === 403) {
+    } else if (status === 403) {
       const msg = err.response.data?.detail || 'No tienes permisos para esta acción'
-      if (typeof window.__primeToast === 'function') {
-        window.__primeToast({ severity: 'error', summary: 'Acceso denegado', detail: msg, life: 4000 })
+      if (!skipToast) toastError('Acceso denegado', msg)
+    } else if (!err.response) {
+      // Sin respuesta: timeout, red caída o petición cancelada. Las vistas suelen
+      // mostrar aquí un mensaje pobre (e.message = "Network Error"), así que damos
+      // un mensaje claro de forma centralizada.
+      if (!skipToast && err.code !== 'ERR_CANCELED') {
+        toastError('Sin conexión', 'No se pudo conectar con el servidor. Revisa tu conexión e intenta de nuevo.')
+      }
+    } else if (status >= 500) {
+      // Error del servidor: mensaje genérico centralizado (el detalle real
+      // rara vez es útil para el usuario y a menudo viene vacío).
+      if (!skipToast) {
+        toastError('Error del servidor', err.response.data?.detail || 'Ocurrió un error inesperado. Intenta de nuevo más tarde.')
       }
     }
+
     return Promise.reject(err)
   }
 )
