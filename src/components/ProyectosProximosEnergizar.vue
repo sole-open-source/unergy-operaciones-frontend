@@ -7,10 +7,32 @@
         <i class="pi pi-bolt" style="color: #F0C040;" />
         <div>
           <h2 class="text-base font-bold" style="color: #2C2039;">Proyectos próximos a energizarse</h2>
-          <p class="text-xs mt-0.5" style="color: #7a6e8a;">Proyección de generación mensual prorrateada desde la fecha de energización</p>
+          <p class="text-xs mt-0.5" style="color: #7a6e8a;">
+            Sincronizado desde TSF/Solenium · proyección mensual prorrateada desde la fecha de energización
+          </p>
         </div>
       </div>
-      <Button icon="pi pi-plus" label="Agregar Proyecto" size="small" @click="addProject" />
+      <div class="flex items-center gap-2">
+        <span v-if="lastSync" class="text-xs" style="color: rgba(44,32,57,0.45);">
+          Última sync: {{ lastSync.toLocaleTimeString() }}
+        </span>
+        <Button
+          icon="pi pi-sync"
+          label="Sincronizar ahora"
+          size="small"
+          outlined
+          :loading="syncing"
+          @click="onSync(false)"
+        />
+        <Button
+          icon="pi pi-replay"
+          label="Re-sincronizar (sobrescribir mis cambios)"
+          size="small"
+          severity="warn"
+          :loading="syncing"
+          @click="onSync(true)"
+        />
+      </div>
     </div>
 
     <!-- Aviso de origen de datos (config faltante / fuente caída) -->
@@ -37,11 +59,11 @@
             </template>
             <template v-else-if="warning">
               <i class="pi pi-database" style="font-size:1.4rem; color:#c4b8d4;" />
-              <p class="mt-2">No se pudieron cargar los proyectos del pipeline.</p>
+              <p class="mt-2">No se pudieron cargar los proyectos.</p>
               <p class="mt-1 text-xs" style="color: rgba(44,32,57,0.4);">Revisa el aviso de arriba (configuración / fuente de datos).</p>
             </template>
             <template v-else>
-              Aún no hay proyectos en el pipeline. Puedes agregar uno manualmente con «Agregar Proyecto».
+              Aún no hay proyectos en el pipeline. Presiona «Sincronizar ahora» para traerlos desde TSF/Solenium.
             </template>
           </div>
         </template>
@@ -49,7 +71,11 @@
         <!-- Commercial name (editable) -->
         <Column header="Proyecto" frozen style="min-width: 180px;">
           <template #body="{ data }">
-            <InputText v-model="data.commercialName" class="w-full" />
+            <InputText
+              :model-value="data.commercialName"
+              @update:model-value="v => persistField(data, 'commercialName', v)"
+              class="w-full"
+            />
           </template>
         </Column>
 
@@ -60,21 +86,40 @@
           </template>
         </Column>
 
-        <!-- Status -->
+        <!-- Status (editable) -->
         <Column header="Estado" style="min-width: 170px;">
           <template #body="{ data }">
-            <Select v-model="data.status" :options="STATUS_OPTIONS" class="w-full" />
+            <Select
+              :model-value="data.status"
+              @update:model-value="v => persistField(data, 'status', v)"
+              :options="STATUS_OPTIONS"
+              class="w-full"
+            />
           </template>
         </Column>
 
-        <!-- Energization date -->
-        <Column header="Energización" style="min-width: 150px;">
+        <!-- Energization date (editable → marca fecha como manual) -->
+        <Column header="Energización" style="min-width: 160px;">
           <template #body="{ data }">
-            <DatePicker v-model="data.energizationDate" dateFormat="yy-mm-dd" showIcon class="w-full" />
+            <div class="flex items-center gap-1">
+              <DatePicker
+                :model-value="data.energizationDate"
+                @update:model-value="v => persistField(data, 'energizationDate', v)"
+                dateFormat="yy-mm-dd"
+                showIcon
+                class="w-full"
+              />
+              <i
+                v-if="data.editadaManual"
+                class="pi pi-pencil"
+                style="color:#915BD8; font-size:0.7rem;"
+                v-tooltip="'Fecha editada manualmente — el sync no la sobrescribe (usa Re-sincronizar para forzar)'"
+              />
+            </div>
           </template>
         </Column>
 
-        <!-- Construction progress (Sun Factory) -->
+        <!-- Construction progress (Sun Factory, read-only) -->
         <Column header="% Obra" style="min-width: 110px;">
           <template #body="{ data }">
             <span v-if="data.avancePct != null" class="text-sm font-mono tabular-nums" style="color: #2C2039;">
@@ -84,24 +129,28 @@
           </template>
         </Column>
 
-        <!-- Assigned contracts -->
+        <!-- Linked PPA contracts (read-only — se gestionan en el flujo PPA) -->
         <Column header="Contratos" style="min-width: 200px;">
           <template #body="{ data }">
-            <AutoComplete
-              v-model="data.contracts"
-              multiple
-              :typeahead="false"
-              :suggestions="[]"
-              placeholder="Escribe y Enter"
-              class="w-full energ-chips"
-            />
+            <div v-if="data.contracts && data.contracts.length" class="flex flex-wrap gap-1">
+              <span
+                v-for="c in data.contracts" :key="c"
+                class="inline-block px-2 py-0.5 rounded text-xs"
+                style="background: rgba(145,91,216,0.12); color:#6b3fa0;"
+              >{{ c }}</span>
+            </div>
+            <span v-else class="text-xs" style="color: rgba(44,32,57,0.3);">Sin contratos</span>
           </template>
         </Column>
 
-        <!-- Expected monthly MWh -->
+        <!-- Expected monthly MWh (editable) -->
         <Column header="MWh / mes" style="min-width: 130px;">
           <template #body="{ data }">
-            <InputNumber v-model="data.monthlyMwh" :maxFractionDigits="2" :min="0" class="w-full" />
+            <InputNumber
+              :model-value="data.monthlyMwh"
+              @update:model-value="v => persistField(data, 'monthlyMwh', v)"
+              :maxFractionDigits="2" :min="0" class="w-full"
+            />
           </template>
         </Column>
 
@@ -124,7 +173,7 @@
         <!-- Actions -->
         <Column style="width: 56px; text-align: center;">
           <template #body="{ data }">
-            <Button icon="pi pi-trash" severity="danger" text rounded size="small" @click="removeProject(data.id)" />
+            <Button icon="pi pi-trash" severity="danger" text rounded size="small" @click="confirmRemove(data)" />
           </template>
         </Column>
       </DataTable>
@@ -133,21 +182,38 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import DatePicker from 'primevue/datepicker'
-import AutoComplete from 'primevue/autocomplete'
 import Select from 'primevue/select'
 import { useEnergizationProjects } from '@/composables/useEnergizationProjects'
 
-const { projects, loading, warning, addProject, removeProject } = useEnergizationProjects()
+const {
+  projects, loading, warning, syncing, lastSync,
+  loadProjects, persistField, removeProject, syncNow,
+} = useEnergizationProjects()
 
 const STATUS_OPTIONS = ['En construcción', 'Pruebas', 'Próximo a energizar', 'Energizado']
 const MESES_CORTOS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+
+onMounted(loadProjects)
+
+async function onSync(force) {
+  if (force && !window.confirm('Esto sobrescribirá las fechas que hayas editado manualmente con la información de Solenium. ¿Continuar?')) {
+    return
+  }
+  await syncNow(force)
+}
+
+function confirmRemove(project) {
+  if (window.confirm(`¿Quitar "${project.commercialName}" de la lista? (se marcará como eliminado)`)) {
+    removeProject(project.id)
+  }
+}
 
 // Next 12 months starting from the current month.
 const monthColumns = computed(() => {
@@ -172,7 +238,7 @@ function calculateGeneration(project, year, month) {
   const ed = project.energizationDate instanceof Date
     ? project.energizationDate
     : new Date(project.energizationDate)
-  if (isNaN(ed.getTime())) return 0
+  if (!project.energizationDate || isNaN(ed.getTime())) return 0
 
   const eYear = ed.getFullYear()
   const eMonth = ed.getMonth() + 1 // 1-based
@@ -197,7 +263,7 @@ function isProrated(project, year, month) {
   const ed = project.energizationDate instanceof Date
     ? project.energizationDate
     : new Date(project.energizationDate)
-  if (isNaN(ed.getTime())) return false
+  if (!project.energizationDate || isNaN(ed.getTime())) return false
   return year === ed.getFullYear() && month === (ed.getMonth() + 1) && ed.getDate() > 1
 }
 </script>
@@ -218,8 +284,5 @@ function isProrated(project, year, month) {
   font-size: 13px;
   color: #2C2039;
   vertical-align: middle;
-}
-:deep(.energ-chips .p-autocomplete-input-multiple) {
-  width: 100%;
 }
 </style>
