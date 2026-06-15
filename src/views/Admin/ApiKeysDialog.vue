@@ -13,11 +13,14 @@
           API Key creada — copia ahora, no se mostrará de nuevo
         </div>
         <div class="flex items-center gap-2">
-          <code class="flex-1 bg-white border rounded px-3 py-2 text-xs font-mono break-all select-all">{{ newKey }}</code>
+          <InputText :value="revealKey ? newKey : maskSecret(newKey)" readonly
+            class="flex-1 text-xs font-mono" :class="{ 'select-all': revealKey }" />
+          <Button :icon="revealKey ? 'pi pi-eye-slash' : 'pi pi-eye'" text rounded size="small"
+            v-tooltip.top="revealKey ? 'Ocultar' : 'Mostrar'" @click="revealKey = !revealKey" />
           <Button icon="pi pi-copy" text rounded size="small" v-tooltip.top="'Copiar'" @click="copyKey" />
         </div>
         <div class="text-xs text-gray-500 mt-2 space-y-1">
-          <p><strong>Uso:</strong> Enviar en header <code class="bg-gray-100 px-1 rounded">X-API-Key: {{ newKey }}</code></p>
+          <p><strong>Uso:</strong> Enviar en header <code class="bg-gray-100 px-1 rounded">X-API-Key: {{ revealKey ? newKey : maskSecret(newKey) }}</code></p>
           <p><strong>Base URL:</strong> <code class="bg-gray-100 px-1 rounded">{{ baseUrl }}/api/v1</code></p>
         </div>
       </div>
@@ -85,7 +88,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, onUnmounted } from 'vue'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
@@ -93,6 +96,7 @@ import Tag from 'primevue/tag'
 import Divider from 'primevue/divider'
 import { useToast } from 'primevue/usetoast'
 import api from '@/api/client'
+import { maskSecret, safeCopyToClipboard } from '@/utils/securityUtils'
 
 const props = defineProps({ usuario: Object })
 const visible = defineModel('visible', { type: Boolean })
@@ -103,6 +107,7 @@ const loadingKeys = ref(false)
 const creating = ref(false)
 const newKeyName = ref('')
 const newKey = ref(null)
+const revealKey = ref(false)
 const deleteConfirmVisible = ref(false)
 const deletingKey = ref(null)
 const deleting = ref(false)
@@ -112,6 +117,7 @@ const baseUrl = window.location.origin
 watch(visible, async (v) => {
   if (v && props.usuario) {
     newKey.value = null
+    revealKey.value = false
     newKeyName.value = ''
     await loadKeys()
   }
@@ -176,9 +182,13 @@ async function doDelete() {
   }
 }
 
-function copyKey() {
-  navigator.clipboard.writeText(newKey.value)
-  toast.add({ severity: 'info', summary: 'Copiado al portapapeles', life: 2000 })
+async function copyKey() {
+  const ok = await safeCopyToClipboard(newKey.value, 'API Key')
+  toast.add(
+    ok
+      ? { severity: 'info', summary: 'Copiado al portapapeles', life: 2000 }
+      : { severity: 'error', summary: 'No se pudo copiar', life: 3000 }
+  )
 }
 
 function formatDate(d) {
@@ -188,5 +198,12 @@ function formatDate(d) {
 
 function onHide() {
   newKey.value = null
+  revealKey.value = false
 }
+
+// Limpiar credenciales sensibles de memoria al desmontar el componente.
+onUnmounted(() => {
+  newKey.value = null
+  revealKey.value = false
+})
 </script>
