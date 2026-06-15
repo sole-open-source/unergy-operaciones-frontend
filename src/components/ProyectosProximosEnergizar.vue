@@ -206,7 +206,20 @@ async function onSync(force) {
   if (force && !window.confirm('Esto sobrescribirá las fechas que hayas editado manualmente con la información de Solenium. ¿Continuar?')) {
     return
   }
-  await syncNow(force)
+  const r = await syncNow(force)
+  if (r) {
+    const partes = [
+      `Creados: ${r.creados ?? 0}`,
+      `Actualizados: ${r.actualizados ?? 0}`,
+      r.errores ? `Errores: ${r.errores}` : null,
+      `Fuente: ${r.fuente ?? 'sunfactory'}`,
+    ].filter(Boolean)
+    let msg = `Sincronización completa.\n${partes.join(' · ')}`
+    if (Array.isArray(r.warnings) && r.warnings.length) {
+      msg += `\n\nAvisos:\n- ${r.warnings.join('\n- ')}`
+    }
+    window.alert(msg)
+  }
 }
 
 function confirmRemove(project) {
