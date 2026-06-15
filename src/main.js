@@ -29,6 +29,8 @@ import './assets/main.css'
 
 import App from './App.vue'
 import router from './router'
+// Inicializa la instancia Axios global (interceptores: JWT, 401, 403, reintentos, toasts).
+import './services/api'
 import InfoField from './components/InfoField.vue'
 import PageHeader from './components/PageHeader.vue'
 
