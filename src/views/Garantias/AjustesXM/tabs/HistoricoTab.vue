@@ -146,6 +146,11 @@ function abrirEditar(ajuste) {
 }
 
 /* ------------------ Helpers ------------------ */
+// Envuelve cálculos de render para que un dato inesperado nunca cuelgue la vista.
+function safe(fn, fallback) {
+  try { return fn() } catch (e) { console.error('[historico] error de render:', e); return fallback }
+}
+
 function tipoBadge(tipo) {
   const map = {
     semanal: 'background:#f3f0f7;color:#915BD8',
@@ -156,14 +161,16 @@ function tipoBadge(tipo) {
 }
 
 function cifraClave(r) {
+  if (!r) return '—'
   if (r.tipo === 'semanal') return r.totalConsignar != null ? fmtCOP(r.totalConsignar) : '—'
   return r.totalAjusteTXR != null ? fmtCOP(r.totalAjusteTXR) : '—'
 }
 
 function mesLabel(mes) {
   // mes = 'YYYY-MM'
-  const [y, m] = mes.split('-')
+  const [y, m] = String(mes || '').split('-')
   const d = new Date(Number(y), Number(m) - 1, 1)
+  if (isNaN(d.getTime())) return String(mes || '')
   const txt = d.toLocaleDateString('es-CO', { month: 'long', year: 'numeric' })
   return txt.charAt(0).toUpperCase() + txt.slice(1)
 }
@@ -179,25 +186,25 @@ const rangos = [
 ]
 
 // Solo semanales con datos de tendencia, ordenados ascendente por fecha
-const semanales = computed(() =>
+const semanales = computed(() => safe(() =>
   (store.historial.value || [])
     .filter(r => r && r.tipo === 'semanal' && r.totalConsignar != null && r.pb != null && r.fecha)
     .slice()
-    .sort((a, b) => String(a.fecha).localeCompare(String(b.fecha)))
-)
+    .sort((a, b) => String(a.fecha).localeCompare(String(b.fecha))),
+  []))
 
-const semanalesEnRango = computed(() => {
+const semanalesEnRango = computed(() => safe(() => {
   const all = semanales.value
   if (rangoActivo.value === 'all') return all
   const cutoff = new Date()
   if (rangoActivo.value === '3m') cutoff.setMonth(cutoff.getMonth() - 3)
   else cutoff.setMonth(cutoff.getMonth() - 12)
   const cutStr = cutoff.toISOString().slice(0, 10)
-  return all.filter(r => r.fecha >= cutStr)
-})
+  return all.filter(r => String(r.fecha) >= cutStr)
+}, []))
 
 // Puntos efectivos de la gráfica (con o sin agrupación por mes)
-const puntosGrafica = computed(() => {
+const puntosGrafica = computed(() => safe(() => {
   const base = semanalesEnRango.value
   if (!agruparPorMes.value) {
     return base.map(r => ({ label: r.fecha, totalConsignar: r.totalConsignar, pb: r.pb }))
@@ -205,13 +212,13 @@ const puntosGrafica = computed(() => {
   // Agrupar: último reporte semanal de cada mes
   const ultimoPorMes = new Map()
   for (const r of base) {
-    const mes = r.fecha.slice(0, 7) // 'YYYY-MM' — base ya viene ascendente, así que el último gana
+    const mes = String(r.fecha).slice(0, 7) // 'YYYY-MM' — base ya viene ascendente, así que el último gana
     ultimoPorMes.set(mes, r)
   }
   return [...ultimoPorMes.entries()]
     .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([mes, r]) => ({ label: mes, totalConsignar: r.totalConsignar, pb: r.pb }))
-})
+}, []))
 
 const chartData = computed(() => ({
   labels: puntosGrafica.value.map(p => p.label),
@@ -281,7 +288,7 @@ const chartOptions = computed(() => ({
 }))
 
 /* ------------------ Navegación por mes ------------------ */
-const mesesAgrupados = computed(() => {
+const mesesAgrupados = computed(() => safe(() => {
   const groups = new Map()
   for (const r of (store.historial.value || [])) {
     if (!r) continue
@@ -297,7 +304,7 @@ const mesesAgrupados = computed(() => {
       label: mesLabel(mes),
       registros: registros.slice().sort((a, b) => String(b.fecha).localeCompare(String(a.fecha))), // fecha desc
     }))
-})
+}, []))
 
 const mesesAbiertos = ref({})
 const snapshotAbierto = ref(null)
