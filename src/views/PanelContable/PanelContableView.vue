@@ -12,9 +12,9 @@
       <div class="top-actions">
         <div class="fld">
           <label>Ver período</label>
-          <input type="month" v-model="periodo" class="month-in" @change="cargarPaneles" />
+          <input type="month" v-model="periodo" class="month-in" @change="setTab(tab)" />
         </div>
-        <button v-if="tab !== 'diferencia'" class="btn-o" :disabled="loading" @click="abrirDialogoPeriodo">
+        <button v-if="tab !== 'diferencia' && tab !== 'clasificacion'" class="btn-o" :disabled="loading" @click="abrirDialogoPeriodo">
           <i class="pi pi-upload" /> Cargar ER
         </button>
         <input ref="erInput" type="file" accept=".xlsx,.xls" multiple class="hidden" @change="onErSelected" />
@@ -60,9 +60,31 @@
           </label>
         </div>
       </div>
+      <div class="fld" style="margin-top:14px;">
+        <label>Tipo de liquidación <span class="req">*</span></label>
+        <div class="tipo-opts tres">
+          <label class="tipo-opt" :class="{ on: dlgTipoCarga === 'normal' }">
+            <input type="radio" value="normal" v-model="dlgTipoCarga" />
+            <span><b>Normal</b><small>ingreso bruto</small></span>
+          </label>
+          <label class="tipo-opt" :class="{ on: dlgTipoCarga === 'neu' }">
+            <input type="radio" value="neu" v-model="dlgTipoCarga" />
+            <span><b>NEU</b><small>despacho + bolsa</small></span>
+          </label>
+          <label class="tipo-opt" :class="{ on: dlgTipoCarga === 'nitro' }">
+            <input type="radio" value="nitro" v-model="dlgTipoCarga" />
+            <span><b>NITRO</b><small>bruto + comerc.</small></span>
+          </label>
+        </div>
+        <div class="dlg-aviso">
+          Solo se cargarán los proyectos clasificados como
+          <b>{{ dlgTipoCarga.toUpperCase() }}</b> para este período. Los demás se
+          reportarán como rechazados.
+        </div>
+      </div>
       <template #footer>
         <button class="mini" @click="showPeriodoDialog = false">Cancelar</button>
-        <button class="btn" :disabled="!dlgMes || !dlgAnio || !dlgTipo" @click="confirmarPeriodo">
+        <button class="btn" :disabled="!dlgMes || !dlgAnio || !dlgTipo || !dlgTipoCarga" @click="confirmarPeriodo">
           Continuar <i class="pi pi-arrow-right" style="font-size:11px;" />
         </button>
       </template>
@@ -73,6 +95,7 @@
       <div class="tab" :class="{ act: tab === 'preliquidacion' }" @click="setTab('preliquidacion')">Preliquidación</div>
       <div class="tab" :class="{ act: tab === 'oficial' }" @click="setTab('oficial')">Oficial</div>
       <div class="tab" :class="{ act: tab === 'diferencia' }" @click="setTab('diferencia')">Diferencia</div>
+      <div class="tab" :class="{ act: tab === 'clasificacion' }" @click="setTab('clasificacion')">Clasificación</div>
     </div>
 
     <div v-if="uploading" class="banner">
@@ -80,8 +103,19 @@
     </div>
     <div v-if="uploadMsg" class="banner banner-info" v-html="uploadMsg" />
 
+    <!-- ER rechazados por clasificación cruzada -->
+    <div v-if="rechazados.length" class="banner banner-rechazo">
+      <div class="rechazo-h">
+        <i class="pi pi-exclamation-triangle" />
+        <b>{{ rechazados.length }} ER no se cargaron</b> — clasificación distinta a la sección elegida
+      </div>
+      <ul class="rechazo-list">
+        <li v-for="(r, i) in rechazados" :key="i">{{ r.mensaje }}</li>
+      </ul>
+    </div>
+
     <!-- ── PRELIQUIDACIÓN / OFICIAL ── -->
-    <template v-if="tab !== 'diferencia'">
+    <template v-if="tab === 'preliquidacion' || tab === 'oficial'">
       <div v-if="loading" class="empty"><i class="pi pi-spin pi-spinner" /> Cargando…</div>
 
       <template v-else>
@@ -225,8 +259,60 @@
       </template>
     </template>
 
+    <!-- ── CLASIFICACIÓN ── -->
+    <template v-if="tab === 'clasificacion'">
+      <div class="card">
+        <div class="card-h">
+          <h3>Clasificación de liquidación · {{ periodoLabel || 'sin período' }}</h3>
+          <div class="pool-actions">
+            <input v-model="clasSearch" class="search-in" placeholder="Buscar proyecto…" />
+            <button class="btn" :disabled="!periodo || clasSaving || !clasDirty" @click="guardarClasificacion">
+              <i class="pi pi-save" /> Guardar clasificación
+            </button>
+          </div>
+        </div>
+
+        <div class="banner-aviso">
+          <i class="pi pi-info-circle" />
+          La clasificación es <b>por período</b> — un proyecto puede cambiar de
+          tipo entre meses. El tipo define cómo se leen los ingresos del ER al cargarlo.
+        </div>
+
+        <div v-if="!periodo" class="empty sm">Selecciona un período arriba para clasificar.</div>
+        <div v-else-if="clasLoading" class="empty"><i class="pi pi-spin pi-spinner" /> Cargando…</div>
+        <div v-else-if="!clasFiltrados.length" class="empty sm">Sin proyectos.</div>
+
+        <div v-else class="tbl-wrap">
+          <table class="ptbl">
+            <thead><tr>
+              <th class="l">Proyecto</th>
+              <th>Tipo de liquidación</th>
+            </tr></thead>
+            <tbody>
+              <tr v-for="c in clasFiltrados" :key="c.proyecto_id">
+                <td class="l"><span class="pname">{{ c.proyecto }}</span></td>
+                <td>
+                  <div class="seg" :class="'seg-' + c.tipo">
+                    <label :class="{ on: c.tipo === 'normal' }">
+                      <input type="radio" :value="'normal'" v-model="c.tipo" @change="clasDirty = true" /> Normal
+                    </label>
+                    <label :class="{ on: c.tipo === 'neu' }">
+                      <input type="radio" :value="'neu'" v-model="c.tipo" @change="clasDirty = true" /> NEU
+                    </label>
+                    <label :class="{ on: c.tipo === 'nitro' }">
+                      <input type="radio" :value="'nitro'" v-model="c.tipo" @change="clasDirty = true" /> NITRO
+                    </label>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </template>
+
     <!-- ── DIFERENCIA ── -->
-    <template v-else>
+    <template v-else-if="tab === 'diferencia'">
       <div v-if="loading" class="empty"><i class="pi pi-spin pi-spinner" /> Cargando…</div>
 
       <!-- Sin liquidación oficial todavía -->
@@ -341,7 +427,10 @@ const showPeriodoDialog = ref(false)
 const dlgMes = ref(null)   // 1..12
 const dlgAnio = ref(null)  // 2025 | 2026
 const dlgTipo = ref('preliquidacion')  // 'preliquidacion' | 'oficial'
+const dlgTipoCarga = ref('normal')     // 'normal' | 'neu' | 'nitro'
 const tipoCarga = ref('preliquidacion')  // tipo confirmado para la carga en curso
+const tipoCargaConfirm = ref('normal')   // tipo_carga confirmado para la carga en curso
+const rechazados = ref([])               // ER rechazados por clasificación cruzada
 const paneles = ref([])
 const diff = ref({})
 const open = reactive({})
@@ -353,6 +442,18 @@ const uploadMsg = ref('')
 const consIngIni = ref(793)
 const consCosIni = ref(850)
 const erInput = ref(null)
+
+// Clasificación de liquidación por período.
+const clasProyectos = ref([])
+const clasSearch = ref('')
+const clasLoading = ref(false)
+const clasSaving = ref(false)
+const clasDirty = ref(false)
+const clasFiltrados = computed(() => {
+  const q = clasSearch.value.trim().toLowerCase()
+  if (!q) return clasProyectos.value
+  return clasProyectos.value.filter(c => (c.proyecto || '').toLowerCase().includes(q))
+})
 
 const periodoLabel = computed(() => {
   if (!periodo.value) return ''
@@ -383,6 +484,7 @@ const utilidad = (inv) => inv.lineas.reduce((s, l) => s + (Number(l.valor_cop) |
 function setTab (t) {
   tab.value = t
   if (t === 'diferencia') cargarDiferencia()
+  else if (t === 'clasificacion') cargarClasificacion()
   else cargarPaneles()
 }
 function toggle (id) { open[id] = !open[id] }
@@ -416,6 +518,37 @@ async function cargarDiferencia () {
   }
 }
 
+async function cargarClasificacion () {
+  if (!periodo.value) { clasProyectos.value = []; return }
+  clasLoading.value = true
+  clasDirty.value = false
+  try {
+    const { data } = await api.get('/panel-contable/clasificacion', { params: { periodo: periodo.value } })
+    clasProyectos.value = (data.proyectos || []).map(p => ({ ...p }))
+  } catch (e) {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo cargar la clasificación', life: 4000 })
+  } finally {
+    clasLoading.value = false
+  }
+}
+
+async function guardarClasificacion () {
+  if (!periodo.value) return
+  clasSaving.value = true
+  try {
+    await api.post('/panel-contable/clasificacion', {
+      periodo: periodo.value,
+      asignaciones: clasProyectos.value.map(c => ({ proyecto_id: c.proyecto_id, tipo: c.tipo })),
+    })
+    clasDirty.value = false
+    toast.add({ severity: 'success', summary: 'Clasificación guardada', detail: periodoLabel.value, life: 3000 })
+  } catch (e) {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo guardar la clasificación', life: 4000 })
+  } finally {
+    clasSaving.value = false
+  }
+}
+
 // ── Flujo de carga: confirmar período en diálogo → abrir selector de archivos ──
 function abrirDialogoPeriodo () {
   // Preseleccionar el período activo si ya hay uno.
@@ -436,6 +569,7 @@ async function confirmarPeriodo () {
   if (!dlgMes.value || !dlgAnio.value || !dlgTipo.value) return
   periodo.value = `${dlgAnio.value}-${String(dlgMes.value).padStart(2, '0')}`
   tipoCarga.value = dlgTipo.value
+  tipoCargaConfirm.value = dlgTipoCarga.value
   // Posicionar la pestaña según el tipo elegido para ver lo que se cargará.
   tab.value = dlgTipo.value
   showPeriodoDialog.value = false
@@ -455,15 +589,19 @@ async function onErSelected (e) {
   const tipoSubida = tipoCarga.value  // tipo confirmado en el diálogo
   uploading.value = files.length
   uploadMsg.value = ''
+  rechazados.value = []
   const fd = new FormData()
   files.forEach(f => fd.append('files', f))
   fd.append('periodo', periodo.value)
   fd.append('tipo', tipoSubida)
+  fd.append('tipo_carga', tipoCargaConfirm.value)
   try {
     const { data } = await api.post('/panel-contable/cargar-er', fd)
+    rechazados.value = data.rechazados || []
     const partes = []
     if (data.cargados?.length) partes.push(`<b>${data.cargados.length}</b> cargados`)
     if (data.sin_match?.length) partes.push(`<span style="color:#c0392b">${data.sin_match.length} sin match: ${data.sin_match.join(', ')}</span>`)
+    if (data.rechazados?.length) partes.push(`<span style="color:#d35400">${data.rechazados.length} rechazados por clasificación</span>`)
     if (data.errores?.length) partes.push(`<span style="color:#c0392b">${data.errores.length} con error</span>`)
     uploadMsg.value = partes.join(' · ')
     toast.add({ severity: 'success', summary: 'ER procesados', detail: `${data.cargados?.length || 0} proyecto(s)`, life: 3500 })
@@ -579,6 +717,14 @@ onMounted(cargarPaneles)
 
 .banner { background:var(--info); color:var(--p1); padding:10px 14px; border-radius:9px; margin-bottom:14px; font-size:12.5px; }
 .banner-info { background:#faf8fd; border:1px solid var(--line); }
+.banner-rechazo { background:#fff4e8; border:1px solid #f5cda0; color:#8a4b00; }
+.rechazo-h { display:flex; align-items:center; gap:8px; }
+.rechazo-h .pi { color:#d35400; }
+.rechazo-list { margin:8px 0 0 26px; padding:0; list-style:disc; }
+.rechazo-list li { margin:2px 0; }
+.banner-aviso { display:flex; align-items:flex-start; gap:8px; background:#faf8fd; border-bottom:1px solid var(--line);
+  padding:10px 18px; font-size:12px; color:var(--txt2); }
+.banner-aviso .pi { color:var(--p2); margin-top:1px; }
 
 .card { background:#fff; border:1px solid var(--line); border-radius:12px; margin-bottom:16px; overflow:hidden; }
 .card-h { padding:13px 18px; border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; }
@@ -666,6 +812,19 @@ tr.tot td { background:var(--sec); font-weight:600; }
   border-radius:8px; color:var(--p1); background:#fff; cursor:pointer; }
 .dlg-select:focus { outline:none; border-color:var(--p2); }
 .tipo-opts { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.tipo-opts.tres { grid-template-columns:1fr 1fr 1fr; }
+.dlg-aviso { font-size:11.5px; color:var(--txt2); margin-top:10px; line-height:1.4;
+  background:#faf8fd; border:1px solid var(--line); border-radius:8px; padding:8px 10px; }
+.dlg-aviso b { color:var(--p2); }
+.search-in { font-size:13px; padding:7px 11px; border:1px solid #ddd6e8; border-radius:8px; color:#2C2039; min-width:200px; }
+.search-in:focus { outline:none; border-color:#915BD8; }
+/* Selector segmentado de tipo de liquidación */
+.seg { display:inline-flex; border:1px solid var(--line2); border-radius:8px; overflow:hidden; }
+.seg label { display:flex; align-items:center; gap:5px; font-size:12px; padding:5px 12px; cursor:pointer;
+  color:var(--txt2); border-right:1px solid var(--line2); transition:all .12s; }
+.seg label:last-child { border-right:none; }
+.seg label.on { background:var(--p2); color:#fff; font-weight:600; }
+.seg label input { display:none; }
 .tipo-opt { display:flex; align-items:center; gap:8px; padding:9px 11px; border:1px solid #ddd6e8;
   border-radius:8px; background:#fff; cursor:pointer; transition:all .15s; }
 .tipo-opt.on { border-color:#915BD8; background:#eee7fb; }
