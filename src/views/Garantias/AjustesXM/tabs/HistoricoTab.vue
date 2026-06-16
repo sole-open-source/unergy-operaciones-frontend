@@ -6,16 +6,18 @@
         @click="exportarExcel" />
     </div>
 
-    <!-- Loading -->
-    <div v-if="store.loading" class="text-center py-4" style="color:#6b5a8a">Cargando…</div>
+    <!-- Loading (solo en la primera carga, cuando aún no hay datos) -->
+    <div v-if="store.loading && !store.historial.length" class="text-center py-4" style="color:#6b5a8a">Cargando…</div>
 
-    <!-- Error de carga -->
-    <div v-else-if="store.errorMsg" class="rounded-lg p-4 text-center space-y-2" style="background:#FEF2F2;border:1px solid rgba(214,68,85,0.2)">
+    <!-- Error de carga (solo si no hay datos que mostrar) -->
+    <div v-else-if="store.errorMsg && !store.historial.length" class="rounded-lg p-4 text-center space-y-2" style="background:#FEF2F2;border:1px solid rgba(214,68,85,0.2)">
       <p class="text-sm" style="color:#D64455">No se pudo cargar el historial: {{ store.errorMsg }}</p>
       <Button label="Reintentar" icon="pi pi-refresh" size="small" outlined @click="store.cargar()" />
     </div>
 
+    <!-- Si ya hay datos, se renderizan siempre (una recarga en curso no oculta el contenido) -->
     <template v-else>
+      <p v-if="store.loading" class="text-xs text-center" style="color:#9ca3af">Actualizando…</p>
       <!-- 1. Gráfica de tendencia -->
       <div class="bg-white rounded-xl shadow-sm p-4 space-y-3" style="border:1px solid #e8e0f0">
         <div class="flex flex-wrap items-center justify-between gap-3">
