@@ -25,11 +25,11 @@
     <Dialog v-model:visible="showPeriodoDialog" modal :draggable="false" :closable="true"
             class="pc-dialog" :style="{ width: '420px' }">
       <template #header>
-        <div class="dlg-title">¿A qué período pertenecen estos ER?</div>
+        <div class="dlg-title">¿A qué período y tipo pertenecen estos ER?</div>
       </template>
       <p class="dlg-hint">
-        Confirma el mes y año. Los ER se cargarán y dividirán según los
-        inversionistas activos de ese período.
+        Confirma el mes, año y tipo de carga. Los ER se cargarán y dividirán según
+        los inversionistas activos de ese período.
       </p>
       <div class="dlg-grid">
         <div class="fld">
@@ -47,9 +47,22 @@
           </select>
         </div>
       </div>
+      <div class="fld" style="margin-top:14px;">
+        <label>Tipo de carga <span class="req">*</span></label>
+        <div class="tipo-opts">
+          <label class="tipo-opt" :class="{ on: dlgTipo === 'preliquidacion' }">
+            <input type="radio" value="preliquidacion" v-model="dlgTipo" />
+            <span><b>Preliquidación</b><small>estimado</small></span>
+          </label>
+          <label class="tipo-opt" :class="{ on: dlgTipo === 'oficial' }">
+            <input type="radio" value="oficial" v-model="dlgTipo" />
+            <span><b>Liquidación oficial</b><small>real</small></span>
+          </label>
+        </div>
+      </div>
       <template #footer>
         <button class="mini" @click="showPeriodoDialog = false">Cancelar</button>
-        <button class="btn" :disabled="!dlgMes || !dlgAnio" @click="confirmarPeriodo">
+        <button class="btn" :disabled="!dlgMes || !dlgAnio || !dlgTipo" @click="confirmarPeriodo">
           Continuar <i class="pi pi-arrow-right" style="font-size:11px;" />
         </button>
       </template>
@@ -327,6 +340,8 @@ const periodo = ref('')
 const showPeriodoDialog = ref(false)
 const dlgMes = ref(null)   // 1..12
 const dlgAnio = ref(null)  // 2025 | 2026
+const dlgTipo = ref('preliquidacion')  // 'preliquidacion' | 'oficial'
+const tipoCarga = ref('preliquidacion')  // tipo confirmado para la carga en curso
 const paneles = ref([])
 const diff = ref({})
 const open = reactive({})
@@ -412,12 +427,17 @@ function abrirDialogoPeriodo () {
     dlgMes.value = null
     dlgAnio.value = null
   }
+  // Tipo por defecto = pestaña activa (preliquidacion/oficial), si aplica.
+  dlgTipo.value = tab.value === 'oficial' ? 'oficial' : 'preliquidacion'
   showPeriodoDialog.value = true
 }
 
 async function confirmarPeriodo () {
-  if (!dlgMes.value || !dlgAnio.value) return
+  if (!dlgMes.value || !dlgAnio.value || !dlgTipo.value) return
   periodo.value = `${dlgAnio.value}-${String(dlgMes.value).padStart(2, '0')}`
+  tipoCarga.value = dlgTipo.value
+  // Posicionar la pestaña según el tipo elegido para ver lo que se cargará.
+  tab.value = dlgTipo.value
   showPeriodoDialog.value = false
   await cargarPaneles()          // refresca la vista al período confirmado
   await nextTick()
@@ -432,12 +452,13 @@ async function onErSelected (e) {
     if (erInput.value) erInput.value.value = ''
     return
   }
+  const tipoSubida = tipoCarga.value  // tipo confirmado en el diálogo
   uploading.value = files.length
   uploadMsg.value = ''
   const fd = new FormData()
   files.forEach(f => fd.append('files', f))
   fd.append('periodo', periodo.value)
-  fd.append('tipo', tab.value)
+  fd.append('tipo', tipoSubida)
   try {
     const { data } = await api.post('/panel-contable/cargar-er', fd)
     const partes = []
@@ -446,7 +467,13 @@ async function onErSelected (e) {
     if (data.errores?.length) partes.push(`<span style="color:#c0392b">${data.errores.length} con error</span>`)
     uploadMsg.value = partes.join(' · ')
     toast.add({ severity: 'success', summary: 'ER procesados', detail: `${data.cargados?.length || 0} proyecto(s)`, life: 3500 })
-    await cargarPaneles()
+    // Tras cargar la OFICIAL, ir a Diferencia y mostrar la comparación al instante.
+    if (tipoSubida === 'oficial') {
+      tab.value = 'diferencia'
+      await cargarDiferencia()
+    } else {
+      await cargarPaneles()
+    }
   } catch (err) {
     toast.add({ severity: 'error', summary: 'Error', detail: err.response?.data?.detail || 'Fallo al procesar ER', life: 5000 })
   } finally {
@@ -638,6 +665,14 @@ tr.tot td { background:var(--sec); font-weight:600; }
 .dlg-select { width:100%; font-size:13px; padding:8px 10px; border:1px solid var(--line2);
   border-radius:8px; color:var(--p1); background:#fff; cursor:pointer; }
 .dlg-select:focus { outline:none; border-color:var(--p2); }
+.tipo-opts { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.tipo-opt { display:flex; align-items:center; gap:8px; padding:9px 11px; border:1px solid #ddd6e8;
+  border-radius:8px; background:#fff; cursor:pointer; transition:all .15s; }
+.tipo-opt.on { border-color:#915BD8; background:#eee7fb; }
+.tipo-opt input { accent-color:#915BD8; cursor:pointer; }
+.tipo-opt span { display:flex; flex-direction:column; line-height:1.2; }
+.tipo-opt b { font-size:12.5px; color:#2C2039; font-weight:600; }
+.tipo-opt small { font-size:10.5px; color:#6b6478; }
 :deep(.pc-dialog) { border:1px solid var(--line); border-radius:14px; overflow:hidden; }
 :deep(.pc-dialog .p-dialog-header) { background:#faf8fd; border-bottom:1px solid var(--line); padding:14px 18px; }
 :deep(.pc-dialog .p-dialog-content) { padding:18px; background:var(--bg); }
