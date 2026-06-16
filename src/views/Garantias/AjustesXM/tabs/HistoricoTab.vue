@@ -9,6 +9,12 @@
     <!-- Loading -->
     <div v-if="store.loading" class="text-center py-4" style="color:#6b5a8a">Cargando…</div>
 
+    <!-- Error de carga -->
+    <div v-else-if="store.errorMsg" class="rounded-lg p-4 text-center space-y-2" style="background:#FEF2F2;border:1px solid rgba(214,68,85,0.2)">
+      <p class="text-sm" style="color:#D64455">No se pudo cargar el historial: {{ store.errorMsg }}</p>
+      <Button label="Reintentar" icon="pi pi-refresh" size="small" outlined @click="store.cargar()" />
+    </div>
+
     <template v-else>
       <!-- 1. Gráfica de tendencia -->
       <div class="bg-white rounded-xl shadow-sm p-4 space-y-3" style="border:1px solid #e8e0f0">
@@ -174,10 +180,10 @@ const rangos = [
 
 // Solo semanales con datos de tendencia, ordenados ascendente por fecha
 const semanales = computed(() =>
-  store.historial.value
-    .filter(r => r.tipo === 'semanal' && r.totalConsignar != null && r.pb != null)
+  (store.historial.value || [])
+    .filter(r => r && r.tipo === 'semanal' && r.totalConsignar != null && r.pb != null && r.fecha)
     .slice()
-    .sort((a, b) => a.fecha.localeCompare(b.fecha))
+    .sort((a, b) => String(a.fecha).localeCompare(String(b.fecha)))
 )
 
 const semanalesEnRango = computed(() => {
@@ -277,8 +283,9 @@ const chartOptions = computed(() => ({
 /* ------------------ Navegación por mes ------------------ */
 const mesesAgrupados = computed(() => {
   const groups = new Map()
-  for (const r of store.historial.value) {
-    const mes = (r.fecha || '').slice(0, 7)
+  for (const r of (store.historial.value || [])) {
+    if (!r) continue
+    const mes = String(r.fecha || '').slice(0, 7)
     if (!mes) continue
     if (!groups.has(mes)) groups.set(mes, [])
     groups.get(mes).push(r)
@@ -288,7 +295,7 @@ const mesesAgrupados = computed(() => {
     .map(([mes, registros]) => ({
       mes,
       label: mesLabel(mes),
-      registros: registros.slice().sort((a, b) => b.fecha.localeCompare(a.fecha)), // fecha desc
+      registros: registros.slice().sort((a, b) => String(b.fecha).localeCompare(String(a.fecha))), // fecha desc
     }))
 })
 

@@ -56,14 +56,20 @@ const MENCIONES_KEY = 'garantias_menciones'
 // y la vista no queda con una caché vacía propia de cada instancia.
 const historial = ref([])
 const loading = ref(false)
+const errorMsg = ref('')
 
 export function useGarantiasHistorial() {
 
   async function cargar() {
     loading.value = true
+    errorMsg.value = ''
     try {
       const { data } = await api.get('/garantias-ajustes')
-      historial.value = data.map(toFrontend)
+      historial.value = Array.isArray(data) ? data.map(toFrontend) : []
+    } catch (e) {
+      console.error('[garantias] cargar() falló:', e?.response?.data || e)
+      errorMsg.value = e?.response?.data?.detail || e?.message || 'No se pudo cargar el historial'
+      historial.value = []
     } finally {
       loading.value = false
     }
@@ -102,5 +108,5 @@ export function useGarantiasHistorial() {
     localStorage.setItem(MENCIONES_KEY, v)
   }
 
-  return { historial, loading, cargar, guardar, actualizar, eliminar, getPbAnterior, setPbAnterior, getMenciones, setMenciones }
+  return { historial, loading, errorMsg, cargar, guardar, actualizar, eliminar, getPbAnterior, setPbAnterior, getMenciones, setMenciones }
 }
