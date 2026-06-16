@@ -11,16 +11,49 @@
       </div>
       <div class="top-actions">
         <div class="fld">
-          <label>Período <span class="req">*</span></label>
+          <label>Ver período</label>
           <input type="month" v-model="periodo" class="month-in" @change="cargarPaneles" />
         </div>
-        <button v-if="tab !== 'diferencia'" class="btn-o" :disabled="loading || !periodo"
-                :title="!periodo ? 'Selecciona un período primero' : ''" @click="$refs.erInput.click()">
+        <button v-if="tab !== 'diferencia'" class="btn-o" :disabled="loading" @click="abrirDialogoPeriodo">
           <i class="pi pi-upload" /> Cargar ER
         </button>
         <input ref="erInput" type="file" accept=".xlsx,.xls" multiple class="hidden" @change="onErSelected" />
       </div>
     </div>
+
+    <!-- Diálogo: confirmar período antes de elegir archivos -->
+    <Dialog v-model:visible="showPeriodoDialog" modal :draggable="false" :closable="true"
+            class="pc-dialog" :style="{ width: '420px' }">
+      <template #header>
+        <div class="dlg-title">¿A qué período pertenecen estos ER?</div>
+      </template>
+      <p class="dlg-hint">
+        Confirma el mes y año. Los ER se cargarán y dividirán según los
+        inversionistas activos de ese período.
+      </p>
+      <div class="dlg-grid">
+        <div class="fld">
+          <label>Mes <span class="req">*</span></label>
+          <select v-model="dlgMes" class="dlg-select">
+            <option :value="null" disabled>Seleccionar mes</option>
+            <option v-for="(nombre, i) in MESES" :key="i" :value="i + 1">{{ nombre }}</option>
+          </select>
+        </div>
+        <div class="fld">
+          <label>Año <span class="req">*</span></label>
+          <select v-model="dlgAnio" class="dlg-select">
+            <option :value="null" disabled>Seleccionar año</option>
+            <option v-for="a in ANIOS" :key="a" :value="a">{{ a }}</option>
+          </select>
+        </div>
+      </div>
+      <template #footer>
+        <button class="mini" @click="showPeriodoDialog = false">Cancelar</button>
+        <button class="btn" :disabled="!dlgMes || !dlgAnio" @click="confirmarPeriodo">
+          Continuar <i class="pi pi-arrow-right" style="font-size:11px;" />
+        </button>
+      </template>
+    </Dialog>
 
     <!-- Tabs -->
     <div class="tabs">
@@ -268,9 +301,10 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, nextTick } from 'vue'
 import api from '@/api/client'
 import { useToast } from 'primevue/usetoast'
+import Dialog from 'primevue/dialog'
 
 const toast = useToast()
 
@@ -283,8 +317,16 @@ const grupos = [
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
+const ANIOS = [2025, 2026]
+
 const tab = ref('preliquidacion')
-const periodo = ref(defaultPeriodo())
+// El período nunca se asume: se confirma siempre en el diálogo antes de cargar ER.
+const periodo = ref('')
+
+// Diálogo de período previo a la carga de ER.
+const showPeriodoDialog = ref(false)
+const dlgMes = ref(null)   // 1..12
+const dlgAnio = ref(null)  // 2025 | 2026
 const paneles = ref([])
 const diff = ref({})
 const open = reactive({})
@@ -297,12 +339,8 @@ const consIngIni = ref(793)
 const consCosIni = ref(850)
 const erInput = ref(null)
 
-function defaultPeriodo () {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-}
-
 const periodoLabel = computed(() => {
+  if (!periodo.value) return ''
   const [y, m] = periodo.value.split('-')
   return `${MESES[Number(m) - 1] || ''} ${y}`
 })
@@ -361,6 +399,29 @@ async function cargarDiferencia () {
   } finally {
     loading.value = false
   }
+}
+
+// ── Flujo de carga: confirmar período en diálogo → abrir selector de archivos ──
+function abrirDialogoPeriodo () {
+  // Preseleccionar el período activo si ya hay uno.
+  if (periodo.value) {
+    const [y, m] = periodo.value.split('-')
+    dlgAnio.value = Number(y)
+    dlgMes.value = Number(m)
+  } else {
+    dlgMes.value = null
+    dlgAnio.value = null
+  }
+  showPeriodoDialog.value = true
+}
+
+async function confirmarPeriodo () {
+  if (!dlgMes.value || !dlgAnio.value) return
+  periodo.value = `${dlgAnio.value}-${String(dlgMes.value).padStart(2, '0')}`
+  showPeriodoDialog.value = false
+  await cargarPaneles()          // refresca la vista al período confirmado
+  await nextTick()
+  erInput.value?.click()         // recién ahora abre el selector de archivos
 }
 
 async function onErSelected (e) {
@@ -565,4 +626,17 @@ tr.tot td { background:var(--sec); font-weight:600; }
 .diff-dt th { text-align:right; }
 .diff-dt th.l { text-align:left; }
 .arrow { font-size:10px; }
+
+/* Diálogo de período */
+.dlg-title { font-size:15px; font-weight:600; color:var(--p1); }
+.dlg-hint { font-size:12.5px; color:var(--txt2); margin-bottom:14px; line-height:1.45; }
+.dlg-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.dlg-select { width:100%; font-size:13px; padding:8px 10px; border:1px solid var(--line2);
+  border-radius:8px; color:var(--p1); background:#fff; cursor:pointer; }
+.dlg-select:focus { outline:none; border-color:var(--p2); }
+:deep(.pc-dialog) { border:1px solid var(--line); border-radius:14px; overflow:hidden; }
+:deep(.pc-dialog .p-dialog-header) { background:#faf8fd; border-bottom:1px solid var(--line); padding:14px 18px; }
+:deep(.pc-dialog .p-dialog-content) { padding:18px; background:var(--bg); }
+:deep(.pc-dialog .p-dialog-footer) { display:flex; justify-content:flex-end; gap:8px;
+  padding:14px 18px; border-top:1px solid var(--line); background:#faf8fd; }
 </style>
