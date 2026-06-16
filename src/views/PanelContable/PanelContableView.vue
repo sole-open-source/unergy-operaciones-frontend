@@ -5,17 +5,68 @@
       <div>
         <h1>Panel Contable</h1>
         <div class="sub">
-          {{ periodoLabel }} · división por % del backend · IVA automático sobre costos
+          <span class="periodo-chip">{{ periodo ? periodoLabel : 'Sin período seleccionado' }}</span>
+          · división por % del backend (inversionistas activos del período) · IVA automático sobre costos
         </div>
       </div>
       <div class="top-actions">
-        <input type="month" v-model="periodo" class="month-in" @change="cargarPaneles" />
-        <button v-if="tab !== 'diferencia'" class="btn-o" :disabled="loading" @click="$refs.erInput.click()">
+        <div class="fld">
+          <label>Ver período</label>
+          <input type="month" v-model="periodo" class="month-in" @change="cargarPaneles" />
+        </div>
+        <button v-if="tab !== 'diferencia'" class="btn-o" :disabled="loading" @click="abrirDialogoPeriodo">
           <i class="pi pi-upload" /> Cargar ER
         </button>
         <input ref="erInput" type="file" accept=".xlsx,.xls" multiple class="hidden" @change="onErSelected" />
       </div>
     </div>
+
+    <!-- Diálogo: confirmar período antes de elegir archivos -->
+    <Dialog v-model:visible="showPeriodoDialog" modal :draggable="false" :closable="true"
+            class="pc-dialog" :style="{ width: '420px' }">
+      <template #header>
+        <div class="dlg-title">¿A qué período y tipo pertenecen estos ER?</div>
+      </template>
+      <p class="dlg-hint">
+        Confirma el mes, año y tipo de carga. Los ER se cargarán y dividirán según
+        los inversionistas activos de ese período.
+      </p>
+      <div class="dlg-grid">
+        <div class="fld">
+          <label>Mes <span class="req">*</span></label>
+          <select v-model="dlgMes" class="dlg-select">
+            <option :value="null" disabled>Seleccionar mes</option>
+            <option v-for="(nombre, i) in MESES" :key="i" :value="i + 1">{{ nombre }}</option>
+          </select>
+        </div>
+        <div class="fld">
+          <label>Año <span class="req">*</span></label>
+          <select v-model="dlgAnio" class="dlg-select">
+            <option :value="null" disabled>Seleccionar año</option>
+            <option v-for="a in ANIOS" :key="a" :value="a">{{ a }}</option>
+          </select>
+        </div>
+      </div>
+      <div class="fld" style="margin-top:14px;">
+        <label>Tipo de carga <span class="req">*</span></label>
+        <div class="tipo-opts">
+          <label class="tipo-opt" :class="{ on: dlgTipo === 'preliquidacion' }">
+            <input type="radio" value="preliquidacion" v-model="dlgTipo" />
+            <span><b>Preliquidación</b><small>estimado</small></span>
+          </label>
+          <label class="tipo-opt" :class="{ on: dlgTipo === 'oficial' }">
+            <input type="radio" value="oficial" v-model="dlgTipo" />
+            <span><b>Liquidación oficial</b><small>real</small></span>
+          </label>
+        </div>
+      </div>
+      <template #footer>
+        <button class="mini" @click="showPeriodoDialog = false">Cancelar</button>
+        <button class="btn" :disabled="!dlgMes || !dlgAnio || !dlgTipo" @click="confirmarPeriodo">
+          Continuar <i class="pi pi-arrow-right" style="font-size:11px;" />
+        </button>
+      </template>
+    </Dialog>
 
     <!-- Tabs -->
     <div class="tabs">
@@ -263,9 +314,10 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, nextTick } from 'vue'
 import api from '@/api/client'
 import { useToast } from 'primevue/usetoast'
+import Dialog from 'primevue/dialog'
 
 const toast = useToast()
 
@@ -278,8 +330,18 @@ const grupos = [
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
+const ANIOS = [2025, 2026]
+
 const tab = ref('preliquidacion')
-const periodo = ref(defaultPeriodo())
+// El período nunca se asume: se confirma siempre en el diálogo antes de cargar ER.
+const periodo = ref('')
+
+// Diálogo de período previo a la carga de ER.
+const showPeriodoDialog = ref(false)
+const dlgMes = ref(null)   // 1..12
+const dlgAnio = ref(null)  // 2025 | 2026
+const dlgTipo = ref('preliquidacion')  // 'preliquidacion' | 'oficial'
+const tipoCarga = ref('preliquidacion')  // tipo confirmado para la carga en curso
 const paneles = ref([])
 const diff = ref({})
 const open = reactive({})
@@ -292,12 +354,8 @@ const consIngIni = ref(793)
 const consCosIni = ref(850)
 const erInput = ref(null)
 
-function defaultPeriodo () {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-}
-
 const periodoLabel = computed(() => {
+  if (!periodo.value) return ''
   const [y, m] = periodo.value.split('-')
   return `${MESES[Number(m) - 1] || ''} ${y}`
 })
@@ -332,6 +390,7 @@ function markDirty (p) { dirty[p.id] = true; savedAt[p.id] = false }
 
 async function cargarPaneles () {
   if (tab.value === 'diferencia') return cargarDiferencia()
+  if (!periodo.value) { paneles.value = []; return }
   loading.value = true
   try {
     const { data } = await api.get('/panel-contable', { params: { periodo: periodo.value, tipo: tab.value } })
@@ -345,6 +404,7 @@ async function cargarPaneles () {
 }
 
 async function cargarDiferencia () {
+  if (!periodo.value) { diff.value = {}; return }
   loading.value = true
   try {
     const { data } = await api.get('/panel-contable/diferencia', { params: { periodo: periodo.value } })
@@ -356,15 +416,49 @@ async function cargarDiferencia () {
   }
 }
 
+// ── Flujo de carga: confirmar período en diálogo → abrir selector de archivos ──
+function abrirDialogoPeriodo () {
+  // Preseleccionar el período activo si ya hay uno.
+  if (periodo.value) {
+    const [y, m] = periodo.value.split('-')
+    dlgAnio.value = Number(y)
+    dlgMes.value = Number(m)
+  } else {
+    dlgMes.value = null
+    dlgAnio.value = null
+  }
+  // Tipo por defecto = pestaña activa (preliquidacion/oficial), si aplica.
+  dlgTipo.value = tab.value === 'oficial' ? 'oficial' : 'preliquidacion'
+  showPeriodoDialog.value = true
+}
+
+async function confirmarPeriodo () {
+  if (!dlgMes.value || !dlgAnio.value || !dlgTipo.value) return
+  periodo.value = `${dlgAnio.value}-${String(dlgMes.value).padStart(2, '0')}`
+  tipoCarga.value = dlgTipo.value
+  // Posicionar la pestaña según el tipo elegido para ver lo que se cargará.
+  tab.value = dlgTipo.value
+  showPeriodoDialog.value = false
+  await cargarPaneles()          // refresca la vista al período confirmado
+  await nextTick()
+  erInput.value?.click()         // recién ahora abre el selector de archivos
+}
+
 async function onErSelected (e) {
   const files = Array.from(e.target.files || [])
   if (!files.length) return
+  if (!periodo.value) {
+    toast.add({ severity: 'warn', summary: 'Período requerido', detail: 'Selecciona el mes/año antes de cargar ER', life: 4000 })
+    if (erInput.value) erInput.value.value = ''
+    return
+  }
+  const tipoSubida = tipoCarga.value  // tipo confirmado en el diálogo
   uploading.value = files.length
   uploadMsg.value = ''
   const fd = new FormData()
   files.forEach(f => fd.append('files', f))
   fd.append('periodo', periodo.value)
-  fd.append('tipo', tab.value)
+  fd.append('tipo', tipoSubida)
   try {
     const { data } = await api.post('/panel-contable/cargar-er', fd)
     const partes = []
@@ -373,7 +467,13 @@ async function onErSelected (e) {
     if (data.errores?.length) partes.push(`<span style="color:#c0392b">${data.errores.length} con error</span>`)
     uploadMsg.value = partes.join(' · ')
     toast.add({ severity: 'success', summary: 'ER procesados', detail: `${data.cargados?.length || 0} proyecto(s)`, life: 3500 })
-    await cargarPaneles()
+    // Tras cargar la OFICIAL, ir a Diferencia y mostrar la comparación al instante.
+    if (tipoSubida === 'oficial') {
+      tab.value = 'diferencia'
+      await cargarDiferencia()
+    } else {
+      await cargarPaneles()
+    }
   } catch (err) {
     toast.add({ severity: 'error', summary: 'Error', detail: err.response?.data?.detail || 'Fallo al procesar ER', life: 5000 })
   } finally {
@@ -459,13 +559,19 @@ onMounted(cargarPaneles)
 .pc-top { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:18px; }
 .pc-top h1 { font-size:20px; font-weight:600; color:var(--p1); }
 .pc-top .sub { font-size:13px; color:var(--txt2); margin-top:2px; }
-.top-actions { display:flex; gap:8px; align-items:center; }
+.periodo-chip { display:inline-block; background:var(--info); color:var(--p2); font-weight:600; padding:2px 9px; border-radius:7px; }
+.top-actions { display:flex; gap:10px; align-items:flex-end; }
+.req { color:var(--p2); }
 .month-in { font-size:13px; padding:8px 10px; border:1px solid var(--line2); border-radius:9px; color:var(--p1); }
-.btn { background:var(--p2); color:#fff; border:none; padding:9px 16px; border-radius:9px; font-size:13px; cursor:pointer; font-weight:500; }
-.btn:hover { filter:brightness(1.07); }
-.btn:disabled { opacity:.5; cursor:default; }
-.btn-o { background:#fff; color:var(--p2); border:1px solid var(--line2); padding:9px 16px; border-radius:9px; font-size:13px; cursor:pointer; font-weight:500; }
-.btn-o:hover { background:var(--sec); }
+/* Colores de marca en hex literal: estos botones también se usan dentro del
+   Dialog de PrimeVue, que se teletransporta a <body> fuera de .pc-wrap donde
+   las variables --p2/--line2/--sec no existen (por eso salían en blanco). */
+.btn { background:#915BD8; color:#fff; border:none; padding:9px 16px; border-radius:9px; font-size:13px; cursor:pointer; font-weight:500; }
+.btn:hover:not(:disabled) { filter:brightness(1.07); }
+.btn:disabled { opacity:.5; cursor:default; background:#915BD8; color:#fff; }
+.btn-o { background:#fff; color:#915BD8; border:1px solid #ddd6e8; padding:9px 16px; border-radius:9px; font-size:13px; cursor:pointer; font-weight:500; }
+.btn-o:hover:not(:disabled) { background:#f5f2fa; }
+.btn-o:disabled { opacity:.5; cursor:default; background:#fff; color:#915BD8; }
 
 .tabs { display:flex; gap:4px; margin-bottom:18px; border-bottom:1px solid var(--line2); }
 .tab { padding:9px 18px; font-size:13px; cursor:pointer; color:var(--txt2); border-bottom:2px solid transparent; margin-bottom:-1px; }
@@ -478,8 +584,8 @@ onMounted(cargarPaneles)
 .card-h { padding:13px 18px; border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; }
 .card-h h3 { font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:var(--p2); font-weight:600; }
 .pool-actions { display:flex; gap:8px; flex-wrap:wrap; }
-.mini { font-size:12px; padding:5px 11px; border-radius:7px; border:1px solid var(--line2); background:#fff; color:var(--txt2); cursor:pointer; }
-.mini:hover { background:var(--sec); }
+.mini { font-size:12px; padding:5px 11px; border-radius:7px; border:1px solid #ddd6e8; background:#fff; color:#6b6478; cursor:pointer; }
+.mini:hover { background:#f5f2fa; }
 
 .empty { padding:30px; text-align:center; color:var(--txt3); font-size:13px; }
 .empty.sm { padding:18px; }
@@ -551,4 +657,25 @@ tr.tot td { background:var(--sec); font-weight:600; }
 .diff-dt th { text-align:right; }
 .diff-dt th.l { text-align:left; }
 .arrow { font-size:10px; }
+
+/* Diálogo de período */
+.dlg-title { font-size:15px; font-weight:600; color:var(--p1); }
+.dlg-hint { font-size:12.5px; color:var(--txt2); margin-bottom:14px; line-height:1.45; }
+.dlg-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.dlg-select { width:100%; font-size:13px; padding:8px 10px; border:1px solid var(--line2);
+  border-radius:8px; color:var(--p1); background:#fff; cursor:pointer; }
+.dlg-select:focus { outline:none; border-color:var(--p2); }
+.tipo-opts { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.tipo-opt { display:flex; align-items:center; gap:8px; padding:9px 11px; border:1px solid #ddd6e8;
+  border-radius:8px; background:#fff; cursor:pointer; transition:all .15s; }
+.tipo-opt.on { border-color:#915BD8; background:#eee7fb; }
+.tipo-opt input { accent-color:#915BD8; cursor:pointer; }
+.tipo-opt span { display:flex; flex-direction:column; line-height:1.2; }
+.tipo-opt b { font-size:12.5px; color:#2C2039; font-weight:600; }
+.tipo-opt small { font-size:10.5px; color:#6b6478; }
+:deep(.pc-dialog) { border:1px solid var(--line); border-radius:14px; overflow:hidden; }
+:deep(.pc-dialog .p-dialog-header) { background:#faf8fd; border-bottom:1px solid var(--line); padding:14px 18px; }
+:deep(.pc-dialog .p-dialog-content) { padding:18px; background:var(--bg); }
+:deep(.pc-dialog .p-dialog-footer) { display:flex; justify-content:flex-end; gap:8px;
+  padding:14px 18px; border-top:1px solid var(--line); background:#faf8fd; }
 </style>
