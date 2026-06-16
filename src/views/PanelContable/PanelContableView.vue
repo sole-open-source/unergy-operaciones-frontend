@@ -5,12 +5,17 @@
       <div>
         <h1>Panel Contable</h1>
         <div class="sub">
-          {{ periodoLabel }} · división por % del backend · IVA automático sobre costos
+          <span class="periodo-chip">{{ periodo ? periodoLabel : 'Sin período seleccionado' }}</span>
+          · división por % del backend (inversionistas activos del período) · IVA automático sobre costos
         </div>
       </div>
       <div class="top-actions">
-        <input type="month" v-model="periodo" class="month-in" @change="cargarPaneles" />
-        <button v-if="tab !== 'diferencia'" class="btn-o" :disabled="loading" @click="$refs.erInput.click()">
+        <div class="fld">
+          <label>Período <span class="req">*</span></label>
+          <input type="month" v-model="periodo" class="month-in" @change="cargarPaneles" />
+        </div>
+        <button v-if="tab !== 'diferencia'" class="btn-o" :disabled="loading || !periodo"
+                :title="!periodo ? 'Selecciona un período primero' : ''" @click="$refs.erInput.click()">
           <i class="pi pi-upload" /> Cargar ER
         </button>
         <input ref="erInput" type="file" accept=".xlsx,.xls" multiple class="hidden" @change="onErSelected" />
@@ -332,6 +337,7 @@ function markDirty (p) { dirty[p.id] = true; savedAt[p.id] = false }
 
 async function cargarPaneles () {
   if (tab.value === 'diferencia') return cargarDiferencia()
+  if (!periodo.value) { paneles.value = []; return }
   loading.value = true
   try {
     const { data } = await api.get('/panel-contable', { params: { periodo: periodo.value, tipo: tab.value } })
@@ -345,6 +351,7 @@ async function cargarPaneles () {
 }
 
 async function cargarDiferencia () {
+  if (!periodo.value) { diff.value = {}; return }
   loading.value = true
   try {
     const { data } = await api.get('/panel-contable/diferencia', { params: { periodo: periodo.value } })
@@ -359,6 +366,11 @@ async function cargarDiferencia () {
 async function onErSelected (e) {
   const files = Array.from(e.target.files || [])
   if (!files.length) return
+  if (!periodo.value) {
+    toast.add({ severity: 'warn', summary: 'Período requerido', detail: 'Selecciona el mes/año antes de cargar ER', life: 4000 })
+    if (erInput.value) erInput.value.value = ''
+    return
+  }
   uploading.value = files.length
   uploadMsg.value = ''
   const fd = new FormData()
@@ -459,7 +471,9 @@ onMounted(cargarPaneles)
 .pc-top { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:18px; }
 .pc-top h1 { font-size:20px; font-weight:600; color:var(--p1); }
 .pc-top .sub { font-size:13px; color:var(--txt2); margin-top:2px; }
-.top-actions { display:flex; gap:8px; align-items:center; }
+.periodo-chip { display:inline-block; background:var(--info); color:var(--p2); font-weight:600; padding:2px 9px; border-radius:7px; }
+.top-actions { display:flex; gap:10px; align-items:flex-end; }
+.req { color:var(--p2); }
 .month-in { font-size:13px; padding:8px 10px; border:1px solid var(--line2); border-radius:9px; color:var(--p1); }
 .btn { background:var(--p2); color:#fff; border:none; padding:9px 16px; border-radius:9px; font-size:13px; cursor:pointer; font-weight:500; }
 .btn:hover { filter:brightness(1.07); }
