@@ -7,21 +7,21 @@
     </div>
 
     <!-- Loading (solo en la primera carga, cuando aún no hay datos) -->
-    <div v-if="store.loading && !store.historial.length" class="text-center py-6 space-y-3" style="color:#6b5a8a">
+    <div v-if="loading && !historial.length" class="text-center py-6 space-y-3" style="color:#6b5a8a">
       <p>Cargando…</p>
       <p class="text-xs" style="color:#9ca3af">Si tarda, el servidor puede estar despertando (arranque en frío).</p>
-      <Button label="Reintentar" icon="pi pi-refresh" size="small" outlined @click="store.cargar()" />
+      <Button label="Reintentar" icon="pi pi-refresh" size="small" outlined @click="cargar()" />
     </div>
 
     <!-- Error de carga (solo si no hay datos que mostrar) -->
-    <div v-else-if="store.errorMsg && !store.historial.length" class="rounded-lg p-4 text-center space-y-2" style="background:#FEF2F2;border:1px solid rgba(214,68,85,0.2)">
-      <p class="text-sm" style="color:#D64455">No se pudo cargar el historial: {{ store.errorMsg }}</p>
-      <Button label="Reintentar" icon="pi pi-refresh" size="small" outlined @click="store.cargar()" />
+    <div v-else-if="errorMsg && !historial.length" class="rounded-lg p-4 text-center space-y-2" style="background:#FEF2F2;border:1px solid rgba(214,68,85,0.2)">
+      <p class="text-sm" style="color:#D64455">No se pudo cargar el historial: {{ errorMsg }}</p>
+      <Button label="Reintentar" icon="pi pi-refresh" size="small" outlined @click="cargar()" />
     </div>
 
     <!-- Si ya hay datos, se renderizan siempre (una recarga en curso no oculta el contenido) -->
     <template v-else>
-      <p v-if="store.loading" class="text-xs text-center" style="color:#9ca3af">Actualizando…</p>
+      <p v-if="loading" class="text-xs text-center" style="color:#9ca3af">Actualizando…</p>
       <!-- 1. Gráfica de tendencia -->
       <div class="bg-white rounded-xl shadow-sm p-4 space-y-3" style="border:1px solid #e8e0f0">
         <div class="flex flex-wrap items-center justify-between gap-3">
@@ -95,7 +95,7 @@
                   <Button icon="pi pi-pencil" text rounded size="small" severity="secondary"
                     @click="abrirEditar(r)" />
                   <Button icon="pi pi-trash" text rounded size="small" severity="danger"
-                    @click="store.eliminar(r.id)" />
+                    @click="eliminar(r.id)" />
                 </div>
               </div>
               <!-- Hoja madre expandida -->
@@ -116,7 +116,7 @@
     <EditAjusteDialog
       v-model:visible="editVisible"
       :ajuste="editAjuste"
-      @saved="store.cargar()"
+      @saved="cargar()"
     />
   </div>
 </template>
@@ -138,9 +138,12 @@ import EditAjusteDialog from '../EditAjusteDialog.vue'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler)
 
-const store = useGarantiasHistorial()
+// Destructuramos las refs/funciones: al ser bindings de nivel superior, Vue las
+// auto-desempaqueta en el template (sin .value). Evita el bug de refs anidadas
+// (loading) que no se desempaquetan y dejan la condición de carga rota.
+const { historial, loading, errorMsg, cargar, eliminar } = useGarantiasHistorial()
 
-onMounted(() => store.cargar())
+onMounted(() => cargar())
 
 /* ------------------ Edición ------------------ */
 const editVisible = ref(false)
@@ -193,7 +196,7 @@ const rangos = [
 
 // Solo semanales con datos de tendencia, ordenados ascendente por fecha
 const semanales = computed(() => safe(() =>
-  (store.historial.value || [])
+  (historial.value || [])
     .filter(r => r && r.tipo === 'semanal' && r.totalConsignar != null && r.pb != null && r.fecha)
     .slice()
     .sort((a, b) => String(a.fecha).localeCompare(String(b.fecha))),
@@ -296,7 +299,7 @@ const chartOptions = computed(() => ({
 /* ------------------ Navegación por mes ------------------ */
 const mesesAgrupados = computed(() => safe(() => {
   const groups = new Map()
-  for (const r of (store.historial.value || [])) {
+  for (const r of (historial.value || [])) {
     if (!r) continue
     const mes = String(r.fecha || '').slice(0, 7)
     if (!mes) continue
@@ -334,6 +337,6 @@ watch(mesesAgrupados, (grupos) => {
 
 /* ------------------ Export ------------------ */
 function exportarExcel() {
-  exportHistorialExcel(store.historial.value)
+  exportHistorialExcel(historial.value)
 }
 </script>
