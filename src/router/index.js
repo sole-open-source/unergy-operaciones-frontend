@@ -28,6 +28,7 @@ const routes = [
   { path: '/proyectos/:id/representacion',  name: 'ProyectoRepresentacion',  component: () => import('@/views/Servicios/RepresentacionView.vue') },
   { path: '/servicios',    name: 'Servicios',    component: () => import('@/views/Contratos/ContratosListView.vue') },
   { path: '/contratos/:id',name: 'ContratoDetalle', component: () => import('@/views/Contratos/ContratoDetailView.vue') },
+  { path: '/general/proximos-energizar', name: 'ProximosEnergizar', component: () => import('@/views/General/ProximosEnergizarView.vue') },
 
   // ── Operaciones ──────────────────────────────────────────────────
   { path: '/operaciones/informes-mensuales', name: 'InformesMensuales', component: () => import('@/views/Operaciones/InformesMensualesView.vue'), meta: { roles: ['admin', 'operaciones', 'monitoreo'] } },
