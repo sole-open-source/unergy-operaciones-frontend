@@ -95,6 +95,8 @@
           <Button label="Volver" icon="pi pi-arrow-left" text severity="secondary" @click="activeStep = 0" />
           <div class="flex gap-2">
             <Button label="Exportar Excel" icon="pi pi-file-excel" outlined severity="secondary" size="small" @click="exportar" />
+            <Button label="Guardar en histórico" icon="pi pi-save" outlined size="small" :loading="guardando"
+              @click="guardarRegistro" style="color:#915BD8;border-color:#915BD8" />
             <Button label="Generar mensaje" icon="pi pi-arrow-right" icon-pos="right" @click="generarYAvanzar" style="background:#915BD8;border-color:#915BD8" />
           </div>
         </div>
@@ -148,7 +150,7 @@
         <Button label="Volver" icon="pi pi-arrow-left" text severity="secondary" @click="activeStep = 1" />
         <div class="flex gap-2">
           <Button label="Copiar" icon="pi pi-copy" outlined severity="secondary" @click="copiar" />
-          <Button label="Confirmar y guardar" icon="pi pi-check" @click="guardarRegistro" style="background:#915BD8;border-color:#915BD8" />
+          <Button label="Confirmar y guardar" icon="pi pi-check" :loading="guardando" @click="guardarRegistro" style="background:#915BD8;border-color:#915BD8" />
         </div>
       </div>
     </div>
@@ -187,6 +189,7 @@ const steps = [
 
 const activeStep = ref(0)
 const loading = ref(false)
+const guardando = ref(false)
 const parseErrors = ref([])
 const resultado = ref(null)
 
@@ -368,10 +371,13 @@ function exportar() {
 async function guardarRegistro() {
   if (!resultado.value) return
   const p = resultado.value.precios
+  // Fecha REAL de la semana (del nombre del archivo); si no se pudo extraer, hoy.
+  const fecha = resultado.value.fecha || fmtISODate(new Date())
+  guardando.value = true
   try {
     await store.guardar({
       tipo: 'semanal',
-      fecha: fmtISODate(new Date()),
+      fecha,
       pb: p?.pb ?? null,
       restricciones: p?.restricciones ?? null,
       stn: p?.stn ?? null,
@@ -379,7 +385,8 @@ async function guardarRegistro() {
       ptb: p?.ptb ?? null,
       totalUNGC: resultado.value.totalUNGC,
       totalUNGG: resultado.value.totalUNGG,
-      totalConsignar: esNegativo.value ? -montoEditable.value : montoEditable.value,
+      // Total con su signo real (negativo = devolución), independiente de lo editado en el mensaje.
+      totalConsignar: resultado.value.totalConsignar,
       disponibleCustodia: resultado.value.custodia?.disponible ?? null,
       congelado: resultado.value.custodia?.congelado ?? null,
       saldo: resultado.value.custodia?.saldo ?? null,
@@ -387,9 +394,13 @@ async function guardarRegistro() {
       snapshot: vistaActual.value,
     })
     if (p?.pb != null) store.setPbAnterior(p.pb)
-    toast.add({ severity: 'success', summary: 'Guardado en historial', life: 3000 })
+    toast.add({ severity: 'success', summary: 'Guardado en historial', detail: `Reporte del ${fecha}`, life: 3000 })
   } catch (e) {
-    toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo guardar el registro', life: 4000 })
+    const detalle = e?.response?.data?.detail || e?.message || 'Error desconocido'
+    console.error('[garantias] error al guardar registro:', e?.response?.data || e)
+    toast.add({ severity: 'error', summary: 'No se pudo guardar', detail: String(detalle), life: 6000 })
+  } finally {
+    guardando.value = false
   }
 }
 </script>

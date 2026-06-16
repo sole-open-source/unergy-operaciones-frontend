@@ -71,6 +71,32 @@ function num(v) {
   return isNaN(n) ? null : n
 }
 
+const MESES_ARCH = {
+  ene: '01', feb: '02', mar: '03', abr: '04', may: '05', jun: '06',
+  jul: '07', ago: '08', sep: '09', oct: '10', nov: '11', dic: '12',
+  jan: '01', apr: '04', aug: '08', dec: '12',
+}
+
+// Extrae la fecha REAL de la semana desde los nombres de archivo.
+// Ej.: "GARANTIA SEMANAL MENSUAL 12JUN-2026" → 2026-06-12 ; "Saldo cuenta custodia 2026-06-10" → 2026-06-10.
+// Devuelve ISO 'YYYY-MM-DD' o null si no encuentra fecha.
+function parseFechaArchivo(...names) {
+  for (const name of names) {
+    if (!name) continue
+    const s = String(name)
+    let m = s.match(/(\d{1,2})\s*([A-Za-z]{3,})[-_.\s]*(\d{4})/) // 12JUN-2026
+    if (m) {
+      const mes = MESES_ARCH[m[2].toLowerCase().slice(0, 3)]
+      if (mes) return `${m[3]}-${mes}-${String(m[1]).padStart(2, '0')}`
+    }
+    m = s.match(/(\d{4})-(\d{2})-(\d{2})/) // 2026-06-10
+    if (m) return `${m[1]}-${m[2]}-${m[3]}`
+    m = s.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/) // 10/06/2026
+    if (m) return `${m[3]}-${String(m[2]).padStart(2, '0')}-${String(m[1]).padStart(2, '0')}`
+  }
+  return null
+}
+
 function parseGarantiaSheet(wb) {
   const ws = findSheetByPattern(wb, /dep[oó]sito\s*sem/i)
   const rows = sheetRows(ws)
@@ -162,7 +188,7 @@ export async function parseSemanales(garantiaFile, saldoFile, webFile) {
   try { wWb = await readWorkbook(webFile) } catch (e) { errors.push(`Error leyendo WEB: ${e.message}`) }
 
   if (!gWb) {
-    return { ungc: [], ungg: [], custodia: null, precios: {}, totalUNGC: 0, totalUNGG: 0, totalConsignar: 0, fechaNombre: '', errors }
+    return { ungc: [], ungg: [], custodia: null, precios: {}, totalUNGC: 0, totalUNGG: 0, totalConsignar: 0, fechaNombre: '', fecha: null, errors }
   }
 
   const { adjColNames, agents, precios } = parseGarantiaSheet(gWb)
@@ -183,12 +209,13 @@ export async function parseSemanales(garantiaFile, saldoFile, webFile) {
   const totalUNGG = blkUNGG.total
   const totalConsignar = totalUNGC + totalUNGG
   const fechaNombre = garantiaFile.name.replace(/\.[^.]+$/, '')
+  const fecha = parseFechaArchivo(garantiaFile?.name, saldoFile?.name, webFile?.name)
 
   return {
     ungc: blkUNGC.rows, ungg: blkUNGG.rows,
     custodia, precios,
     totalUNGC, totalUNGG, totalConsignar,
-    fechaNombre, errors,
+    fechaNombre, fecha, errors,
   }
 }
 

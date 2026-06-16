@@ -52,9 +52,12 @@ function toBackend(r) {
 const PB_KEY = 'garantias_pb_anterior'
 const MENCIONES_KEY = 'garantias_menciones'
 
+// Estado compartido (singleton): así un guardado en Semanales se refleja en el Histórico
+// y la vista no queda con una caché vacía propia de cada instancia.
+const historial = ref([])
+const loading = ref(false)
+
 export function useGarantiasHistorial() {
-  const historial = ref([])
-  const loading = ref(false)
 
   async function cargar() {
     loading.value = true
