@@ -72,8 +72,17 @@
 
         <div class="ff-field">
           <label class="ff-label">
+            Hora identificación
+            <span class="ff-hint">(hora exacta en que se identificó)</span>
+          </label>
+          <DatePicker v-model="form.hora_identificacion" timeOnly hourFormat="24"
+            placeholder="HH:mm" class="w-full" showIcon />
+        </div>
+
+        <div class="ff-field">
+          <label class="ff-label">
             Fecha y hora ocurrencia
-            <span class="ff-hint">(si difiere de la identificación)</span>
+            <span class="ff-hint">(inicio de la afectación; si difiere de la identificación)</span>
           </label>
           <DatePicker v-model="form.fecha_ocurrencia" dateFormat="yy-mm-dd"
             showTime hourFormat="24" class="w-full" showIcon />
@@ -144,13 +153,19 @@
       </div>
     </div>
 
-    <!-- ── SECCIÓN: Resolución (solo al editar) ─────────────── -->
-    <div v-if="initial" class="ff-section ff-section--resolve">
-      <div class="ff-section-title"><i class="pi pi-check-circle" style="color:#16a34a" /> Resolución</div>
+    <!-- ── SECCIÓN: Resolución ──────────────────────────────── -->
+    <div class="ff-section ff-section--resolve">
+      <div class="ff-section-title">
+        <i class="pi pi-check-circle" style="color:#16a34a" /> Resolución
+        <span class="ff-hint" v-if="!initial">(opcional — si la falla ya está resuelta)</span>
+      </div>
       <div class="ff-grid">
 
         <div class="ff-field">
-          <label class="ff-label">Fecha de solución</label>
+          <label class="ff-label">
+            Fecha y hora de solución
+            <span class="ff-hint">(fin de la afectación)</span>
+          </label>
           <DatePicker v-model="form.fecha_resolucion" dateFormat="yy-mm-dd"
             placeholder="AAAA-MM-DD HH:mm" class="w-full" showButtonBar showIcon
             showTime hourFormat="24" />
@@ -162,6 +177,67 @@
             placeholder="Seleccionar tipo" showClear class="w-full" />
         </div>
 
+        <!-- Tiempo de afectación calculado automáticamente -->
+        <div v-if="tiempoAfectacionTexto" class="ff-field ff-span2 ff-afectacion">
+          <i class="pi pi-clock" style="color:#16a34a" />
+          <span>Tiempo de afectación: <strong>{{ tiempoAfectacionTexto }}</strong></span>
+          <span class="ff-hint">(solución − ocurrencia, automático)</span>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── SECCIÓN: Intervalos de afectación (disparos) ─────── -->
+    <div class="ff-section ff-section--intervalos">
+      <div class="ff-section-title">
+        <i class="pi pi-bolt" style="color:#d97706" /> Intervalos de afectación (disparos)
+        <span class="ff-hint">(agrupa varios disparos en esta misma falla)</span>
+      </div>
+
+      <p class="ff-intervalos-help">
+        Si el proyecto se disparó y re-energizó varias veces, registra cada disparo como un
+        intervalo (inicio → fin). El tiempo total de afectación se calcula sumando todos.
+      </p>
+
+      <div v-if="form.intervalos.length" class="ff-intervalos-list">
+        <div v-for="(iv, i) in form.intervalos" :key="i" class="ff-intervalo-row">
+          <span class="ff-intervalo-num">#{{ i + 1 }}</span>
+          <div class="ff-intervalo-fields">
+            <div class="ff-field">
+              <label class="ff-label">Disparo (inicio) *</label>
+              <DatePicker v-model="iv.inicio" dateFormat="yy-mm-dd" showTime hourFormat="24"
+                placeholder="AAAA-MM-DD HH:mm" class="w-full" showIcon
+                :class="{ 'p-invalid': iv._err }" />
+            </div>
+            <div class="ff-field">
+              <label class="ff-label">Re-energización (fin)
+                <span class="ff-hint">(vacío = sigue afectando)</span></label>
+              <DatePicker v-model="iv.fin" dateFormat="yy-mm-dd" showTime hourFormat="24"
+                placeholder="AAAA-MM-DD HH:mm" class="w-full" showIcon showButtonBar />
+            </div>
+            <div class="ff-field ff-span2">
+              <label class="ff-label">Nota <span class="ff-hint">(opcional)</span></label>
+              <InputText v-model="iv.nota" placeholder="Ej: causa del disparo, observación..."
+                class="w-full" style="font-size:12px" />
+            </div>
+          </div>
+          <div class="ff-intervalo-side">
+            <span v-if="duracionIntervalo(iv)" class="ff-intervalo-dur">{{ duracionIntervalo(iv) }}</span>
+            <button type="button" class="ff-intervalo-remove" @click="removeIntervalo(i)" title="Eliminar intervalo">
+              <i class="pi pi-trash" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="ff-intervalos-foot">
+        <Button type="button" label="Añadir intervalo" icon="pi pi-plus" size="small"
+          severity="secondary" outlined @click="addIntervalo" />
+        <span v-if="tiempoAfectacionIntervalos != null" class="ff-intervalos-total">
+          <i class="pi pi-clock" />
+          Total afectación: <strong>{{ fmtDuracion(tiempoAfectacionIntervalos) }}</strong>
+          <span class="ff-hint">({{ form.intervalos.length }} disparo{{ form.intervalos.length === 1 ? '' : 's' }})</span>
+        </span>
       </div>
     </div>
 
@@ -308,8 +384,9 @@ const form = ref({
   prioridad_id:         props.initial?.prioridad?.id ?? null,
   descripcion:          props.initial?.descripcion ?? '',
   fecha_identificacion: props.initial?.fecha_identificacion ? new Date(props.initial.fecha_identificacion) : null,
+  hora_identificacion:  props.initial?.hora_identificacion ? parseHora(props.initial.hora_identificacion) : null,
   fecha_ocurrencia:     props.initial?.fecha_ocurrencia ? new Date(props.initial.fecha_ocurrencia) : null,
-  fecha_resolucion:     props.initial?.fecha_resolucion ? new Date(props.initial.fecha_resolucion.slice(0, 10)) : null,
+  fecha_resolucion:     props.initial?.fecha_resolucion ? new Date(props.initial.fecha_resolucion) : null,
   tipo_solucion:        props.initial?.tipo_solucion ?? null,
   sla_limite_horas:     props.initial?.sla_limite_horas ?? null,
   causa_raiz:           props.initial?.causa_raiz ?? '',
@@ -318,8 +395,32 @@ const form = ref({
   energia_perdida_kwh:  props.initial?.energia_perdida_kwh ?? null,
   nota_inicial:         '',
   fecha_programada:     props.initial?.fecha_programada ? new Date(props.initial.fecha_programada) : null,
+  intervalos:           (props.initial?.intervalos ?? []).map(iv => ({
+                          inicio: iv.inicio ? new Date(iv.inicio) : null,
+                          fin:    iv.fin ? new Date(iv.fin) : null,
+                          nota:   iv.nota ?? '',
+                        })),
   notificacion:         false,   // siempre OFF por defecto — el usuario lo activa explícitamente
 })
+
+function addIntervalo() {
+  form.value.intervalos.push({ inicio: null, fin: null, nota: '' })
+}
+function removeIntervalo(i) {
+  form.value.intervalos.splice(i, 1)
+}
+// Duración de un intervalo en horas (fin − inicio; si no hay fin, hasta ahora)
+function horasIntervalo(iv) {
+  if (!iv?.inicio) return null
+  const ini = iv.inicio instanceof Date ? iv.inicio : new Date(iv.inicio)
+  const fin = iv.fin ? (iv.fin instanceof Date ? iv.fin : new Date(iv.fin)) : new Date()
+  const h = (fin - ini) / 3_600_000
+  return Number.isFinite(h) && h >= 0 ? h : null
+}
+function duracionIntervalo(iv) {
+  const h = horasIntervalo(iv)
+  return h == null ? null : fmtDuracion(h)
+}
 
 // Detectar si el estado seleccionado es "programado"
 const esEstadoProgramado = computed(() => {
@@ -376,6 +477,74 @@ function formatDate(d) {
   return d.toISOString().split('T')[0]
 }
 
+// "HH:MM" o "HH:MM:SS" → Date (solo hora) para el DatePicker timeOnly
+function parseHora(h) {
+  if (!h) return null
+  if (h instanceof Date) return h
+  const [hh, mm] = String(h).split(':')
+  const d = new Date()
+  d.setHours(Number(hh) || 0, Number(mm) || 0, 0, 0)
+  return d
+}
+
+// Date (timeOnly) → "HH:MM" para enviar al backend
+function formatHora(d) {
+  if (!d) return null
+  const dt = d instanceof Date ? d : new Date(d)
+  const hh = String(dt.getHours()).padStart(2, '0')
+  const mm = String(dt.getMinutes()).padStart(2, '0')
+  return `${hh}:${mm}`
+}
+
+// Convierte horas decimales a un texto legible: "3 h 30 min", "1 d 4 h", "45 min"
+function fmtDuracion(horas) {
+  if (horas == null || horas < 0) return null
+  const totalMin = Math.round(horas * 60)
+  if (totalMin === 0) return '0 min'
+  const dias = Math.floor(totalMin / 1440)
+  const hrs = Math.floor((totalMin % 1440) / 60)
+  const min = totalMin % 60
+  const parts = []
+  if (dias) parts.push(`${dias} d`)
+  if (hrs) parts.push(`${hrs} h`)
+  if (min) parts.push(`${min} min`)
+  return parts.join(' ')
+}
+
+// Suma en horas de todos los intervalos de disparo con inicio definido.
+const tiempoAfectacionIntervalos = computed(() => {
+  const conInicio = form.value.intervalos.filter(iv => iv.inicio)
+  if (!conInicio.length) return null
+  let total = 0
+  for (const iv of conInicio) {
+    const h = horasIntervalo(iv)
+    if (h != null) total += h
+  }
+  return total
+})
+
+// Tiempo de afectación calculado en vivo. Prefiere la suma de intervalos de
+// disparo si los hay; si no, usa solución − ocurrencia (o identificación + hora).
+const tiempoAfectacionTexto = computed(() => {
+  if (tiempoAfectacionIntervalos.value != null) {
+    return fmtDuracion(tiempoAfectacionIntervalos.value)
+  }
+  const fin = form.value.fecha_resolucion
+  if (!fin) return null
+  let inicio = form.value.fecha_ocurrencia
+  if (!inicio) {
+    if (!form.value.fecha_identificacion) return null
+    inicio = new Date(form.value.fecha_identificacion)
+    const h = form.value.hora_identificacion
+    if (h instanceof Date) inicio.setHours(h.getHours(), h.getMinutes(), 0, 0)
+    else inicio.setHours(0, 0, 0, 0)
+  }
+  const finDate = fin instanceof Date ? fin : new Date(fin)
+  const horas = (finDate - inicio) / 3_600_000
+  if (!Number.isFinite(horas) || horas < 0) return null
+  return fmtDuracion(horas)
+})
+
 async function submit() {
   if (!validate()) return
   saving.value = true
@@ -387,6 +556,7 @@ async function submit() {
       descripcion:          form.value.descripcion,
       fecha_identificacion: formatDate(form.value.fecha_identificacion),
     }
+    base.hora_identificacion = formatHora(form.value.hora_identificacion)
     if (form.value.tipo_libre?.trim())             base.tipo_libre           = form.value.tipo_libre.trim()
     if (form.value.sla_limite_horas)              base.sla_limite_horas     = form.value.sla_limite_horas
     if (form.value.fecha_ocurrencia)              base.fecha_ocurrencia     = form.value.fecha_ocurrencia.toISOString()
@@ -399,6 +569,18 @@ async function submit() {
     if (form.value.nota_inicial?.trim())          base.nota_inicial         = form.value.nota_inicial.trim()
     if (form.value.fecha_programada)             base.fecha_programada     = formatDate(form.value.fecha_programada)
     base.notificacion = !!form.value.notificacion
+
+    // Intervalos de disparo: solo los que tienen inicio. En edición se envía
+    // siempre (aunque vacío) para que el backend aplique replace-all y persista
+    // las eliminaciones. En creación solo si hay al menos uno.
+    const intervalosPayload = form.value.intervalos
+      .filter(iv => iv.inicio)
+      .map(iv => ({
+        inicio: (iv.inicio instanceof Date ? iv.inicio : new Date(iv.inicio)).toISOString(),
+        fin:    iv.fin ? (iv.fin instanceof Date ? iv.fin : new Date(iv.fin)).toISOString() : null,
+        nota:   iv.nota?.trim() || null,
+      }))
+    if (props.initial || intervalosPayload.length) base.intervalos = intervalosPayload
 
     if (props.initial) {
       emit('save', { ...base, proyecto_id: form.value.proyecto_id, _archivos: archivosStaged.value })
@@ -440,6 +622,87 @@ onMounted(async () => {
   margin-bottom: 4px;
 }
 
+/* ── Intervalos de disparo ── */
+.ff-section--intervalos {
+  background: #fffbeb;
+  border-radius: 10px;
+  padding: 12px 14px;
+  border: 1px solid #fde68a;
+  margin-bottom: 4px;
+}
+.ff-intervalos-help {
+  font-size: 11.5px;
+  color: #92400e;
+  margin: 0 0 10px;
+  line-height: 1.45;
+}
+.ff-intervalos-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.ff-intervalo-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  background: #fff;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  padding: 10px;
+}
+.ff-intervalo-num {
+  font-size: 11px;
+  font-weight: 800;
+  color: #d97706;
+  padding-top: 6px;
+  min-width: 22px;
+}
+.ff-intervalo-fields {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 12px;
+  min-width: 0;
+}
+.ff-intervalo-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+.ff-intervalo-dur {
+  font-size: 11px;
+  font-weight: 700;
+  color: #b45309;
+  white-space: nowrap;
+}
+.ff-intervalo-remove {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #dc2626;
+  font-size: 13px;
+  opacity: .75;
+  padding: 2px;
+}
+.ff-intervalo-remove:hover { opacity: 1; }
+.ff-intervalos-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.ff-intervalos-total {
+  font-size: 12.5px;
+  color: #92400e;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ff-intervalos-total strong { color: #b45309; }
+
 .ff-section-title {
   font-size: 11px;
   font-weight: 800;
@@ -480,6 +743,18 @@ onMounted(async () => {
   color: #dc2626;
   font-size: 11px;
 }
+.ff-afectacion {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: #166534;
+  background: #dcfce7;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+.ff-afectacion strong { font-weight: 700; }
 .ff-highlight {
   background: #eff6ff;
   border: 1.5px solid #bfdbfe;

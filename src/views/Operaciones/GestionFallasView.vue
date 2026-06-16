@@ -274,7 +274,10 @@
               </div>
               <div class="gf-fact">
                 <dt class="gf-fact-label"><i class="pi pi-calendar" /> Identificada</dt>
-                <dd class="gf-fact-value">{{ fmtFecha(drawerFalla.fecha_identificacion) }} <span class="text-gray-500">· {{ relativeTime(drawerFalla.fecha_identificacion) }}</span></dd>
+                <dd class="gf-fact-value">
+                  {{ fmtFecha(drawerFalla.fecha_identificacion) }}<span v-if="drawerFalla.hora_identificacion"> · {{ fmtHora(drawerFalla.hora_identificacion) }}</span>
+                  <span class="text-gray-500"> · {{ relativeTime(drawerFalla.fecha_identificacion) }}</span>
+                </dd>
               </div>
               <div class="gf-fact">
                 <dt class="gf-fact-label"><i class="pi pi-user-edit" /> Registrado por</dt>
@@ -282,7 +285,27 @@
               </div>
               <div v-if="drawerFalla.fecha_resolucion" class="gf-fact">
                 <dt class="gf-fact-label"><i class="pi pi-check-circle" /> Resuelta</dt>
-                <dd class="gf-fact-value text-emerald-700 font-semibold">{{ fmtFecha(drawerFalla.fecha_resolucion?.slice?.(0,10) || drawerFalla.fecha_resolucion) }}</dd>
+                <dd class="gf-fact-value text-emerald-700 font-semibold">{{ fmtFechaHora(drawerFalla.fecha_resolucion) }}</dd>
+              </div>
+              <div v-if="drawerFalla.tiempo_afectacion_horas != null" class="gf-fact">
+                <dt class="gf-fact-label"><i class="pi pi-clock" /> Tiempo de afectación</dt>
+                <dd class="gf-fact-value font-semibold" style="color:#b45309">{{ fmtDuracion(drawerFalla.tiempo_afectacion_horas) }}</dd>
+              </div>
+              <div v-if="drawerFalla.intervalos?.length" class="gf-fact gf-fact--full">
+                <dt class="gf-fact-label"><i class="pi pi-bolt" /> Disparos ({{ drawerFalla.intervalos.length }})</dt>
+                <dd class="gf-fact-value">
+                  <ul class="gf-intervalos">
+                    <li v-for="(iv, i) in drawerFalla.intervalos" :key="iv.id ?? i" class="gf-intervalo">
+                      <span class="gf-intervalo-idx">#{{ i + 1 }}</span>
+                      <span class="gf-intervalo-rango">
+                        {{ fmtFechaHora(iv.inicio) }}
+                        <i class="pi pi-arrow-right" style="font-size:9px;opacity:.5" />
+                        {{ iv.fin ? fmtFechaHora(iv.fin) : 'en curso' }}
+                      </span>
+                      <span v-if="iv.duracion_horas != null" class="gf-intervalo-dur">{{ fmtDuracion(iv.duracion_horas) }}</span>
+                    </li>
+                  </ul>
+                </dd>
               </div>
               <div v-if="drawerFalla.energia_perdida_kwh != null" class="gf-fact">
                 <dt class="gf-fact-label"><i class="pi pi-bolt" /> Energía perdida</dt>
@@ -718,17 +741,33 @@ async function onSaveForm(payload) {
   savingForm.value = true
   try {
     if (editingFalla.value) {
-      const notaInicial = payload.nota_inicial
-      delete payload.nota_inicial
-      await api.patch(`/fallas/${editingFalla.value.id}`, payload)
-      if (notaInicial) await api.post(`/fallas/${editingFalla.value.id}/seguimientos`, { nota: notaInicial })
+      // eslint-disable-next-line no-unused-vars
+      const { nota_inicial: notaInicial, _archivos, ...patchPayload } = payload
+      await api.patch(`/fallas/${editingFalla.value.id}`, patchPayload)
+      if (notaInicial) {
+        api.post(`/fallas/${editingFalla.value.id}/seguimientos`, { nota: notaInicial }).catch(() => {})
+      }
       toast.add({ severity: 'success', summary: 'Falla actualizada', life: 2500 })
     } else {
-      const notaInicial = payload.nota_inicial
-      delete payload.nota_inicial
-      const { data: nueva } = await api.post('/fallas', payload)
-      if (notaInicial) await api.post(`/fallas/${nueva.id}/seguimientos`, { nota: notaInicial })
-      toast.add({ severity: 'success', summary: 'Falla registrada', life: 2500 })
+      // Al crear: puede venir proyecto_ids (array) → una falla por proyecto
+      // eslint-disable-next-line no-unused-vars
+      const { proyecto_ids, nota_inicial, _archivos, ...basePayload } = payload
+      const ids = proyecto_ids?.length ? proyecto_ids : [basePayload.proyecto_id].filter(Boolean)
+      if (!ids.length) throw new Error('Selecciona al menos un proyecto')
+      const created = []
+      for (const pid of ids) {
+        const { data: nueva } = await api.post('/fallas', { ...basePayload, proyecto_id: pid })
+        created.push(nueva)
+        // La nota inicial se agrega por separado — no bloquea el guardado si falla
+        if (nota_inicial) {
+          api.post(`/fallas/${nueva.id}/seguimientos`, { nota: nota_inicial }).catch(() => {})
+        }
+      }
+      toast.add({
+        severity: 'success',
+        summary: created.length > 1 ? `${created.length} fallas registradas` : 'Falla registrada',
+        life: 2500,
+      })
     }
     formDialogVisible.value = false
     await cargar()
@@ -980,6 +1019,34 @@ function fmtFecha(d) {
   if (!d) return '—'
   return new Date(d + 'T00:00:00').toLocaleDateString('es-CO',
     { day: '2-digit', month: 'short', year: 'numeric' })
+}
+
+// Fecha + hora (para fechas con timestamp completo, ej. resolución)
+function fmtFechaHora(d) {
+  if (!d) return '—'
+  return new Date(d).toLocaleString('es-CO',
+    { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
+// "08:30" / "08:30:00" → "08:30"
+function fmtHora(h) {
+  if (!h) return ''
+  return String(h).slice(0, 5)
+}
+
+// Horas decimales → "1 d 4 h", "3 h 30 min", "45 min"
+function fmtDuracion(horas) {
+  if (horas == null || horas < 0) return '—'
+  const totalMin = Math.round(horas * 60)
+  if (totalMin === 0) return '0 min'
+  const dias = Math.floor(totalMin / 1440)
+  const hrs = Math.floor((totalMin % 1440) / 60)
+  const min = totalMin % 60
+  const parts = []
+  if (dias) parts.push(`${dias} d`)
+  if (hrs) parts.push(`${hrs} h`)
+  if (min) parts.push(`${min} min`)
+  return parts.join(' ')
 }
 
 function relativeTime(d, includeAbsolute = false) {
@@ -1526,6 +1593,16 @@ watch(bucket, (newBucket) => {
   margin: 0;
   word-break: break-word;
 }
+.gf-fact--full { grid-column: 1 / -1; }
+.gf-intervalos { list-style: none; margin: 2px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.gf-intervalo {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px;
+  padding: 4px 8px; font-size: 12px;
+}
+.gf-intervalo-idx { font-weight: 800; color: #d97706; }
+.gf-intervalo-rango { color: #2C2039; flex: 1; min-width: 0; }
+.gf-intervalo-dur { font-weight: 700; color: #b45309; white-space: nowrap; }
 
 /* Grid 2-col para Edición rápida + SLA en pantallas anchas */
 .gf-twocol {

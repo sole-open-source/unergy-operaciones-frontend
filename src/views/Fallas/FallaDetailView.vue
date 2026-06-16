@@ -84,10 +84,14 @@
             <InfoField label="Registrado por" :value="falla.registrado_por?.nombre" />
             <InfoField label="Asignado a" :value="falla.asignado_a?.nombre || 'Sin asignar'" />
             <InfoField label="Fecha ocurrencia" :value="fmtDatetime(falla.fecha_ocurrencia)" />
-            <InfoField label="Fecha identificación" :value="fmtDate(falla.fecha_identificacion)" />
+            <InfoField label="Fecha identificación" :value="fmtFechaConHora(falla.fecha_identificacion, falla.hora_identificacion)" />
             <div v-if="falla.fecha_resolucion">
               <p class="text-xs text-gray-400 uppercase tracking-wide">Fecha resolución</p>
               <p class="font-semibold mt-0.5 text-emerald-600">{{ fmtDatetime(falla.fecha_resolucion) }}</p>
+            </div>
+            <div v-if="falla.tiempo_afectacion_horas != null">
+              <p class="text-xs text-gray-400 uppercase tracking-wide">Tiempo de afectación</p>
+              <p class="font-semibold mt-0.5" style="color:#b45309">{{ fmtDuracion(falla.tiempo_afectacion_horas) }}</p>
             </div>
             <InfoField v-if="falla.resolucion" label="Tipo resolución" :value="falla.resolucion?.etiqueta" />
           </div>
@@ -427,6 +431,24 @@ function fmtDatetime(d) {
   if (!d) return '—'
   return new Date(d).toLocaleString('es-CO',
     { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+function fmtFechaConHora(d, hora) {
+  if (!d) return '—'
+  const base = fmtDate(d)
+  return hora ? `${base} · ${String(hora).slice(0, 5)}` : base
+}
+function fmtDuracion(horas) {
+  if (horas == null || horas < 0) return '—'
+  const totalMin = Math.round(horas * 60)
+  if (totalMin === 0) return '0 min'
+  const dias = Math.floor(totalMin / 1440)
+  const hrs = Math.floor((totalMin % 1440) / 60)
+  const min = totalMin % 60
+  const parts = []
+  if (dias) parts.push(`${dias} d`)
+  if (hrs) parts.push(`${hrs} h`)
+  if (min) parts.push(`${min} min`)
+  return parts.join(' ')
 }
 function driveFileId(url) {
   const m = (url || '').match(/\/file\/d\/([^/?#]+)/)
