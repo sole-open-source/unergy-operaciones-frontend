@@ -291,22 +291,6 @@
                 <dt class="gf-fact-label"><i class="pi pi-clock" /> Tiempo de afectación</dt>
                 <dd class="gf-fact-value font-semibold" style="color:#b45309">{{ fmtDuracion(drawerFalla.tiempo_afectacion_horas) }}</dd>
               </div>
-              <div v-if="drawerFalla.intervalos?.length" class="gf-fact gf-fact--full">
-                <dt class="gf-fact-label"><i class="pi pi-bolt" /> Disparos ({{ drawerFalla.intervalos.length }})</dt>
-                <dd class="gf-fact-value">
-                  <ul class="gf-intervalos">
-                    <li v-for="(iv, i) in drawerFalla.intervalos" :key="iv.id ?? i" class="gf-intervalo">
-                      <span class="gf-intervalo-idx">#{{ i + 1 }}</span>
-                      <span class="gf-intervalo-rango">
-                        {{ fmtFechaHora(iv.inicio) }}
-                        <i class="pi pi-arrow-right" style="font-size:9px;opacity:.5" />
-                        {{ iv.fin ? fmtFechaHora(iv.fin) : 'en curso' }}
-                      </span>
-                      <span v-if="iv.duracion_horas != null" class="gf-intervalo-dur">{{ fmtDuracion(iv.duracion_horas) }}</span>
-                    </li>
-                  </ul>
-                </dd>
-              </div>
               <div v-if="drawerFalla.energia_perdida_kwh != null" class="gf-fact">
                 <dt class="gf-fact-label"><i class="pi pi-bolt" /> Energía perdida</dt>
                 <dd class="gf-fact-value text-red-700 font-semibold">{{ Number(drawerFalla.energia_perdida_kwh).toLocaleString('es-CO') }} kWh</dd>
@@ -1593,17 +1577,6 @@ watch(bucket, (newBucket) => {
   margin: 0;
   word-break: break-word;
 }
-.gf-fact--full { grid-column: 1 / -1; }
-.gf-intervalos { list-style: none; margin: 2px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
-.gf-intervalo {
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-  background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px;
-  padding: 4px 8px; font-size: 12px;
-}
-.gf-intervalo-idx { font-weight: 800; color: #d97706; }
-.gf-intervalo-rango { color: #2C2039; flex: 1; min-width: 0; }
-.gf-intervalo-dur { font-weight: 700; color: #b45309; white-space: nowrap; }
-
 /* Grid 2-col para Edición rápida + SLA en pantallas anchas */
 .gf-twocol {
   display: grid;
