@@ -63,11 +63,13 @@ export function useGarantiasHistorial() {
   async function cargar() {
     loading.value = true
     errorMsg.value = ''
+    console.log('[hist] cargar: GET /garantias-ajustes …')
     try {
       const { data } = await api.get('/garantias-ajustes')
       historial.value = Array.isArray(data) ? data.map(toFrontend) : []
+      console.log('[hist] cargar: OK, registros =', historial.value.length)
     } catch (e) {
-      console.error('[garantias] cargar() falló:', e?.response?.data || e)
+      console.error('[hist] cargar: ERROR', e?.response?.status, e?.response?.data || e?.message || e)
       errorMsg.value = e?.response?.data?.detail || e?.message || 'No se pudo cargar el historial'
       historial.value = []
     } finally {

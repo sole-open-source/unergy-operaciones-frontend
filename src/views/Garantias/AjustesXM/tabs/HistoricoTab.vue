@@ -7,7 +7,11 @@
     </div>
 
     <!-- Loading (solo en la primera carga, cuando aún no hay datos) -->
-    <div v-if="store.loading && !store.historial.length" class="text-center py-4" style="color:#6b5a8a">Cargando…</div>
+    <div v-if="store.loading && !store.historial.length" class="text-center py-6 space-y-3" style="color:#6b5a8a">
+      <p>Cargando…</p>
+      <p class="text-xs" style="color:#9ca3af">Si tarda, el servidor puede estar despertando (arranque en frío).</p>
+      <Button label="Reintentar" icon="pi pi-refresh" size="small" outlined @click="store.cargar()" />
+    </div>
 
     <!-- Error de carga (solo si no hay datos que mostrar) -->
     <div v-else-if="store.errorMsg && !store.historial.length" class="rounded-lg p-4 text-center space-y-2" style="background:#FEF2F2;border:1px solid rgba(214,68,85,0.2)">
