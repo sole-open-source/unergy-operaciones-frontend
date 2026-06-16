@@ -107,7 +107,7 @@
         <!-- Campos editables -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div class="space-y-1">
-            <label class="text-xs font-semibold uppercase tracking-wide" style="color:#6b5a8a">Total a consignar ($)</label>
+            <label class="text-xs font-semibold uppercase tracking-wide" style="color:#6b5a8a">{{ esNegativo ? 'Recursos que regresan ($)' : 'Total a consignar ($)' }}</label>
             <InputNumber v-model="montoEditable" fluid :max-fraction-digits="0" @update:model-value="actualizarMensaje" />
           </div>
           <div class="space-y-1">
@@ -128,8 +128,13 @@
         </div>
 
         <div class="space-y-1">
-          <label class="text-xs font-semibold uppercase tracking-wide" style="color:#6b5a8a">Contexto adicional (opcional)</label>
+          <label class="text-xs font-semibold uppercase tracking-wide" style="color:#6b5a8a">Nota de contexto (opcional)</label>
           <Textarea v-model="contexto" rows="2" fluid @input="actualizarMensaje" placeholder="Notas adicionales..." />
+        </div>
+
+        <div class="space-y-1">
+          <label class="text-xs font-semibold uppercase tracking-wide" style="color:#6b5a8a">Frase de tendencia (editable)</label>
+          <Textarea v-model="tendencia" rows="2" fluid @input="actualizarMensaje" />
         </div>
 
         <!-- Mensaje generado -->
@@ -219,7 +224,11 @@ const montoEditable = ref(0)
 const variacionPb = ref(null)
 const mencionesEditable = ref('')
 const contexto = ref('')
+const tendencia = ref('')
 const mensajeEditable = ref('')
+
+// El TOTAL A PAGAR (UNGG+UNGC) negativo = devolución de recursos (no se consigna).
+const esNegativo = computed(() => (resultado.value?.totalConsignar ?? 0) < 0)
 
 // Vista completa de la hoja madre (se muestra en vivo y se guarda como snapshot).
 const vistaActual = computed(() => {
@@ -286,7 +295,7 @@ async function procesar() {
 
 function generarYAvanzar() {
   if (!resultado.value) return
-  montoEditable.value = resultado.value.totalConsignar
+  montoEditable.value = Math.abs(resultado.value.totalConsignar || 0)
   const pbAnterior = store.getPbAnterior()
   const pbActual = resultado.value.precios?.pb
   if (pbAnterior != null && pbActual != null && pbAnterior !== 0) {
@@ -294,33 +303,47 @@ function generarYAvanzar() {
   } else {
     variacionPb.value = null
   }
+  tendencia.value = esNegativo.value
+    ? 'la bolsa presenta una tendencia a la baja, que se refleja en las garantías por precio'
+    : 'la bolsa presenta una tendencia al alza, que se refleja en las garantías por precio'
   mencionesEditable.value = store.getMenciones()
   contexto.value = ''
   actualizarMensaje()
   activeStep.value = 2
 }
 
+// Variación del PB: "Aumento del X%" / "Disminución del X%" (abs, 2 decimales).
+function variacionTexto() {
+  const v = variacionPb.value
+  if (v == null) return ''
+  const abs = Math.abs(v).toFixed(2)
+  return v >= 0 ? `Aumento del ${abs}%` : `Disminución del ${abs}%`
+}
+
 function actualizarMensaje() {
   if (!resultado.value) return
-  const p = resultado.value.precios
-  const variStr = variacionPb.value != null
-    ? `(${variacionPb.value > 0 ? '+' : ''}${variacionPb.value}% vs semana anterior)`
-    : ''
-  mensajeEditable.value = `Garantías Semanales — ${resultado.value.fechaNombre}
+  const pb = resultado.value.precios?.pb
+  const pbFmt = pb != null
+    ? new Intl.NumberFormat('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(pb)
+    : '—'
+  const variStr = variacionTexto()
+  const pbLinea = `Precio de bolsa del cálculo: $${pbFmt}${variStr ? ` (${variStr})` : ''}`
+  const tendLinea = tendencia.value ? `\n${tendencia.value}` : ''
+  const menc = mencionesEditable.value ? `\n\n${mencionesEditable.value}` : ''
+  const nota = contexto.value ? ` ${contexto.value}` : ''
+  const monto = fmtCOP(montoEditable.value)
 
-UNGC: ${fmtCOP(resultado.value.totalUNGC)}
-UNGG: ${fmtCOP(resultado.value.totalUNGG)}
-Total a consignar: ${fmtCOP(montoEditable.value)}
+  if (esNegativo.value) {
+    mensajeEditable.value = `Para esta semana nos están regresando recursos ${monto}, por lo que no hay valor a consignar.${nota}
 
-Disponible custodia (neto): ${fmtCOP(disponibleNeto.value)}${facturasDescontadas.value ? `\n  (crudo ${fmtCOP(disponibleCrudo.value)} − facturas ${fmtCOP(facturasDescontadas.value)})` : ''}
-Congelado: ${fmtCOP(resultado.value.custodia?.congelado)}
-Saldo custodia: ${fmtCOP(resultado.value.custodia?.saldo)}${p ? `
+${pbLinea}${tendLinea}${menc}`
+  } else {
+    mensajeEditable.value = `Para esta semana el total a consignar es de ${monto}${nota}.
 
-PB: $${p.pb?.toFixed(2) ?? '—'} ${variStr}
-Restricciones: $${p.restricciones?.toFixed(2) ?? '—'}
-STN: $${p.stn?.toFixed(2) ?? '—'}
-TRM: ${fmtCOP(p.trm)}
-PTB: $${p.ptb?.toFixed(2) ?? '—'}` : ''}${contexto.value ? '\n\n' + contexto.value : ''}${mencionesEditable.value ? '\n\n' + mencionesEditable.value : ''}`
+Les recuerdo que este dinero debe estar en la cuenta custodia a más tardar el viernes.
+
+${pbLinea}${tendLinea}${menc}`
+  }
 }
 
 async function copiar() {
@@ -356,7 +379,7 @@ async function guardarRegistro() {
       ptb: p?.ptb ?? null,
       totalUNGC: resultado.value.totalUNGC,
       totalUNGG: resultado.value.totalUNGG,
-      totalConsignar: montoEditable.value,
+      totalConsignar: esNegativo.value ? -montoEditable.value : montoEditable.value,
       disponibleCustodia: resultado.value.custodia?.disponible ?? null,
       congelado: resultado.value.custodia?.congelado ?? null,
       saldo: resultado.value.custodia?.saldo ?? null,
