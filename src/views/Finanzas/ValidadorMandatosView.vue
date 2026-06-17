@@ -276,10 +276,13 @@ function initValidador(el) {
           tagsAnaliticos  = pa.tags
         } catch (e2) { asientosDetalle = []; tagsAnaliticos = [] }
         const label = $('xlsxLabel')
-        label.innerHTML = `<b style="color:var(--ok)">✅ ${file.name}</b> — <span style="color:#64748b">${contabilidadData.length} registros cargados</span>`
+        const esCostos = currentConcMode === 'costos'
+        const cuenta = esCostos ? asientosDetalle.length : contabilidadData.length
+        label.innerHTML = `<b style="color:var(--ok)">✅ ${file.name}</b> — <span style="color:#64748b">${cuenta} ${esCostos ? 'líneas de detalle' : 'registros'} cargados</span>`
         $('dzExcel').classList.add('loaded')
-        $('xlsxStatus').textContent =
-          `Periodo detectado: ${detectPeriodo(rows)} · Cuenta 28150505: ${contabilidadData.length} líneas agrupadas`
+        $('xlsxStatus').textContent = esCostos
+          ? `Periodo: ${detectPeriodo(rows)} · ${asientosDetalle.length} líneas · ${tagsAnaliticos.length} proyectos (etiquetas analíticas)`
+          : `Periodo detectado: ${detectPeriodo(rows)} · Cuenta 28150505: ${contabilidadData.length} líneas agrupadas`
         updateConcBtn()
       } catch(err) {
         $('xlsxLabel').innerHTML = `<span style="color:var(--err)">❌ Error leyendo el archivo: ${err.message}</span>`
@@ -371,6 +374,7 @@ function initValidador(el) {
     $('concTableContainer').style.display = 'none'
     $('concCostosContainer').style.display = 'none'
     $('concStatsBar').style.display = 'none'
+    updateConcBtn()
   }
 
   function updateConcUI() {
@@ -384,7 +388,9 @@ function initValidador(el) {
 
   function updateConcBtn() {
     const hasPdfs  = $('concFileInput').files.length > 0
-    const hasXlsx  = contabilidadData.length > 0
+    const hasXlsx  = currentConcMode === 'costos'
+      ? asientosDetalle.length > 0
+      : contabilidadData.length > 0
     $('btnConc').disabled = !(hasPdfs && hasXlsx)
   }
 
