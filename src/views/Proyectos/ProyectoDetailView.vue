@@ -102,6 +102,14 @@
                 </a>
               </div>
             </div>
+            <!-- Documentación -->
+            <div v-if="proyecto.info_tecnica?.retie_url">
+              <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Documentación</p>
+              <a :href="proyecto.info_tecnica.retie_url" target="_blank" rel="noopener"
+                 class="inline-flex items-center gap-1 text-blue-600 hover:underline text-xs">
+                <i class="pi pi-file" /> RETIE
+              </a>
+            </div>
             <!-- Eléctrico general -->
             <div>
               <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">General</p>
@@ -181,6 +189,10 @@
                 <div class="flex flex-col gap-1">
                   <label class="field-label">Link Google Maps</label>
                   <InputText v-model="editInfoTecnica.url_ubicacion" class="w-full" placeholder="https://maps.app.goo.gl/..." />
+                </div>
+                <div class="flex flex-col gap-1">
+                  <label class="field-label">RETIE (link Drive)</label>
+                  <InputText v-model="editInfoTecnica.retie_url" class="w-full" placeholder="https://drive.google.com/..." />
                 </div>
               </div>
             </div>
@@ -783,6 +795,7 @@ const editInfoTecnica = reactive({
   marca_modems_frontera: null,
   ip_modem_reconectador: null,
   url_ubicacion: null,
+  retie_url: null,
   cctv_estado: null,
   marca_cctv: null,
   seguridad_fisica: null,
