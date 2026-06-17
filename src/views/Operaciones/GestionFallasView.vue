@@ -450,6 +450,28 @@
         @save="onSaveForm" @cancel="formDialogVisible = false" />
     </Dialog>
 
+    <!-- ══ DIALOG RESOLVER (confirmar/editar fecha y hora de cierre) ══════ -->
+    <Dialog v-model:visible="resolveDialog.visible" modal class="w-full max-w-md"
+      header="Resolver falla" :closable="!resolvingFalla">
+      <div v-if="resolveDialog.falla" class="gf-resolve-body">
+        <p class="gf-resolve-text">
+          Vas a marcar la falla <strong>{{ resolveDialog.falla.codigo_interno }}</strong> como
+          <strong>{{ resolveDialog.estadoEtiqueta?.toLowerCase() }}</strong>.
+          Confirma o edita la fecha y hora de cierre:
+        </p>
+        <label class="gf-resolve-label">Fecha y hora de solución *</label>
+        <DatePicker v-model="resolveDialog.fecha" dateFormat="yy-mm-dd" showTime hourFormat="24"
+          placeholder="AAAA-MM-DD HH:mm" class="w-full" showIcon />
+        <small v-if="resolveDialog.error" class="gf-resolve-error">{{ resolveDialog.error }}</small>
+      </div>
+      <template #footer>
+        <Button label="Cancelar" severity="secondary" :disabled="resolvingFalla"
+          @click="resolveDialog.visible = false" />
+        <Button label="Marcar resuelta" severity="success" icon="pi pi-check"
+          :loading="resolvingFalla" @click="confirmarResolver" />
+      </template>
+    </Dialog>
+
   </div><!-- /outer space-y-4 -->
 </template>
 
@@ -528,6 +550,9 @@ const quickEdit = reactive({
 const savingQuick = ref(false)
 const savedFlash = ref(false)
 const resolvingFalla = ref(false)
+const resolveDialog = reactive({
+  visible: false, falla: null, estadoId: null, estadoEtiqueta: '', fecha: null, error: '',
+})
 const addingSeg = ref(false)
 const nuevaNota = reactive({ nota: '', estado_id: null })
 
@@ -804,37 +829,45 @@ async function guardarQuickEdit() {
   }
 }
 
-async function quickResolve(falla) {
+function quickResolve(falla) {
   const estadoFinal = catalogos.value.estados.find(e => e.es_estado_final)
   if (!estadoFinal) {
     toast.add({ severity: 'warn', summary: 'Sin estado final configurado', life: 3000 })
     return
   }
-  confirmService.require({
-    message: `¿Marcar la falla ${falla.codigo_interno} como ${estadoFinal.etiqueta.toLowerCase()}?`,
-    header: 'Resolver falla',
-    icon: 'pi pi-check-circle',
-    rejectProps: { label: 'Cancelar', severity: 'secondary' },
-    acceptProps: { label: 'Marcar resuelta', severity: 'success' },
-    accept: async () => {
-      resolvingFalla.value = true
-      try {
-        const { data } = await api.patch(`/fallas/${falla.id}`, {
-          estado_id: estadoFinal.id,
-          fecha_resolucion: new Date().toISOString(),
-          sla_cumplido: !slaVencido(falla),
-        })
-        const idx = allFallas.value.findIndex(f => f.id === data.id)
-        if (idx >= 0) allFallas.value[idx] = data
-        if (drawerFalla.value?.id === data.id) drawerFalla.value = data
-        toast.add({ severity: 'success', summary: 'Falla resuelta', life: 2500 })
-      } catch (err) {
-        toast.add({ severity: 'error', summary: 'Error', detail: err?.response?.data?.detail, life: 3000 })
-      } finally {
-        resolvingFalla.value = false
-      }
-    },
-  })
+  // Abrir diálogo con la fecha/hora de cierre sugerida (momento actual, editable)
+  resolveDialog.falla = falla
+  resolveDialog.estadoId = estadoFinal.id
+  resolveDialog.estadoEtiqueta = estadoFinal.etiqueta
+  resolveDialog.fecha = new Date()
+  resolveDialog.error = ''
+  resolveDialog.visible = true
+}
+
+async function confirmarResolver() {
+  if (!resolveDialog.fecha) {
+    resolveDialog.error = 'La fecha y hora de cierre es obligatoria.'
+    return
+  }
+  resolveDialog.error = ''
+  const falla = resolveDialog.falla
+  resolvingFalla.value = true
+  try {
+    const { data } = await api.patch(`/fallas/${falla.id}`, {
+      estado_id: resolveDialog.estadoId,
+      fecha_resolucion: resolveDialog.fecha.toISOString(),
+      sla_cumplido: !slaVencido(falla),
+    })
+    const idx = allFallas.value.findIndex(f => f.id === data.id)
+    if (idx >= 0) allFallas.value[idx] = data
+    if (drawerFalla.value?.id === data.id) drawerFalla.value = data
+    resolveDialog.visible = false
+    toast.add({ severity: 'success', summary: 'Falla resuelta', life: 2500 })
+  } catch (err) {
+    toast.add({ severity: 'error', summary: 'Error', detail: err?.response?.data?.detail, life: 3000 })
+  } finally {
+    resolvingFalla.value = false
+  }
 }
 
 async function reabrirFalla() {
@@ -1577,6 +1610,12 @@ watch(bucket, (newBucket) => {
   margin: 0;
   word-break: break-word;
 }
+/* Diálogo de resolución (confirmar/editar fecha y hora de cierre) */
+.gf-resolve-body { display: flex; flex-direction: column; gap: 6px; }
+.gf-resolve-text { font-size: 13px; color: #4a3b6b; margin: 0 0 6px; line-height: 1.5; }
+.gf-resolve-label { font-size: 12px; font-weight: 600; color: #4a3b6b; }
+.gf-resolve-error { color: #dc2626; font-size: 12px; }
+
 /* Grid 2-col para Edición rápida + SLA en pantallas anchas */
 .gf-twocol {
   display: grid;
