@@ -249,12 +249,13 @@ export function reconciliar(mandato, details, tag) {
   }
   const lines = details.filter((d) => d.proj === tag && asociadoMatch(d.asociado))
 
-  // Sumar por concepto (débito = costo cargado al mandante) + detectar cuenta equivocada
+  // Sumar por concepto el NETO (débito − crédito): las cuentas de costo de mandato
+  // traen líneas de cargo y de reverso; el costo real es el neto (= "Importe en moneda").
   const sums = {}; const wrongAcc = []
   lines.forEach((d) => {
     const c = ACC2CONCEPT[d.acc]
-    if (c) sums[c] = (sums[c] || 0) + d.debe
-    else if (NON_COST_ACCOUNTS[d.acc] && d.debe > 0) wrongAcc.push(d)
+    if (c) sums[c] = (sums[c] || 0) + (d.debe - d.haber)
+    else if (NON_COST_ACCOUNTS[d.acc] && (d.debe - d.haber) > 0) wrongAcc.push(d)
   })
 
   // A) Importes por concepto (incluye faltantes)
