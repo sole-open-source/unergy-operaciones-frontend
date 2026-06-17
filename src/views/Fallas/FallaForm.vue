@@ -147,18 +147,17 @@
       </div>
     </div>
 
-    <!-- ── SECCIÓN: Resolución ──────────────────────────────── -->
-    <div class="ff-section ff-section--resolve">
+    <!-- ── SECCIÓN: Resolución (solo cuando el estado es final/cerrada) ── -->
+    <div v-if="esEstadoFinal" class="ff-section ff-section--resolve">
       <div class="ff-section-title">
         <i class="pi pi-check-circle" style="color:#16a34a" /> Resolución
-        <span class="ff-hint" v-if="!esEstadoFinal">(opcional — si la falla ya está resuelta)</span>
-        <span class="ff-hint" v-else style="color:#dc2626">(obligatoria al cerrar la falla)</span>
+        <span class="ff-hint" style="color:#dc2626">(obligatoria al cerrar la falla)</span>
       </div>
       <div class="ff-grid">
 
         <div class="ff-field">
           <label class="ff-label">
-            Fecha y hora de solución <span v-if="esEstadoFinal">*</span>
+            Fecha y hora de solución *
             <span class="ff-hint">(fin de la afectación)</span>
           </label>
           <DatePicker v-model="form.fecha_resolucion" dateFormat="yy-mm-dd"
@@ -480,8 +479,10 @@ async function submit() {
     if (form.value.tipo_libre?.trim())             base.tipo_libre           = form.value.tipo_libre.trim()
     if (form.value.sla_limite_horas)              base.sla_limite_horas     = form.value.sla_limite_horas
     if (form.value.fecha_ocurrencia)              base.fecha_ocurrencia     = form.value.fecha_ocurrencia.toISOString()
-    if (form.value.fecha_resolucion)              base.fecha_resolucion     = form.value.fecha_resolucion instanceof Date ? form.value.fecha_resolucion.toISOString() : form.value.fecha_resolucion
-    if (form.value.tipo_solucion)                 base.tipo_solucion        = form.value.tipo_solucion
+    // La fecha de solución solo aplica cuando el estado es final (cerrada).
+    if (esEstadoFinal.value && form.value.fecha_resolucion)
+      base.fecha_resolucion = form.value.fecha_resolucion instanceof Date ? form.value.fecha_resolucion.toISOString() : form.value.fecha_resolucion
+    if (esEstadoFinal.value && form.value.tipo_solucion)  base.tipo_solucion        = form.value.tipo_solucion
     if (form.value.causa_raiz?.trim())            base.causa_raiz           = form.value.causa_raiz.trim()
     if (form.value.acciones_correctivas?.trim())  base.acciones_correctivas = form.value.acciones_correctivas.trim()
     if (form.value.equipo_afectado?.trim())       base.equipo_afectado      = form.value.equipo_afectado.trim()
