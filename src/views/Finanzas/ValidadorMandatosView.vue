@@ -14,6 +14,9 @@
 
 <script setup>
 import { ref, onMounted, onBeforeUnmount } from 'vue'
+import {
+  parseAsientos, extractMandate, suggestTag, reconciliar, fmt, norm as normNombre,
+} from '@/utils/conciliacionMandatos.js'
 
 const root = ref(null)
 
@@ -21,7 +24,7 @@ const root = ref(null)
 const GLOBAL_FNS = [
   'switchTab', 'setMode', 'updateAuditUI', 'loadExcel', 'setConcMode',
   'updateConcUI', 'startConciliation', 'renderConcTable', 'exportConcCSV',
-  'startAudit',
+  'startAudit', 'setCostoTag',
 ]
 
 // Carga un <script> externo una sola vez (pdf.js / xlsx desde CDN, igual que el HTML original)
@@ -189,6 +192,21 @@ const MARKUP = `
       </div>
     </div>
 
+    <!-- Resultado DETALLADO por concepto (modo COSTOS) -->
+    <div id="concCostosContainer" class="panel" style="display:none">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:8px">
+        <h3 style="margin:0">Conciliación detallada por concepto · Costos</h3>
+        <label class="toggle-label">
+          <input type="checkbox" id="costosOnlyProblem" onchange="renderConcTable()"> Solo con hallazgos
+        </label>
+      </div>
+      <p style="margin:0 0 14px 0;color:#64748b;font-size:12px">
+        Empareja por <b>palabra completa</b> del mandante + etiqueta analítica, y valida concepto por concepto
+        (mantenimiento, IVA, internet, arriendo), conceptos faltantes/sobrantes y montos en cuenta equivocada.
+      </p>
+      <div id="concCostosBody"></div>
+    </div>
+
   </div><!-- /sectionConc -->
 `
 
@@ -205,8 +223,17 @@ function initValidador(el) {
   // ====== ESTADO GLOBAL ======
   let currentMode     = 'ingresos'
   let currentConcMode = 'ingresos'
-  let contabilidadData = []   // [{asociado, planta, valor_contabilidad}]  cargado desde xlsx
-  let concResults      = []   // resultados del cruce
+  let contabilidadData = []   // [{asociado, planta, valor_contabilidad}]  cargado desde xlsx (modo total)
+  let concResults      = []   // resultados del cruce (modos ingresos/autoconsumo)
+
+  // --- Modo COSTOS: conciliación detallada por concepto ---
+  let asientosDetalle = []    // detalle línea-a-línea del xlsx (parseAsientos)
+  let tagsAnaliticos  = []    // etiquetas analíticas (proyectos) del xlsx
+  let costosResults   = []    // [{mandato, tag, status, flags, sums, candidates, fileName}]
+  const TAGMAP_KEY = 'conc_costos_tagmap'
+  const loadTagMap = () => { try { return JSON.parse(localStorage.getItem(TAGMAP_KEY) || '{}') } catch { return {} } }
+  const saveTagMap = (m) => { try { localStorage.setItem(TAGMAP_KEY, JSON.stringify(m)) } catch { /* noop */ } }
+  let savedTagMap = loadTagMap()
 
   // ====== TABS ======
   function switchTab(tab) {
@@ -241,6 +268,13 @@ function initValidador(el) {
         const ws = wb.Sheets[wb.SheetNames[0]]
         const rows = XLSX.utils.sheet_to_json(ws, {defval:''})
         contabilidadData = parseContabilidad(rows)
+        // Modo costos: detalle línea-a-línea (matriz de filas incl. cabecera)
+        try {
+          const matriz = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
+          const pa = parseAsientos(matriz)
+          asientosDetalle = pa.details
+          tagsAnaliticos  = pa.tags
+        } catch (e2) { asientosDetalle = []; tagsAnaliticos = [] }
         const label = $('xlsxLabel')
         label.innerHTML = `<b style="color:var(--ok)">✅ ${file.name}</b> — <span style="color:#64748b">${contabilidadData.length} registros cargados</span>`
         $('dzExcel').classList.add('loaded')
@@ -333,6 +367,10 @@ function initValidador(el) {
     currentConcMode = m
     ;['Ingresos','Costos','Autoconsumo'].forEach(x =>
       $('cTab'+x).classList.toggle('active', m === x.toLowerCase()))
+    // Ocultar resultados previos de otro modo para no mezclar vistas
+    $('concTableContainer').style.display = 'none'
+    $('concCostosContainer').style.display = 'none'
+    $('concStatsBar').style.display = 'none'
   }
 
   function updateConcUI() {
@@ -405,8 +443,132 @@ function initValidador(el) {
     }
   }
 
+  // ====== CONCILIACIÓN DETALLADA (modo COSTOS) ======
+
+  // Extrae texto preservando líneas (agrupa items del PDF por coordenada Y),
+  // necesario para leer "ETIQUETA ... $ valor" línea por línea.
+  async function extractPdfLines(file) {
+    const data = await file.arrayBuffer()
+    const pdf = await pdfjsLib.getDocument({ data }).promise
+    let out = ''
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i)
+      const content = await page.getTextContent()
+      const byLine = new Map()
+      content.items.forEach(it => {
+        const y = Math.round(it.transform[5])
+        if (!byLine.has(y)) byLine.set(y, [])
+        byLine.get(y).push({ x: it.transform[4], s: it.str })
+      })
+      ;[...byLine.keys()].sort((a, b) => b - a).forEach(y => {
+        out += byLine.get(y).sort((a, b) => a.x - b.x).map(o => o.s).join(' ') + '\n'
+      })
+    }
+    return out
+  }
+
+  function recalcCostosStats() {
+    $('csTotal').textContent  = costosResults.length
+    $('csMatch').textContent  = costosResults.filter(r => r.status === 'ok').length
+    $('csDiff').textContent   = costosResults.filter(r => r.status === 'bad').length
+    $('csNoCont').textContent = costosResults.filter(r => r.status === 'warn').length
+    $('csNoPdf').textContent  = costosResults.filter(r => !r.tag).length
+  }
+
+  async function startConciliationCostos() {
+    const files = [...$('concFileInput').files]
+    costosResults = []
+    $('concStatsBar').style.display = 'flex'
+    $('concTableContainer').style.display = 'none'
+    $('concCostosContainer').style.display = 'none'
+    $('btnExportCSV').disabled = true
+
+    for (const file of files) {
+      let mandato
+      try {
+        const text = await extractPdfLines(file)
+        mandato = extractMandate(text, file.name)
+      } catch (e) {
+        mandato = { cmu: '', projName: '', mandante: '', nit: '', vals: {}, total: null }
+      }
+      const sug = suggestTag(mandato.projName, tagsAnaliticos, savedTagMap)
+      const rec = reconciliar(mandato, asientosDetalle, sug.tag)
+      costosResults.push({ mandato, fileName: file.name, tag: sug.tag, sugStatus: sug.status, candidates: sug.candidates, ...rec })
+    }
+
+    recalcCostosStats()
+    $('concCostosContainer').style.display = 'block'
+    $('btnExportCSV').disabled = false
+    renderConcCostos()
+  }
+
+  function renderConcCostos() {
+    const body = $('concCostosBody')
+    if (!body) return
+    const onlyProb = $('costosOnlyProblem') && $('costosOnlyProblem').checked
+    const lvlColor = { ok: '#10b981', warn: '#f59e0b', bad: '#e11d48' }
+    const stBadge = s => s === 'ok'
+      ? '<span class="badge badge-ok">✅ OK</span>'
+      : s === 'warn'
+        ? '<span class="badge badge-warn">⚠️ Revisar</span>'
+        : '<span class="badge badge-err">❌ Hallazgos</span>'
+    const visible = onlyProb ? costosResults.filter(r => r.status !== 'ok') : costosResults
+    if (!visible.length) { body.innerHTML = '<div style="text-align:center;color:#94a3b8;padding:20px">Sin registros</div>'; return }
+    body.innerHTML = visible.map(r => {
+      const idx = costosResults.indexOf(r)
+      let tagControl
+      if (r.tag && (r.sugStatus === 'recordado' || r.sugStatus === 'auto')) {
+        tagControl = `<span style="color:#64748b;font-size:12px">Etiqueta analítica: <b>${r.tag}</b> <small>(${r.sugStatus})</small></span>`
+      } else {
+        const opts = ['<option value="">— elegir etiqueta —</option>']
+          .concat(tagsAnaliticos.map(t => `<option value="${t}" ${t === r.tag ? 'selected' : ''}>${t}</option>`)).join('')
+        tagControl = `<span style="color:#64748b;font-size:12px">Etiqueta analítica: </span><select class="tol-input" style="width:auto;min-width:220px" onchange="setCostoTag(${idx}, this.value)">${opts}</select>`
+      }
+      const flagsHtml = r.flags.map(f => `<li style="color:${lvlColor[f.lvl]};font-size:12px;margin:2px 0">${f.txt}</li>`).join('')
+      return `<div style="border:1px solid #e2e8f0;border-radius:10px;padding:12px;margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:6px">
+          <div><b style="color:var(--accent)">${r.mandato.cmu || '-'}</b>
+            <span style="font-size:12px;margin-left:8px">${r.mandato.mandante || '<span style="color:var(--warn)">mandante no detectado</span>'}</span></div>
+          ${stBadge(r.status)}
+        </div>
+        <div style="margin-bottom:6px">${tagControl}</div>
+        <ul style="margin:0;padding-left:18px">${flagsHtml || '<li style="font-size:12px;color:#64748b">Sin detalle</li>'}</ul>
+      </div>`
+    }).join('')
+  }
+
+  function setCostoTag(idx, tag) {
+    const r = costosResults[idx]
+    if (!r) return
+    r.tag = tag
+    if (tag && r.mandato.projName) { savedTagMap[normNombre(r.mandato.projName)] = tag; saveTagMap(savedTagMap) }
+    Object.assign(r, reconciliar(r.mandato, asientosDetalle, tag))
+    r.sugStatus = tag ? 'recordado' : r.sugStatus
+    recalcCostosStats()
+    renderConcCostos()
+  }
+
+  function exportConcCostosCSV() {
+    if (!costosResults.length) return
+    let csv = '﻿CMU,Mandante,Etiqueta,Estado,Nivel,Codigo,Detalle,Archivo\n'
+    for (const r of costosResults) {
+      const base = [r.mandato.cmu || '', `"${(r.mandato.mandante || '').replace(/"/g, '""')}"`, `"${r.tag || ''}"`, r.status]
+      if (r.flags.length) {
+        for (const f of r.flags) csv += base.concat([f.lvl, f.code, `"${f.txt.replace(/"/g, '""')}"`, `"${r.fileName}"`]).join(',') + '\n'
+      } else {
+        csv += base.concat(['', '', '', `"${r.fileName}"`]).join(',') + '\n'
+      }
+    }
+    const a = Object.assign(document.createElement('a'), {
+      href: URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' })),
+      download: `conciliacion_costos_${new Date().toISOString().slice(0, 10)}.csv`,
+    })
+    a.click()
+  }
+
   // ====== EJECUTAR CONCILIACIÓN ======
   async function startConciliation() {
+    if (currentConcMode === 'costos') return startConciliationCostos()
     const files = [...$('concFileInput').files]
     concResults  = []
     $('concStatsBar').style.display = 'flex'
@@ -452,6 +614,7 @@ function initValidador(el) {
   }
 
   function renderConcTable(sinPdfOverride) {
+    if (currentConcMode === 'costos') return renderConcCostos()
     const tol     = parseInt($('toleranceInput').value) || 200
     const onlyDiff= $('filterDiffOnly').checked
     const tbody   = $('concTableBody')
@@ -517,6 +680,7 @@ function initValidador(el) {
   }
 
   function exportConcCSV() {
+    if (currentConcMode === 'costos') return exportConcCostosCSV()
     if (!concResults.length) return
     const tol = parseInt($('toleranceInput').value) || 200
     let csv = '﻿'
@@ -691,6 +855,7 @@ function initValidador(el) {
   window.renderConcTable = renderConcTable
   window.exportConcCSV = exportConcCSV
   window.startAudit = startAudit
+  window.setCostoTag = setCostoTag
 }
 
 onMounted(async () => {
