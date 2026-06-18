@@ -221,7 +221,11 @@
                       <template v-if="lineasDe(inv, g.key).length">
                         <tr class="grp"><td colspan="3">{{ g.label }}</td></tr>
                         <tr v-for="ln in lineasDe(inv, g.key)" :key="ln.id">
-                          <td class="l">{{ ln.concepto }}</td>
+                          <td class="l">
+                            <div>{{ ln.concepto }}</div>
+                            <input class="celda-origen" :value="ln.origen" placeholder="hoja!celda"
+                                   @change="cambiarCelda(p, ln, $event.target.value)" />
+                          </td>
                           <td>
                             <input class="val-in" :class="{ neg: ln.valor_cop < 0 }"
                                    type="number" v-model.number="ln.valor_cop" @change="markDirty(p)" />
@@ -667,6 +671,33 @@ async function reasignar () {
   } catch (e) { /* noop */ }
 }
 
+async function cambiarCelda (p, ln, texto) {
+  const m = String(texto).trim().match(/^([^!]+)!\s*([A-Za-z]+\d+)\s*$/)
+  if (!m) {
+    toast.add({ severity: 'warn', summary: 'Formato inválido', detail: 'Usa hoja!celda, ej. Sheet1!H35', life: 3500 })
+    return
+  }
+  const [, hoja, celda] = m
+  try {
+    const { data } = await api.post('/panel-contable/mapeo-celda', {
+      proyecto_id: p.proyecto_id,
+      periodo: periodo.value,
+      tipo: tab.value,
+      concepto: ln.concepto,
+      hoja: hoja.trim(),
+      celda: celda.trim().toUpperCase(),
+    })
+    const i = paneles.value.findIndex(x => x.id === p.id)
+    if (i !== -1) {
+      open[data.id] = open[p.id]
+      paneles.value[i] = data
+    }
+    toast.add({ severity: 'success', summary: 'Celda actualizada', detail: ln.concepto + ' ← ' + hoja + '!' + celda, life: 2500 })
+  } catch (err) {
+    toast.add({ severity: 'error', summary: 'Error', detail: err.response?.data?.detail || 'No se pudo remapear la celda', life: 4500 })
+  }
+}
+
 async function guardar (p) {
   const lineas = []
   p.inversionistas.forEach(inv => inv.lineas.forEach(l => {
@@ -790,6 +821,11 @@ tr.tot td { background:var(--sec); font-weight:600; }
 .val-in:hover { border-color:var(--line2); }
 .val-in:focus { outline:none; background:var(--info); border-color:var(--p2); }
 .comp-in { width:100px; font-size:11px; padding:3px 6px; border:1px solid var(--line2); border-radius:5px; text-align:left; }
+.celda-origen { display:block; width:95px; margin-top:3px; font-size:10.5px; color:#9a93a8;
+  padding:2px 5px; border:1px solid #ddd6e8; border-radius:5px; text-align:left;
+  font-variant-numeric:tabular-nums; background:transparent; }
+.celda-origen::placeholder { color:#bcb5c9; }
+.celda-origen:focus { outline:none; border-color:#915BD8; color:#2C2039; }
 .proj-foot { display:flex; align-items:center; gap:12px; padding:12px 16px; }
 .saved { font-size:12px; color:var(--green); }
 
