@@ -44,9 +44,41 @@
         <span class="mand-buscar"><i class="pi pi-search" /><input v-model="buscarCmu" type="text" placeholder="Buscar CMU…" /></span>
       </div>
 
-      <!-- G. Tabla (Task 9) -->
+      <!-- G. Tabla principal -->
       <div class="mand-tabla-wrap">
-        <p class="text-xs text-gray-400 px-2 py-3">{{ mandatosFiltrados.length }} mandatos</p>
+        <table class="mand-tabla">
+          <thead>
+            <tr>
+              <th>Certificado</th><th>Tercero / proyecto</th><th>Período</th><th>Estado</th>
+              <th>Observación</th><th>Doc. firmado</th><th>Enviado inv.</th><th>Adj.</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="m in mandatosFiltrados" :key="m.id" :class="{ 'mand-fila-resalt': filaResaltada(m.estado) }">
+              <td class="mand-cmu">{{ m.cmu }}</td>
+              <td>
+                <div class="mand-tercero">{{ m.tercero || '—' }}</div>
+                <div class="mand-proyecto">{{ m.proyecto || '' }}</div>
+              </td>
+              <td>{{ m.periodo }}</td>
+              <td><span class="mand-badge" :class="`mand-badge--${estadoMeta(m.estado).cls}`">
+                <i v-if="estadoMeta(m.estado).cls === 'neutro-alerta'" class="pi pi-exclamation-triangle" style="font-size:10px" />
+                {{ estadoMeta(m.estado).label }}</span></td>
+              <td class="mand-obs">{{ m.observacion || '—' }}</td>
+              <td><span v-if="m.tiene_pdf" class="mand-doc-ok">Disponible</span><span v-else class="mand-guion">—</span></td>
+              <td>
+                <span v-if="m.fecha_envio_inversionista" class="mand-badge mand-badge--morado">{{ m.fecha_envio_inversionista }}</span>
+                <span v-else-if="m.estado === 'firmado'" class="mand-pend-envio">Pendiente envío</span>
+                <span v-else-if="m.estado === 'sin_inversionista'" class="mand-sin-inv">Sin inversionista</span>
+                <span v-else class="mand-guion">—</span>
+              </td>
+              <td><i class="pi pi-paperclip" :style="m.tiene_pdf ? 'color:#185FA5' : 'color:#C9C2D6'" /></td>
+            </tr>
+            <tr v-if="mandatosFiltrados.length === 0">
+              <td colspan="8" class="mand-vacio">No hay mandatos para este filtro.</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   </div>
@@ -114,6 +146,18 @@ const mandatosFiltrados = computed(() => {
   }
   return lista
 })
+
+const ESTADO_META = {
+  pendiente_envio:       { label: 'Pendiente envío',       cls: 'neutro' },
+  enviado_revisoria:     { label: 'Enviado revisoría',     cls: 'azul' },
+  con_correcciones:      { label: 'Con correcciones',      cls: 'ambar' },
+  corregido:             { label: 'Corregido',             cls: 'verde-suave' },
+  firmado:               { label: 'Firmado',               cls: 'verde' },
+  enviado_inversionista: { label: 'Enviado inversionista', cls: 'morado' },
+  sin_inversionista:     { label: 'Sin inversionista',     cls: 'neutro-alerta' },
+}
+function estadoMeta(e) { return ESTADO_META[e] || { label: e, cls: 'neutro' } }
+function filaResaltada(e) { return e === 'con_correcciones' || e === 'corregido' }
 
 const badgeMes = computed(() => {
   const info = periodosInfo.value.find(p => p.periodo === periodo.value)
@@ -192,4 +236,25 @@ defineExpose({ cargar })
 .mand-buscar input { border: none; outline: none; font-size: 13px; }
 .mand-buscar i { color: #B0A8C0; font-size: 12px; }
 @media (max-width: 720px) { .mand-metricas { grid-template-columns: repeat(2, 1fr); } }
+.mand-tabla { width: 100%; border-collapse: collapse; font-size: 13px; }
+.mand-tabla thead th { text-align: left; font-size: 11px; font-weight: 700; color: #8B7BA8; padding: 10px 12px; border-bottom: 1px solid #ECE7F2; white-space: nowrap; }
+.mand-tabla tbody td { padding: 10px 12px; border-bottom: 0.5px solid #F1EEF7; vertical-align: top; }
+.mand-fila-resalt { background: #FFFBF4; }
+.mand-cmu { font-weight: 700; color: #2C2039; }
+.mand-tercero { font-weight: 600; color: #2C2039; }
+.mand-proyecto { font-size: 11px; color: #8B7BA8; }
+.mand-obs { max-width: 220px; color: #5A5468; }
+.mand-guion { color: #C9C2D6; }
+.mand-doc-ok { font-size: 11px; font-weight: 700; color: #3B6D11; background: #EAF3DE; padding: 2px 8px; border-radius: 999px; }
+.mand-pend-envio { font-size: 11px; color: #8B7BA8; }
+.mand-sin-inv { font-size: 11px; color: #8B7BA8; }
+.mand-vacio { text-align: center; color: #B0A8C0; padding: 28px; }
+.mand-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 999px; white-space: nowrap; }
+.mand-badge--ambar { background: #FAEEDA; color: #854F0B; }
+.mand-badge--verde-suave { background: #E1F5EE; color: #0F6E56; }
+.mand-badge--verde { background: #EAF3DE; color: #3B6D11; }
+.mand-badge--azul { background: #E6F1FB; color: #185FA5; }
+.mand-badge--morado { background: #EEEDFE; color: #534AB7; }
+.mand-badge--neutro { background: #F0EEF4; color: #8B7BA8; }
+.mand-badge--neutro-alerta { background: #F0EEF4; color: #8B7BA8; }
 </style>
