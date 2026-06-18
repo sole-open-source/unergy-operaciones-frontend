@@ -86,5 +86,37 @@ assert(mNaos && mNaos.planta === 'GD NAOS 1', `matchIngresoContab NAOS 1 (no 2) 
 const mUru = matchIngresoContab({ mandante: 'Rodríguez Vélez Beatriz', projName: 'Minigranja Solar Uruaco' }, grupos)
 assert(mUru && mUru.planta === 'MINIGRANJA SOLAR URUACO', `matchIngresoContab Uruaco = "${mUru && mUru.planta}"`)
 
+// 7) ARRIENDO La Esmeralda (CMU0996): el arriendo está en 3 asientos, cuenta de
+//    costo 28150517, analítica [10038] LA ESMERALDA. El mandante (Bancolombia)
+//    aparece en AMBOS lados (débito = costo, crédito = arrendador). Sumar el NETO
+//    (debe − haber) lo cancela → "no aparece"/0. Hay que sumar el DÉBITO.
+const ESM = '[10038] LA ESMERALDA'
+const BANC = 'PATRIMONIOS AUTONOMOS FIDUCIARIA BANCOLOMBIA'
+const arrLineas = []
+for (const contrato of ['30982', '30978', '30974']) {
+  arrLineas.push({ asociado: BANC, acc: '28150517', accDesc: 'Costo arriendo', debe: 552770.72, haber: 0, etiqueta: contrato, proj: ESM })
+  arrLineas.push({ asociado: BANC, acc: '28150517', accDesc: 'Costo arriendo', debe: 0, haber: 552770.72, etiqueta: contrato, proj: ESM })
+}
+const resArr = reconciliar({ mandante: BANC, vals: { arr: 1658312.16 }, total: 1658312.16 }, arrLineas, ESM)
+assert(Math.round(resArr.sums.arr) === 1658312,
+  `ESMERALDA arriendo (débito de 3 asientos) = ${resArr.sums && Math.round(resArr.sums.arr)} (esperado 1658312, NO 0, NO 184257)`)
+assert(resArr.status === 'ok', `ESMERALDA arriendo: status = ${resArr.status} (esperado ok)`)
+
+// 8) Porción en una segunda fiduciaria (CREDICORP, 184.257 como crédito sobre la
+//    MISMA planta). El mandato arr = 1.842.569 = 1.658.312 (Bancolombia, débito)
+//    + 184.257 (Credicorp, crédito). La porción de Credicorp NO debe forzarse a 0
+//    ni marcarse como error duro: queda como hallazgo (warn) para revisión.
+const CRED = 'PATRIMONIOS AUTONOMOS CREDICORP CAPITAL'
+const arrConCred = [...arrLineas,
+  { asociado: CRED, acc: '28150517', accDesc: 'Costo arriendo', debe: 0, haber: 184257, etiqueta: '30982', proj: ESM }]
+const resCred = reconciliar({ mandante: BANC, vals: { arr: 1842569 }, total: 1842569 }, arrConCred, ESM)
+assert(Math.round(resCred.sums.arr) === 1658312,
+  `ESMERALDA+Credicorp: suma arr (solo mandante) = ${resCred.sums && Math.round(resCred.sums.arr)} (esperado 1658312)`)
+const flagArr = resCred.flags.find((f) => f.txt.includes('Arriendo'))
+assert(flagArr && flagArr.lvl === 'warn' && flagArr.code === 'REPARTO',
+  `ESMERALDA+Credicorp: arriendo es warn/REPARTO (no error duro) — fue ${flagArr && flagArr.lvl}/${flagArr && flagArr.code}`)
+assert(flagArr && flagArr.txt.includes('CREDICORP'),
+  'ESMERALDA+Credicorp: el hallazgo nombra la otra fiduciaria (CREDICORP)')
+
 console.log(ok ? '\nTODOS LOS TESTS PASARON' : '\nHAY FALLOS')
 process.exit(ok ? 0 : 1)
