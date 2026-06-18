@@ -178,6 +178,7 @@ const MARKUP = `
               <th style="text-align:right">Valor Contab.</th>
               <th style="text-align:right">Diferencia</th>
               <th>Estado</th>
+              <th>Detalle</th>
             </tr>
           </thead>
           <tbody id="concTableBody"></tbody>
@@ -281,9 +282,13 @@ function initValidador(el) {
         const cuenta = esCostos ? asientosDetalle.length : contabilidadData.length
         label.innerHTML = `<b style="color:var(--ok)">✅ ${file.name}</b> — <span style="color:#64748b">${cuenta} ${esCostos ? 'líneas de detalle' : 'registros'} cargados</span>`
         $('dzExcel').classList.add('loaded')
+        // Detectar prefijos de cuenta para mostrar al usuario (modo ingresos/autoconsumo)
+        const freqPfx = {}
+        rows.forEach(r => { const c = String(r['Cuenta']||r['cuenta']||'').trim(); if(c.length>=5) { const p=c.slice(0,5); freqPfx[p]=(freqPfx[p]||0)+1 } })
+        const pfxUsados = Object.keys(freqPfx).filter(p=>p==='28150'||p==='28151'||(!freqPfx['28150']&&!freqPfx['28151']))
         $('xlsxStatus').textContent = esCostos
           ? `Periodo: ${detectPeriodo(rows)} · ${asientosDetalle.length} líneas · ${tagsAnaliticos.length} proyectos (etiquetas analíticas)`
-          : `Periodo detectado: ${detectPeriodo(rows)} · Cuenta 28150505: ${contabilidadData.length} líneas agrupadas`
+          : `Periodo: ${detectPeriodo(rows)} · Cuentas: ${pfxUsados.join(', ')}xxxx · ${contabilidadData.length} registros agrupados`
         updateConcBtn()
       } catch(err) {
         $('xlsxLabel').innerHTML = `<span style="color:var(--err)">❌ Error leyendo el archivo: ${err.message}</span>`
@@ -300,25 +305,52 @@ function initValidador(el) {
     return 'desconocido'
   }
 
-  // Parsear el xlsx de Odoo: agrupar cuenta 28150505 por (Asociado, Planta)
+  // Detecta el conjunto de prefijos de cuenta (5 dígitos) a sumar.
+  // Prefiere 28150/28151 (ingresos energía) si existen; si no, el prefijo más frecuente.
+  function detectPrefixCuentas(rows) {
+    const freq = {}
+    for (const r of rows) {
+      const c = String(r['Cuenta'] || r['cuenta'] || '').trim()
+      if (c.length >= 5) {
+        const p = c.slice(0, 5)
+        freq[p] = (freq[p] || 0) + 1
+      }
+    }
+    if (freq['28150'] || freq['28151']) return p => p === '28150' || p === '28151'
+    const top = Object.entries(freq).sort((a,b) => b[1]-a[1])[0]
+    return top ? p => p === top[0] : () => true
+  }
+
+  // Parsear xlsx de Odoo: agrupa por (Asociado, Planta) sumando todas las cuentas
+  // del grupo 281505xx/281501xx (el neto por inversionista+planta equivale al
+  // "Valor a Pagar" del mandato). Para costos, detecta el prefijo más frecuente.
   function parseContabilidad(rows) {
+    const prefixFn = detectPrefixCuentas(rows)
     const map = new Map()
     for (const r of rows) {
-      const cuenta = String(r['Cuenta'] || r['cuenta'] || '')
-      if (!cuenta.includes('28150505')) continue
+      const cuentaStr = String(r['Cuenta'] || r['cuenta'] || '').trim()
+      const prefix    = cuentaStr.slice(0, 5)
+      if (!prefixFn(prefix)) continue
       const asociado = String(r['Asociado'] || r['asociado'] || '').trim()
       const etiqueta = String(r['Etiqueta'] || r['etiqueta'] || '').trim()
       const importe  = parseFloat(r['Importe en moneda'] || r['importe en moneda'] || 0) || 0
-      const planta   = extractPlantaFromEtiqueta(etiqueta)
+      if (!asociado && !etiqueta) continue
+      const planta = extractPlantaFromEtiqueta(etiqueta || asociado)
       const key = asociado + '|||' + planta
       map.set(key, (map.get(key) || 0) + importe)
     }
     const result = []
     for (const [key, net] of map.entries()) {
       const [asociado, planta] = key.split('|||')
-      result.push({ asociado, planta, valor_contabilidad: net })
+      // Solo incluir registros con neto significativo
+      if (Math.abs(net) > 1) result.push({ asociado, planta, valor_contabilidad: net })
     }
     return result
+  }
+
+  // Elimina prefijos contables que no forman parte del nombre de la planta
+  function cleanPlantaPrefix(p) {
+    return p.replace(/^(INGRESO BRUTO(?:\s+(?:PPA|UNGC|BIAC|TERPEL\s+\d+))?|COMERCIALIZACI[OÓ]N|DESPACHO|VENTAS EN BOLSA|COMPRAS EN BOLSA|REDISTRIBUCI[OÓ]N[\w\s]*?)\s+/i, '').trim()
   }
 
   function extractPlantaFromEtiqueta(label) {
@@ -326,16 +358,17 @@ function initValidador(el) {
     const up = label.toUpperCase()
     let m
     m = up.match(new RegExp('(MINIGRANJA SOLAR [\\w\\s\\u00C0-\\u017E#\\-]+?)\\s+' + meses))
-    if (m) return m[1].trim()
+    if (m) return cleanPlantaPrefix(m[1].trim())
     m = up.match(new RegExp('(GD [\\w\\s\\-\\.]+?)\\s+' + meses))
-    if (m) return m[1].trim()
+    if (m) return cleanPlantaPrefix(m[1].trim())
     m = up.match(new RegExp('(SOL&CIELO[\\s\\w\\-]+?)\\s+' + meses))
-    if (m) return m[1].trim()
+    if (m) return cleanPlantaPrefix(m[1].trim())
     m = up.match(new RegExp('(PSF[\\s\\-][\\w\\s]+?)\\s+' + meses))
-    if (m) return m[1].trim()
-    m = up.match(new RegExp('([\\w\\s\\-]+?)\\s+' + meses))
-    if (m) return m[1].trim()
-    return label.slice(0,60).trim()
+    if (m) return cleanPlantaPrefix(m[1].trim())
+    // Genérico: cualquier cosa antes del mes
+    m = up.match(new RegExp('([\\w\\s&\\-\\.]+?)\\s+' + meses))
+    if (m) return cleanPlantaPrefix(m[1].trim())
+    return cleanPlantaPrefix(label.slice(0,60).trim())
   }
 
   function norm(s) {
@@ -413,15 +446,25 @@ function initValidador(el) {
       const cmu  = cmuM ? 'CMU' + cmuM[1]
                  : (file.name.match(/CMU\d+/i) || [''])[0].toUpperCase()
 
-      // Inversionista: bloque "Señores ... NIT"
+      // Inversionista: bloque "Señores" hasta NIT o ciudad
       let inversionista = ''
-      const senM = fullText.match(/Se[ñn]ores\s*\r?\n?\s*([\w\s\.\-,]+?)(?=\s*NIT|\s*Medell|\s*Bogot|\s*Cali|\s*\n\n)/is)
+      const senM = fullText.match(/Se[ñn]ores\s*\r?\n?\s*([\w\s\.\-,]+?)(?=\s*NIT|\s*Medell|\s*Bogot|\s*Cali|\s*Buca|\s*Barran|\s*Monter|\s*\n\n)/is)
       if (senM) inversionista = senM[1].replace(/\s+/g,' ').trim()
+      // Fallback: "mandante, relacionado con" → nombre antes de ", con NIT"
+      if (!inversionista) {
+        const mM = fullText.match(/mandante,?\s+relacionado.*?suscrito.*?y\s+([^,]+),\s+con\s+NIT/is)
+        if (mM) inversionista = mM[1].replace(/\s+/g,' ').trim()
+      }
 
-      // Planta: "proyecto [nombre]"
+      // Planta: "proyecto [nombre]" — & para Sol&Cielo, guión para PSF
       let planta = ''
-      const pM = fullText.match(/proyecto\s+([\w\s\-#À-ž]+?)[\.\,\r\n]/i)
+      const pM = fullText.match(/proyecto\s+([\w\s\-#&À-ž]+?)[\.,\r\n]/i)
       if (pM) planta = pM[1].replace(/\s+/g,' ').trim()
+      // Fallback: extraer desde el asunto del mandato
+      if (!planta) {
+        const asM = fullText.match(/Proyecto\s+([\w\s\-#&À-ž]+?)\s*\./i)
+        if (asM) planta = asM[1].replace(/\s+/g,' ').trim()
+      }
 
       // Valor a Pagar
       let valorPagar = 0
@@ -642,7 +685,7 @@ function initValidador(el) {
 
     const visible = onlyDiff ? rows.filter(r => r.estado !== 'OK') : rows
     if (!visible.length) {
-      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:20px">Sin registros</td></tr>'
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:20px">Sin registros</td></tr>'
     } else {
       for (const r of visible) {
         const [color, badge] = r.estado === 'OK'
@@ -655,14 +698,39 @@ function initValidador(el) {
           ? `<span style="color:${color};font-weight:700">${r.diferencia>=0?'+':''}${r.diferencia.toLocaleString('es-CO')}</span>`
           : '—'
 
+        // Detalle de diferencia: qué concepto falta o sobra
+        let detalle = ''
+        if (r.estado === 'DIFERENCIA' && r.diferencia !== null) {
+          const dAbs = Math.abs(r.diferencia)
+          // Buscar en contabilidadData si hay entradas relacionadas con misma planta
+          const np = norm(r.planta || '')
+          const relRows = contabilidadData.filter(cr => {
+            const rp = norm(cr.planta)
+            return (rp.includes(np) || np.includes(rp)) && Math.abs(cr.valor_contabilidad) > 1
+          })
+          if (relRows.length > 1) {
+            detalle = relRows.map(cr =>
+              `<div style="white-space:nowrap;font-size:10px;color:#475569">${cr.planta.replace(/^(MINIGRANJA SOLAR |GD )/,'')}: <b>$${Math.round(Math.abs(cr.valor_contabilidad)).toLocaleString('es-CO')}</b></div>`
+            ).join('')
+          } else {
+            // Intentar identificar si es diferencia de redondeo, comercialización, etc.
+            const pctDif = r.contVal ? (dAbs / r.contVal * 100) : 0
+            if (pctDif < 1) detalle = '<span style="font-size:10px;color:#94a3b8">Posible redondeo</span>'
+            else detalle = `<span style="font-size:10px;color:var(--err)">Dif: $${dAbs.toLocaleString('es-CO')}</span>`
+          }
+        } else if (r.estado === 'SIN_CONTAB') {
+          detalle = `<span style="font-size:10px;color:var(--warn)">Planta: "${r.planta||'?'}"</span>`
+        }
+
         tbody.innerHTML += `<tr>
           <td class="mono" style="color:var(--accent);font-weight:600">${r.cmu||'-'}</td>
-          <td style="font-size:12px;max-width:200px;word-break:break-word">${r.inversionista||'<span style="color:var(--warn)">No detectado</span>'}</td>
-          <td style="font-size:12px;max-width:180px;word-break:break-word">${r.planta||'<span style="color:var(--warn)">No detectado</span>'}</td>
+          <td style="font-size:12px;max-width:180px;word-break:break-word">${r.inversionista||'<span style="color:var(--warn)">No detectado</span>'}</td>
+          <td style="font-size:12px;max-width:160px;word-break:break-word">${r.planta||'<span style="color:var(--warn)">No detectado</span>'}</td>
           <td class="mono" style="text-align:right">$${Math.round(r.valorPagar).toLocaleString('es-CO')}</td>
           <td class="mono" style="text-align:right">${r.contVal!==null?'$'+Math.round(r.contVal).toLocaleString('es-CO'):'<span style="color:var(--warn)">—</span>'}</td>
           <td class="mono" style="text-align:right">${difStr}</td>
           <td>${badge}</td>
+          <td style="font-size:11px;min-width:120px">${detalle}</td>
         </tr>`
       }
     }
