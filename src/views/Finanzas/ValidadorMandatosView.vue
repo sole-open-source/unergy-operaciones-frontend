@@ -17,6 +17,7 @@ import { ref, onMounted, onBeforeUnmount } from 'vue'
 import * as XLSX from 'xlsx'
 import {
   parseAsientos, extractMandate, suggestTag, reconciliar, fmt, norm as normNombre,
+  parseIngresos, matchIngresoContab,
 } from '@/utils/conciliacionMandatos.js'
 
 const root = ref(null)
@@ -269,10 +270,13 @@ function initValidador(el) {
         const wb = XLSX.read(e.target.result, {type:'array'})
         const ws = wb.Sheets[wb.SheetNames[0]]
         const rows = XLSX.utils.sheet_to_json(ws, {defval:''})
-        contabilidadData = parseContabilidad(rows)
-        // Modo costos: detalle línea-a-línea (matriz de filas incl. cabecera)
+        // Matriz (con cabecera) para los motores de conciliacionMandatos.js:
+        //  - INGRESOS/AUTOCONSUMO: parseIngresos agrupa (asociado, planta) sumando
+        //    el neto de 28150505 (mismo enfoque robusto de detección de columnas).
+        //  - COSTOS: parseAsientos arma el detalle línea-a-línea (motor existente).
+        const matriz = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
+        contabilidadData = parseIngresos(matriz)
         try {
-          const matriz = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
           const pa = parseAsientos(matriz)
           asientosDetalle = pa.details
           tagsAnaliticos  = pa.tags
@@ -280,15 +284,11 @@ function initValidador(el) {
         const label = $('xlsxLabel')
         const esCostos = currentConcMode === 'costos'
         const cuenta = esCostos ? asientosDetalle.length : contabilidadData.length
-        label.innerHTML = `<b style="color:var(--ok)">✅ ${file.name}</b> — <span style="color:#64748b">${cuenta} ${esCostos ? 'líneas de detalle' : 'registros'} cargados</span>`
+        label.innerHTML = `<b style="color:var(--ok)">✅ ${file.name}</b> — <span style="color:#64748b">${cuenta} ${esCostos ? 'líneas de detalle' : 'grupos inversionista+planta'} cargados</span>`
         $('dzExcel').classList.add('loaded')
-        // Detectar prefijos de cuenta para mostrar al usuario (modo ingresos/autoconsumo)
-        const freqPfx = {}
-        rows.forEach(r => { const c = String(r['Cuenta']||r['cuenta']||'').trim(); if(c.length>=5) { const p=c.slice(0,5); freqPfx[p]=(freqPfx[p]||0)+1 } })
-        const pfxUsados = Object.keys(freqPfx).filter(p=>p==='28150'||p==='28151'||(!freqPfx['28150']&&!freqPfx['28151']))
         $('xlsxStatus').textContent = esCostos
           ? `Periodo: ${detectPeriodo(rows)} · ${asientosDetalle.length} líneas · ${tagsAnaliticos.length} proyectos (etiquetas analíticas)`
-          : `Periodo: ${detectPeriodo(rows)} · Cuentas: ${pfxUsados.join(', ')}xxxx · ${contabilidadData.length} registros agrupados`
+          : `Periodo: ${detectPeriodo(rows)} · Cuenta 28150505 (neto inversionista) · ${contabilidadData.length} grupos (inversionista + planta)`
         updateConcBtn()
       } catch(err) {
         $('xlsxLabel').innerHTML = `<span style="color:var(--err)">❌ Error leyendo el archivo: ${err.message}</span>`
@@ -305,98 +305,10 @@ function initValidador(el) {
     return 'desconocido'
   }
 
-  // Detecta el conjunto de prefijos de cuenta (5 dígitos) a sumar.
-  // Prefiere 28150/28151 (ingresos energía) si existen; si no, el prefijo más frecuente.
-  function detectPrefixCuentas(rows) {
-    const freq = {}
-    for (const r of rows) {
-      const c = String(r['Cuenta'] || r['cuenta'] || '').trim()
-      if (c.length >= 5) {
-        const p = c.slice(0, 5)
-        freq[p] = (freq[p] || 0) + 1
-      }
-    }
-    if (freq['28150'] || freq['28151']) return p => p === '28150' || p === '28151'
-    const top = Object.entries(freq).sort((a,b) => b[1]-a[1])[0]
-    return top ? p => p === top[0] : () => true
-  }
-
-  // Parsear xlsx de Odoo: agrupa por (Asociado, Planta) sumando todas las cuentas
-  // del grupo 281505xx/281501xx (el neto por inversionista+planta equivale al
-  // "Valor a Pagar" del mandato). Para costos, detecta el prefijo más frecuente.
-  function parseContabilidad(rows) {
-    const prefixFn = detectPrefixCuentas(rows)
-    const map = new Map()
-    for (const r of rows) {
-      const cuentaStr = String(r['Cuenta'] || r['cuenta'] || '').trim()
-      const prefix    = cuentaStr.slice(0, 5)
-      if (!prefixFn(prefix)) continue
-      const asociado = String(r['Asociado'] || r['asociado'] || '').trim()
-      const etiqueta = String(r['Etiqueta'] || r['etiqueta'] || '').trim()
-      const importe  = parseFloat(r['Importe en moneda'] || r['importe en moneda'] || 0) || 0
-      if (!asociado && !etiqueta) continue
-      const planta = extractPlantaFromEtiqueta(etiqueta || asociado)
-      const key = asociado + '|||' + planta
-      map.set(key, (map.get(key) || 0) + importe)
-    }
-    const result = []
-    for (const [key, net] of map.entries()) {
-      const [asociado, planta] = key.split('|||')
-      // Solo incluir registros con neto significativo
-      if (Math.abs(net) > 1) result.push({ asociado, planta, valor_contabilidad: net })
-    }
-    return result
-  }
-
-  // Elimina prefijos contables que no forman parte del nombre de la planta
-  function cleanPlantaPrefix(p) {
-    return p.replace(/^(INGRESO BRUTO(?:\s+(?:PPA|UNGC|BIAC|TERPEL\s+\d+))?|COMERCIALIZACI[OÓ]N|DESPACHO|VENTAS EN BOLSA|COMPRAS EN BOLSA|REDISTRIBUCI[OÓ]N[\w\s]*?)\s+/i, '').trim()
-  }
-
-  function extractPlantaFromEtiqueta(label) {
-    const meses = '(ENERO|FEBRERO|MARZO|ABRIL|MAYO|JUNIO|JULIO|AGOSTO|SEPTIEMBRE|OCTUBRE|NOVIEMBRE|DICIEMBRE)'
-    const up = label.toUpperCase()
-    let m
-    m = up.match(new RegExp('(MINIGRANJA SOLAR [\\w\\s\\u00C0-\\u017E#\\-]+?)\\s+' + meses))
-    if (m) return cleanPlantaPrefix(m[1].trim())
-    m = up.match(new RegExp('(GD [\\w\\s\\-\\.]+?)\\s+' + meses))
-    if (m) return cleanPlantaPrefix(m[1].trim())
-    m = up.match(new RegExp('(SOL&CIELO[\\s\\w\\-]+?)\\s+' + meses))
-    if (m) return cleanPlantaPrefix(m[1].trim())
-    m = up.match(new RegExp('(PSF[\\s\\-][\\w\\s]+?)\\s+' + meses))
-    if (m) return cleanPlantaPrefix(m[1].trim())
-    // Genérico: cualquier cosa antes del mes
-    m = up.match(new RegExp('([\\w\\s&\\-\\.]+?)\\s+' + meses))
-    if (m) return cleanPlantaPrefix(m[1].trim())
-    return cleanPlantaPrefix(label.slice(0,60).trim())
-  }
-
+  // Normaliza para comparaciones de planta en la tabla de detalle.
   function norm(s) {
     return s.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'')
             .replace(/[.\-,]/g,' ').replace(/\s+/g,' ').trim()
-  }
-
-  function buscarEnContabilidad(asociado, planta) {
-    const na = norm(asociado), np = norm(planta)
-    // Exacto
-    for (const r of contabilidadData) {
-      if (norm(r.asociado) === na && norm(r.planta) === np) return r
-    }
-    // Fuzzy planta (contains) + asociado (contains)
-    for (const r of contabilidadData) {
-      const ra = norm(r.asociado), rp = norm(r.planta)
-      const plantaOk = rp.includes(np) || np.includes(rp)
-      const asocOk   = ra.includes(na) || na.includes(ra)
-      if (plantaOk && asocOk) return r
-    }
-    // Solo planta (útil cuando el nombre del inversionista difiere mucho)
-    if (np.length > 6) {
-      for (const r of contabilidadData) {
-        const rp = norm(r.planta)
-        if (rp.includes(np) || np.includes(rp)) return r
-      }
-    }
-    return null
   }
 
   // ====== CONCILIACIÓN: controles ======
@@ -487,9 +399,18 @@ function initValidador(el) {
         }
       }
 
-      return { cmu, inversionista, planta, valorPagar, fileName: file.name }
+      // Mandante + proyecto leídos del CUERPO del PDF (extractMandate, motor de
+      // costos) — más robustos que inversionista/planta para EMPAREJAR por tokens.
+      const mand = extractMandate(fullText, file.name)
+
+      return {
+        cmu, fileName: file.name, valorPagar,
+        inversionista, planta,                       // para mostrar en la tabla
+        mandante: mand.mandante || inversionista,    // para el match (palabra completa)
+        projName: mand.projName || planta,           // para el match (tokens de planta)
+      }
     } catch(e) {
-      return { cmu:'', inversionista:'', planta:'', valorPagar:0, fileName:file.name, error:true }
+      return { cmu:'', inversionista:'', planta:'', mandante:'', projName:'', valorPagar:0, fileName:file.name, error:true }
     }
   }
 
@@ -632,8 +553,10 @@ function initValidador(el) {
 
     for (const file of files) {
       const d = await extractConcData(file, currentConcMode)
-      const rec = (d.inversionista || d.planta)
-                ? buscarEnContabilidad(d.inversionista, d.planta) : null
+      // Match con el motor de tokens (mismo criterio que costos): asociado por
+      // palabra completa + planta por tokens (incluye números). Ver matchIngresoContab.
+      const rec = (d.mandante || d.projName)
+                ? matchIngresoContab({ mandante: d.mandante, projName: d.projName }, contabilidadData) : null
       const contVal   = rec ? Math.abs(rec.valor_contabilidad) : null
       const diferencia= contVal !== null ? Math.round(d.valorPagar - contVal) : null
       const tol       = parseInt($('toleranceInput').value) || 200

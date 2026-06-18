@@ -13,8 +13,8 @@ import { dirname, join } from 'path'
 const here = dirname(fileURLToPath(import.meta.url))
 let src = fs.readFileSync(join(here, 'conciliacionMandatos.js'), 'utf8')
 src = src.replace(/export const /g, 'const ').replace(/export function /g, 'function ')
-const api = new Function(src + '\nreturn { parseAsientos, extractMandate, suggestTag, reconciliar };')()
-const { parseAsientos, extractMandate, suggestTag, reconciliar } = api
+const api = new Function(src + '\nreturn { parseAsientos, extractMandate, suggestTag, reconciliar, plantaDesdeEtiqueta, parseIngresos, matchIngresoContab };')()
+const { parseAsientos, extractMandate, suggestTag, reconciliar, plantaDesdeEtiqueta, parseIngresos, matchIngresoContab } = api
 
 let ok = true
 const assert = (cond, msg) => { console.log((cond ? '✅' : '❌') + ' ' + msg); if (!cond) ok = false }
@@ -51,6 +51,40 @@ const rows = [
 const pa = parseAsientos(rows)
 assert(pa.details.length === 1 && pa.tags.includes(TAG), `parseAsientos detalles=${pa.details.length} tags=${JSON.stringify(pa.tags)}`)
 assert(suggestTag('La Reserva', pa.tags, {}).tag === TAG, 'suggestTag("La Reserva") -> tag correcto')
+
+// 4) INGRESOS: plantaDesdeEtiqueta normaliza concepto + clasificador + mes.
+assert(plantaDesdeEtiqueta('INGRESO BRUTO MINIGRANJA SOLAR URUACO ABRIL 2026 TERPEL') === 'MINIGRANJA SOLAR URUACO',
+  `plantaDesdeEtiqueta INGRESO BRUTO = "${plantaDesdeEtiqueta('INGRESO BRUTO MINIGRANJA SOLAR URUACO ABRIL 2026 TERPEL')}"`)
+assert(plantaDesdeEtiqueta('COMERCIALIZACIÓN MINIGRANJA SOLAR URUACO ABRIL 2026 TERPEL') === 'MINIGRANJA SOLAR URUACO',
+  'plantaDesdeEtiqueta COMERCIALIZACIÓN agrupa igual que INGRESO BRUTO')
+assert(plantaDesdeEtiqueta('INGRESO BRUTO BIAC GD NAOS 1 ABRIL 2026 BIA ENERGY') === 'GD NAOS 1',
+  `plantaDesdeEtiqueta quita BIAC = "${plantaDesdeEtiqueta('INGRESO BRUTO BIAC GD NAOS 1 ABRIL 2026 BIA ENERGY')}"`)
+
+// 5) parseIngresos: suma neto de 28150505 por (asociado, planta); ignora 28151001 (contra-asiento).
+// Debe/Haber como NÚMEROS, igual que los entrega SheetJS al leer el .xlsx.
+const ingRows = [
+  ['Asiento contable', 'Cuenta', 'Asociado', 'Etiqueta', 'Debe', 'Haber'],
+  ['CM/1', '28150505 INGRESO DE ENERGIA', 'RODRIGUEZ VELEZ BEATRIZ', 'INGRESO BRUTO MINIGRANJA SOLAR URUACO ABRIL 2026 TERPEL', 0, 3712635.47],
+  ['CM/1', '28150505 INGRESO DE ENERGIA', 'RODRIGUEZ VELEZ BEATRIZ', 'COMERCIALIZACIÓN MINIGRANJA SOLAR URUACO ABRIL 2026 TERPEL', 273321.72, 0],
+  ['CM/1', '28151001 FACTURAS DE COMERCIALIZACION', 'RODRIGUEZ VELEZ BEATRIZ', 'COMERCIALIZACIÓN MINIGRANJA SOLAR URUACO ABRIL 2026 TERPEL', 0, 273321.72],
+  ['CM/1', '28150501 GANANCIAS POR PARTICIPACION', 'TERPEL ENERGIA S.A.S E.S.P', 'INGRESO BRUTO MINIGRANJA SOLAR URUACO ABRIL 2026 TERPEL', 3712635.47, 0],
+]
+const ing = parseIngresos(ingRows)
+const rodri = ing.find((g) => g.asociado.includes('RODRIGUEZ'))
+assert(ing.length === 1, `parseIngresos: 1 grupo (TERPEL 28150501 excluido) — fue ${ing.length}`)
+assert(rodri && Math.round(Math.abs(rodri.valor_contabilidad)) === 3439314,
+  `parseIngresos: neto = ${rodri && Math.round(Math.abs(rodri.valor_contabilidad))} (esperado 3439314, NO 3712635 bruto)`)
+
+// 6) matchIngresoContab: empareja por asociado (palabra completa) + planta (con número).
+const grupos = [
+  { asociado: 'GD EL REMOLINO 1 S.A.S. E.S.P', planta: 'GD NAOS 1', valor_contabilidad: -58469697 },
+  { asociado: 'GD EL REMOLINO 1 S.A.S. E.S.P', planta: 'GD NAOS 2', valor_contabilidad: -56507155 },
+  { asociado: 'RODRIGUEZ VELEZ BEATRIZ', planta: 'MINIGRANJA SOLAR URUACO', valor_contabilidad: -3439314 },
+]
+const mNaos = matchIngresoContab({ mandante: 'GD EL REMOLINO 1 S.A.S. E.S.P.', projName: 'GD NAOS 1' }, grupos)
+assert(mNaos && mNaos.planta === 'GD NAOS 1', `matchIngresoContab NAOS 1 (no 2) = "${mNaos && mNaos.planta}"`)
+const mUru = matchIngresoContab({ mandante: 'Rodríguez Vélez Beatriz', projName: 'Minigranja Solar Uruaco' }, grupos)
+assert(mUru && mUru.planta === 'MINIGRANJA SOLAR URUACO', `matchIngresoContab Uruaco = "${mUru && mUru.planta}"`)
 
 console.log(ok ? '\nTODOS LOS TESTS PASARON' : '\nHAY FALLOS')
 process.exit(ok ? 0 : 1)

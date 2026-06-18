@@ -64,7 +64,7 @@ export const norm = (s) =>
 export const projectTokens = (s) => norm(s).split(' ').filter((t) => t.length > 2 && !FILLER.has(t))
 
 /** Conjunto de tokens distintivos de un nombre de empresa/persona (palabra completa). */
-const nameTokenSet = (s) => new Set(norm(s).split(' ').filter((w) => w.length >= 3 && !STOP.has(w)))
+export const nameTokenSet = (s) => new Set(norm(s).split(' ').filter((w) => w.length >= 3 && !STOP.has(w)))
 
 /** Convierte "1.234.567,89" / "$ 1.234.567,89" a número (formato CO). */
 export const parseNum = (s) => {
@@ -290,4 +290,108 @@ export function reconciliar(mandato, details, tag) {
 
   const status = flags.some((f) => f.lvl === 'bad') ? 'bad' : flags.some((f) => f.lvl === 'warn') ? 'warn' : 'ok'
   return { status, flags, sums, lines }
+}
+
+// ===================== INGRESOS (energía) =====================
+//
+// El soporte de INGRESOS de Odoo trae la planta dentro de la columna ETIQUETA
+// (la columna ANALÍTICA viene vacía en estos exports), con la forma:
+//
+//   "<CONCEPTO> [CLASIF] <PLANTA> <MES> <AÑO> <comercializador>"
+//
+//   CONCEPTO ∈ {INGRESO BRUTO, COMERCIALIZACIÓN, DESPACHO, VENTAS/COMPRAS EN
+//   BOLSA, REDISTRIBUCIÓN DE INGRESOS…}; CLASIF ∈ {BIAC, UNGC, PPA} (solo aparece
+//   en las líneas de INGRESO BRUTO, no en las demás → hay que quitarlo para que
+//   todas las líneas de una planta agrupen igual).
+//
+// El "Valor a Pagar" del PDF (Ingreso Bruto/Despacho − Comercialización ± Bolsa
+// + Redistribución) queda como NETO (débito − crédito) de la cuenta 28150505
+// (INGRESO DE ENERGÍA) por inversionista + planta. Las demás cuentas del grupo
+// 2815 son contra-asientos que se anulan (28151001/28151005) o del comercializador
+// (28150501 GANANCIAS POR PARTICIPACIÓN), por eso NO se suman. Verificado contra
+// PDFs reales: RODRIGUEZ/Uruaco 3.439.314 · SUNO/Uruaco 3.655.103 · GD NAOS1
+// 58.469.697. (Plantas que sólo operan en bolsa —Baraya, El Son— no tienen línea
+// de Despacho en este soporte y quedarán como DIFERENCIA: es un faltante del dato).
+
+/** Prefijo de cuenta cuyo neto (débito − crédito) equivale al valor a pagar. */
+export const INGRESO_ACC_PREFIX = '28150505'
+
+const MESES_RE = /\b(ENERO|FEBRERO|MARZO|ABRIL|MAYO|JUNIO|JULIO|AGOSTO|SEPTIEMBRE|OCTUBRE|NOVIEMBRE|DICIEMBRE)\b.*$/
+const CONCEPTO_RE = /^(INGRESO BRUTO|COMERCIALIZACION|DESPACHO|VENTAS EN BOLSA|COMPRAS EN BOLSA|REDISTRIBUCION DE INGRESOS DE ACUERDO AL PROTOCOLO|REDISTRIBUCION)\s+/
+const CLASIF_RE = /^(BIAC|UNGC|PPA)\s+/
+
+/**
+ * Nombre de planta normalizado a partir de la columna ETIQUETA. Quita el
+ * concepto inicial, el clasificador (BIAC/UNGC/PPA) y todo lo que va desde el
+ * mes en adelante, de modo que TODAS las líneas de una misma planta produzcan
+ * la misma clave de agrupación.
+ */
+export function plantaDesdeEtiqueta(etiqueta) {
+  let p = norm(etiqueta)            // mayúsculas, sin tildes, sólo [A-Z0-9 ]
+  p = p.replace(MESES_RE, '').trim() // corta "MES AÑO comercializador…"
+  p = p.replace(CONCEPTO_RE, '')     // quita el concepto inicial
+  p = p.replace(CLASIF_RE, '')       // quita BIAC/UNGC/PPA
+  return p.trim()
+}
+
+/**
+ * Tokens distintivos de una planta. Igual que projectTokens pero CONSERVANDO los
+ * números: NAOS 1/2/3, POLARIS 1/2 y VALENCIA ORIENTE 1/2 sólo se distinguen por
+ * el dígito, que projectTokens descarta por longitud.
+ */
+export const plantaTokens = (s) =>
+  norm(s).split(' ').filter((t) => (t.length > 2 && !FILLER.has(t)) || /^\d+$/.test(t))
+
+/**
+ * Agrupa el soporte de INGRESOS por (asociado, planta) sumando el neto
+ * (débito − crédito) de la cuenta de ingreso. Reutiliza parseAsientos para
+ * detectar columnas de forma robusta.
+ * @param {Array<Array>} rows  Filas del Excel incluida cabecera (sheet_to_json {header:1}).
+ * @param {string} accPrefix   Prefijo de cuenta a sumar (def. 28150505).
+ * @returns {Array<{asociado, planta, valor_contabilidad}>}  valor_contabilidad<0 = a pagar.
+ */
+export function parseIngresos(rows, accPrefix = INGRESO_ACC_PREFIX) {
+  const { details } = parseAsientos(rows)
+  const map = new Map()
+  for (const d of details) {
+    if (!d.acc || !d.acc.startsWith(accPrefix)) continue
+    const planta = plantaDesdeEtiqueta(d.etiqueta || d.proj)
+    if (!planta || !d.asociado) continue
+    const key = norm(d.asociado) + '|||' + planta
+    const cur = map.get(key) || { asociado: d.asociado, planta, valor_contabilidad: 0 }
+    cur.valor_contabilidad += d.debe - d.haber
+    map.set(key, cur)
+  }
+  return [...map.values()].filter((g) => Math.abs(g.valor_contabilidad) > 1)
+}
+
+/**
+ * Empareja un mandato (PDF) con un grupo contable de ingresos con el mismo
+ * criterio robusto de costos: el asociado debe contener TODAS las palabras
+ * distintivas del mandante (palabra completa, evita STRADA⊂ESTRADA) y la planta
+ * se elige por mejor score de tokens compartidos (incluyendo números).
+ * @param {{mandante?:string, projName?:string}} mandato
+ * @param {Array} grupos  Salida de parseIngresos().
+ * @returns {object|null} El grupo contable emparejado, o null.
+ */
+export function matchIngresoContab(mandato, grupos) {
+  const mandTok = [...nameTokenSet(mandato.mandante || '')]
+  const ptk = plantaTokens(mandato.projName || '')
+  if (!ptk.length) return null
+  let best = null, bestSc = 0
+  for (const g of grupos) {
+    // Asociado: todas las palabras distintivas del mandante presentes (si las hay)
+    if (mandTok.length) {
+      const aset = nameTokenSet(g.asociado)
+      if (!mandTok.every((t) => aset.has(t))) continue
+    }
+    // Planta: score por tokens compartidos (incluye dígitos)
+    const gtk = new Set(plantaTokens(g.planta))
+    if (!gtk.size) continue
+    let sc = ptk.filter((t) => gtk.has(t)).length
+    if (!sc) continue
+    if (ptk.every((t) => gtk.has(t))) sc += 0.5  // bonus: todos los tokens del PDF presentes
+    if (sc > bestSc) { bestSc = sc; best = g }
+  }
+  return best
 }
