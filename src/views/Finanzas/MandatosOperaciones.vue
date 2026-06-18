@@ -18,6 +18,16 @@
     </div>
 
     <div v-else>
+      <!-- C. Banner de correcciones -->
+      <div v-if="hayBanner" class="mand-banner">
+        <i class="pi pi-envelope" />
+        <div class="mand-banner-txt">
+          <strong>Vanessa (revisoría)</strong> reportó {{ correcciones.length }} mandato(s) con novedad.
+          <span class="mand-banner-obs">{{ obsBanner }}</span>
+        </div>
+        <button class="mand-banner-btn" disabled title="Disponible al conectar Gmail (Fase B)">Ver correo</button>
+      </div>
+
       <!-- E. Tarjetas de métricas -->
       <div class="mand-metricas">
         <div class="mand-metrica"><span class="mand-metrica-num">{{ resumen.total }}</span><span class="mand-metrica-lbl">Total</span></div>
@@ -80,6 +90,18 @@
           </tbody>
         </table>
       </div>
+
+      <!-- H. Barra de acciones -->
+      <div class="mand-acciones">
+        <button class="mand-btn mand-btn--sec" @click="exportarCsv"><i class="pi pi-download" /> Exportar</button>
+        <button class="mand-btn mand-btn--sec" disabled title="Acción interna (Fase B)"><i class="pi pi-send" /> Correo a revisoría</button>
+        <span class="mand-acciones-sep" />
+        <label class="mand-btn mand-btn--pri">
+          <i :class="subiendoPdf ? 'pi pi-spin pi-spinner' : 'pi pi-upload'" /> Subir firmados
+          <input type="file" accept=".pdf" class="hidden" @change="onSubirFirmado" />
+        </label>
+        <button class="mand-btn mand-btn--pri" disabled title="Acción interna (Fase B)"><i class="pi pi-share-alt" /> Enviar a inversionistas</button>
+      </div>
     </div>
   </div>
 </template>
@@ -88,6 +110,9 @@
 import { ref, computed, onMounted } from 'vue'
 import Select from 'primevue/select'
 import api from '@/api/client'
+import { useToast } from 'primevue/usetoast'
+
+const toast = useToast()
 
 const MESES_ES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
@@ -104,6 +129,50 @@ const mandatos = ref([])
 const periodosInfo = ref([])
 const resumen = ref({ total: 0, correcciones: 0, firmados: 0, enviados_inversionista: 0, pendientes: 0 })
 const inversionistas = ref([])
+
+const subiendoPdf = ref(false)
+
+const correcciones = computed(() => mandatos.value.filter(m => m.estado === 'con_correcciones'))
+const hayBanner = computed(() => correcciones.value.length > 0)
+const obsBanner = computed(() => correcciones.value[0]?.observacion || '')
+
+async function onSubirFirmado(e) {
+  const archivo = e.target.files?.[0]
+  if (!archivo) return
+  subiendoPdf.value = true
+  try {
+    const fd = new FormData()
+    fd.append('periodo', periodo.value)
+    fd.append('file', archivo)
+    const { data } = await api.post('/mandatos/upload-firmado', fd)
+    if (data.asociado) {
+      toast.add({ severity: 'success', summary: `PDF asociado a ${data.mandato.cmu}`, life: 3000 })
+    } else {
+      toast.add({ severity: 'warn', summary: 'PDF subido', detail: data.mensaje, life: 5000 })
+    }
+    await cargar()
+  } catch {
+    toast.add({ severity: 'error', summary: 'No se pudo subir el PDF', life: 3000 })
+  } finally {
+    subiendoPdf.value = false
+    e.target.value = ''
+  }
+}
+
+function exportarCsv() {
+  const filas = mandatosFiltrados.value
+  const cabecera = ['CMU', 'Tercero', 'Proyecto', 'Periodo', 'Estado', 'Observacion', 'Enviado inversionista']
+  const lineas = filas.map(m => [m.cmu, m.tercero || '', m.proyecto || '', m.periodo, m.estado,
+    (m.observacion || '').replace(/[\r\n;]/g, ' '), m.fecha_envio_inversionista || ''].join(';'))
+  const csv = [cabecera.join(';'), ...lineas].join('\n')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `mandatos_${periodo.value}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
 
 // Sub-tabs: todos | correcciones | firmados | enviados_inv
 const subTab = ref('todos')
@@ -257,4 +326,17 @@ defineExpose({ cargar })
 .mand-badge--morado { background: #EEEDFE; color: #534AB7; }
 .mand-badge--neutro { background: #F0EEF4; color: #8B7BA8; }
 .mand-badge--neutro-alerta { background: #F0EEF4; color: #8B7BA8; }
+.mand-banner { display: flex; align-items: center; gap: 12px; background: #FAEEDA; border: 1px solid #F0DDB8; border-radius: 12px; padding: 10px 14px; margin-bottom: 14px; color: #854F0B; }
+.mand-banner > i { font-size: 16px; }
+.mand-banner-txt { font-size: 13px; flex: 1; }
+.mand-banner-obs { display: block; font-size: 12px; opacity: .85; }
+.mand-banner-btn { background: #fff; border: 1px solid #E6CF9E; color: #854F0B; font-size: 12px; font-weight: 700; padding: 5px 12px; border-radius: 8px; cursor: pointer; }
+.mand-banner-btn:disabled { opacity: .5; cursor: not-allowed; }
+.mand-acciones { display: flex; align-items: center; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+.mand-acciones-sep { flex: 1; }
+.mand-btn { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; padding: 7px 14px; border-radius: 8px; cursor: pointer; border: 1px solid transparent; }
+.mand-btn--sec { background: #fff; border-color: #E5E2EC; color: #6B5A8A; }
+.mand-btn--pri { background: #6D4AE8; color: #fff; }
+.mand-btn:disabled { opacity: .45; cursor: not-allowed; }
+.hidden { display: none; }
 </style>
