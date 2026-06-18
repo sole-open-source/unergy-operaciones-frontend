@@ -7,8 +7,8 @@
       <span class="mand-periodo-label">{{ periodoLargo }}</span>
       <button class="mand-nav-btn" @click="cambiarMes(1)"><i class="pi pi-chevron-right" /></button>
       <span class="mand-periodo-code">{{ periodo }}</span>
-      <span v-if="badgeMes" class="mand-badge-mes" :class="`mand-badge-mes--${badgeMes}`">
-        {{ badgeMes === 'correcciones' ? 'Correcciones pendientes' : badgeMes === 'cerrado' ? 'Mes cerrado' : '' }}
+      <span v-if="badgeMes === 'correcciones' || badgeMes === 'cerrado'" class="mand-badge-mes" :class="`mand-badge-mes--${badgeMes}`">
+        {{ badgeMes === 'correcciones' ? 'Correcciones pendientes' : 'Mes cerrado' }}
       </span>
       <span class="mand-sync">Gmail no conectado</span>
     </div>
