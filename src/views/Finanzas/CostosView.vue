@@ -264,6 +264,11 @@
       </div>
     </div>
 
+    <!-- ══ TAB 3 — MANDATOS ══════════════════════════════════════════════ -->
+    <div v-if="activeTab === 3" class="mon-tab-view">
+      <MandatosOperaciones />
+    </div>
+
   </div>
 </template>
 
@@ -278,6 +283,7 @@ import OMAProveedor          from './OMAProveedor.vue'
 import ArriendosOperaciones  from './ArriendosOperaciones.vue'
 import ArriendosInfo          from './ArriendosInfo.vue'
 import StarlinkPDF            from './StarlinkPDF.vue'
+import MandatosOperaciones    from './MandatosOperaciones.vue'
 
 const toast = useToast()
 
@@ -298,6 +304,7 @@ const TABS = [
   { label: 'Mantenimiento',         icon: 'pi pi-wrench' },
   { label: 'Arriendos',             icon: 'pi pi-building' },
   { label: 'Servicios de Internet', icon: 'pi pi-wifi' },
+  { label: 'Mandatos',              icon: 'pi pi-file-check' },
 ]
 const activeTab = ref(0)
 
