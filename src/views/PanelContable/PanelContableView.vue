@@ -222,7 +222,12 @@
                         <tr class="grp"><td colspan="3">{{ g.label }}</td></tr>
                         <tr v-for="ln in lineasDe(inv, g.key)" :key="ln.id">
                           <td class="l">
-                            <div>{{ ln.concepto }}</div>
+                            <div v-if="g.key === 'ingresos'" class="fuente-row">
+                              <input class="fuente-et" :value="ln.concepto"
+                                     @change="renombrarFuente(p, ln, $event.target.value)" />
+                              <button class="fuente-x" title="Quitar fuente" @click="quitarFuente(p, ln)">✕</button>
+                            </div>
+                            <div v-else>{{ ln.concepto }}</div>
                             <input class="celda-origen" :value="ln.origen" placeholder="hoja!celda"
                                    @change="cambiarCelda(p, ln, $event.target.value)" />
                           </td>
@@ -232,6 +237,11 @@
                           </td>
                           <td class="l">
                             <input class="comp-in" placeholder="comprob." v-model="ln.comprobante_contable" @change="markDirty(p)" />
+                          </td>
+                        </tr>
+                        <tr v-if="g.key === 'ingresos'">
+                          <td colspan="3">
+                            <button class="fuente-add" @click="agregarFuente(p)">+ Agregar fuente de ingreso</button>
                           </td>
                         </tr>
                         <tr v-if="g.total" class="tot">
@@ -671,6 +681,16 @@ async function reasignar () {
   } catch (e) { /* noop */ }
 }
 
+// Reemplaza un panel en paneles.value con la respuesta del backend,
+// preservando el estado de despliegue (open).
+function _reemplazarPanel (p, data) {
+  const i = paneles.value.findIndex(x => x.id === p.id)
+  if (i !== -1) {
+    open[data.id] = open[p.id]
+    paneles.value[i] = data
+  }
+}
+
 async function cambiarCelda (p, ln, texto) {
   const m = String(texto).trim().match(/^([^!]+)!\s*([A-Za-z]+\d+)\s*$/)
   if (!m) {
@@ -687,14 +707,78 @@ async function cambiarCelda (p, ln, texto) {
       hoja: hoja.trim(),
       celda: celda.trim().toUpperCase(),
     })
-    const i = paneles.value.findIndex(x => x.id === p.id)
-    if (i !== -1) {
-      open[data.id] = open[p.id]
-      paneles.value[i] = data
-    }
+    _reemplazarPanel(p, data)
     toast.add({ severity: 'success', summary: 'Celda actualizada', detail: ln.concepto + ' ← ' + hoja + '!' + celda, life: 2500 })
   } catch (err) {
     toast.add({ severity: 'error', summary: 'Error', detail: err.response?.data?.detail || 'No se pudo remapear la celda', life: 4500 })
+  }
+}
+
+// ── Fase 2: gestión de fuentes de ingreso (solo grupo INGRESOS) ──
+async function renombrarFuente (p, ln, nuevaEtiqueta) {
+  if (!ln.hoja || !ln.celda) {
+    toast.add({ severity: 'warn', summary: 'Sin celda de origen', detail: 'Esta fuente no tiene celda de origen; primero asígnale una', life: 4000 })
+    return
+  }
+  nuevaEtiqueta = String(nuevaEtiqueta).trim()
+  if (!nuevaEtiqueta || nuevaEtiqueta === ln.concepto) return
+  try {
+    const { data } = await api.post('/panel-contable/alias-fuente', {
+      proyecto_id: p.proyecto_id,
+      periodo: periodo.value,
+      tipo: tab.value,
+      columna_origen: ln.origen || (ln.hoja + '!' + ln.celda),
+      etiqueta: nuevaEtiqueta,
+    })
+    _reemplazarPanel(p, data)
+    toast.add({ severity: 'success', summary: 'Fuente renombrada', detail: nuevaEtiqueta, life: 2500 })
+  } catch (err) {
+    toast.add({ severity: 'error', summary: 'Error', detail: err.response?.data?.detail || 'No se pudo renombrar la fuente', life: 4500 })
+  }
+}
+
+async function agregarFuente (p) {
+  const etiqueta = window.prompt('Nombre de la fuente de ingreso (ej. Ingreso Bruto PPA):')
+  if (!etiqueta) return
+  const cel = window.prompt('Celda de origen (hoja!celda, ej. Sheet1!H35):')
+  if (!cel) return
+  const m = String(cel).match(/^([^!]+)!\s*([A-Za-z]+\d+)\s*$/)
+  if (!m) {
+    toast.add({ severity: 'warn', summary: 'Formato inválido', detail: 'Usa hoja!celda, ej. Sheet1!H35', life: 3500 })
+    return
+  }
+  const [, hoja, celda] = m
+  try {
+    const { data } = await api.post('/panel-contable/fuente-ingreso', {
+      proyecto_id: p.proyecto_id,
+      periodo: periodo.value,
+      tipo: tab.value,
+      etiqueta: String(etiqueta).trim(),
+      hoja: hoja.trim(),
+      celda: celda.trim().toUpperCase(),
+    })
+    _reemplazarPanel(p, data)
+    toast.add({ severity: 'success', summary: 'Fuente agregada', detail: String(etiqueta).trim(), life: 2500 })
+  } catch (err) {
+    toast.add({ severity: 'error', summary: 'Error', detail: err.response?.data?.detail || 'No se pudo agregar la fuente', life: 4500 })
+  }
+}
+
+async function quitarFuente (p, ln) {
+  if (!window.confirm('¿Quitar la fuente "' + ln.concepto + '"?')) return
+  try {
+    const { data } = await api.delete('/panel-contable/fuente-ingreso', {
+      data: {
+        proyecto_id: p.proyecto_id,
+        periodo: periodo.value,
+        tipo: tab.value,
+        columna_origen: ln.origen || (ln.hoja + '!' + ln.celda),
+      },
+    })
+    _reemplazarPanel(p, data)
+    toast.add({ severity: 'success', summary: 'Fuente quitada', detail: ln.concepto, life: 2500 })
+  } catch (err) {
+    toast.add({ severity: 'error', summary: 'Error', detail: err.response?.data?.detail || 'No se pudo quitar la fuente', life: 4500 })
   }
 }
 
@@ -826,6 +910,19 @@ tr.tot td { background:var(--sec); font-weight:600; }
   font-variant-numeric:tabular-nums; background:transparent; }
 .celda-origen::placeholder { color:#bcb5c9; }
 .celda-origen:focus { outline:none; border-color:#915BD8; color:#2C2039; }
+
+/* Fase 2: edición de fuentes de ingreso */
+.fuente-row { display:flex; align-items:center; gap:2px; }
+.fuente-et { font-size:12.5px; color:#2C2039; width:200px; max-width:100%;
+  padding:2px 5px; border:1px solid transparent; border-radius:5px; background:transparent; }
+.fuente-et:hover { border-color:#ddd6e8; }
+.fuente-et:focus { outline:none; border-color:#915BD8; background:#fff; }
+.fuente-x { background:none; border:none; color:#9a93a8; font-size:11px; cursor:pointer;
+  margin-left:6px; padding:0 4px; line-height:1; }
+.fuente-x:hover { color:#c0392b; }
+.fuente-add { background:transparent; border:1px dashed #ddd6e8; color:#915BD8; font-size:12px;
+  padding:4px 10px; border-radius:6px; cursor:pointer; }
+.fuente-add:hover { background:#f5f2fa; }
 .proj-foot { display:flex; align-items:center; gap:12px; padding:12px 16px; }
 .saved { font-size:12px; color:var(--green); }
 
