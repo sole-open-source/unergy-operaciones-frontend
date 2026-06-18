@@ -249,12 +249,19 @@ export function reconciliar(mandato, details, tag) {
   }
   const lines = details.filter((d) => d.proj === tag && asociadoMatch(d.asociado))
 
-  // Sumar por concepto el NETO (débito − crédito): las cuentas de costo de mandato
-  // traen líneas de cargo y de reverso; el costo real es el neto (= "Importe en moneda").
+  // Sumar por concepto el DÉBITO de la cuenta de costo (NUNCA el neto debe − haber).
+  // En arriendo el mandante (la fiduciaria) aparece en AMBOS lados del asiento, con el
+  // MISMO importe: como débito (el costo) y como crédito (contrapartida/reverso). Netear
+  // debe − haber los cancela y el arriendo "desaparece" (queda 0). El costo real es el
+  // débito; cada contrato de la planta aporta su débito y se suman todos.
+  // (Verificado con el Excel real de mayo, planta [10038] LA ESMERALDA, CMU0996:
+  //  5 contratos × 368.513,81 de débito Bancolombia = 1.842.569 = arriendo del mandato.
+  //  Los créditos a los arrendadores —p. ej. personas naturales— quedan fuera porque su
+  //  asociado no es el mandante y, además, son crédito, no débito.)
   const sums = {}; const wrongAcc = []
   lines.forEach((d) => {
     const c = ACC2CONCEPT[d.acc]
-    if (c) sums[c] = (sums[c] || 0) + (d.debe - d.haber)
+    if (c) sums[c] = (sums[c] || 0) + d.debe
     else if (NON_COST_ACCOUNTS[d.acc] && (d.debe - d.haber) > 0) wrongAcc.push(d)
   })
 
