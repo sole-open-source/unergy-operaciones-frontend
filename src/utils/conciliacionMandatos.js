@@ -250,10 +250,14 @@ export function reconciliar(mandato, details, tag) {
   const lines = details.filter((d) => d.proj === tag && asociadoMatch(d.asociado))
 
   // Sumar por concepto el DÉBITO de la cuenta de costo (NUNCA el neto debe − haber).
-  // En arriendo el mandante aparece en AMBOS lados del asiento: como débito (el costo)
-  // y como crédito (el arrendador es la misma fiduciaria). Netear debe − haber los
-  // cancela y el arriendo "desaparece" (queda 0). El costo real es el débito; cada
-  // asiento (p. ej. 3 contratos de una planta) aporta su débito y se suman todos.
+  // En arriendo el mandante (la fiduciaria) aparece en AMBOS lados del asiento, con el
+  // MISMO importe: como débito (el costo) y como crédito (contrapartida/reverso). Netear
+  // debe − haber los cancela y el arriendo "desaparece" (queda 0). El costo real es el
+  // débito; cada contrato de la planta aporta su débito y se suman todos.
+  // (Verificado con el Excel real de mayo, planta [10038] LA ESMERALDA, CMU0996:
+  //  5 contratos × 368.513,81 de débito Bancolombia = 1.842.569 = arriendo del mandato.
+  //  Los créditos a los arrendadores —p. ej. personas naturales— quedan fuera porque su
+  //  asociado no es el mandante y, además, son crédito, no débito.)
   const sums = {}; const wrongAcc = []
   lines.forEach((d) => {
     const c = ACC2CONCEPT[d.acc]
@@ -261,37 +265,12 @@ export function reconciliar(mandato, details, tag) {
     else if (NON_COST_ACCOUNTS[d.acc] && (d.debe - d.haber) > 0) wrongAcc.push(d)
   })
 
-  // Reparto entre fiduciarias: una planta puede repartir un concepto (p. ej. arriendo)
-  // entre varias sub-fiduciarias. Esas líneas están en la MISMA analítica y la MISMA
-  // cuenta de costo, pero con un asociado DISTINTO al mandante, y entran como crédito.
-  // Las acumulamos por concepto para explicar la diferencia como hallazgo (no error duro).
-  const otrasFid = {}
-  details.forEach((d) => {
-    if (d.proj !== tag || asociadoMatch(d.asociado)) return
-    const c = ACC2CONCEPT[d.acc]
-    if (!c) return
-    const credito = (d.haber || 0) - (d.debe || 0)
-    if (credito <= 0) return
-    const o = otrasFid[c] || (otrasFid[c] = { monto: 0, asociados: new Set() })
-    o.monto += credito
-    o.asociados.add(d.asociado)
-  })
-
   // A) Importes por concepto (incluye faltantes)
   Object.keys(mandato.vals || {}).forEach((c) => {
     const mv = mandato.vals[c] || 0
     const av = Math.round((sums[c] || 0) * 100) / 100
-    const o = otrasFid[c]
-    const gap = mv - av
-    if (av === 0 && mv > 0 && o && Math.abs(gap - o.monto) <= TOL)
-      // Todo el concepto quedó en otra(s) fiduciaria(s) sobre la misma planta.
-      flags.push({ lvl: 'warn', code: 'REPARTO', txt: `${CONCEPTS[c]}: mandato ${fmt(mv)} no aparece para este mandante, pero sí ${fmt(o.monto)} en otra(s) fiduciaria(s) [${[...o.asociados].join(', ')}] sobre la misma planta. Revisar reparto con contabilidad.` })
-    else if (av === 0 && mv > 0)
+    if (av === 0 && mv > 0)
       flags.push({ lvl: 'bad', code: 'FALTANTE', txt: `${CONCEPTS[c]}: en el mandato (${fmt(mv)}) pero no aparece en el asiento para este mandante/proyecto.` })
-    else if (Math.abs(mv - av) > TOL && o && gap > TOL && Math.abs(gap - o.monto) <= TOL)
-      // El asiento del mandante cubre su parte; el resto está en otra(s) fiduciaria(s)
-      // de la MISMA planta. No es error duro: hallazgo para revisión.
-      flags.push({ lvl: 'warn', code: 'REPARTO', txt: `${CONCEPTS[c]}: mandato ${fmt(mv)} = asiento ${fmt(av)} (mandante) + ${fmt(o.monto)} en otra(s) fiduciaria(s) [${[...o.asociados].join(', ')}] sobre la misma planta. Revisar reparto con contabilidad.` })
     else if (Math.abs(mv - av) > TOL)
       flags.push({ lvl: 'bad', code: 'DIFERENCIA', txt: `${CONCEPTS[c]}: mandato ${fmt(mv)} vs. asiento ${fmt(av)} · diferencia ${fmt(Math.abs(mv - av))}.` })
     else

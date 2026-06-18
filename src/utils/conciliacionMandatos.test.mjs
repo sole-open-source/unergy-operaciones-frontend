@@ -86,37 +86,33 @@ assert(mNaos && mNaos.planta === 'GD NAOS 1', `matchIngresoContab NAOS 1 (no 2) 
 const mUru = matchIngresoContab({ mandante: 'Rodríguez Vélez Beatriz', projName: 'Minigranja Solar Uruaco' }, grupos)
 assert(mUru && mUru.planta === 'MINIGRANJA SOLAR URUACO', `matchIngresoContab Uruaco = "${mUru && mUru.planta}"`)
 
-// 7) ARRIENDO La Esmeralda (CMU0996): el arriendo está en 3 asientos, cuenta de
-//    costo 28150517, analítica [10038] LA ESMERALDA. El mandante (Bancolombia)
-//    aparece en AMBOS lados (débito = costo, crédito = arrendador). Sumar el NETO
-//    (debe − haber) lo cancela → "no aparece"/0. Hay que sumar el DÉBITO.
+// 7) ARRIENDO La Esmeralda (CMU0996) — datos reales del Excel de mayo 2026.
+//    Cuenta de costo 28150517, analítica [10038] LA ESMERALDA, mandante Bancolombia.
+//    Son 5 contratos; en CADA UNO el mandante (la fiduciaria) aparece con el MISMO
+//    importe en débito (costo) y en crédito (contrapartida) → el NETO (debe − haber)
+//    se cancela y el arriendo "no aparece" (queda 0). El costo real es la suma de los
+//    DÉBITOS: 5 × 368.513,81 = 1.842.569,05 = arriendo del mandato.
+//    Además cada contrato lleva un crédito al ARRENDADOR (persona natural), que NO debe
+//    sumarse: su asociado no es el mandante y, además, es crédito (no débito).
 const ESM = '[10038] LA ESMERALDA'
-const BANC = 'PATRIMONIOS AUTONOMOS FIDUCIARIA BANCOLOMBIA'
+const BANC = 'PATRIMONIOS AUTONOMOS FIDUCIARIA BANCOLOMBIA SA SOCIEDAD FIDUCIARIA'
+const DEB = 368513.81
+const arrendadores = ['EDGARDO JESUS AROCA MENDIOLA', 'DULM DAYAN AROCA GUTIERREZ', 'CARLOS ALBERTO AROCA MINDIOLA']
 const arrLineas = []
-for (const contrato of ['30982', '30978', '30974']) {
-  arrLineas.push({ asociado: BANC, acc: '28150517', accDesc: 'Costo arriendo', debe: 552770.72, haber: 0, etiqueta: contrato, proj: ESM })
-  arrLineas.push({ asociado: BANC, acc: '28150517', accDesc: 'Costo arriendo', debe: 0, haber: 552770.72, etiqueta: contrato, proj: ESM })
+for (const ct of ['30980', '30976', '30982', '30978', '30974']) {
+  arrLineas.push({ asociado: BANC, acc: '28150517', accDesc: 'Costo arriendo', debe: 0, haber: DEB, etiqueta: ct, proj: ESM })
+  arrLineas.push({ asociado: BANC, acc: '28150517', accDesc: 'Costo arriendo', debe: DEB, haber: 0, etiqueta: ct, proj: ESM })
 }
-const resArr = reconciliar({ mandante: BANC, vals: { arr: 1658312.16 }, total: 1658312.16 }, arrLineas, ESM)
-assert(Math.round(resArr.sums.arr) === 1658312,
-  `ESMERALDA arriendo (débito de 3 asientos) = ${resArr.sums && Math.round(resArr.sums.arr)} (esperado 1658312, NO 0, NO 184257)`)
-assert(resArr.status === 'ok', `ESMERALDA arriendo: status = ${resArr.status} (esperado ok)`)
+// Créditos a los arrendadores (personas naturales) en 3 de los contratos.
+arrendadores.forEach((p, i) =>
+  arrLineas.push({ asociado: p, acc: '28150517', accDesc: 'Costo arriendo', debe: 0, haber: 184256.91, etiqueta: ['30982', '30978', '30974'][i], proj: ESM }))
 
-// 8) Porción en una segunda fiduciaria (CREDICORP, 184.257 como crédito sobre la
-//    MISMA planta). El mandato arr = 1.842.569 = 1.658.312 (Bancolombia, débito)
-//    + 184.257 (Credicorp, crédito). La porción de Credicorp NO debe forzarse a 0
-//    ni marcarse como error duro: queda como hallazgo (warn) para revisión.
-const CRED = 'PATRIMONIOS AUTONOMOS CREDICORP CAPITAL'
-const arrConCred = [...arrLineas,
-  { asociado: CRED, acc: '28150517', accDesc: 'Costo arriendo', debe: 0, haber: 184257, etiqueta: '30982', proj: ESM }]
-const resCred = reconciliar({ mandante: BANC, vals: { arr: 1842569 }, total: 1842569 }, arrConCred, ESM)
-assert(Math.round(resCred.sums.arr) === 1658312,
-  `ESMERALDA+Credicorp: suma arr (solo mandante) = ${resCred.sums && Math.round(resCred.sums.arr)} (esperado 1658312)`)
-const flagArr = resCred.flags.find((f) => f.txt.includes('Arriendo'))
-assert(flagArr && flagArr.lvl === 'warn' && flagArr.code === 'REPARTO',
-  `ESMERALDA+Credicorp: arriendo es warn/REPARTO (no error duro) — fue ${flagArr && flagArr.lvl}/${flagArr && flagArr.code}`)
-assert(flagArr && flagArr.txt.includes('CREDICORP'),
-  'ESMERALDA+Credicorp: el hallazgo nombra la otra fiduciaria (CREDICORP)')
+const resArr = reconciliar({ mandante: BANC, vals: { arr: 1842569 }, total: 1842569 }, arrLineas, ESM)
+assert(Math.round(resArr.sums.arr) === 1842569,
+  `ESMERALDA arriendo (suma de débitos, 5 contratos) = ${resArr.sums && Math.round(resArr.sums.arr)} (esperado 1842569, NO 0, NO 184257)`)
+assert(resArr.lines.every((l) => l.asociado === BANC),
+  'ESMERALDA: las líneas conciliadas son solo del mandante (arrendadores excluidos)')
+assert(resArr.status === 'ok', `ESMERALDA arriendo: status = ${resArr.status} (esperado ok — reconcilia exacto)`)
 
 console.log(ok ? '\nTODOS LOS TESTS PASARON' : '\nHAY FALLOS')
 process.exit(ok ? 0 : 1)
