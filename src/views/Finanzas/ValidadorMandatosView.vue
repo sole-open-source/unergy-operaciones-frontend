@@ -14,6 +14,7 @@
 
 <script setup>
 import { ref, onMounted, onBeforeUnmount } from 'vue'
+import * as XLSX from 'xlsx'
 import {
   parseAsientos, extractMandate, suggestTag, reconciliar, fmt, norm as normNombre,
 } from '@/utils/conciliacionMandatos.js'
@@ -214,7 +215,7 @@ const MARKUP = `
 // Recibe `el` = contenedor raíz para acotar las búsquedas por id al componente.
 function initValidador(el) {
   const pdfjsLib = window.pdfjsLib
-  const XLSX = window.XLSX
+  // XLSX viene del paquete npm (import arriba), ya no del CDN
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'
 
   // getElementById acotado al contenedor del componente (evita colisiones globales)
@@ -865,10 +866,8 @@ function initValidador(el) {
 }
 
 onMounted(async () => {
-  await Promise.all([
-    loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'),
-    loadScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'),
-  ])
+  // pdf.js sigue desde CDN; XLSX ahora es el paquete npm importado
+  await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js')
   root.value.innerHTML = MARKUP
   initValidador(root.value)
 })
