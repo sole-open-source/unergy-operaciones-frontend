@@ -771,8 +771,9 @@ function svgPortfolioChart(items) {
   return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%;height:${H}px;display:block">${html}</svg>`
 }
 
-// Gráfico de ranking vs P90 SIN excedente. Muestra el valor de la generación
-// real y el valor de P90, más el % de desviación. (Usado por el informe Ranking.)
+// Gráfico de ranking vs P90 para el informe Ranking. Mantiene el excedente
+// (verde) sobre P90 y muestra el valor de generación real, el valor de P90 y
+// el % de desviación.
 function svgRankingP90Chart(items) {
   if (!items.length) return ''
   const W = 660, rowH = 26, padL = 135, padR = 215, padT = 30, padB = 8
@@ -781,13 +782,15 @@ function svgRankingP90Chart(items) {
   const maxV = Math.max(...items.map(i => Math.max(i.real || 0, i.p90 || 0)), 1)
   const fmt = (n) => Math.round(n).toLocaleString('es-CO')
 
-  // Leyenda (Real + P90, sin excedente)
+  // Leyenda: Real + Excedente + P90 esperado
   let html =
     `<g font-size="10" font-weight="700">` +
     `<rect x="${padL}" y="5" width="12" height="11" fill="#6B35C0" opacity="0.82" rx="2"/>` +
     `<text x="${padL + 17}" y="14" fill="#444">Real</text>` +
-    `<line x1="${padL + 62}" y1="3" x2="${padL + 62}" y2="18" stroke="#C89600" stroke-width="2" stroke-dasharray="3 2"/>` +
-    `<text x="${padL + 68}" y="14" fill="#444">P90 esperado (simulación)</text>` +
+    `<rect x="${padL + 52}" y="5" width="12" height="11" fill="#22C55E" opacity="0.85" rx="2"/>` +
+    `<text x="${padL + 69}" y="14" fill="#444">Excedente</text>` +
+    `<line x1="${padL + 142}" y1="3" x2="${padL + 142}" y2="18" stroke="#C89600" stroke-width="2" stroke-dasharray="3 2"/>` +
+    `<text x="${padL + 148}" y="14" fill="#444">P90 esperado (simulación)</text>` +
     `</g>`
 
   items.forEach((it, i) => {
@@ -798,13 +801,15 @@ function svgRankingP90Chart(items) {
     const wReal = (real / maxV) * barAreaW
     html += `<text x="${padL - 6}" y="${barY + 11}" text-anchor="end" font-size="10" fill="#444" font-weight="600">${esc(it.name.slice(0, 22))}</text>`
 
-    // Barra real (morado, siempre sólida)
-    html += `<rect x="${padL}" y="${barY}" width="${wReal.toFixed(1)}" height="${barH}" fill="#6B35C0" opacity="0.82" rx="2"/>`
-
     if (p90 != null) {
       const wP90 = (p90 / maxV) * barAreaW
-      // Déficit (rojo translúcido) cuando real < P90
-      if (real < p90) {
+      if (real >= p90) {
+        // Morado hasta P90 + excedente verde P90→Real
+        html += `<rect x="${padL}" y="${barY}" width="${wP90.toFixed(1)}" height="${barH}" fill="#6B35C0" opacity="0.82" rx="2"/>`
+        html += `<rect x="${(padL + wP90).toFixed(1)}" y="${barY}" width="${(wReal - wP90).toFixed(1)}" height="${barH}" fill="#22C55E" opacity="0.85" rx="2"/>`
+      } else {
+        // Morado hasta Real + déficit rojo translúcido Real→P90
+        html += `<rect x="${padL}" y="${barY}" width="${wReal.toFixed(1)}" height="${barH}" fill="#6B35C0" opacity="0.82" rx="2"/>`
         html += `<rect x="${(padL + wReal).toFixed(1)}" y="${barY}" width="${(wP90 - wReal).toFixed(1)}" height="${barH}" fill="#FCA5A5" opacity="0.45" rx="2"/>`
       }
       // Marcador P90
@@ -817,6 +822,8 @@ function svgRankingP90Chart(items) {
       html += `<text x="${labelX.toFixed(1)}" y="${barY + 11}" font-size="9" fill="#333" font-weight="700">` +
         `${fmt(real)} <tspan fill="#B8860B">· P90 ${fmt(p90)}</tspan> <tspan fill="${pctCol}" font-weight="800">${pctStr}</tspan></text>`
     } else {
+      // Sin P90: barra morada sólida + valor
+      html += `<rect x="${padL}" y="${barY}" width="${wReal.toFixed(1)}" height="${barH}" fill="#6B35C0" opacity="0.82" rx="2"/>`
       html += `<text x="${(padL + wReal + 6).toFixed(1)}" y="${barY + 11}" font-size="9" fill="#333" font-weight="700">${fmt(real)} kWh</text>`
     }
   })
