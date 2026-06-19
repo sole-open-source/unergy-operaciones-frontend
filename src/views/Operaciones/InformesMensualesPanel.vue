@@ -160,12 +160,11 @@
           <Button label="PDF" icon="pi pi-print" outlined size="small"
                   severity="warn" @click="imprimir"
                   v-tooltip.bottom="'Imprimir o exportar a PDF'" />
-          <Button v-if="tipo !== 'ranking'"
-                  :label="guardando ? 'Guardando…' : (informeIdGuardado ? 'Actualizar' : 'Guardar')"
+          <Button :label="guardando ? 'Guardando…' : (informeIdGuardado ? 'Actualizar' : 'Guardar')"
                   icon="pi pi-save" :loading="guardando" size="small"
                   class="im-btn-primary" @click="guardar"
                   v-tooltip.bottom="'Guardar como borrador para revisión/aprobación'" />
-          <Button v-if="informeIdGuardado && tipo !== 'ranking'" icon="pi pi-arrow-right" outlined size="small"
+          <Button v-if="informeIdGuardado" icon="pi pi-arrow-right" outlined size="small"
                   @click="abrirEditor"
                   v-tooltip.bottom="'Abrir en el editor (flujo de aprobación)'" />
         </div>
@@ -1500,11 +1499,12 @@ async function generar() {
         items.sort((a, b) => (b.real || 0) - (a.real || 0))
         pages.push(buildRankingPage(scopeLabel, mes.label, items))
       }
+      ultimoSubProject.value = `ranking_${rankingScope.value}_${scopeLabel}`.replace(/[^\w-]/g, '_').toLowerCase().slice(0, 180)
       htmlContent.value = pages.join('<div class="rpt-page-sep"></div>')
       resultTitle.value = scopeLabel
       rangeLabel.value = meses.length > 1 ? `${meses[0].label} – ${meses[meses.length - 1].label}` : meses[0].label
     }
-    ultimoTipo.value = tipo.value === 'portafolio' ? 'port' : tipo.value === 'fmo' ? 'fmo' : 'op'
+    ultimoTipo.value = tipo.value === 'portafolio' ? 'port' : tipo.value === 'fmo' ? 'fmo' : tipo.value === 'ranking' ? 'ranking' : 'op'
   } catch (e) {
     console.error('[InformesMensuales] generar error', e)
     error.value = { title: 'Error al generar el informe', detail: e.response?.data?.detail || e.message }
@@ -1580,8 +1580,9 @@ async function guardar() {
 
 // Watchers para limpiar selecciones cuando cambia el tipo
 watch(tipo, (t) => {
-  if (t === 'portafolio') { proyectoSel.value = '' }
-  else { portafolioSel.value = '' }
+  // No se limpia en 'ranking' (usa portafolio o proyectos según el alcance)
+  if (t === 'portafolio') proyectoSel.value = ''
+  else if (t === 'proyecto' || t === 'fmo') portafolioSel.value = ''
 })
 </script>
 
