@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { securityGuard } from '@/middleware/securityMiddleware'
 
 const routes = [
   // ── Públicas ─────────────────────────────────────────────────────
@@ -79,6 +80,10 @@ const router = createRouter({
   history: createWebHistory(),
   routes,
 })
+
+// Guarda de seguridad: bloquea parámetros de ruta/query con payloads de
+// inyección (XSS) antes de cualquier otra lógica de navegación.
+router.beforeEach(securityGuard)
 
 router.beforeEach((to) => {
   const auth = useAuthStore()

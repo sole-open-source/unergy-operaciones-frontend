@@ -166,6 +166,9 @@ import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import Select from 'primevue/select'
 import Button from 'primevue/button'
+import { useSecureInput } from '@/composables/useSecureInput'
+
+const { beforeSubmit } = useSecureInput()
 
 const props = defineProps({ initial: Object })
 const emit = defineEmits(['save', 'cancel', 'test-correo'])
@@ -199,7 +202,8 @@ function submit() {
   payload.correos_operacionales = (f.correos_operacionales || [])
     .map(e => e.trim().toLowerCase())
     .filter(e => e && emailValido(e))
-  emit('save', payload)
+  // Saneamiento anti-XSS de todos los campos de texto antes de enviar a la API.
+  emit('save', beforeSubmit(payload))
 }
 </script>
 

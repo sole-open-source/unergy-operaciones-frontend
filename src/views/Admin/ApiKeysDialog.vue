@@ -93,6 +93,7 @@ import Tag from 'primevue/tag'
 import Divider from 'primevue/divider'
 import { useToast } from 'primevue/usetoast'
 import api from '@/api/client'
+import { sanitizeText } from '@/utils/sanitization'
 
 const props = defineProps({ usuario: Object })
 const visible = defineModel('visible', { type: Boolean })
@@ -132,9 +133,11 @@ async function loadKeys() {
 async function createKey() {
   creating.value = true
   try {
+    // Sanea la etiqueta provista por el usuario antes de persistirla (la key
+    // se renderiza luego en la lista; defensa en profundidad anti-XSS).
     const { data } = await api.post('/api-keys', {
       usuario_id: props.usuario.id,
-      nombre: newKeyName.value.trim(),
+      nombre: sanitizeText(newKeyName.value.trim()),
     })
     newKey.value = data.api_key
     newKeyName.value = ''

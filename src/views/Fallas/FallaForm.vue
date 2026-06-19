@@ -258,6 +258,9 @@ import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
 import Textarea from 'primevue/textarea'
 import api from '@/api/client'
+import { useSecureInput } from '@/composables/useSecureInput'
+
+const { beforeSubmit } = useSecureInput()
 
 const TIPOS_SOLUCION = [
   'Reemplazo de componente',
@@ -491,10 +494,13 @@ async function submit() {
     if (form.value.fecha_programada)             base.fecha_programada     = formatDate(form.value.fecha_programada)
     base.notificacion = !!form.value.notificacion
 
+    // Saneamiento anti-XSS de los campos de texto (descripción, causa raíz,
+    // acciones, equipo afectado, nota…). sanitizeJSON preserva los File de
+    // `_archivos` intactos, por lo que los adjuntos no se ven afectados.
     if (props.initial) {
-      emit('save', { ...base, proyecto_id: form.value.proyecto_id, _archivos: archivosStaged.value })
+      emit('save', beforeSubmit({ ...base, proyecto_id: form.value.proyecto_id, _archivos: archivosStaged.value }))
     } else {
-      emit('save', { ...base, proyecto_ids: form.value.proyecto_ids, _archivos: archivosStaged.value })
+      emit('save', beforeSubmit({ ...base, proyecto_ids: form.value.proyecto_ids, _archivos: archivosStaged.value }))
     }
   } finally {
     saving.value = false

@@ -163,6 +163,9 @@ import Divider from 'primevue/divider'
 import Tag from 'primevue/tag'
 import { useToast } from 'primevue/usetoast'
 import api from '@/api/client'
+import { useSecureInput } from '@/composables/useSecureInput'
+
+const { beforeSubmit } = useSecureInput()
 
 const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 
@@ -276,7 +279,9 @@ function submit() {
   const p50json = serializeMonthArray(p50Array.value)
   if (p90json !== null) payload.p90_mensual_kwh = p90json
   if (p50json !== null) payload.p50_mensual_kwh = p50json
-  emit('save', payload)
+  // Saneamiento anti-XSS de descripciones/especificaciones antes de enviar.
+  // Los campos numéricos (potencia, P50/P90) ya están tipados por InputNumber.
+  emit('save', beforeSubmit(payload))
 }
 </script>
 
