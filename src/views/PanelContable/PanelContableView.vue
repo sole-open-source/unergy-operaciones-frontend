@@ -183,7 +183,18 @@
         </div>
 
         <!-- Detalle por proyecto -->
-        <div class="sec-title">Detalle contable por proyecto</div>
+        <div class="sec-title-row">
+          <div class="sec-title">Detalle contable por proyecto</div>
+          <div class="vista-toggle">
+            <span>Ver:</span>
+            <label class="vt-opt" :class="{ on: !vista100 }">
+              <input type="radio" :value="false" v-model="vista100" /> Por inversionista
+            </label>
+            <label class="vt-opt" :class="{ on: vista100 }">
+              <input type="radio" :value="true" v-model="vista100" /> 100% total
+            </label>
+          </div>
+        </div>
         <div v-for="p in paneles" :key="'d' + p.id" class="proj" :class="{ off: !esActivo(p), open: open[p.id] }">
           <div class="phead" @click="toggle(p.id)">
             <span class="chev">▶</span>
@@ -201,66 +212,118 @@
           </div>
 
           <div class="body" v-show="open[p.id]">
-            <div v-for="inv in p.inversionistas" :key="inv.proyecto_inversionista_id || inv.nombre" class="inv-block">
-              <div class="inv-head">
-                <div class="inv-name">{{ inv.nombre }} · {{ (inv.porcentaje ?? 0).toFixed(2) }}%</div>
-                <div class="inv-cons">
-                  <span>Ing: <b>{{ p.liquidar_ingresos ? (p.consecutivo_ingresos ?? '—') : '—' }}</b></span>
-                  <span>Cost: <b>{{ (p.liquidar_costos && p.tiene_costos) ? (p.consecutivo_costos ?? '—') : '—' }}</b></span>
+            <!-- Vista por inversionista (comportamiento por defecto) -->
+            <template v-if="!vista100">
+              <div v-for="inv in p.inversionistas" :key="inv.proyecto_inversionista_id || inv.nombre" class="inv-block">
+                <div class="inv-head">
+                  <div class="inv-name">{{ inv.nombre }} · {{ (inv.porcentaje ?? 0).toFixed(2) }}%</div>
+                  <div class="inv-cons">
+                    <span>Ing: <b>{{ p.liquidar_ingresos ? (p.consecutivo_ingresos ?? '—') : '—' }}</b></span>
+                    <span>Cost: <b>{{ (p.liquidar_costos && p.tiene_costos) ? (p.consecutivo_costos ?? '—') : '—' }}</b></span>
+                  </div>
+                </div>
+                <div class="tbl-wrap">
+                  <table class="dt">
+                    <thead><tr>
+                      <th class="l">Concepto</th>
+                      <th>Valor ({{ shortName(inv.nombre) }})</th>
+                      <th class="l">Comprobante</th>
+                    </tr></thead>
+                    <tbody>
+                      <template v-for="g in grupos" :key="g.key">
+                        <template v-if="lineasDe(inv, g.key).length">
+                          <tr class="grp"><td colspan="3">{{ g.label }}</td></tr>
+                          <tr v-for="ln in lineasDe(inv, g.key)" :key="ln.id">
+                            <td class="l">
+                              <div v-if="g.key === 'ingresos'" class="fuente-row">
+                                <input class="fuente-et" :value="ln.concepto"
+                                       @change="renombrarFuente(p, ln, $event.target.value)" />
+                                <button class="fuente-x" title="Quitar fuente" @click="quitarFuente(p, ln)">✕</button>
+                              </div>
+                              <div v-else>{{ ln.concepto }}</div>
+                              <div class="origen-wrap">
+                                <button class="origen-link" :title="origenOpen[ln.id] ? 'Ocultar origen' : 'Editar celda de origen'"
+                                        @click="toggleOrigen(ln.id)">⚙ origen: {{ ln.origen || '—' }}</button>
+                                <input v-if="origenOpen[ln.id]" class="celda-origen" :value="ln.origen" placeholder="hoja!celda"
+                                       @change="cambiarCelda(p, ln, $event.target.value)" />
+                              </div>
+                            </td>
+                            <td>
+                              <input class="val-in" :class="{ neg: ln.valor_cop < 0 }"
+                                     type="number" v-model.number="ln.valor_cop" @change="markDirty(p)" />
+                            </td>
+                            <td class="l">
+                              <input class="comp-in" placeholder="comprob." v-model="ln.comprobante_contable" @change="markDirty(p)" />
+                            </td>
+                          </tr>
+                          <tr v-if="g.key === 'ingresos'">
+                            <td colspan="3">
+                              <button class="fuente-add" @click="agregarFuente(p)">+ Agregar fuente de ingreso</button>
+                            </td>
+                          </tr>
+                          <tr v-if="g.total" class="tot">
+                            <td class="l">{{ g.total }}</td>
+                            <td>{{ fmt(totalGrupo(inv, g.key)) }}</td>
+                            <td></td>
+                          </tr>
+                        </template>
+                      </template>
+                      <tr class="grp"><td colspan="3">RESULTADO</td></tr>
+                      <tr class="tot">
+                        <td class="l">Utilidad</td>
+                        <td :class="{ neg: utilidad(inv) < 0 }">{{ fmt(utilidad(inv)) }}</td>
+                        <td></td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
               </div>
-              <div class="tbl-wrap">
-                <table class="dt">
-                  <thead><tr>
-                    <th class="l">Concepto</th>
-                    <th>Valor ({{ shortName(inv.nombre) }})</th>
-                    <th class="l">Comprobante</th>
-                  </tr></thead>
-                  <tbody>
-                    <template v-for="g in grupos" :key="g.key">
-                      <template v-if="lineasDe(inv, g.key).length">
-                        <tr class="grp"><td colspan="3">{{ g.label }}</td></tr>
-                        <tr v-for="ln in lineasDe(inv, g.key)" :key="ln.id">
-                          <td class="l">
-                            <div v-if="g.key === 'ingresos'" class="fuente-row">
-                              <input class="fuente-et" :value="ln.concepto"
-                                     @change="renombrarFuente(p, ln, $event.target.value)" />
-                              <button class="fuente-x" title="Quitar fuente" @click="quitarFuente(p, ln)">✕</button>
-                            </div>
-                            <div v-else>{{ ln.concepto }}</div>
-                            <input class="celda-origen" :value="ln.origen" placeholder="hoja!celda"
-                                   @change="cambiarCelda(p, ln, $event.target.value)" />
-                          </td>
-                          <td>
-                            <input class="val-in" :class="{ neg: ln.valor_cop < 0 }"
-                                   type="number" v-model.number="ln.valor_cop" @change="markDirty(p)" />
-                          </td>
-                          <td class="l">
-                            <input class="comp-in" placeholder="comprob." v-model="ln.comprobante_contable" @change="markDirty(p)" />
-                          </td>
-                        </tr>
-                        <tr v-if="g.key === 'ingresos'">
-                          <td colspan="3">
-                            <button class="fuente-add" @click="agregarFuente(p)">+ Agregar fuente de ingreso</button>
-                          </td>
-                        </tr>
-                        <tr v-if="g.total" class="tot">
-                          <td class="l">{{ g.total }}</td>
-                          <td>{{ fmt(totalGrupo(inv, g.key)) }}</td>
-                          <td></td>
-                        </tr>
+            </template>
+
+            <!-- Vista 100%: una sola tabla con el total del proyecto (sin dividir) -->
+            <template v-else>
+              <div class="inv-block">
+                <div class="inv-head">
+                  <div class="inv-name">100% — Total proyecto</div>
+                  <div class="inv-cons">
+                    <span>Ing: <b>{{ p.liquidar_ingresos ? (p.consecutivo_ingresos ?? '—') : '—' }}</b></span>
+                    <span>Cost: <b>{{ (p.liquidar_costos && p.tiene_costos) ? (p.consecutivo_costos ?? '—') : '—' }}</b></span>
+                  </div>
+                </div>
+                <div class="tbl-wrap">
+                  <table class="dt">
+                    <thead><tr>
+                      <th class="l">Concepto</th>
+                      <th>Valor</th>
+                      <th class="l">Comprobante</th>
+                    </tr></thead>
+                    <tbody>
+                      <template v-for="g in grupos" :key="'100' + g.key">
+                        <template v-if="lineas100(p, g.key).length">
+                          <tr class="grp"><td colspan="3">{{ g.label }}</td></tr>
+                          <tr v-for="(ln, i) in lineas100(p, g.key)" :key="'100' + g.key + i">
+                            <td class="l">{{ ln.concepto }}</td>
+                            <td :class="{ neg: ln.valor_cop < 0 }">{{ fmt(ln.valor_cop) }}</td>
+                            <td class="l">{{ ln.comprobante_contable || '' }}</td>
+                          </tr>
+                          <tr v-if="g.total" class="tot">
+                            <td class="l">{{ g.total }}</td>
+                            <td>{{ fmt(total100Grupo(p, g.key)) }}</td>
+                            <td></td>
+                          </tr>
+                        </template>
                       </template>
-                    </template>
-                    <tr class="grp"><td colspan="3">RESULTADO</td></tr>
-                    <tr class="tot">
-                      <td class="l">Utilidad</td>
-                      <td :class="{ neg: utilidad(inv) < 0 }">{{ fmt(utilidad(inv)) }}</td>
-                      <td></td>
-                    </tr>
-                  </tbody>
-                </table>
+                      <tr class="grp"><td colspan="3">RESULTADO</td></tr>
+                      <tr class="tot">
+                        <td class="l">Utilidad 100%</td>
+                        <td :class="{ neg: utilidad100(p) < 0 }">{{ fmt(utilidad100(p)) }}</td>
+                        <td></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
+            </template>
 
             <div class="proj-foot">
               <button class="btn" :disabled="!dirty[p.id]" @click="guardar(p)">
@@ -421,11 +484,14 @@ import Dialog from 'primevue/dialog'
 
 const toast = useToast()
 
+// Grupos de VISUALIZACIÓN. `keys` son las claves de `grupo` del backend que
+// se renderizan juntas bajo un mismo encabezado. "COSTOS OPERATIVOS" combina
+// las líneas de 'costos' y 'facturas' (Representación, CGM, Administración).
+// No se altera el campo `grupo` de los datos, solo la presentación.
 const grupos = [
-  { key: 'ingresos', label: 'INGRESOS', total: 'Total Ingresos' },
-  { key: 'comercializacion', label: 'COMERCIALIZACIÓN XM', total: 'Total Comercialización' },
-  { key: 'costos', label: 'COSTOS OPERATIVOS', total: 'Total Costos Operativos' },
-  { key: 'facturas', label: 'FACTURAS DE SERVICIO', total: null },
+  { key: 'ingresos', keys: ['ingresos'], label: 'INGRESOS', total: 'Total Ingresos' },
+  { key: 'comercializacion', keys: ['comercializacion'], label: 'COMERCIALIZACIÓN XM', total: 'Total Comercialización' },
+  { key: 'costos', keys: ['costos', 'facturas'], label: 'COSTOS OPERATIVOS', total: 'Total Costos Operativos' },
 ]
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
@@ -450,6 +516,9 @@ const diff = ref({})
 const open = reactive({})
 const dirty = reactive({})
 const savedAt = reactive({})
+// Toggle por fila para revelar el input editable de celda de origen (colapsado por defecto).
+const origenOpen = reactive({})
+const toggleOrigen = (id) => { origenOpen[id] = !origenOpen[id] }
 const loading = ref(false)
 const uploading = ref(0)
 const uploadMsg = ref('')
@@ -488,12 +557,33 @@ const shortName = (n) => (n || '').split(' ').slice(0, 2).join(' ')
 const diffClass = (v) => (v == null ? '' : (v > 0 ? 'pos' : (v < 0 ? 'neg' : '')))
 const arrow = (v) => (v == null || v === 0 ? '' : (v > 0 ? '▲ ' : '▼ '))
 
-// Diferencia: líneas de un inversionista por grupo (ya cruzadas en el backend).
-const lineasGrupo = (inv, grupo) => (inv.lineas || []).filter(l => l.grupo === grupo)
+// Resuelve las claves de backend que corresponden a un grupo de visualización.
+const _keysDe = (grupo) => {
+  const g = grupos.find(x => x.key === grupo)
+  return g ? g.keys : [grupo]
+}
 
-const lineasDe = (inv, grupo) => inv.lineas.filter(l => l.grupo === grupo)
+// Diferencia: líneas de un inversionista por grupo (ya cruzadas en el backend).
+const lineasGrupo = (inv, grupo) => {
+  const keys = _keysDe(grupo)
+  return (inv.lineas || []).filter(l => keys.includes(l.grupo))
+}
+
+const lineasDe = (inv, grupo) => {
+  const keys = _keysDe(grupo)
+  return inv.lineas.filter(l => keys.includes(l.grupo))
+}
 const totalGrupo = (inv, grupo) => lineasDe(inv, grupo).reduce((s, l) => s + (Number(l.valor_cop) || 0), 0)
 const utilidad = (inv) => inv.lineas.reduce((s, l) => s + (Number(l.valor_cop) || 0), 0)
+
+// ── Vista 100% (total proyecto, antes de dividir por inversionista) ──
+const vista100 = ref(false)
+const lineas100 = (p, grupo) => {
+  const keys = _keysDe(grupo)
+  return (p.total_100 || []).filter(l => keys.includes(l.grupo))
+}
+const total100Grupo = (p, grupo) => lineas100(p, grupo).reduce((s, l) => s + (Number(l.valor_cop) || 0), 0)
+const utilidad100 = (p) => (p.total_100 || []).reduce((s, l) => s + (Number(l.valor_cop) || 0), 0)
 
 function setTab (t) {
   tab.value = t
@@ -512,6 +602,11 @@ async function cargarPaneles () {
     const { data } = await api.get('/panel-contable', { params: { periodo: periodo.value, tipo: tab.value } })
     paneles.value = data.paneles || []
     paneles.value.forEach((p, i) => { if (open[p.id] === undefined) open[p.id] = (i === 0 && esActivo(p)) })
+    // Asignar la cadena de consecutivos al cargar: si hay algún proyecto activo
+    // (liquida ingresos o costos) aún sin consecutivo, reasignar de inmediato.
+    if (paneles.value.some(p => p.liquidar_ingresos || p.liquidar_costos)) {
+      await reasignar()
+    }
   } catch (e) {
     toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudieron cargar los paneles', life: 4000 })
   } finally {
@@ -876,6 +971,18 @@ onMounted(cargarPaneles)
 .summary b { color:var(--p1); }
 
 .sec-title { font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:var(--txt2); font-weight:600; margin:18px 0 10px; }
+.sec-title-row { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin:18px 0 10px; }
+.sec-title-row .sec-title { margin:0; }
+.vista-toggle { display:inline-flex; align-items:center; gap:8px; font-size:12px; color:var(--txt2); }
+.vista-toggle > span { font-weight:500; }
+.vista-toggle .vt-opt { display:inline-flex; align-items:center; gap:5px; font-size:12px; padding:5px 12px;
+  border:1px solid var(--line2); border-radius:8px; cursor:pointer; color:var(--txt2); background:#fff; transition:all .12s; }
+.vista-toggle .vt-opt.on { border-color:#915BD8; background:#eee7fb; color:#2C2039; font-weight:600; }
+.vista-toggle .vt-opt input { accent-color:#915BD8; cursor:pointer; }
+.origen-wrap { margin-top:3px; }
+.origen-link { display:inline-block; background:none; border:none; padding:0; font-size:10px; color:#9a93a8;
+  cursor:pointer; text-align:left; font-variant-numeric:tabular-nums; }
+.origen-link:hover { color:#915BD8; }
 .proj { background:#fff; border:1px solid var(--line); border-radius:12px; margin-bottom:10px; overflow:hidden; transition:opacity .2s; }
 .proj.off { opacity:.45; }
 .phead { display:flex; align-items:center; gap:12px; padding:12px 16px; cursor:pointer; flex-wrap:wrap; }
