@@ -82,7 +82,12 @@
                 <span v-else-if="m.estado === 'sin_inversionista'" class="mand-sin-inv">Sin inversionista</span>
                 <span v-else class="mand-guion">—</span>
               </td>
-              <td><i class="pi pi-paperclip" :style="m.tiene_pdf ? 'color:#185FA5' : 'color:#C9C2D6'" /></td>
+              <td>
+                <button v-if="m.tiene_pdf_zip || m.tiene_pdf" class="mand-clip-btn" title="Ver PDF" @click="descargarPdf(m)">
+                  <i class="pi pi-paperclip" style="color:#185FA5" />
+                </button>
+                <i v-else class="pi pi-paperclip" style="color:#C9C2D6" />
+              </td>
             </tr>
             <tr v-if="mandatosFiltrados.length === 0">
               <td colspan="8" class="mand-vacio">No hay mandatos para este filtro.</td>
@@ -100,8 +105,50 @@
           <i :class="subiendoPdf ? 'pi pi-spin pi-spinner' : 'pi pi-upload'" /> Subir firmados
           <input type="file" accept=".pdf" class="hidden" @change="onSubirFirmado" />
         </label>
+        <label class="mand-btn mand-btn--pri">
+          <i :class="subiendoZip ? 'pi pi-spin pi-spinner' : 'pi pi-file-import'" /> Cargar ZIP de mandatos
+          <input type="file" accept=".zip" class="hidden" @change="abrirDialogoZip" />
+        </label>
         <button class="mand-btn mand-btn--pri" disabled title="Acción interna (Fase B)"><i class="pi pi-share-alt" /> Enviar a inversionistas</button>
       </div>
+    </div>
+
+    <!-- Diálogo selector de período del ZIP -->
+    <div v-if="mostrarDialogoZip" class="mand-modal-overlay" @click.self="mostrarDialogoZip = false">
+      <div class="mand-modal">
+        <h3 class="mand-modal-titulo">¿A qué período corresponde este ZIP?</h3>
+        <p class="mand-modal-sub">{{ archivoZip?.name }}</p>
+        <input type="month" v-model="periodoZip" class="mand-modal-month" />
+        <div class="mand-modal-acciones">
+          <button class="mand-btn mand-btn--sec" @click="mostrarDialogoZip = false">Cancelar</button>
+          <button class="mand-btn mand-btn--pri" :disabled="subiendoZip || !periodoZip" @click="confirmarCargaZip">
+            <i :class="subiendoZip ? 'pi pi-spin pi-spinner' : 'pi pi-check'" /> Confirmar
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Panel de resumen de la carga -->
+    <div v-if="resumenZip" class="mand-resumen">
+      <div class="mand-resumen-head">
+        <span><i class="pi pi-check-circle" style="color:#3B6D11" /> {{ resumenZip.detectados }} mandatos detectados</span>
+        <span><i class="pi pi-check-circle" style="color:#3B6D11" /> {{ resumenZip.identificados_auto }} inversionistas identificados</span>
+        <span v-if="resumenZip.sin_inversionista"><i class="pi pi-exclamation-triangle" style="color:#854F0B" /> {{ resumenZip.sin_inversionista }} sin inversionista</span>
+        <span v-if="resumenZip.omitidos">· {{ resumenZip.omitidos }} omitidos (ya existían)</span>
+        <button class="mand-resumen-x" @click="resumenZip = null"><i class="pi pi-times" /></button>
+      </div>
+      <div v-if="resumenZip.sugerencias?.length" class="mand-sugerencias">
+        <p class="mand-sug-titulo">Sugerencias de inversionista (confirma cada una):</p>
+        <div v-for="s in resumenZip.sugerencias" :key="s.mandato_id" class="mand-sug-fila">
+          <span class="mand-sug-cmu">{{ s.cmu }}</span>
+          <span class="mand-sug-txt">"{{ s.nombre_extraido }}" → <strong>{{ s.sugerido_nombre }}</strong> ({{ Math.round(s.score * 100) }}%)</span>
+          <button class="mand-btn mand-btn--sec mand-sug-btn" @click="asignarSugerencia(s)">Asignar</button>
+        </div>
+      </div>
+      <p v-if="resumenZip.no_parseables?.length" class="mand-noparse">
+        {{ resumenZip.no_parseables.length }} archivo(s) no reconocido(s): {{ resumenZip.no_parseables.join(', ') }}
+      </p>
+      <p class="mand-resumen-nota">El cruce con Gmail se activará al conectar la cuenta (Fase B).</p>
     </div>
   </div>
 </template>
@@ -131,6 +178,67 @@ const resumen = ref({ total: 0, correcciones: 0, firmados: 0, enviados_inversion
 const inversionistas = ref([])
 
 const subiendoPdf = ref(false)
+
+// ── Carga de ZIP ──
+const mostrarDialogoZip = ref(false)
+const archivoZip = ref(null)
+const periodoZip = ref(periodo.value)          // "YYYY-MM"
+const subiendoZip = ref(false)
+const resumenZip = ref(null)                    // null | objeto de resumen
+
+function abrirDialogoZip(e) {
+  const f = e.target.files?.[0]
+  if (!f) return
+  archivoZip.value = f
+  periodoZip.value = periodo.value
+  mostrarDialogoZip.value = true
+  e.target.value = ''
+}
+
+async function confirmarCargaZip() {
+  if (!archivoZip.value || !periodoZip.value) return
+  subiendoZip.value = true
+  try {
+    const fd = new FormData()
+    fd.append('periodo', periodoZip.value)
+    fd.append('file', archivoZip.value)
+    const { data } = await api.post('/mandatos/upload-zip', fd)
+    resumenZip.value = data
+    mostrarDialogoZip.value = false
+    const [y, m] = periodoZip.value.split('-')
+    anio.value = Number(y); mes.value = Number(m)
+    await cargar()
+    toast.add({ severity: 'success', summary: `ZIP cargado: ${data.creados} creados`, life: 4000 })
+  } catch (err) {
+    toast.add({ severity: 'error', summary: 'No se pudo cargar el ZIP',
+      detail: err.response?.data?.detail || '', life: 4000 })
+  } finally {
+    subiendoZip.value = false
+    archivoZip.value = null
+  }
+}
+
+async function asignarSugerencia(s) {
+  try {
+    await api.patch(`/mandatos/${s.mandato_id}`, { inversionista_id: s.sugerido_id, estado: 'pendiente_envio' })
+    resumenZip.value.sugerencias = resumenZip.value.sugerencias.filter(x => x.mandato_id !== s.mandato_id)
+    await cargar()
+    toast.add({ severity: 'success', summary: `${s.cmu} → ${s.sugerido_nombre}`, life: 2500 })
+  } catch {
+    toast.add({ severity: 'error', summary: 'No se pudo asignar', life: 3000 })
+  }
+}
+
+async function descargarPdf(m) {
+  try {
+    const { data } = await api.get(`/mandatos/${m.id}/pdf`, { responseType: 'blob' })
+    const url = URL.createObjectURL(data)
+    window.open(url, '_blank')
+    setTimeout(() => URL.revokeObjectURL(url), 60000)
+  } catch {
+    toast.add({ severity: 'error', summary: 'No se pudo abrir el PDF', life: 3000 })
+  }
+}
 
 const correcciones = computed(() => mandatos.value.filter(m => m.estado === 'con_correcciones'))
 const hayBanner = computed(() => correcciones.value.length > 0)
@@ -339,4 +447,22 @@ defineExpose({ cargar })
 .mand-btn--pri { background: #6D4AE8; color: #fff; }
 .mand-btn:disabled { opacity: .45; cursor: not-allowed; }
 .hidden { display: none; }
+.mand-clip-btn { background: none; border: none; cursor: pointer; padding: 0; }
+.mand-modal-overlay { position: fixed; inset: 0; background: rgba(28,18,50,.35); display: flex; align-items: center; justify-content: center; z-index: 50; }
+.mand-modal { background: #fff; border-radius: 12px; padding: 20px; width: 380px; max-width: 92vw; box-shadow: 0 8px 30px rgba(28,18,50,.2); }
+.mand-modal-titulo { font-size: 15px; font-weight: 700; color: #2C2039; margin: 0 0 4px; }
+.mand-modal-sub { font-size: 12px; color: #8B7BA8; margin: 0 0 12px; word-break: break-all; }
+.mand-modal-month { width: 100%; font-size: 14px; border: 1px solid #E5E2EC; border-radius: 8px; padding: 8px 10px; margin-bottom: 14px; }
+.mand-modal-acciones { display: flex; justify-content: flex-end; gap: 8px; }
+.mand-resumen { background: #fff; border: 1px solid #ECE7F2; border-radius: 12px; padding: 12px 14px; margin-top: 14px; }
+.mand-resumen-head { display: flex; align-items: center; gap: 14px; font-size: 13px; color: #2C2039; flex-wrap: wrap; }
+.mand-resumen-x { margin-left: auto; background: none; border: none; cursor: pointer; color: #B0A8C0; }
+.mand-sugerencias { margin-top: 10px; border-top: 1px solid #F1EEF7; padding-top: 10px; }
+.mand-sug-titulo { font-size: 12px; font-weight: 700; color: #854F0B; margin: 0 0 6px; }
+.mand-sug-fila { display: flex; align-items: center; gap: 10px; padding: 4px 0; font-size: 12px; flex-wrap: wrap; }
+.mand-sug-cmu { font-weight: 700; color: #2C2039; }
+.mand-sug-txt { color: #5A5468; flex: 1; }
+.mand-sug-btn { padding: 3px 10px; }
+.mand-noparse { font-size: 12px; color: #8B7BA8; margin: 8px 0 0; }
+.mand-resumen-nota { font-size: 11px; color: #B0A8C0; margin: 8px 0 0; font-style: italic; }
 </style>
