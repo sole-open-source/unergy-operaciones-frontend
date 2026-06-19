@@ -153,7 +153,7 @@
                     <span v-if="p.tiene_bolsa" class="pill pill-bolsa">bolsa</span>
                   </td>
                   <td><span class="pmeta">{{ p.inversionistas.map(i => i.nombre).join(', ') }}</span></td>
-                  <td style="text-align:right;">{{ fmt(p.ingreso_bruto_cop) }}</td>
+                  <td style="text-align:right;">{{ fmtCOP(p.ingreso_bruto_cop) }}</td>
                   <td><input type="checkbox" class="chk" v-model="p.liquidar_ingresos" @change="onFlag(p)" /></td>
                   <td><input type="checkbox" class="chk" v-model="p.liquidar_costos" :disabled="!p.tiene_costos"
                              :title="!p.tiene_costos ? 'sin costos' : ''" @change="onFlag(p)" /></td>
@@ -214,7 +214,7 @@
           <div class="body" v-show="open[p.id]">
             <!-- Vista por inversionista (comportamiento por defecto) -->
             <template v-if="!vista100">
-              <div v-for="inv in p.inversionistas" :key="inv.proyecto_inversionista_id || inv.nombre" class="inv-block">
+              <div v-for="inv in p.inversionistas" :key="invKeyOf(inv)" class="inv-block">
                 <div class="inv-head">
                   <div class="inv-name">{{ inv.nombre }} · {{ (inv.porcentaje ?? 0).toFixed(2) }}%</div>
                   <div class="inv-cons">
@@ -222,65 +222,70 @@
                     <span>Cost: <b>{{ (p.liquidar_costos && p.tiene_costos) ? (p.consecutivo_costos ?? '—') : '—' }}</b></span>
                   </div>
                 </div>
-                <div class="tbl-wrap">
-                  <table class="dt">
-                    <thead><tr>
-                      <th class="l">Concepto</th>
-                      <th>Valor ({{ shortName(inv.nombre) }})</th>
-                      <th class="l">Comprobante</th>
-                    </tr></thead>
-                    <tbody>
-                      <template v-for="g in grupos" :key="g.key">
-                        <template v-if="lineasDe(inv, g.key).length">
-                          <tr class="grp"><td colspan="3">{{ g.label }}</td></tr>
-                          <tr v-for="ln in lineasDe(inv, g.key)" :key="ln.id">
-                            <td class="l">
-                              <div v-if="g.key === 'ingresos'" class="fuente-row">
-                                <input class="fuente-et" :value="ln.concepto"
-                                       @change="renombrarFuente(p, ln, $event.target.value)" />
-                                <button class="fuente-x" title="Quitar fuente" @click="quitarFuente(p, ln)">✕</button>
-                              </div>
-                              <div v-else>{{ ln.concepto }}</div>
-                              <div class="origen-wrap">
-                                <button class="origen-link" :title="origenOpen[ln.id] ? 'Ocultar origen' : 'Editar celda de origen'"
-                                        @click="toggleOrigen(ln.id)">⚙ origen: {{ ln.origen || '—' }}</button>
-                                <input v-if="origenOpen[ln.id]" class="celda-origen" :value="ln.origen" placeholder="hoja!celda"
-                                       @change="cambiarCelda(p, ln, $event.target.value)" />
-                              </div>
-                            </td>
-                            <td>
-                              <input class="val-in" :class="{ neg: ln.valor_cop < 0 }"
-                                     type="number" v-model.number="ln.valor_cop" @change="markDirty(p)" />
-                            </td>
-                            <td class="l">
-                              <input class="comp-in" placeholder="comprob." v-model="ln.comprobante_contable" @change="markDirty(p)" />
-                            </td>
-                          </tr>
-                          <tr v-if="g.key === 'ingresos'">
-                            <td colspan="3">
-                              <button class="fuente-add" @click="agregarFuente(p)">+ Agregar fuente de ingreso</button>
-                            </td>
-                          </tr>
-                          <tr v-if="g.total" class="tot">
-                            <td class="l">{{ g.total }}</td>
-                            <td>{{ fmt(totalGrupo(inv, g.key)) }}</td>
-                            <td></td>
-                          </tr>
-                        </template>
-                      </template>
-                      <tr class="grp"><td colspan="3">RESULTADO</td></tr>
-                      <tr class="tot">
-                        <td class="l">Utilidad</td>
-                        <td :class="{ neg: utilidad(inv) < 0 }">{{ fmt(utilidad(inv)) }}</td>
-                        <td></td>
-                      </tr>
-                    </tbody>
-                  </table>
+
+                <!-- Acordeones por sección: colapsados → solo título + total -->
+                <div class="secs">
+                  <div v-for="sec in secciones" :key="sec.key"
+                       v-show="lineasSec(inv, sec.key).length || sec.key === 'ingresos'"
+                       class="sec-acc" :class="{ open: secOpen[secKey(p.id, invKeyOf(inv), sec.key)] }">
+                    <div class="sec-bar" @click="toggleSec(p.id, invKeyOf(inv), sec.key)">
+                      <span class="chev">▶</span>
+                      <span class="sec-lbl">{{ sec.label }}</span>
+                      <span class="sec-tot" :class="{ neg: totalSec(inv, sec.key) < 0 }">{{ fmt(totalSec(inv, sec.key)) }}</span>
+                    </div>
+                    <div class="sec-body" v-show="secOpen[secKey(p.id, invKeyOf(inv), sec.key)]">
+                      <div class="tbl-wrap">
+                        <table class="dt">
+                          <thead><tr>
+                            <th class="l">Concepto</th>
+                            <th>Valor ({{ shortName(inv.nombre) }})</th>
+                            <th class="l">Comprobante</th>
+                          </tr></thead>
+                          <tbody>
+                            <tr v-for="ln in lineasSec(inv, sec.key)" :key="ln.id">
+                              <td class="l">
+                                <div v-if="sec.key === 'ingresos'" class="fuente-row">
+                                  <input class="fuente-et" :value="ln.concepto"
+                                         @change="renombrarFuente(p, ln, $event.target.value)" />
+                                  <button class="fuente-x" title="Quitar fuente" @click="quitarFuente(p, ln)">✕</button>
+                                </div>
+                                <div v-else>{{ ln.concepto }}</div>
+                                <div class="origen-wrap">
+                                  <button class="origen-link" :title="origenOpen[ln.id] ? 'Ocultar origen' : 'Editar celda de origen'"
+                                          @click="toggleOrigen(ln.id)">⚙ origen: {{ ln.origen || '—' }}</button>
+                                  <input v-if="origenOpen[ln.id]" class="celda-origen" :value="ln.origen" placeholder="hoja!celda"
+                                         @change="cambiarCelda(p, ln, $event.target.value)" />
+                                </div>
+                              </td>
+                              <td>
+                                <input class="val-in" :class="{ neg: ln.valor_cop < 0 }"
+                                       type="number" v-model.number="ln.valor_cop" @change="markDirty(p)" />
+                              </td>
+                              <td class="l">
+                                <input class="comp-in" placeholder="comprob." v-model="ln.comprobante_contable" @change="markDirty(p)" />
+                              </td>
+                            </tr>
+                            <tr v-if="sec.key === 'ingresos'">
+                              <td colspan="3">
+                                <button class="fuente-add" @click="agregarFuente(p)">+ Agregar fuente de ingreso</button>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- RESULTADO · valor a pagar: siempre visible -->
+                  <div class="sec-resultado">
+                    <span class="sec-lbl">RESULTADO · Valor a pagar</span>
+                    <span class="sec-tot" :class="{ neg: utilidad(inv) < 0 }">{{ fmt(utilidad(inv)) }}</span>
+                  </div>
                 </div>
               </div>
             </template>
 
-            <!-- Vista 100%: una sola tabla con el total del proyecto (sin dividir) -->
+            <!-- Vista 100%: total del proyecto (sin dividir), mismas secciones -->
             <template v-else>
               <div class="inv-block">
                 <div class="inv-head">
@@ -290,37 +295,41 @@
                     <span>Cost: <b>{{ (p.liquidar_costos && p.tiene_costos) ? (p.consecutivo_costos ?? '—') : '—' }}</b></span>
                   </div>
                 </div>
-                <div class="tbl-wrap">
-                  <table class="dt">
-                    <thead><tr>
-                      <th class="l">Concepto</th>
-                      <th>Valor</th>
-                      <th class="l">Comprobante</th>
-                    </tr></thead>
-                    <tbody>
-                      <template v-for="g in grupos" :key="'100' + g.key">
-                        <template v-if="lineas100(p, g.key).length">
-                          <tr class="grp"><td colspan="3">{{ g.label }}</td></tr>
-                          <tr v-for="(ln, i) in lineas100(p, g.key)" :key="'100' + g.key + i">
-                            <td class="l">{{ ln.concepto }}</td>
-                            <td :class="{ neg: ln.valor_cop < 0 }">{{ fmt(ln.valor_cop) }}</td>
-                            <td class="l">{{ ln.comprobante_contable || '' }}</td>
-                          </tr>
-                          <tr v-if="g.total" class="tot">
-                            <td class="l">{{ g.total }}</td>
-                            <td>{{ fmt(total100Grupo(p, g.key)) }}</td>
-                            <td></td>
-                          </tr>
-                        </template>
-                      </template>
-                      <tr class="grp"><td colspan="3">RESULTADO</td></tr>
-                      <tr class="tot">
-                        <td class="l">Utilidad 100%</td>
-                        <td :class="{ neg: utilidad100(p) < 0 }">{{ fmt(utilidad100(p)) }}</td>
-                        <td></td>
-                      </tr>
-                    </tbody>
-                  </table>
+
+                <div class="secs">
+                  <div v-for="sec in secciones" :key="'100' + sec.key"
+                       v-show="lineas100Sec(p, sec.key).length"
+                       class="sec-acc" :class="{ open: secOpen[secKey(p.id, '100', sec.key)] }">
+                    <div class="sec-bar" @click="toggleSec(p.id, '100', sec.key)">
+                      <span class="chev">▶</span>
+                      <span class="sec-lbl">{{ sec.label }}</span>
+                      <span class="sec-tot" :class="{ neg: total100Sec(p, sec.key) < 0 }">{{ fmt(total100Sec(p, sec.key)) }}</span>
+                    </div>
+                    <div class="sec-body" v-show="secOpen[secKey(p.id, '100', sec.key)]">
+                      <div class="tbl-wrap">
+                        <table class="dt">
+                          <thead><tr>
+                            <th class="l">Concepto</th>
+                            <th>Valor</th>
+                            <th class="l">Comprobante</th>
+                          </tr></thead>
+                          <tbody>
+                            <tr v-for="(ln, i) in lineas100Sec(p, sec.key)" :key="'100' + sec.key + i">
+                              <td class="l">{{ ln.concepto }}</td>
+                              <td :class="{ neg: ln.valor_cop < 0 }">{{ fmt(ln.valor_cop) }}</td>
+                              <td class="l">{{ ln.comprobante_contable || '' }}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- RESULTADO · valor a pagar: siempre visible -->
+                  <div class="sec-resultado">
+                    <span class="sec-lbl">RESULTADO · Valor a pagar (100%)</span>
+                    <span class="sec-tot" :class="{ neg: utilidad100(p) < 0 }">{{ fmt(utilidad100(p)) }}</span>
+                  </div>
                 </div>
               </div>
             </template>
@@ -494,6 +503,17 @@ const grupos = [
   { key: 'costos', keys: ['costos', 'facturas'], label: 'COSTOS OPERATIVOS', total: 'Total Costos Operativos' },
 ]
 
+// Secciones del DETALLE por proyecto: cada una es un acordeón colapsado que
+// muestra solo su título + total; al expandir revela los conceptos. A
+// diferencia de `grupos` (usado en Diferencia), aquí FACTURAS DE SERVICIO se
+// separa de COSTOS OPERATIVOS para aligerar la lectura.
+const secciones = [
+  { key: 'ingresos', keys: ['ingresos'], label: 'INGRESOS' },
+  { key: 'comercializacion', keys: ['comercializacion'], label: 'COMERCIALIZACIÓN XM' },
+  { key: 'costos', keys: ['costos'], label: 'COSTOS OPERATIVOS' },
+  { key: 'facturas', keys: ['facturas'], label: 'FACTURAS DE SERVICIO' },
+]
+
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
 const ANIOS = [2025, 2026]
@@ -553,6 +573,9 @@ const fmt = (n) => {
   if (r === 0) return '–'
   return (r < 0 ? '-$ ' : '$ ') + Math.abs(r).toLocaleString('es-CO')
 }
+// Formato de presentación para la tabla de selección: $ es-CO, redondeado,
+// sin decimales. Solo afecta cómo se muestra; no altera el dato.
+const fmtCOP = (n) => '$ ' + Math.round(Number(n) || 0).toLocaleString('es-CO')
 const shortName = (n) => (n || '').split(' ').slice(0, 2).join(' ')
 const diffClass = (v) => (v == null ? '' : (v > 0 ? 'pos' : (v < 0 ? 'neg' : '')))
 const arrow = (v) => (v == null || v === 0 ? '' : (v > 0 ? '▲ ' : '▼ '))
@@ -584,6 +607,26 @@ const lineas100 = (p, grupo) => {
 }
 const total100Grupo = (p, grupo) => lineas100(p, grupo).reduce((s, l) => s + (Number(l.valor_cop) || 0), 0)
 const utilidad100 = (p) => (p.total_100 || []).reduce((s, l) => s + (Number(l.valor_cop) || 0), 0)
+
+// ── Acordeones del detalle por proyecto (un nivel más de colapso) ──
+// Resolución de claves específica de `secciones` (FACTURAS separado de COSTOS).
+const _keysDeSec = (sk) => {
+  const s = secciones.find(x => x.key === sk)
+  return s ? s.keys : [sk]
+}
+const lineasSec = (inv, sk) => inv.lineas.filter(l => _keysDeSec(sk).includes(l.grupo))
+const totalSec = (inv, sk) => lineasSec(inv, sk).reduce((s, l) => s + (Number(l.valor_cop) || 0), 0)
+const lineas100Sec = (p, sk) => (p.total_100 || []).filter(l => _keysDeSec(sk).includes(l.grupo))
+const total100Sec = (p, sk) => lineas100Sec(p, sk).reduce((s, l) => s + (Number(l.valor_cop) || 0), 0)
+
+// Estado de despliegue por (proyecto, inversionista, sección). Colapsado por defecto.
+const invKeyOf = (inv) => inv.proyecto_inversionista_id || inv.nombre
+const secOpen = reactive({})
+const secKey = (pid, invKey, sk) => `${pid}:${invKey}:${sk}`
+const toggleSec = (pid, invKey, sk) => {
+  const k = secKey(pid, invKey, sk)
+  secOpen[k] = !secOpen[k]
+}
 
 function setTab (t) {
   tab.value = t
@@ -998,6 +1041,25 @@ onMounted(cargarPaneles)
 .inv-name { font-size:12px; font-weight:600; flex:1; color:var(--p1); }
 .inv-cons { font-size:11px; color:var(--txt2); font-variant-numeric:tabular-nums; display:flex; gap:10px; }
 .inv-cons b { color:var(--p1); }
+/* Acordeones de sección dentro del detalle por proyecto */
+.secs { padding:4px 0; }
+.sec-acc { border-bottom:1px solid var(--line); }
+.sec-acc:last-of-type { border-bottom:1px solid var(--line); }
+.sec-bar { display:flex; align-items:center; gap:10px; padding:10px 16px; cursor:pointer; transition:background .15s ease; }
+.sec-bar:hover { background:var(--sec); }
+.sec-acc.open .sec-bar { background:var(--sec); }
+.sec-acc .chev { color:var(--txt3); transition:transform .2s ease; font-size:11px; }
+.sec-acc.open .chev { transform:rotate(90deg); }
+.sec-lbl { flex:1; font-size:11.5px; font-weight:600; letter-spacing:.03em; color:var(--p1); text-transform:uppercase; }
+.sec-tot { font-weight:700; font-size:13px; color:var(--p1); font-variant-numeric:tabular-nums; }
+.sec-tot.neg { color:var(--red); }
+.sec-body { background:#fff; border-top:1px solid var(--line); animation:secReveal .18s ease; }
+@keyframes secReveal { from { opacity:0; transform:translateY(-3px); } to { opacity:1; transform:none; } }
+.sec-resultado { display:flex; align-items:center; gap:10px; padding:12px 16px;
+  background:#eee7fb; border-top:1px solid var(--line2); }
+.sec-resultado .sec-lbl { color:var(--p2); }
+.sec-resultado .sec-tot { color:var(--p2); font-size:14px; }
+.sec-resultado .sec-tot.neg { color:var(--red); }
 .tbl-wrap { overflow-x:auto; }
 table.dt { width:100%; border-collapse:collapse; font-size:12.5px; min-width:640px; }
 table.dt th { font-weight:500; color:var(--txt2); padding:6px 12px; text-align:right; border-bottom:1px solid var(--line); white-space:nowrap; }
