@@ -91,6 +91,30 @@
 
       <div v-else-if="proyectoSeleccionado" class="space-y-4 mt-3">
 
+        <!-- Detalle del contrato de mantenimiento (expandible) -->
+        <div class="rounded-xl border bg-white overflow-hidden" style="border-color:#ECE7F2">
+          <div class="flex items-center justify-between px-4 py-2.5 border-b" style="border-color:#F3F0FA">
+            <div class="flex items-center gap-2">
+              <i class="pi pi-briefcase text-xs" style="color:#915BD8" />
+              <span class="text-sm font-semibold" style="color:#2C2039">Detalle del contrato</span>
+            </div>
+            <button type="button"
+              class="text-xs flex items-center gap-1 text-gray-400 hover:text-purple-600 transition-colors"
+              style="background:none;border:none;cursor:pointer"
+              @click="showContrato = !showContrato">
+              <i class="pi pi-chevron-down text-[10px] transition-transform duration-200"
+                :style="showContrato ? 'transform:rotate(180deg)' : ''" />
+              {{ showContrato ? 'Ocultar' : 'Ver contrato' }}
+            </button>
+          </div>
+
+          <div class="contrato-collapse" :class="{ open: showContrato }">
+            <div class="p-3">
+              <ContractDetailCard :contrato-id="contratoMantenimientoId" />
+            </div>
+          </div>
+        </div>
+
         <!-- Facturas históricas -->
         <FacturasMantenimiento
           :contrato-id="contratoMantenimientoId"
@@ -278,6 +302,7 @@ import Select from 'primevue/select'
 import { useToast } from 'primevue/usetoast'
 import api from '@/api/client'
 import FacturasMantenimiento from '@/views/Servicios/FacturasMantenimiento.vue'
+import ContractDetailCard     from '@/components/Finanzas/ContractDetailCard.vue'
 import OMAOperaciones       from './OMAOperaciones.vue'
 import OMAProveedor          from './OMAProveedor.vue'
 import ArriendosOperaciones  from './ArriendosOperaciones.vue'
@@ -317,6 +342,7 @@ const proyectoNombre       = ref('')
 // ── Contrato de mantenimiento del proyecto seleccionado ────────────────────────
 const contratoMantenimientoId = ref(null)
 const loadingContrato         = ref(false)
+const showContrato            = ref(false)
 
 // ── Cargar factura ─────────────────────────────────────────────────────────────
 const showCargarFactura = ref(false)
@@ -540,6 +566,17 @@ async function onProyectoChange() {
   padding: 80px 20px;
 }
 .space-y-4 > * + * { margin-top: 1rem; }
+
+/* ── Colapso suave del detalle de contrato ── */
+.contrato-collapse {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.38s ease-out;
+}
+.contrato-collapse.open {
+  max-height: 1200px;
+  transition: max-height 0.45s ease-in;
+}
 
 @media (max-width: 640px) {
   .mon-tab-view { padding: 12px; }
