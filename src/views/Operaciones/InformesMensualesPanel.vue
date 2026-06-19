@@ -45,8 +45,27 @@
                   class="im-select" :loading="loadingCatalogos" />
         </div>
 
-        <!-- Portafolio -->
-        <div v-if="tipo === 'portafolio'" class="im-field">
+        <!-- Ranking vs P90: alcance (portafolio / proyectos) -->
+        <div v-if="tipo === 'ranking'" class="im-field im-field-narrow">
+          <label class="im-label">Alcance</label>
+          <div class="im-segmented">
+            <button class="im-seg-btn" :class="{ 'im-seg-btn--active': rankingScope === 'portafolio' }"
+                    @click="rankingScope = 'portafolio'">Portafolio</button>
+            <button class="im-seg-btn" :class="{ 'im-seg-btn--active': rankingScope === 'proyectos' }"
+                    @click="rankingScope = 'proyectos'">Proyectos</button>
+          </div>
+        </div>
+
+        <!-- Ranking por proyectos: multiselección -->
+        <div v-if="tipo === 'ranking' && rankingScope === 'proyectos'" class="im-field">
+          <label class="im-label">Proyectos (uno o varios)</label>
+          <MultiSelect v-model="proyectosSel" :options="opcionesProyecto" optionLabel="label" optionValue="value"
+                       :filter="true" filterPlaceholder="Buscar…" placeholder="Selecciona proyectos…"
+                       display="chip" class="im-select" :loading="loadingCatalogos" />
+        </div>
+
+        <!-- Portafolio (tipo portafolio o ranking por portafolio) -->
+        <div v-if="tipo === 'portafolio' || (tipo === 'ranking' && rankingScope === 'portafolio')" class="im-field">
           <label class="im-label">Portafolio / Cliente</label>
           <Select v-model="portafolioSel" :options="opcionesPortafolio" optionLabel="label" optionValue="value"
                   :filter="true" filterPlaceholder="Buscar…" placeholder="Selecciona un portafolio…"
@@ -129,7 +148,7 @@
       <section class="im-result-bar im-no-print">
         <div class="im-result-meta">
           <span class="im-result-pill" :class="`im-pill-${tipo}`">
-            {{ tipo === 'fmo' ? 'FMO' : tipo === 'portafolio' ? 'Portafolio' : 'Operacional' }}
+            {{ tipo === 'fmo' ? 'FMO' : tipo === 'portafolio' ? 'Portafolio' : tipo === 'ranking' ? 'Ranking vs P90' : 'Operacional' }}
           </span>
           <span class="im-result-title">{{ resultTitle }}</span>
           <span class="im-result-sub">· {{ rangeLabel }}</span>
@@ -141,11 +160,12 @@
           <Button label="PDF" icon="pi pi-print" outlined size="small"
                   severity="warn" @click="imprimir"
                   v-tooltip.bottom="'Imprimir o exportar a PDF'" />
-          <Button :label="guardando ? 'Guardando…' : (informeIdGuardado ? 'Actualizar' : 'Guardar')"
+          <Button v-if="tipo !== 'ranking'"
+                  :label="guardando ? 'Guardando…' : (informeIdGuardado ? 'Actualizar' : 'Guardar')"
                   icon="pi pi-save" :loading="guardando" size="small"
                   class="im-btn-primary" @click="guardar"
                   v-tooltip.bottom="'Guardar como borrador para revisión/aprobación'" />
-          <Button v-if="informeIdGuardado" icon="pi pi-arrow-right" outlined size="small"
+          <Button v-if="informeIdGuardado && tipo !== 'ranking'" icon="pi pi-arrow-right" outlined size="small"
                   @click="abrirEditor"
                   v-tooltip.bottom="'Abrir en el editor (flujo de aprobación)'" />
         </div>
@@ -163,6 +183,7 @@
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import Select from 'primevue/select'
+import MultiSelect from 'primevue/multiselect'
 import Button from 'primevue/button'
 import ProgressSpinner from 'primevue/progressspinner'
 import api from '@/api/client'
@@ -175,6 +196,7 @@ const TIPOS = [
   { key: 'proyecto',   label: 'Por proyecto',    icon: 'pi pi-bolt',          tip: 'Operacional individual con KPIs, semanal y eventos.' },
   { key: 'portafolio', label: 'Por portafolio',  icon: 'pi pi-th-large',      tip: 'Consolidado del cliente + páginas por proyecto.' },
   { key: 'fmo',        label: 'FMO (O&M)',       icon: 'pi pi-file-edit',     tip: 'Contrato O&M: disponibilidad, SLA, multas, inversores.' },
+  { key: 'ranking',    label: 'Ranking vs P90',  icon: 'pi pi-chart-bar',     tip: 'Solo el gráfico de generación por proyecto vs P90 (un gráfico por mes).' },
 ]
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
@@ -183,6 +205,8 @@ const tipo = ref('proyecto')
 const periodoMode = ref('mes')
 const proyectoSel = ref('')
 const portafolioSel = ref('')
+const rankingScope = ref('portafolio')   // 'portafolio' | 'proyectos' (solo tipo === 'ranking')
+const proyectosSel = ref([])             // sub_projects seleccionados (ranking por proyectos)
 const today = new Date()
 const hoyISO = today.toISOString().slice(0, 10)
 const mesMax = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`
@@ -244,6 +268,9 @@ const puedeGenerar = computed(() => {
     if (!proyectoSel.value) return false
   } else if (tipo.value === 'portafolio') {
     if (!portafolioSel.value) return false
+  } else if (tipo.value === 'ranking') {
+    if (rankingScope.value === 'portafolio' && !portafolioSel.value) return false
+    if (rankingScope.value === 'proyectos' && !proyectosSel.value.length) return false
   }
   if (periodoMode.value === 'mes') {
     return !!mesSel.value
@@ -402,6 +429,45 @@ function buildRange() {
     from: customDesde.value, to: customHasta.value, year: y, month: m, monthName: MESES[m - 1],
     lastDay: d2, label, headerPeriod: label, isCustom: true, totalDays,
   }
+}
+
+// Lista de meses completos a graficar (uno por mes). En modo "mes" devuelve 1;
+// en "rango" enumera cada mes calendario tocado por el rango (mes completo).
+function monthsInRange() {
+  if (periodoMode.value === 'mes') {
+    if (!mesSel.value) return []
+    const [y, m] = mesSel.value.split('-').map(Number)
+    const last = new Date(y, m, 0).getDate()
+    return [{ from: `${y}-${pad(m)}-01`, to: `${y}-${pad(m)}-${pad(last)}`, label: `${MESES[m - 1]} ${y}` }]
+  }
+  if (!customDesde.value || !customHasta.value) return []
+  const [y1, m1] = customDesde.value.split('-').map(Number)
+  const [y2, m2] = customHasta.value.split('-').map(Number)
+  const out = []
+  let yy = y1, mm = m1
+  while ((yy < y2 || (yy === y2 && mm <= m2)) && out.length < 36) {
+    const last = new Date(yy, mm, 0).getDate()
+    out.push({ from: `${yy}-${pad(mm)}-01`, to: `${yy}-${pad(mm)}-${pad(last)}`, label: `${MESES[mm - 1]} ${yy}` })
+    mm++; if (mm > 12) { mm = 1; yy++ }
+  }
+  return out
+}
+
+// Página de informe que contiene ÚNICAMENTE el ranking de generación vs P90 de un mes.
+function buildRankingPage(scopeLabel, monthLabel, items) {
+  const conP90 = items.filter(i => i.p90 > 0).length
+  const overP90 = items.filter(i => i.p90 > 0 && i.real >= i.p90).length
+  const chart = svgPortfolioChart(items)
+  return '<div class="rpt-page">' +
+    '<div class="rpt-header">' +
+    '<div style="display:flex;align-items:center;gap:13px">' + unergyLogoSVG() +
+    '<div><div style="color:#fff;font-size:14px;font-weight:800;letter-spacing:.8px">GENERACIÓN POR PROYECTO — RANKING vs P90</div>' +
+    '<div style="color:#6B5F80;font-size:10px;letter-spacing:.6px;margin-top:2px">Unergy Energía Digital S.A.S ESP | Operación &amp; Mantenimiento</div></div></div>' +
+    `<div class="rpt-meta-grid">${rmeta('ALCANCE', scopeLabel)}${rmeta('PERÍODO', monthLabel)}${rmeta('PROYECTOS', String(items.length))}${rmeta('SOBRE P90', `${overP90} / ${conP90}`)}</div>` +
+    '</div>' +
+    `<div class="rpt-section"><div class="rpt-section-title">▌ Generación por Proyecto — Ranking vs P90 · ${esc(monthLabel)}</div>` +
+    `<div class="rpt-chart-card">${chart}</div></div>` +
+    '</div>'
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────
@@ -1301,6 +1367,60 @@ async function generar() {
       htmlContent.value = [consolidada, ...miembros.map(m => m.html)].join('<div class="rpt-page-sep"></div>')
       resultTitle.value = portName
       rangeLabel.value = range.label
+    } else if (tipo.value === 'ranking') {
+      // Resolver proyectos según alcance
+      let cfgs = []
+      let scopeLabel = ''
+      if (rankingScope.value === 'portafolio') {
+        const portName = portafolioSel.value
+        const projNames = portafolios.value[portName] || []
+        cfgs = projNames
+          .map(name => {
+            const nl = String(name).trim().toLowerCase()
+            return proyectos.value.find(p =>
+              nl === (p.nombre_clientes || '').trim().toLowerCase() ||
+              nl === (p.nombre_display || '').trim().toLowerCase() ||
+              nl === (p.nombre_bitacora || '').trim().toLowerCase() ||
+              nl === (p.nombre_comercial || '').trim().toLowerCase()
+            )
+          })
+          .filter(Boolean)
+        scopeLabel = portName
+        if (!cfgs.length) throw new Error('No se encontraron proyectos del portafolio en la plataforma')
+      } else {
+        cfgs = proyectos.value.filter(p => proyectosSel.value.includes(p.sub_project))
+        scopeLabel = `${cfgs.length} proyecto${cfgs.length !== 1 ? 's' : ''}`
+        if (!cfgs.length) throw new Error('Selecciona al menos un proyecto')
+      }
+      const meses = monthsInRange()
+      if (!meses.length) throw new Error('Período inválido')
+
+      const pages = []
+      const totalReq = meses.length * cfgs.length
+      let done = 0
+      for (const mes of meses) {
+        const items = []
+        for (const c of cfgs) {
+          done++
+          const cn = c.nombre_comercial || c.nombre_display || c.nombre_clientes || c.sub_project
+          loadingSub.value = `(${done}/${totalReq}) ${mes.label} — ${cn}`
+          let tot = 0, p90 = null
+          try {
+            const { data: r } = await api.get('/monitoreo/_legacy', {
+              params: { action: 'getGeneration', sub_project: c.sub_project, date_from: mes.from, date_to: mes.to },
+            })
+            const arr = (r && r.data) || []
+            tot = arr.reduce((s, d) => s + d.kwh, 0)
+            p90 = r?.simulation?.p90_monthly ?? null
+          } catch { /* sin datos para ese mes */ }
+          items.push({ name: cn, real: tot, p90 })
+        }
+        items.sort((a, b) => (b.real || 0) - (a.real || 0))
+        pages.push(buildRankingPage(scopeLabel, mes.label, items))
+      }
+      htmlContent.value = pages.join('<div class="rpt-page-sep"></div>')
+      resultTitle.value = scopeLabel
+      rangeLabel.value = meses.length > 1 ? `${meses[0].label} – ${meses[meses.length - 1].label}` : meses[0].label
     }
     ultimoTipo.value = tipo.value === 'portafolio' ? 'port' : tipo.value === 'fmo' ? 'fmo' : 'op'
   } catch (e) {
