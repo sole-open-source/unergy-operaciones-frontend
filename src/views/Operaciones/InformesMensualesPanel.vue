@@ -457,7 +457,36 @@ function monthsInRange() {
 function buildRankingPage(scopeLabel, monthLabel, items) {
   const conP90 = items.filter(i => i.p90 > 0).length
   const overP90 = items.filter(i => i.p90 > 0 && i.real >= i.p90).length
-  const chart = svgPortfolioChart(items)
+  const chart = svgRankingP90Chart(items)
+  const fmt = (n) => Math.round(n).toLocaleString('es-CO')
+
+  // Proyectos por debajo de P90 → nota editable (causa · estado · acción)
+  const bajoP90 = items.filter(i => i.p90 > 0 && i.real < i.p90)
+  let notasHtml
+  if (bajoP90.length) {
+    const slug = monthLabel.replace(/[^\w]/g, '').toLowerCase()
+    const filas = bajoP90.map((it, i) => {
+      const pct = (it.real - it.p90) / it.p90 * 100
+      const pctStr = `${pct.toFixed(1)}%`
+      return '<div class="rpt-nota-item" style="border:1px solid #EDE8F5;border-radius:8px;padding:8px 10px;background:#FCFAFF;margin-bottom:8px">' +
+        `<div style="font-size:11px;font-weight:800;color:#2C2039;margin-bottom:4px">${esc(it.name)} ` +
+        `<span style="color:#DC2626;font-weight:800">${pctStr}</span> ` +
+        `<span style="color:#6B5F80;font-weight:600">· Real ${fmt(it.real)} / P90 ${fmt(it.p90)} kWh</span></div>` +
+        `<div class="rpt-obs-editable" contenteditable="true" data-obs="rank-${slug}-${i}" ` +
+        'style="min-height:42px;outline:none;border:1px solid #EDE8F5;border-radius:6px;padding:8px 10px;background:#fff;font-size:11px;color:#3D2D5C;line-height:1.6">' +
+        'Causa: — · Estado: — · Acción tomada: —</div>'
+        + '</div>'
+    }).join('')
+    notasHtml =
+      '<div class="rpt-section"><div class="rpt-section-title">▌ Proyectos fuera de P90 — Causa, estado y acción ' +
+      '<span class="rpt-edit-hint">✏️ clic para editar (1–5 líneas por proyecto)</span></div>' +
+      filas + '</div>'
+  } else {
+    notasHtml =
+      '<div class="rpt-section"><div class="rpt-section-title">▌ Proyectos fuera de P90</div>' +
+      '<div style="font-size:12px;color:#16A34A;font-weight:700">✅ Todos los proyectos del período se encuentran en o por encima de P90.</div></div>'
+  }
+
   return '<div class="rpt-page">' +
     '<div class="rpt-header">' +
     '<div style="display:flex;align-items:center;gap:13px">' + unergyLogoSVG() +
@@ -467,6 +496,7 @@ function buildRankingPage(scopeLabel, monthLabel, items) {
     '</div>' +
     `<div class="rpt-section"><div class="rpt-section-title">▌ Generación por Proyecto — Ranking vs P90 · ${esc(monthLabel)}</div>` +
     `<div class="rpt-chart-card">${chart}</div></div>` +
+    notasHtml +
     '</div>'
 }
 
@@ -737,6 +767,58 @@ function svgPortfolioChart(items) {
     } else {
       html += `<rect x="${padL}" y="${barY}" width="${wReal.toFixed(1)}" height="${barH}" fill="#6B35C0" opacity="0.82" rx="2"/>`
       html += `<text x="${(padL + wReal + 5).toFixed(1)}" y="${barY + 11}" font-size="9.5" fill="#333" font-weight="700">${Math.round(real).toLocaleString('es-CO')} kWh</text>`
+    }
+  })
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%;height:${H}px;display:block">${html}</svg>`
+}
+
+// Gráfico de ranking vs P90 SIN excedente. Muestra el valor de la generación
+// real y el valor de P90, más el % de desviación. (Usado por el informe Ranking.)
+function svgRankingP90Chart(items) {
+  if (!items.length) return ''
+  const W = 660, rowH = 26, padL = 135, padR = 215, padT = 30, padB = 8
+  const H = padT + items.length * rowH + padB
+  const barAreaW = W - padL - padR
+  const maxV = Math.max(...items.map(i => Math.max(i.real || 0, i.p90 || 0)), 1)
+  const fmt = (n) => Math.round(n).toLocaleString('es-CO')
+
+  // Leyenda (Real + P90, sin excedente)
+  let html =
+    `<g font-size="10" font-weight="700">` +
+    `<rect x="${padL}" y="5" width="12" height="11" fill="#6B35C0" opacity="0.82" rx="2"/>` +
+    `<text x="${padL + 17}" y="14" fill="#444">Real</text>` +
+    `<line x1="${padL + 62}" y1="3" x2="${padL + 62}" y2="18" stroke="#C89600" stroke-width="2" stroke-dasharray="3 2"/>` +
+    `<text x="${padL + 68}" y="14" fill="#444">P90 esperado (simulación)</text>` +
+    `</g>`
+
+  items.forEach((it, i) => {
+    const y = padT + i * rowH
+    const barY = y + 4, barH = 15
+    const real = it.real || 0
+    const p90 = (it.p90 != null && it.p90 > 0) ? it.p90 : null
+    const wReal = (real / maxV) * barAreaW
+    html += `<text x="${padL - 6}" y="${barY + 11}" text-anchor="end" font-size="10" fill="#444" font-weight="600">${esc(it.name.slice(0, 22))}</text>`
+
+    // Barra real (morado, siempre sólida)
+    html += `<rect x="${padL}" y="${barY}" width="${wReal.toFixed(1)}" height="${barH}" fill="#6B35C0" opacity="0.82" rx="2"/>`
+
+    if (p90 != null) {
+      const wP90 = (p90 / maxV) * barAreaW
+      // Déficit (rojo translúcido) cuando real < P90
+      if (real < p90) {
+        html += `<rect x="${(padL + wReal).toFixed(1)}" y="${barY}" width="${(wP90 - wReal).toFixed(1)}" height="${barH}" fill="#FCA5A5" opacity="0.45" rx="2"/>`
+      }
+      // Marcador P90
+      html += `<line x1="${(padL + wP90).toFixed(1)}" y1="${barY - 2}" x2="${(padL + wP90).toFixed(1)}" y2="${barY + barH + 2}" stroke="#C89600" stroke-width="2" stroke-dasharray="3 2"/>`
+      // Etiqueta: Real · P90 · % desviación
+      const pct = (real - p90) / p90 * 100
+      const pctStr = `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`
+      const pctCol = pct >= 0 ? '#16A34A' : '#DC2626'
+      const labelX = padL + Math.max(wReal, wP90) + 6
+      html += `<text x="${labelX.toFixed(1)}" y="${barY + 11}" font-size="9" fill="#333" font-weight="700">` +
+        `${fmt(real)} <tspan fill="#B8860B">· P90 ${fmt(p90)}</tspan> <tspan fill="${pctCol}" font-weight="800">${pctStr}</tspan></text>`
+    } else {
+      html += `<text x="${(padL + wReal + 6).toFixed(1)}" y="${barY + 11}" font-size="9" fill="#333" font-weight="700">${fmt(real)} kWh</text>`
     }
   })
   return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%;height:${H}px;display:block">${html}</svg>`
