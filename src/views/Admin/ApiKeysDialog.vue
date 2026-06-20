@@ -20,6 +20,14 @@
           <p><strong>Uso:</strong> Enviar en header <code class="bg-gray-100 px-1 rounded">X-API-Key: {{ newKey }}</code></p>
           <p><strong>Base URL:</strong> <code class="bg-gray-100 px-1 rounded">{{ baseUrl }}/api/v1</code></p>
         </div>
+        <div class="flex items-start gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2 mt-1">
+          <i class="pi pi-shield mt-0.5" />
+          <span>
+            Trata esta key como una contraseña: concede el rol del usuario.
+            Guárdala en un gestor de secretos, nunca en el código ni en repositorios,
+            y revócala desde aquí si se expone.
+          </span>
+        </div>
       </div>
 
       <!-- Create new key form -->
