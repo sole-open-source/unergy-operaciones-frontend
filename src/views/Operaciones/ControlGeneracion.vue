@@ -130,12 +130,12 @@
           <span class="cname">{{ p.nombre }}</span>
           <span v-if="p.frt_code" class="frt-badge">{{ p.frt_code.toUpperCase() }}</span>
           <span v-if="p.estado_quoia" class="quoia-status" :class="quoiaStatusClass(p.estado_quoia)">
-            {{ p.estado_quoia }}
+            {{ quoiaStatusLabel(p.estado_quoia) }}
           </span>
           <span v-if="p.discrepancia_pct !== null && p.discrepancia_pct > 5" class="disc-pill">
             ⚠ Diferencia {{ p.discrepancia_pct }}%
           </span>
-          <span v-if="!p.tiene_solenium" class="no-sol-tag">Sin Fusion</span>
+          <span v-if="!p.tiene_solenium" class="no-sol-tag">Sin match Fusion</span>
           <span v-if="p.estado === 'sin_medidas'" class="err-tag">Sin medidas</span>
         </div>
 
@@ -193,10 +193,12 @@
               </div>
             </div>
             <div v-if="p.solenium_nombre" class="legend">
-              <div class="leg">
+              <div class="leg"
+                :title="p.metodo_match === 'numero' ? 'Match por código numérico (confiable)' : 'Match por nombre (verificar)'"
+              >
                 <div class="leg-dot" style="background:#C084FC" />
                 {{ p.solenium_nombre }}
-                <span class="match-tag">{{ p.metodo_match }}</span>
+                <span v-if="p.metodo_match === 'token'" class="match-warn" title="Match por nombre — verificar que sea correcto">⚠</span>
               </div>
             </div>
           </div>
@@ -409,10 +411,19 @@ function soleniumChartData(p) {
   }
 }
 
+const _REPORTE_AUTOMATICO = new Set(['OK', 'WARNING'])
+
+function quoiaStatusLabel(status) {
+  if (status === 'OK')      return 'Reporte automático'
+  if (status === 'WARNING') return 'Automático · alerta'
+  if (!status)              return ''
+  return 'Sin reporte automático'
+}
+
 function quoiaStatusClass(status) {
   if (status === 'OK')      return 'qs-ok'
   if (status === 'WARNING') return 'qs-warn'
-  if (status === 'ERROR')   return 'qs-error'
+  if (status === 'ERROR' || !_REPORTE_AUTOMATICO.has(status)) return 'qs-error'
   return 'qs-default'
 }
 
@@ -584,8 +595,7 @@ onMounted(() => {
 .legend { display: flex; gap: 12px; margin-top: 6px; flex-wrap: wrap; }
 .leg { display: flex; align-items: center; gap: 5px; font-size: 10px; color: #9b8fb0; }
 .leg-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-.match-tag {
-  font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 3px;
-  background: #F3F4F6; color: #9b8fb0; text-transform: uppercase;
+.match-warn {
+  font-size: 11px; color: #D97706; cursor: help;
 }
 </style>
