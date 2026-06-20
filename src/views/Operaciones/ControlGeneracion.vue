@@ -180,6 +180,8 @@
             <div class="pane-total">
               {{ fmt(p.solenium.total_kwh) }} <small>kWh</small>
             </div>
+
+            <!-- Curva total -->
             <div class="chart-box">
               <Line
                 v-if="p.solenium.curva.length"
@@ -192,7 +194,30 @@
                 {{ p.tiene_solenium ? 'Sin datos Fusion' : 'Sin match Fusion' }}
               </div>
             </div>
-            <div v-if="p.solenium_nombre" class="legend">
+
+            <!-- Curvas por inversor -->
+            <template v-if="p.solenium.inversores && p.solenium.inversores.length">
+              <div class="inv-lbl">Por inversor</div>
+              <div class="chart-box chart-box-inv">
+                <Line
+                  :data="soleniumInvChartData(p)"
+                  :options="chartOptions"
+                  :height="120"
+                  :plugins="[bgPlugin]"
+                />
+              </div>
+              <div class="legend">
+                <div
+                  v-for="(inv, idx) in p.solenium.inversores"
+                  :key="inv.id"
+                  class="leg"
+                >
+                  <div class="leg-dot" :style="{ background: INV_COLORS[idx % INV_COLORS.length] }" />
+                  {{ inv.nombre }} — {{ fmt(inv.total_kwh) }} kWh
+                </div>
+              </div>
+            </template>
+            <div v-else-if="p.solenium_nombre" class="legend">
               <div class="leg"
                 :title="p.metodo_match === 'numero' ? 'Match por código numérico (confiable)' : 'Match por nombre (verificar)'"
               >
@@ -232,6 +257,8 @@ import api from '@/api/client'
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Filler, Tooltip, Legend)
 
 const toast = useToast()
+
+const INV_COLORS = ['#F6FF72', '#C084FC', '#34D399', '#FB923C', '#38BDF8', '#F472B6', '#A78BFA', '#FCD34D']
 
 // ── Plugin dark background ─────────────────────────────────────────────────────
 const bgPlugin = {
@@ -398,7 +425,7 @@ function soleniumChartData(p) {
   return {
     labels: p.solenium.curva.map(pt => pt.hora),
     datasets: [{
-      label: 'Generación (kWh/h)',
+      label: 'Generación total (kWh/h)',
       data: p.solenium.curva.map(pt => pt.kwh),
       borderColor: '#C084FC',
       backgroundColor: 'rgba(192,132,252,0.15)',
@@ -409,6 +436,33 @@ function soleniumChartData(p) {
       borderWidth: 1.8,
     }],
   }
+}
+
+function soleniumInvChartData(p) {
+  const inversores = p.solenium.inversores || []
+  const first = inversores.find(i => i.curva.length)
+  const labels = first ? first.curva.map(pt => pt.tiempo) : []
+  return {
+    labels,
+    datasets: inversores.map((inv, idx) => ({
+      label: inv.nombre,
+      data: inv.curva.map(pt => pt.kw),
+      borderColor: INV_COLORS[idx % INV_COLORS.length],
+      backgroundColor: hexToRgba(INV_COLORS[idx % INV_COLORS.length], 0.1),
+      fill: false,
+      tension: 0.3,
+      pointRadius: 0,
+      pointHoverRadius: 3,
+      borderWidth: 1.6,
+    })),
+  }
+}
+
+function hexToRgba(hex, alpha) {
+  const r = parseInt(hex.slice(1, 3), 16)
+  const g = parseInt(hex.slice(3, 5), 16)
+  const b = parseInt(hex.slice(5, 7), 16)
+  return `rgba(${r},${g},${b},${alpha})`
 }
 
 const _REPORTE_AUTOMATICO = new Set(['OK', 'WARNING'])
@@ -598,4 +652,9 @@ onMounted(() => {
 .match-warn {
   font-size: 11px; color: #D97706; cursor: help;
 }
+.inv-lbl {
+  font-size: 9px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  color: #c4b8d4; margin: 10px 0 5px;
+}
+.chart-box-inv { min-height: 124px; }
 </style>
