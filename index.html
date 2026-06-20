@@ -2,6 +2,18 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
+    <!--
+      Content Security Policy en modo "solo reporte" (no bloquea, solo registra
+      violaciones en la consola del navegador). Sirve para afinar la política
+      antes de aplicarla en modo bloqueo. Cuando ya no aparezcan violaciones
+      legítimas, migrar a `Content-Security-Policy` (sin -Report-Only).
+      HSTS y una política CORS estricta NO se configuran aquí: son del servidor.
+      Ver SECURITY.md.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy-Report-Only"
+      content="default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https: wss:; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+    />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Unergy Operaciones</title>
     <link rel="icon" href="/favicon.ico" sizes="any" />

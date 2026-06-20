@@ -1,43 +1,30 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import {
+  getAccessToken,
+  setAccessToken,
+  getStoredUser,
+  setStoredUser,
+  clearTokens,
+  decodeJwtPayload,
+  isTokenExpired,
+} from '@/utils/security'
 
 const BASE = import.meta.env.VITE_API_URL || ''
 
-/** Lee el tiempo de expiración del JWT sin verificar firma. */
-function tokenExpired(jwt) {
-  if (!jwt) return true
-  try {
-    const b64 = jwt.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
-    const { exp } = JSON.parse(atob(b64.padEnd(b64.length + (4 - b64.length % 4) % 4, '=')))
-    return !exp || Date.now() >= exp * 1000
-  } catch { return true }
-}
-
-/** Decodifica el payload completo del JWT (sin verificar firma). */
-function decodeJwtPayload(jwt) {
-  try {
-    const b64 = jwt.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
-    return JSON.parse(atob(b64.padEnd(b64.length + (4 - b64.length % 4) % 4, '=')))
-  } catch { return null }
-}
-
 export const useAuthStore = defineStore('auth', () => {
-  const stored = localStorage.getItem('token')
-  const tokenValid = !!stored && !tokenExpired(stored)
+  const stored = getAccessToken()
+  const tokenValid = !!stored && !isTokenExpired(stored)
   const token = ref(tokenValid ? stored : null)
 
   // ── Recuperar usuario ────────────────────────────────────────────────────────
-  // Fuente de verdad: localStorage.user si existe con rol válido.
+  // Fuente de verdad: usuario en caché si existe con rol válido.
   // Fallback: decodificar el JWT (contiene sub, rol, nombre, email).
-  // Esto cubre el caso donde localStorage.user se borró pero el token sigue vivo.
-  let initialUser = null
-  try {
-    const raw = localStorage.getItem('user')
-    if (raw) initialUser = JSON.parse(raw)
-  } catch { initialUser = null }
+  // Esto cubre el caso donde el usuario en caché se borró pero el token sigue vivo.
+  let initialUser = getStoredUser()
 
-  if (token.value && (!initialUser?.rol)) {
-    // localStorage.user está vacío o sin rol — reconstruir desde JWT
+  if (token.value && !initialUser?.rol) {
+    // Usuario en caché vacío o sin rol — reconstruir desde el JWT
     const payload = decodeJwtPayload(token.value)
     if (payload?.sub && payload?.rol) {
       initialUser = {
@@ -46,7 +33,7 @@ export const useAuthStore = defineStore('auth', () => {
         nombre: payload.nombre || '',
         email:  payload.email  || '',
       }
-      localStorage.setItem('user', JSON.stringify(initialUser))
+      setStoredUser(initialUser)
     }
   }
 
@@ -54,15 +41,12 @@ export const useAuthStore = defineStore('auth', () => {
 
   // Si el token expiró, limpiar estado
   if (!token.value) {
-    if (stored) {
-      localStorage.removeItem('token')
-      localStorage.removeItem('user')
-    }
+    if (stored) clearTokens()
     user.value = null
   }
 
   // ── Computeds ────────────────────────────────────────────────────────────────
-  const isAuthenticated = computed(() => !!token.value && !tokenExpired(token.value))
+  const isAuthenticated = computed(() => !!token.value && !isTokenExpired(token.value))
   const role            = computed(() => user.value?.rol || null)
 
   function can(...roles) {
@@ -82,21 +66,17 @@ export const useAuthStore = defineStore('auth', () => {
     if (!resp.ok) throw { response: { data } }
 
     token.value = data.access_token
-    localStorage.setItem('token', data.access_token)
+    setAccessToken(data.access_token)
 
     // Decodificar payload del nuevo token para obtener datos del usuario
-    const b64 = data.access_token.split('.')[1]
-      .replace(/-/g, '+').replace(/_/g, '/')
-    const payload = JSON.parse(atob(
-      b64.padEnd(b64.length + (4 - b64.length % 4) % 4, '=')
-    ))
+    const payload = decodeJwtPayload(data.access_token) || {}
     user.value = {
       id:     payload.sub,
       rol:    payload.rol,
       nombre: payload.nombre,
       email:  payload.email,
     }
-    localStorage.setItem('user', JSON.stringify(user.value))
+    setStoredUser(user.value)
   }
 
   async function login(email, password) {
@@ -112,8 +92,7 @@ export const useAuthStore = defineStore('auth', () => {
   function logout() {
     token.value = null
     user.value  = null
-    localStorage.removeItem('token')
-    localStorage.removeItem('user')
+    clearTokens()
   }
 
   // Solo en desarrollo: simula login sin backend para preview de vistas
@@ -124,8 +103,8 @@ export const useAuthStore = defineStore('auth', () => {
     const fakeToken = `${h}.${p}.preview`
     token.value = fakeToken
     user.value = { id: '99', rol, nombre: `Preview ${rol}`, email: 'preview@unergy.io' }
-    localStorage.setItem('token', fakeToken)
-    localStorage.setItem('user', JSON.stringify(user.value))
+    setAccessToken(fakeToken)
+    setStoredUser(user.value)
   }
 
   return { token, user, isAuthenticated, role, can, login, loginMobile, logout, previewLogin }

@@ -187,6 +187,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useToast } from 'primevue/usetoast'
 import { useConfirm } from 'primevue/useconfirm'
 import api from '@/api/client'
+import { getAccessToken } from '@/utils/security'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import InputText from 'primevue/inputtext'
@@ -220,7 +221,7 @@ async function generarFasorial() {
   }
   generandoFasorial.value = true
   try {
-    const token = localStorage.getItem('token')
+    const token = getAccessToken()
     const response = await fetch('/api/v1/fronteras/fasorial/generar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
