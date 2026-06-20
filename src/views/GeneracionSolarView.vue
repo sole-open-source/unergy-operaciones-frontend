@@ -575,36 +575,15 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler,
-} from 'chart.js'
 import { Bar, Line } from 'vue-chartjs'
 import Dialog from 'primevue/dialog'
 import { useToast } from 'primevue/usetoast'
 import api from '@/api/client'
 import FallaForm from './Fallas/FallaForm.vue'
+import { registerCharts } from '@/utils/chartUtils'
 
-// ── Register Chart.js components ────────────────────────────────────────────
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler,
-)
+// ── Register Chart.js components (centralizado e idempotente) ────────────────
+registerCharts()
 
 // ── Toast ────────────────────────────────────────────────────────────────────
 const toast = useToast()

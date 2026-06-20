@@ -31,9 +31,16 @@
 
     <!-- Tabla -->
     <div class="bg-white rounded-xl shadow-sm overflow-hidden" style="border: 1px solid #e8e0f0;">
-      <DataTable :value="items" lazy :loading="loading" :rows="size" :totalRecords="total"
-        paginator @page="onPage" rowHover size="small" class="text-xs" :rowsPerPageOptions="[10, 20, 50]"
-        @row-click="goToDetail">
+      <!--
+        Scroll virtual desactivado a propósito: la lista de fallas ya usa
+        paginación *lazy* en el servidor (filtros incluidos), por lo que sólo
+        ~20 filas viven en el DOM a la vez — el objetivo de rendimiento ya se
+        cumple sin cargar miles de registros en el cliente. Se usa VirtualTable
+        para estandarizar el componente y reenviar eventos (onPage) al padre.
+      -->
+      <VirtualTable :value="items" :virtualScroll="false" lazy :loading="loading" :rows="size"
+        :totalRecords="total" paginator @page="onPage" rowHover size="small" class="text-xs"
+        :rowsPerPageOptions="[10, 20, 50]" @row-click="goToDetail">
         <template #empty>
           <div class="py-10 text-center text-sm" style="color: #9b89b5;">
             No hay fallas registradas con los filtros actuales.
@@ -50,7 +57,7 @@
 
         <Column header="Tipo" style="min-width: 150px;">
           <template #body="{ data }">
-            <div>
+            <div v-memo="[data.id, data.tipo?.id]">
               <span class="text-[10px] px-1.5 py-0.5 rounded font-medium"
                 :style="{ background: data.tipo?.categoria?.color_hex + '18', color: data.tipo?.categoria?.color_hex }">
                 {{ data.tipo?.categoria?.etiqueta }}
@@ -118,7 +125,7 @@
               @click.stop="goToDetail({ data })" />
           </template>
         </Column>
-      </DataTable>
+      </VirtualTable>
     </div>
 
     <!-- Dialog crear -->
@@ -133,7 +140,6 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
-import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
@@ -143,6 +149,7 @@ import IconField from 'primevue/iconfield'
 import InputIcon from 'primevue/inputicon'
 import Select from 'primevue/select'
 import FallaForm from './FallaForm.vue'
+import VirtualTable from '@/components/common/VirtualTable.vue'
 import api from '@/api/client'
 
 const router = useRouter()
