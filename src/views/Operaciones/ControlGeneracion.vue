@@ -2,7 +2,7 @@
   <div class="cg-page">
     <PageHeader
       title="Control de Generación"
-      subtitle="Curvas de Quoia y Fusion por frontera"
+      subtitle="Curvas de Quoia y Fusion por frontera de generación"
     >
       <template #actions>
         <div class="fecha-picker-wrap">
@@ -26,15 +26,15 @@
     <!-- ── Filtros ─────────────────────────────────────────────────── -->
     <div class="filter-bar">
 
-      <!-- Proyecto -->
+      <!-- Frontera -->
       <div class="f-group">
-        <span class="f-label">Proyecto</span>
+        <span class="f-label">Frontera</span>
         <Select
           v-model="filtroProyecto"
           :options="opcionesProyecto"
           optionLabel="nombre"
           optionValue="frt_code"
-          placeholder="Todos los proyectos"
+          placeholder="Todas las fronteras"
           showClear
           filter
           class="f-select"
@@ -102,7 +102,7 @@
         <div class="stat-lbl">Total Fusion (inversores)</div>
       </div>
       <div class="stat warn">
-        <div class="stat-val">{{ resumen.sin_medidas }} <small>frontera{{ resumen.sin_medidas !== 1 ? 's' : '' }}</small></div>
+        <div class="stat-val">{{ resumen.sin_medidas }}</div>
         <div class="stat-lbl">Sin medidas</div>
       </div>
     </div>
@@ -128,20 +128,21 @@
         <div class="card-hd">
           <span class="dot" :class="p.estado === 'sin_medidas' ? 'warn' : 'ok'" />
           <span class="cname">{{ p.nombre }}</span>
-          <span v-if="p.frontera_codigo" class="frt-badge">{{ p.frontera_codigo?.toUpperCase() }}</span>
-          <span v-if="p.potencia_kwp" class="cap">{{ p.potencia_kwp }} kWp</span>
-          <span v-if="p.solenium?.inversores?.length" class="cap">· {{ p.solenium.inversores.length }} inversor{{ p.solenium.inversores.length !== 1 ? 'es' : '' }}</span>
+          <span v-if="p.frt_code" class="frt-badge">{{ p.frt_code.toUpperCase() }}</span>
+          <span v-if="p.estado_quoia" class="quoia-status" :class="quoiaStatusClass(p.estado_quoia)">
+            {{ p.estado_quoia }}
+          </span>
           <span v-if="p.discrepancia_pct !== null && p.discrepancia_pct > 5" class="disc-pill">
             ⚠ Diferencia {{ p.discrepancia_pct }}%
           </span>
-          <span v-if="!p.en_app" class="unregistered-tag">Sin registrar</span>
+          <span v-if="!p.tiene_solenium" class="no-sol-tag">Sin Fusion</span>
           <span v-if="p.estado === 'sin_medidas'" class="err-tag">Sin medidas</span>
         </div>
 
         <!-- Sin medidas -->
         <div v-if="p.estado === 'sin_medidas'" class="empty-card">
           <i class="pi pi-circle" style="font-size:1.2rem;opacity:.3;" />
-          <span>Sin medidas para este día — proyecto apagado o sin comunicación.</span>
+          <span>Sin medidas para este día — frontera apagada o sin comunicación.</span>
         </div>
 
         <!-- Charts -->
@@ -166,14 +167,14 @@
               <div v-else class="no-data">Sin datos Quoia</div>
             </div>
             <div class="legend">
-              <div class="leg"><div class="leg-dot" style="background:#38BDF8" />Energía exportada eae (kWh/h)</div>
+              <div class="leg"><div class="leg-dot" style="background:#38BDF8" />eae (kWh/h)</div>
             </div>
           </div>
 
           <!-- Solenium -->
           <div class="chart-pane">
             <div class="pane-hd">
-              <span class="pane-lbl">Inversores · Fusion</span>
+              <span class="pane-lbl">Generación · Fusion</span>
               <span class="src-badge badge-s">Solenium</span>
             </div>
             <div class="pane-total">
@@ -181,18 +182,21 @@
             </div>
             <div class="chart-box">
               <Line
-                v-if="p.solenium.inversores.some(i => i.curva.length)"
+                v-if="p.solenium.curva.length"
                 :data="soleniumChartData(p)"
                 :options="chartOptions"
                 :height="96"
                 :plugins="[bgPlugin]"
               />
-              <div v-else class="no-data">Sin datos Solenium</div>
+              <div v-else class="no-data">
+                {{ p.tiene_solenium ? 'Sin datos Fusion' : 'Sin match Fusion' }}
+              </div>
             </div>
-            <div class="legend">
-              <div v-for="(inv, idx) in p.solenium.inversores" :key="inv.id" class="leg">
-                <div class="leg-dot" :style="{ background: INV_COLORS[idx % INV_COLORS.length] }" />
-                {{ inv.nombre }} — {{ fmt(inv.total_kwh) }} kWh
+            <div v-if="p.solenium_nombre" class="legend">
+              <div class="leg">
+                <div class="leg-dot" style="background:#C084FC" />
+                {{ p.solenium_nombre }}
+                <span class="match-tag">{{ p.metodo_match }}</span>
               </div>
             </div>
           </div>
@@ -227,9 +231,6 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Filler, 
 
 const toast = useToast()
 
-// ── Paleta inversores ──────────────────────────────────────────────────────────
-const INV_COLORS = ['#F6FF72', '#C084FC', '#34D399', '#FB923C', '#38BDF8', '#F472B6']
-
 // ── Plugin dark background ─────────────────────────────────────────────────────
 const bgPlugin = {
   id: 'cg-bg',
@@ -243,7 +244,7 @@ const bgPlugin = {
   },
 }
 
-// ── Chart options (compartido) ─────────────────────────────────────────────────
+// ── Chart options ──────────────────────────────────────────────────────────────
 const chartOptions = {
   responsive: true,
   maintainAspectRatio: false,
@@ -289,22 +290,21 @@ function colYesterday() {
   const d = new Date(Date.now() - 5 * 3600000 - 86400000)
   return d.toISOString().slice(0, 10)
 }
-const ayerDate  = new Date(Date.now() - 5 * 3600000 - 86400000)
-const fechaStr  = ref(colYesterday())            // "YYYY-MM-DD"
-const fechaModel = ref(ayerDate)                 // Date object para DatePicker
-const esAyer = computed(() => fechaStr.value === colYesterday())
+const ayerDate   = new Date(Date.now() - 5 * 3600000 - 86400000)
+const fechaStr   = ref(colYesterday())
+const fechaModel = ref(ayerDate)
+const esAyer     = computed(() => fechaStr.value === colYesterday())
 
 function onFechaChange(val) {
   if (!val) return
-  const d = new Date(val)
-  fechaStr.value = d.toISOString().slice(0, 10)
+  fechaStr.value = new Date(val).toISOString().slice(0, 10)
   cargarDatos()
 }
 
 // ── Datos ──────────────────────────────────────────────────────────────────────
-const cargando   = ref(false)
-const proyectos  = ref([])
-const resumen    = ref({ total_proyectos: 0, con_datos: 0, sin_medidas: 0, total_quoia_kwh: 0, total_solenium_kwh: 0 })
+const cargando  = ref(false)
+const proyectos = ref([])
+const resumen   = ref({ total_fronteras: 0, con_datos: 0, sin_medidas: 0, total_quoia_kwh: 0, total_solenium_kwh: 0 })
 
 const opcionesProyecto = ref([])
 
@@ -339,10 +339,11 @@ async function cargarDatos() {
 
 // ── Filtros ────────────────────────────────────────────────────────────────────
 const ESTADOS = [
-  { key: 'todos',  label: 'Todos'       },
-  { key: 'datos',  label: 'Con datos'   },
-  { key: 'sin',    label: 'Sin medidas' },
+  { key: 'todos', label: 'Todos'       },
+  { key: 'datos', label: 'Con datos'   },
+  { key: 'sin',   label: 'Sin medidas' },
 ]
+
 const filtroProyecto = ref(null)
 const filtroEstado   = ref('todos')
 const discActiva     = ref(false)
@@ -352,15 +353,15 @@ const hayFiltros = computed(() =>
   filtroProyecto.value !== null || filtroEstado.value !== 'todos' || discActiva.value
 )
 
-const proyectosFiltrados = computed(() => {
-  return proyectos.value.filter(p => {
+const proyectosFiltrados = computed(() =>
+  proyectos.value.filter(p => {
     if (filtroProyecto.value && p.frt_code !== filtroProyecto.value) return false
-    if (filtroEstado.value === 'datos' && p.estado !== 'con_datos')   return false
+    if (filtroEstado.value === 'datos' && p.estado !== 'con_datos')  return false
     if (filtroEstado.value === 'sin'   && p.estado !== 'sin_medidas') return false
     if (discActiva.value && (p.discrepancia_pct === null || p.discrepancia_pct < discUmbral.value)) return false
     return true
   })
-})
+)
 
 const nConDisc = computed(() =>
   proyectos.value.filter(p => p.discrepancia_pct !== null && p.discrepancia_pct >= discUmbral.value).length
@@ -373,15 +374,13 @@ function limpiarFiltros() {
   discUmbral.value     = 5
 }
 
-// ── Chart data builders ────────────────────────────────────────────────────────
+// ── Chart data ─────────────────────────────────────────────────────────────────
 function quoiaChartData(p) {
-  const labels   = p.quoia.curva.map(pt => pt.hora)
-  const values   = p.quoia.curva.map(pt => pt.kwh)
   return {
-    labels,
+    labels: p.quoia.curva.map(pt => pt.hora),
     datasets: [{
       label: 'eae (kWh/h)',
-      data: values,
+      data: p.quoia.curva.map(pt => pt.kwh),
       borderColor: '#38BDF8',
       backgroundColor: 'rgba(56,189,248,0.18)',
       fill: true,
@@ -394,32 +393,29 @@ function quoiaChartData(p) {
 }
 
 function soleniumChartData(p) {
-  const firstCurve = p.solenium.inversores.find(i => i.curva.length)
-  const labels = firstCurve ? firstCurve.curva.map(pt => pt.tiempo) : []
   return {
-    labels,
-    datasets: p.solenium.inversores.map((inv, idx) => ({
-      label: inv.nombre,
-      data: inv.curva.map(pt => pt.kw),
-      borderColor: INV_COLORS[idx % INV_COLORS.length],
-      backgroundColor: hexToRgba(INV_COLORS[idx % INV_COLORS.length], 0.12),
+    labels: p.solenium.curva.map(pt => pt.hora),
+    datasets: [{
+      label: 'Generación (kWh/h)',
+      data: p.solenium.curva.map(pt => pt.kwh),
+      borderColor: '#C084FC',
+      backgroundColor: 'rgba(192,132,252,0.15)',
       fill: true,
-      tension: 0.3,
+      tension: 0.35,
       pointRadius: 0,
-      pointHoverRadius: 3,
-      borderWidth: 1.7,
-    })),
+      pointHoverRadius: 4,
+      borderWidth: 1.8,
+    }],
   }
 }
 
-function hexToRgba(hex, alpha) {
-  const r = parseInt(hex.slice(1, 3), 16)
-  const g = parseInt(hex.slice(3, 5), 16)
-  const b = parseInt(hex.slice(5, 7), 16)
-  return `rgba(${r},${g},${b},${alpha})`
+function quoiaStatusClass(status) {
+  if (status === 'OK')      return 'qs-ok'
+  if (status === 'WARNING') return 'qs-warn'
+  if (status === 'ERROR')   return 'qs-error'
+  return 'qs-default'
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────────────
 function fmt(n) {
   if (n == null) return '—'
   return Number(n).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 1 })
@@ -435,10 +431,7 @@ onMounted(() => {
 <style scoped>
 .cg-page { display: flex; flex-direction: column; gap: 0; }
 
-/* Fecha picker */
-.fecha-picker-wrap {
-  display: flex; align-items: center; gap: 6px;
-}
+.fecha-picker-wrap { display: flex; align-items: center; gap: 6px; }
 .tag-ayer {
   font-size: 9px; font-weight: 800; letter-spacing: .5px; text-transform: uppercase;
   background: #F6FF72; color: #2C2039; padding: 2px 7px; border-radius: 4px;
@@ -535,10 +528,20 @@ onMounted(() => {
   font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 5px;
   background: #F3F4F6; border: 1px solid #E5E7EB; color: #6b5a8a;
 }
-.cap { font-size: 11px; color: #9b8fb0; }
+.quoia-status {
+  font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 5px;
+}
+.qs-ok      { background: rgba(22,163,74,.1);  color: #16A34A; border: 1px solid rgba(22,163,74,.2); }
+.qs-warn    { background: rgba(217,119,6,.1);  color: #D97706; border: 1px solid rgba(217,119,6,.2); }
+.qs-error   { background: rgba(220,38,38,.1);  color: #DC2626; border: 1px solid rgba(220,38,38,.2); }
+.qs-default { background: #F3F4F6; color: #9b8fb0; border: 1px solid #E5E7EB; }
 .disc-pill {
   font-size: 10px; font-weight: 700; padding: 2px 9px; border-radius: 5px;
   background: rgba(217,119,6,.1); color: #D97706; border: 1px solid rgba(217,119,6,.25);
+}
+.no-sol-tag {
+  font-size: 10px; font-weight: 700; padding: 2px 9px; border-radius: 5px;
+  background: rgba(107,90,138,.1); color: #6b5a8a; border: 1px solid rgba(107,90,138,.2);
 }
 .err-tag {
   font-size: 10px; font-weight: 700; margin-left: auto;
@@ -564,7 +567,7 @@ onMounted(() => {
 }
 .src-badge { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
 .badge-q { background: rgba(56,189,248,.13); color: #0284C7; }
-.badge-s { background: rgba(145,91,216,.13); color: #915BD8; }
+.badge-s { background: rgba(192,132,252,.13); color: #915BD8; }
 .pane-total {
   font-size: 18px; font-weight: 800; color: #2C2039;
   letter-spacing: -.4px; margin-bottom: 7px; line-height: 1;
@@ -581,9 +584,8 @@ onMounted(() => {
 .legend { display: flex; gap: 12px; margin-top: 6px; flex-wrap: wrap; }
 .leg { display: flex; align-items: center; gap: 5px; font-size: 10px; color: #9b8fb0; }
 .leg-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-
-.unregistered-tag {
-  font-size: 10px; font-weight: 700; padding: 2px 9px; border-radius: 5px;
-  background: rgba(107,90,138,.1); color: #6b5a8a; border: 1px solid rgba(107,90,138,.25);
+.match-tag {
+  font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 3px;
+  background: #F3F4F6; color: #9b8fb0; text-transform: uppercase;
 }
 </style>
