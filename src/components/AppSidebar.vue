@@ -272,6 +272,7 @@ const ALL_GROUPS = [
     items: [
       { to: '/solar-live', label: 'Generación Solar', icon: 'pi pi-sun', roles: ['admin', 'operaciones', 'monitoreo'] },
       { to: '/operaciones/informes-mensuales', label: 'Informes Mensuales', icon: 'pi pi-file-edit', roles: ['admin', 'operaciones', 'monitoreo'] },
+      { to: '/operaciones/control-generacion', label: 'Control de Generación', icon: 'pi pi-sliders-h', roles: ['admin', 'operaciones', 'monitoreo'] },
       { to: '/fallas', label: 'Gestión de Fallas', icon: 'pi pi-wrench', roles: ['admin', 'operaciones', 'monitoreo'] },
       { to: '/alertas/monitoreo', label: 'Alarmas MGS', icon: 'pi pi-bell', roles: ['admin', 'operaciones', 'monitoreo'] },
       { to: '/operaciones/costos-variables', label: 'Costos Variables', icon: 'pi pi-receipt', roles: ['admin', 'operaciones'] },
