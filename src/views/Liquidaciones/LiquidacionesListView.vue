@@ -74,11 +74,20 @@
           </div>
         </template>
 
+        <!--
+          Filas de altura variable (proyecto / año / mes) en una sola columna:
+          no es candidato a scroll virtual de altura fija (rompería el layout).
+          Las filas de detalle ya sólo se renderizan al expandirse
+          (filasResumenFiltradas) y los filtros se aplican en el servidor. Se usa
+          v-memo por rama para evitar re-renderizar el subárbol de una fila
+          cuando cambia estado no relacionado del padre (p. ej. otra selección).
+        -->
         <Column style="width:100%; padding:0">
           <template #body="{ data }">
 
             <!-- PROYECTO -->
             <div v-if="data.tipo === 'proyecto'"
+              v-memo="[expandedProyectos.has(data.proyKey)]"
               class="flex items-center gap-2 px-3 py-2 cursor-pointer select-none bg-gray-100 hover:bg-gray-200"
               @click="toggleProy(data.proyKey)">
               <i :class="expandedProyectos.has(data.proyKey)
@@ -89,6 +98,7 @@
 
             <!-- AÑO -->
             <div v-else-if="data.tipo === 'anio'"
+              v-memo="[expandedAnios.has(data.anioKey)]"
               class="flex items-center gap-2 px-6 py-1.5 cursor-pointer select-none bg-gray-50 hover:bg-gray-100"
               @click="toggleAnio(data.anioKey)">
               <i :class="expandedAnios.has(data.anioKey)
@@ -99,6 +109,7 @@
 
             <!-- MES -->
             <div v-else
+              v-memo="[seleccionadas.has(data.liq_id), tipoFilter]"
               class="flex items-center gap-4 px-10 py-2 cursor-pointer hover:bg-purple-50 border-b border-gray-100"
               @click="router.push(`/liquidaciones/${data.liq_id}`)">
               <span @click.stop>

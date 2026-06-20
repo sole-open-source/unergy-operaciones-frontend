@@ -99,10 +99,10 @@
 
           <template v-else>
             <!-- % diferencia inversores vs medidores (mejor nodo) -->
-            <div v-if="getDiffPct(proy.proyecto_id) !== null" class="sl-diff-row">
+            <div v-if="projChartData[proy.proyecto_id]?.diffPct !== null && projChartData[proy.proyecto_id]?.diffPct !== undefined" class="sl-diff-row">
               <span class="sl-diff-label">Inversores vs Medidor</span>
-              <span :class="['sl-diff-badge', Math.abs(getDiffPct(proy.proyecto_id)) > 5 ? 'sl-diff-warn' : 'sl-diff-ok']">
-                {{ getDiffPct(proy.proyecto_id) > 0 ? '+' : '' }}{{ getDiffPct(proy.proyecto_id) }}%
+              <span :class="['sl-diff-badge', Math.abs(projChartData[proy.proyecto_id].diffPct) > 5 ? 'sl-diff-warn' : 'sl-diff-ok']">
+                {{ projChartData[proy.proyecto_id].diffPct > 0 ? '+' : '' }}{{ projChartData[proy.proyecto_id].diffPct }}%
               </span>
             </div>
 
@@ -116,12 +116,12 @@
                     <span class="sl-dot" style="background:#915BD8" />
                     Inversores
                   </div>
-                  <span v-if="getInversorAcum(proy.proyecto_id) !== null" class="sl-acum inv">
-                    {{ getInversorAcum(proy.proyecto_id).toFixed(1) }} kWh
+                  <span v-if="projChartData[proy.proyecto_id]?.inversorAcum != null" class="sl-acum inv">
+                    {{ projChartData[proy.proyecto_id].inversorAcum.toFixed(1) }} kWh
                   </span>
                 </div>
-                <div v-if="getInversorData(proy.proyecto_id).labels.length" class="sl-chart-wrap">
-                  <Line :data="getInversorData(proy.proyecto_id)" :options="chartOptionsInv"
+                <div v-if="projChartData[proy.proyecto_id]?.inversorData.labels.length" class="sl-chart-wrap">
+                  <Line :data="projChartData[proy.proyecto_id].inversorData" :options="chartOptionsInv"
                     :plugins="[crosshairPlugin]" :key="'inv-' + proy.proyecto_id" />
                 </div>
                 <div v-else class="sl-no-data">Sin datos</div>
@@ -133,16 +133,16 @@
                   <div class="sl-chart-title">
                     <span class="sl-dot" style="background:#D4A017" />
                     Medidores
-                    <span v-if="getBestMedidorTipo(proy.proyecto_id)" class="sl-med-tipo">
-                      {{ getBestMedidorTipo(proy.proyecto_id) }}
+                    <span v-if="projChartData[proy.proyecto_id]?.bestMedidorTipo" class="sl-med-tipo">
+                      {{ projChartData[proy.proyecto_id].bestMedidorTipo }}
                     </span>
                   </div>
-                  <span v-if="getMedidorAcum(proy.proyecto_id) !== null" class="sl-acum med">
-                    {{ getMedidorAcum(proy.proyecto_id).toFixed(1) }} kWh
+                  <span v-if="projChartData[proy.proyecto_id]?.medidorAcum != null" class="sl-acum med">
+                    {{ projChartData[proy.proyecto_id].medidorAcum.toFixed(1) }} kWh
                   </span>
                 </div>
-                <div v-if="getMedidorData(proy.proyecto_id).labels.length" class="sl-chart-wrap">
-                  <Line :data="getMedidorData(proy.proyecto_id)" :options="chartOptionsMed"
+                <div v-if="projChartData[proy.proyecto_id]?.medidorData.labels.length" class="sl-chart-wrap">
+                  <Line :data="projChartData[proy.proyecto_id].medidorData" :options="chartOptionsMed"
                     :plugins="[crosshairPlugin]" :key="'med-' + proy.proyecto_id" />
                 </div>
                 <div v-else class="sl-no-data">Sin datos</div>
@@ -159,30 +159,30 @@
                 </span>
                 <div class="sl-genhoy-vals">
                   <span :style="{
-                    color: getGenHoy(proy.proyecto_id).pct === null ? '#6b5a8a'
-                         : getGenHoy(proy.proyecto_id).pct >= 100 ? '#4ade80'
-                         : getGenHoy(proy.proyecto_id).pct >= 75  ? '#fbbf24'
+                    color: genHoyByProy[proy.proyecto_id].pct === null ? '#6b5a8a'
+                         : genHoyByProy[proy.proyecto_id].pct >= 100 ? '#4ade80'
+                         : genHoyByProy[proy.proyecto_id].pct >= 75  ? '#fbbf24'
                          : '#f87171',
                     fontWeight: 700, fontSize: '12px'
                   }">
-                    {{ getGenHoy(proy.proyecto_id).real.toLocaleString('es-CO') }} kWh
+                    {{ genHoyByProy[proy.proyecto_id].real.toLocaleString('es-CO') }} kWh
                   </span>
                   <span style="color:#4a3960;font-size:11px">/</span>
                   <span style="color:#a89fc0;font-size:11px">
-                    {{ getGenHoy(proy.proyecto_id).p90.toLocaleString('es-CO') }} kWh P90
+                    {{ genHoyByProy[proy.proyecto_id].p90.toLocaleString('es-CO') }} kWh P90
                   </span>
-                  <span v-if="getGenHoy(proy.proyecto_id).pct !== null"
+                  <span v-if="genHoyByProy[proy.proyecto_id].pct !== null"
                     class="sl-genhoy-pct"
                     :style="{
-                      color: getGenHoy(proy.proyecto_id).pct >= 100 ? '#4ade80'
-                           : getGenHoy(proy.proyecto_id).pct >= 75  ? '#fbbf24'
+                      color: genHoyByProy[proy.proyecto_id].pct >= 100 ? '#4ade80'
+                           : genHoyByProy[proy.proyecto_id].pct >= 75  ? '#fbbf24'
                            : '#f87171'
                     }">
-                    {{ getGenHoy(proy.proyecto_id).pct }}%
+                    {{ genHoyByProy[proy.proyecto_id].pct }}%
                   </span>
-                  <span v-if="getGenHoy(proy.proyecto_id).fuente === 'inversor'"
+                  <span v-if="genHoyByProy[proy.proyecto_id].fuente === 'inversor'"
                     class="sl-genhoy-badge" title="Dato de inversores">INV</span>
-                  <span v-else-if="getGenHoy(proy.proyecto_id).fuente === 'medidor'"
+                  <span v-else-if="genHoyByProy[proy.proyecto_id].fuente === 'medidor'"
                     class="sl-genhoy-badge sl-genhoy-badge--med" title="Dato de medidor de frontera">MED</span>
                   <span v-else
                     class="sl-genhoy-badge sl-genhoy-badge--nd" title="Sin dato disponible">S/D</span>
@@ -190,11 +190,11 @@
               </div>
               <div class="sl-genhoy-track">
                 <div class="sl-genhoy-fill" :style="{
-                  width: getGenHoy(proy.proyecto_id).p90 > 0
-                    ? Math.min(100, getGenHoy(proy.proyecto_id).real / getGenHoy(proy.proyecto_id).p90 * 100) + '%'
+                  width: genHoyByProy[proy.proyecto_id].p90 > 0
+                    ? Math.min(100, genHoyByProy[proy.proyecto_id].real / genHoyByProy[proy.proyecto_id].p90 * 100) + '%'
                     : '0%',
-                  background: getGenHoy(proy.proyecto_id).pct >= 100 ? '#4ADE80'
-                    : getGenHoy(proy.proyecto_id).real > 0 ? '#C4B5FD'
+                  background: genHoyByProy[proy.proyecto_id].pct >= 100 ? '#4ADE80'
+                    : genHoyByProy[proy.proyecto_id].real > 0 ? '#C4B5FD'
                     : '#e9e6f5'
                 }" />
               </div>
@@ -218,16 +218,13 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
-import {
-  Chart as ChartJS, CategoryScale, LinearScale,
-  PointElement, LineElement, Title, Tooltip, Filler,
-} from 'chart.js'
 import { Line } from 'vue-chartjs'
 import draggable from 'vuedraggable'
 import api from '@/api/client'
 import GeneracionView from '@/views/Operaciones/GeneracionView.vue'
+import { registerCharts, crosshairPlugin } from '@/utils/chartUtils'
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Filler)
+registerCharts()
 
 const STORAGE_KEY = 'solar_project_order'
 
@@ -325,25 +322,6 @@ function applyOrder(list) {
     const rest = list.filter(p => !order.includes(p.proyecto_id))
     return [...sorted, ...rest]
   } catch { return list }
-}
-
-// ── Crosshair plugin ───────────────────────────────────────────────────────
-const crosshairPlugin = {
-  id: 'crosshair',
-  afterDraw(chart) {
-    if (!chart.tooltip?._active?.length) return
-    const x = chart.tooltip._active[0].element.x
-    const { ctx, chartArea: { top, bottom } } = chart
-    ctx.save()
-    ctx.beginPath()
-    ctx.moveTo(x, top)
-    ctx.lineTo(x, bottom)
-    ctx.lineWidth = 1
-    ctx.strokeStyle = 'rgba(28,18,50,0.18)'
-    ctx.setLineDash([4, 3])
-    ctx.stroke()
-    ctx.restore()
-  },
 }
 
 // ── Labels cada 5 min (00:00–23:55) ──────────────────────────────────────
@@ -499,6 +477,44 @@ function makeOptions(color) {
 
 const chartOptionsInv = makeOptions('#915BD8')
 const chartOptionsMed = makeOptions('#D4A017')
+
+// ── Memoización por proyecto ────────────────────────────────────────────────
+// La plantilla solía invocar getInversorData/getMedidorData/getGenHoy… en cada
+// render (getGenHoy se llamaba ~10 veces por tarjeta), recreando objetos de
+// datos y forzando a vue-chartjs a actualizar todas las gráficas en cada tick
+// reactivo (auto-refresh, apertura de menús, drag…). Aquí se calcula una sola
+// vez por cambio real de dependencias:
+//
+//   • projChartData depende sólo de detailMap → no se recrea cuando cambia
+//     genHoyMap, evitando updates innecesarios de las gráficas.
+//   • genHoyByProy depende de genHoyMap + p90List.
+const projChartData = computed(() => {
+  const out = {}
+  for (const proy of proyectos.value) {
+    const id = proy.proyecto_id
+    // Acceso a detailMap[id] dentro del computed → dependencia reactiva.
+    out[id] = detailMap[id]
+      ? {
+          ready:           true,
+          inversorData:    getInversorData(id),
+          medidorData:     getMedidorData(id),
+          inversorAcum:    getInversorAcum(id),
+          medidorAcum:     getMedidorAcum(id),
+          bestMedidorTipo: getBestMedidorTipo(id),
+          diffPct:         getDiffPct(id),
+        }
+      : { ready: false }
+  }
+  return out
+})
+
+const genHoyByProy = computed(() => {
+  const out = {}
+  for (const proy of proyectos.value) {
+    out[proy.proyecto_id] = getGenHoy(proy.proyecto_id)
+  }
+  return out
+})
 
 // ── Carga ─────────────────────────────────────────────────────────────────
 async function cargar() {

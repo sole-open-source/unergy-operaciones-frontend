@@ -35,15 +35,12 @@
         </IconField>
       </div>
 
-      <DataTable
+      <VirtualTable
         :value="contratosFiltrados"
         :loading="loading"
+        :itemSize="52"
         stripedRows
         class="text-sm"
-        paginator
-        :rows="20"
-        :rowsPerPageOptions="[10, 20, 50]"
-        paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown"
         emptyMessage="No hay contratos PPA registrados."
         rowHover
         sortField="fecha_inicio"
@@ -90,7 +87,8 @@
         </Column>
         <Column header="Cobertura" style="width:120px">
           <template #body="{ data }">
-            <div v-if="data.cobertura_actual_pct != null" class="flex items-center gap-1.5">
+            <div v-if="data.cobertura_actual_pct != null" class="flex items-center gap-1.5"
+              v-memo="[data.cobertura_actual_pct]">
               <div class="flex-1 h-2 rounded-full overflow-hidden" style="background: #f3f0f7;">
                 <div class="h-full rounded-full"
                   :style="{
@@ -115,7 +113,7 @@
               @click.stop="confirmarEliminar(data)" />
           </template>
         </Column>
-      </DataTable>
+      </VirtualTable>
     </template>
 
     <!-- REPRESENTACIÓN — Lista de plantas -->
@@ -128,15 +126,12 @@
         </IconField>
       </div>
 
-      <DataTable
+      <VirtualTable
         :value="plantasRepresentacionFiltradas"
         :loading="loadingPlantas"
+        :itemSize="48"
         stripedRows
         class="text-sm"
-        paginator
-        :rows="20"
-        :rowsPerPageOptions="[10, 20, 50]"
-        paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown"
         emptyMessage="No hay plantas con servicio de representación."
         rowHover
         sortField="nombre_comercial"
@@ -193,7 +188,7 @@
               @click.stop="irAProyecto(data)" v-tooltip="'Ver planta'" />
           </template>
         </Column>
-      </DataTable>
+      </VirtualTable>
     </template>
 
     <!-- OPERACIÓN / REC — contratos de servicio -->
@@ -206,15 +201,12 @@
         </IconField>
       </div>
 
-      <DataTable
+      <VirtualTable
         :value="contratosServicioFiltrados"
         :loading="loadingServicio"
+        :itemSize="48"
         stripedRows
         class="text-sm"
-        paginator
-        :rows="20"
-        :rowsPerPageOptions="[10, 20, 50]"
-        paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown"
         :emptyMessage="`No hay contratos de ${servicioInfo?.label} registrados.`"
         rowHover
         sortField="fecha_inicio"
@@ -242,7 +234,7 @@
             <Tag :value="ESTADO_LABELS[data.estado] || data.estado" :severity="ESTADO_SEVERITY[data.estado]" />
           </template>
         </Column>
-      </DataTable>
+      </VirtualTable>
     </template>
 
     <!-- Wizards -->
@@ -266,7 +258,6 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import { useConfirm } from 'primevue/useconfirm'
-import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Tag from 'primevue/tag'
 import Button from 'primevue/button'
@@ -276,6 +267,7 @@ import InputIcon from 'primevue/inputicon'
 import ConfirmDialog from 'primevue/confirmdialog'
 import PPAContratoWizard from './PPAContratoWizard.vue'
 import ContratoServicioWizard from './ContratoServicioWizard.vue'
+import VirtualTable from '@/components/common/VirtualTable.vue'
 import api from '@/api/client'
 
 const router = useRouter()
