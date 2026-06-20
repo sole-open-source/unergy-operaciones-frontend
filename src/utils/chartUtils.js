@@ -4,8 +4,7 @@
 // vue-chartjs ya administra el ciclo de vida del canvas (crea la gráfica en
 // onMounted y llama a chart.destroy() en onBeforeUnmount, además de adjuntar un
 // ResizeObserver cuando responsive:true). Estas utilidades centralizan el
-// registro de componentes, evitan recrear datos/objetos en cada render y
-// ofrecen un throttle para suavizar redibujados por resize.
+// registro de componentes y comparten el plugin de crosshair entre vistas.
 // ─────────────────────────────────────────────────────────────────────────────
 import {
   Chart as ChartJS,
@@ -41,50 +40,6 @@ export function registerCharts() {
     Filler,
   )
   _registered = true
-}
-
-/**
- * Throttle por flanco de subida + cola final. Limita la frecuencia con la que
- * se ejecuta `fn` (p. ej. al redimensionar la ventana) a una vez cada `wait` ms.
- * @param {Function} fn
- * @param {number} wait  milisegundos entre ejecuciones (def. 200)
- */
-export function throttle(fn, wait = 200) {
-  let last = 0
-  let timer = null
-  let lastArgs = null
-  return function throttled(...args) {
-    const now = Date.now()
-    const remaining = wait - (now - last)
-    lastArgs = args
-    if (remaining <= 0) {
-      if (timer) { clearTimeout(timer); timer = null }
-      last = now
-      fn.apply(this, lastArgs)
-    } else if (!timer) {
-      timer = setTimeout(() => {
-        last = Date.now()
-        timer = null
-        fn.apply(this, lastArgs)
-      }, remaining)
-    }
-  }
-}
-
-/**
- * Observa el redimensionado de un elemento con throttle. Devuelve una función
- * de limpieza que desconecta el observer (llámala en onBeforeUnmount).
- * @param {HTMLElement} el
- * @param {Function} cb
- * @param {number} wait  throttle en ms (def. 200)
- * @returns {() => void} disposer
- */
-export function observeResize(el, cb, wait = 200) {
-  if (!el || typeof ResizeObserver === 'undefined') return () => {}
-  const throttled = throttle(cb, wait)
-  const ro = new ResizeObserver(throttled)
-  ro.observe(el)
-  return () => ro.disconnect()
 }
 
 /**
