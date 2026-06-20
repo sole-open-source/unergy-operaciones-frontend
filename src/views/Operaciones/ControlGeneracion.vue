@@ -33,7 +33,7 @@
           v-model="filtroProyecto"
           :options="opcionesProyecto"
           optionLabel="nombre"
-          optionValue="id"
+          optionValue="frt_code"
           placeholder="Todos los proyectos"
           showClear
           filter
@@ -123,7 +123,7 @@
 
     <!-- ── Cards ─────────────────────────────────────────────────── -->
     <template v-else>
-      <div v-for="p in proyectosFiltrados" :key="p.proyecto_id" class="card">
+      <div v-for="p in proyectosFiltrados" :key="p.frt_code" class="card">
         <!-- Header -->
         <div class="card-hd">
           <span class="dot" :class="p.estado === 'sin_medidas' ? 'warn' : 'ok'" />
@@ -134,6 +134,7 @@
           <span v-if="p.discrepancia_pct !== null && p.discrepancia_pct > 5" class="disc-pill">
             ⚠ Diferencia {{ p.discrepancia_pct }}%
           </span>
+          <span v-if="!p.en_app" class="unregistered-tag">Sin registrar</span>
           <span v-if="p.estado === 'sin_medidas'" class="err-tag">Sin medidas</span>
         </div>
 
@@ -320,7 +321,7 @@ async function cargarDatos() {
   cargando.value = true
   try {
     const params = { fecha: fechaStr.value }
-    if (filtroProyecto.value) params.proyecto_id = filtroProyecto.value
+    if (filtroProyecto.value) params.frt_code = filtroProyecto.value
     const { data } = await api.get('/control-generacion/datos', { params })
     proyectos.value = data.proyectos || []
     resumen.value   = data.resumen   || resumen.value
@@ -353,7 +354,7 @@ const hayFiltros = computed(() =>
 
 const proyectosFiltrados = computed(() => {
   return proyectos.value.filter(p => {
-    if (filtroProyecto.value && p.proyecto_id !== filtroProyecto.value) return false
+    if (filtroProyecto.value && p.frt_code !== filtroProyecto.value) return false
     if (filtroEstado.value === 'datos' && p.estado !== 'con_datos')   return false
     if (filtroEstado.value === 'sin'   && p.estado !== 'sin_medidas') return false
     if (discActiva.value && (p.discrepancia_pct === null || p.discrepancia_pct < discUmbral.value)) return false
@@ -580,4 +581,9 @@ onMounted(() => {
 .legend { display: flex; gap: 12px; margin-top: 6px; flex-wrap: wrap; }
 .leg { display: flex; align-items: center; gap: 5px; font-size: 10px; color: #9b8fb0; }
 .leg-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+
+.unregistered-tag {
+  font-size: 10px; font-weight: 700; padding: 2px 9px; border-radius: 5px;
+  background: rgba(107,90,138,.1); color: #6b5a8a; border: 1px solid rgba(107,90,138,.25);
+}
 </style>
