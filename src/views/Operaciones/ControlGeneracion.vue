@@ -2,7 +2,7 @@
   <div class="cg-page">
     <PageHeader
       title="Control de Generación"
-      subtitle="Curvas de Quoia y Fusion por frontera — para revisar antes de enviar el reporte al ASIC."
+      subtitle="Curvas de Quoia y Fusion por frontera"
     >
       <template #actions>
         <div class="fecha-picker-wrap">
@@ -140,7 +140,7 @@
         <!-- Sin medidas -->
         <div v-if="p.estado === 'sin_medidas'" class="empty-card">
           <i class="pi pi-circle" style="font-size:1.2rem;opacity:.3;" />
-          <span>Sin medidas para este día — proyecto apagado o sin comunicación. Se incluirá con valores en cero en el reporte ASIC.</span>
+          <span>Sin medidas para este día — proyecto apagado o sin comunicación.</span>
         </div>
 
         <!-- Charts -->
