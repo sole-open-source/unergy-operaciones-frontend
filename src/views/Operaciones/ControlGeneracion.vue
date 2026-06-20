@@ -353,6 +353,7 @@ const hayFiltros = computed(() =>
 
 const proyectosFiltrados = computed(() => {
   return proyectos.value.filter(p => {
+    if (filtroProyecto.value && p.proyecto_id !== filtroProyecto.value) return false
     if (filtroEstado.value === 'datos' && p.estado !== 'con_datos')   return false
     if (filtroEstado.value === 'sin'   && p.estado !== 'sin_medidas') return false
     if (discActiva.value && (p.discrepancia_pct === null || p.discrepancia_pct < discUmbral.value)) return false
