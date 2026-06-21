@@ -164,6 +164,51 @@
           </div>
         </div>
 
+        <!-- ── Terminación: solo los datos que XM exige ─────────────── -->
+        <template v-if="esTerminacion">
+          <div class="rounded-lg px-3 py-2 text-xs flex items-start gap-2"
+            style="background:#FFF7ED; border:1px solid #FED7AA; color:#9A3412;">
+            <i class="pi pi-info-circle mt-0.5" />
+            <span>Al publicar, el contrato con este código SIC terminará en la fecha indicada:
+              dejará de aportar energía en Cumplimiento después de esa fecha (el histórico previo se conserva).</span>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div class="flex flex-col gap-1">
+              <label class="text-xs font-medium" style="color:#6b5a8a;">Código SIC del contrato a terminar *</label>
+              <InputText v-model="form.codigo_sic_contrato" placeholder="87552" class="w-full"
+                :class="{ 'p-invalid': errores.codigo_sic_contrato }" />
+              <small v-if="errores.codigo_sic_contrato" class="text-red-500 text-xs">{{ errores.codigo_sic_contrato }}</small>
+            </div>
+            <div class="flex flex-col gap-1">
+              <label class="text-xs font-medium" style="color:#6b5a8a;">Fecha de terminación *</label>
+              <DatePicker v-model="form.fecha_fin" dateFormat="dd/mm/yy"
+                placeholder="dd/mm/aa" showIcon class="w-full"
+                :class="{ 'p-invalid': errores.fecha_fin }" />
+              <small v-if="errores.fecha_fin" class="text-red-500 text-xs">{{ errores.fecha_fin }}</small>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div class="flex flex-col gap-1">
+              <label class="text-xs font-medium" style="color:#6b5a8a;">Cédula agente vendedor</label>
+              <InputText v-model="form.cedula_agente_vendedor" placeholder="1037625350" class="w-full" />
+            </div>
+            <div class="flex flex-col gap-1">
+              <label class="text-xs font-medium" style="color:#6b5a8a;">Cédula agente comprador</label>
+              <InputText v-model="form.cedula_agente_comprador" placeholder="1107047209" class="w-full" />
+            </div>
+          </div>
+
+          <div class="flex flex-col gap-1">
+            <label class="text-xs font-medium" style="color:#6b5a8a;">Link archivo</label>
+            <InputText v-model="form.link_archivo" placeholder="https://..." class="w-full" />
+          </div>
+        </template>
+
+        <!-- ── Campos completos (registro / modificación / desistimiento) ── -->
+        <template v-if="!esTerminacion">
+
         <!-- Fila 2: SIC Contrato + Contrato interno + Nombre interno -->
         <div class="grid grid-cols-3 gap-4">
           <div class="flex flex-col gap-1">
@@ -288,6 +333,8 @@
           <Textarea v-model="form.observaciones" rows="2" class="w-full" autoResize />
         </div>
 
+        </template>
+
         <div class="flex justify-end gap-2 pt-2">
           <Button label="Cancelar" severity="secondary" @click="dialogVisible = false" type="button" />
           <Button :label="editandoId ? 'Actualizar' : 'Guardar'" icon="pi pi-check" type="submit" :loading="guardando"
@@ -299,7 +346,7 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, computed, onMounted } from 'vue'
 import api from '@/api/client.js'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
@@ -550,6 +597,8 @@ const FORM_INICIAL = () => ({
   nombre_interno: '',
   codigo_sic_vendedor: 'UNGG',
   codigo_sic_comprador: '',
+  cedula_agente_vendedor: '',
+  cedula_agente_comprador: '',
   prioridad_limitacion: null,
   proyecto_id: null,
   fecha_solicitud: null,
@@ -567,6 +616,10 @@ const FORM_INICIAL = () => ({
   es_duplicado: false,
 })
 const form = ref(FORM_INICIAL())
+
+// Una terminación solo necesita: SIC del contrato a terminar, fecha de terminación,
+// cédulas de los agentes y el link del archivo. El resto de campos se ocultan.
+const esTerminacion = computed(() => form.value.tipo_solicitud === 'terminacion')
 
 const opcionesEstadoForm = [
   { label: 'En proceso', value: 'en_proceso' },
@@ -597,6 +650,8 @@ function abrirEditar(row) {
     nombre_interno: row.nombre_interno || '',
     codigo_sic_vendedor: row.codigo_sic_vendedor || '',
     codigo_sic_comprador: row.codigo_sic_comprador || '',
+    cedula_agente_vendedor: row.cedula_agente_vendedor || '',
+    cedula_agente_comprador: row.cedula_agente_comprador || '',
     prioridad_limitacion: row.prioridad_limitacion,
     proyecto_id: row.proyecto_id,
     fecha_solicitud: parseDateField(row.fecha_solicitud),
@@ -629,6 +684,12 @@ async function guardar() {
   errores.value = {}
   if (!form.value.tipo_solicitud) { errores.value.tipo_solicitud = 'Requerido'; return }
   if (!form.value.estado_solicitud) { errores.value.estado_solicitud = 'Requerido'; return }
+  // En una terminación, el SIC del contrato a terminar y la fecha de terminación son
+  // obligatorios: con ellos el sistema cierra el contrato en esa fecha.
+  if (esTerminacion.value) {
+    if (!form.value.codigo_sic_contrato) { errores.value.codigo_sic_contrato = 'Requerido'; return }
+    if (!form.value.fecha_fin) { errores.value.fecha_fin = 'Requerido'; return }
+  }
 
   guardando.value = true
   try {
@@ -637,6 +698,8 @@ async function guardar() {
       codigo_sic_contrato: form.value.codigo_sic_contrato || null,
       codigo_sic_vendedor: form.value.codigo_sic_vendedor || null,
       codigo_sic_comprador: form.value.codigo_sic_comprador || null,
+      cedula_agente_vendedor: form.value.cedula_agente_vendedor || null,
+      cedula_agente_comprador: form.value.cedula_agente_comprador || null,
       contrato_interno: form.value.contrato_interno || null,
       nombre_interno: form.value.nombre_interno || null,
       requerimiento_asic: form.value.requerimiento_asic || null,
@@ -650,6 +713,30 @@ async function guardar() {
       // despacho: el form usa escala 0-100 pero la BD/cumplimiento usa fracción 0-1
       porcentaje_despacho: form.value.porcentaje_despacho != null
         ? Number((form.value.porcentaje_despacho / 100).toFixed(4)) : null,
+    }
+
+    // Una terminación solo lleva SIC, fecha de terminación, cédulas y link.
+    // Los demás campos se limpian para no arrastrar datos sin sentido.
+    if (esTerminacion.value) {
+      Object.assign(payload, {
+        contrato_interno: null,
+        nombre_interno: null,
+        codigo_sic_vendedor: null,
+        codigo_sic_comprador: null,
+        prioridad_limitacion: null,
+        proyecto_id: null,
+        fecha_solicitud: null,
+        fecha_inicio: null,
+        tipo_mercado: null,
+        tipo_asignacion: null,
+        porcentaje_fncer: null,
+        porcentaje_despacho: null,
+        requerimiento_asic: null,
+        nombre_contacto_solicitante: null,
+        observaciones: null,
+        reemplaza_anterior: true,
+        es_duplicado: false,
+      })
     }
 
     if (editandoId.value) {
@@ -698,8 +785,8 @@ const TIPO_SEV = { registro: 'success', modificacion: 'info', terminacion: 'warn
 function tipoLabel(v) { return TIPO_LABELS[v] || v }
 function tipoSeverity(v) { return TIPO_SEV[v] || 'secondary' }
 
-const ESTADO_LABELS = { publicado: 'Publicado', en_proceso: 'En proceso', rechazado: 'Rechazado', desistido: 'Desistido' }
-const ESTADO_SEV = { publicado: 'success', en_proceso: 'info', rechazado: 'danger', desistido: 'secondary' }
+const ESTADO_LABELS = { publicado: 'Publicado', en_proceso: 'En proceso', rechazado: 'Rechazado', desistido: 'Desistido', terminado: 'Terminado' }
+const ESTADO_SEV = { publicado: 'success', en_proceso: 'info', rechazado: 'danger', desistido: 'secondary', terminado: 'warn' }
 function estadoLabel(v) { return ESTADO_LABELS[v] || v }
 function estadoSeverity(v) { return ESTADO_SEV[v] || 'secondary' }
 
