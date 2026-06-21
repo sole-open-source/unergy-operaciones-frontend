@@ -12,11 +12,11 @@
 
     <!-- Resumen / KPIs -->
     <ClientSummaryPanel
-      :mwh-net-last-month="resumen?.mwh_net_last_month ?? null"
-      :active-services-count="resumen?.active_services_count ?? null"
-      :ppa-compliance-status="resumen?.ppa_compliance_status ?? 'N/A'"
+      :mwh-net-last-month="resumen?.mwh_netos_mes_anterior ?? null"
+      :active-services-count="resumen?.servicios_activos ?? null"
+      :ppa-compliance-status="resumen?.estado_cumplimiento_ppa ?? 'sin_contratos'"
       :periodo="resumen?.periodo ?? null"
-      :ppa-contracts-count="resumen?.ppa_contracts_count ?? 0"
+      :ppa-contracts-count="resumen?.num_contratos_ppa ?? 0"
       :loading="resumenLoading"
       :error="resumenError"
     />

@@ -80,7 +80,7 @@ import { computed } from 'vue'
 const props = defineProps({
   mwhNetLastMonth: { type: Number, default: null },
   activeServicesCount: { type: Number, default: null },
-  ppaComplianceStatus: { type: String, default: 'N/A' },
+  ppaComplianceStatus: { type: String, default: 'sin_contratos' },
   periodo: { type: String, default: null },          // 'YYYY-MM'
   ppaContractsCount: { type: Number, default: 0 },
   loading: { type: Boolean, default: false },
@@ -103,10 +103,10 @@ const periodoLabel = computed(() => {
 })
 
 const SEMAFOROS = {
-  Green:  { label: 'Al día',        dot: '#10B981', style: 'background:rgba(16,185,129,0.12);color:#0f8a5f' },
-  Yellow: { label: 'En alerta',     dot: '#CA8A04', style: 'background:rgba(202,138,4,0.12);color:#a16207' },
-  Red:    { label: 'En riesgo',     dot: '#DC2626', style: 'background:rgba(220,38,38,0.12);color:#b91c1c' },
-  'N/A':  { label: 'Sin contratos', dot: '#9b89b5', style: 'background:#f3f3f3;color:#6b5a8a' },
+  verde:         { label: 'Al día',        dot: '#10B981', style: 'background:rgba(16,185,129,0.12);color:#0f8a5f' },
+  amarillo:      { label: 'En alerta',     dot: '#CA8A04', style: 'background:rgba(202,138,4,0.12);color:#a16207' },
+  rojo:          { label: 'En riesgo',     dot: '#DC2626', style: 'background:rgba(220,38,38,0.12);color:#b91c1c' },
+  sin_contratos: { label: 'Sin contratos', dot: '#9b89b5', style: 'background:#f3f3f3;color:#6b5a8a' },
 }
 
 // Estado degradado: cuando el resumen no cargó NO afirmamos "Sin contratos"
@@ -115,7 +115,7 @@ const SEMAFORO_SIN_DATOS = { label: 'Sin datos', dot: '#c4b8d4', style: 'backgro
 
 const semaforo = computed(() => {
   if (props.error) return SEMAFORO_SIN_DATOS
-  return SEMAFOROS[props.ppaComplianceStatus] || SEMAFOROS['N/A']
+  return SEMAFOROS[props.ppaComplianceStatus] || SEMAFOROS.sin_contratos
 })
 
 const ppaSubLabel = computed(() => {
