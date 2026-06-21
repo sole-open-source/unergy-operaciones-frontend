@@ -10,6 +10,17 @@
       <span class="text-sm font-semibold" style="color: #2C2039;">{{ cliente.razon_social_nombre }}</span>
     </div>
 
+    <!-- Resumen / KPIs -->
+    <ClientSummaryPanel
+      :mwh-net-last-month="resumen?.mwh_net_last_month ?? null"
+      :active-services-count="resumen?.active_services_count ?? null"
+      :ppa-compliance-status="resumen?.ppa_compliance_status ?? 'N/A'"
+      :periodo="resumen?.periodo ?? null"
+      :ppa-contracts-count="resumen?.ppa_contracts_count ?? 0"
+      :loading="resumenLoading"
+      :error="resumenError"
+    />
+
     <!-- Tabs -->
     <div class="bg-white rounded-xl shadow-sm overflow-hidden" style="border: 1px solid #e8e0f0;">
       <div class="flex border-b" style="border-color: #e8e0f0;">
@@ -449,10 +460,14 @@ import Textarea from 'primevue/textarea'
 import DatePicker from 'primevue/datepicker'
 import api from '@/api/client'
 import ClienteForm from './ClienteForm.vue'
+import ClientSummaryPanel from '@/components/ClientSummaryPanel.vue'
 
 const route = useRoute()
 const toast = useToast()
 const cliente = ref(null)
+const resumen = ref(null)
+const resumenLoading = ref(false)
+const resumenError = ref(false)
 const activeTab = ref('info')
 const guardando = ref(false)
 const archivoSeleccionado = ref(null)
@@ -734,6 +749,21 @@ async function cargar() {
   cliente.value = data
 }
 
+async function cargarResumen() {
+  resumenLoading.value = true
+  resumenError.value = false
+  try {
+    const { data } = await api.get(`/clientes/${route.params.id}/resumen`)
+    resumen.value = data
+  } catch {
+    // El panel degrada (aviso + neutro "Sin datos") sin bloquear la vista.
+    resumen.value = null
+    resumenError.value = true
+  } finally {
+    resumenLoading.value = false
+  }
+}
+
 async function loadRelatedData(tab) {
   loadingRelated.value = true
   try {
@@ -760,5 +790,8 @@ watch(activeTab, (tab) => {
   }
 })
 
-onMounted(cargar)
+onMounted(() => {
+  cargar()
+  cargarResumen()
+})
 </script>
