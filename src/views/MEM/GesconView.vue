@@ -189,6 +189,12 @@
             </div>
           </div>
 
+          <div class="flex flex-col gap-1">
+            <label class="text-xs font-medium" style="color:#6b5a8a;">N° Requerimiento ASIC</label>
+            <InputText v-model="form.requerimiento_asic" placeholder="20260419002" class="w-full" />
+            <small class="text-xs" style="color:#9b8ab5;">El SIC puede repetir el del registro, pero el requerimiento de la terminación es distinto.</small>
+          </div>
+
           <div class="grid grid-cols-2 gap-4">
             <div class="flex flex-col gap-1">
               <label class="text-xs font-medium" style="color:#6b5a8a;">Cédula agente vendedor</label>
@@ -715,7 +721,7 @@ async function guardar() {
         ? Number((form.value.porcentaje_despacho / 100).toFixed(4)) : null,
     }
 
-    // Una terminación solo lleva SIC, fecha de terminación, cédulas y link.
+    // Una terminación solo lleva SIC, fecha de terminación, requerimiento, cédulas y link.
     // Los demás campos se limpian para no arrastrar datos sin sentido.
     if (esTerminacion.value) {
       Object.assign(payload, {
@@ -731,7 +737,6 @@ async function guardar() {
         tipo_asignacion: null,
         porcentaje_fncer: null,
         porcentaje_despacho: null,
-        requerimiento_asic: null,
         nombre_contacto_solicitante: null,
         observaciones: null,
         reemplaza_anterior: true,
