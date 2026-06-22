@@ -303,12 +303,38 @@ export function buildReportHtmlDoc(html, opts = {}) {
     title    = 'Informe Operacional',
     bgGray   = true,
     editable = false,
+    autoFit  = false,   // escala cada .rpt-page para que SIEMPRE quepa en una hoja A4 (Ranking vs P90)
   } = opts
 
   // ── CSS extra según el modo ──────────────────────────────────────────
   let modeCSS = ''
 
-  if (editable) {
+  if (autoFit) {
+    // Modo auto-ajuste (impresión de Ranking): cada página se mide y se escala
+    // para entrar completa en una sola hoja A4. El script de abajo hace el cálculo.
+    modeCSS = `
+      body { margin: 0; padding: 0; background: #fff; }
+      .rpt-fit { margin: 0 auto; }
+      @media print {
+        @page { size: A4 portrait; margin: 6mm 8mm; }
+        .rpt-fit { page-break-after: always; break-after: page; overflow: hidden; }
+        .rpt-fit:last-child { page-break-after: avoid; break-after: avoid; }
+        /* La página deja de forzar alto completo / flex: el wrapper controla el salto */
+        .rpt-page {
+          min-height: 0 !important;
+          display: block !important;
+          page-break-after: avoid !important;
+          break-after: avoid !important;
+          width: 733px !important; max-width: 733px !important;
+          padding: 30px 36px !important;
+          margin: 0 !important;
+          box-shadow: none !important;
+        }
+        .rpt-header { margin: -30px -36px 22px !important; border-radius: 0 !important; }
+        .rpt-footer { margin-top: 18px !important; }
+      }
+    `
+  } else if (editable) {
     // Modo editor: simula visor PDF con páginas A4 centradas
     modeCSS = `
       html, body {
@@ -347,6 +373,44 @@ export function buildReportHtmlDoc(html, opts = {}) {
   }
 
   const bodyAttrs = editable ? ' contenteditable="true"' : ''
+
+  // Script de auto-ajuste: envuelve cada .rpt-page, mide su alto natural a 733px
+  // (ancho de contenido A4 con márgenes de 8mm) y aplica transform:scale() para que
+  // entre completa en el alto imprimible de una hoja (~285mm). Dispara print() al terminar.
+  const fitScript = autoFit ? `
+<script>
+(function () {
+  var TARGET_H = 1040;  // alto imprimible útil en px (A4 285mm @96dpi ≈ 1077px, con margen de seguridad)
+  var WIDTH = 733;      // ancho de contenido A4 (210-16mm) @96dpi
+  function fit() {
+    var pages = document.querySelectorAll('.rpt-page');
+    for (var i = 0; i < pages.length; i++) {
+      var page = pages[i];
+      if (page.parentNode && page.parentNode.className === 'rpt-fit') continue;
+      var wrap = document.createElement('div');
+      wrap.className = 'rpt-fit';
+      page.parentNode.insertBefore(wrap, page);
+      wrap.appendChild(page);
+      page.style.width = WIDTH + 'px';
+      page.style.transformOrigin = 'top left';
+      page.style.transform = 'none';
+      var natural = page.scrollHeight;
+      var s = Math.min(1, TARGET_H / natural);
+      page.style.transform = 'scale(' + s + ')';
+      wrap.style.width = (WIDTH * s) + 'px';
+      wrap.style.height = (natural * s) + 'px';
+    }
+  }
+  var printed = false;
+  function run() { if (printed) return; printed = true; fit(); setTimeout(function () { window.print(); }, 150); }
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(function () { setTimeout(run, 200); });
+    setTimeout(run, 1500); // respaldo por si fonts.ready no resuelve
+  } else {
+    window.addEventListener('load', function () { setTimeout(run, 600); });
+  }
+})();
+</script>` : ''
 
   return `<!doctype html>
 <html lang="es">

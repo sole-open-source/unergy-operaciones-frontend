@@ -332,16 +332,19 @@ function imprimir() {
     setTimeout(() => document.body.classList.remove('im-printing'), 300)
     return
   }
+  // El Ranking vs P90 se imprime con auto-ajuste: cada mes se escala para caber en una sola hoja.
+  const autoFit = tipo.value === 'ranking'
   const doc = buildReportHtmlDoc(html, {
     title:  resultTitle.value || 'Informe Operacional',
     bgGray: false,
+    autoFit,
   })
   w.document.open()
   w.document.write(doc)
   w.document.close()
   w.focus()
-  // Esperar a que cargue la fuente Sora antes de imprimir
-  setTimeout(() => w.print(), 700)
+  // Con autoFit, el propio documento ajusta y dispara print(). Si no, esperamos a la fuente Sora.
+  if (!autoFit) setTimeout(() => w.print(), 700)
 }
 
 function abrirEditor() {
