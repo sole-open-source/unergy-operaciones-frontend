@@ -1564,12 +1564,13 @@ function _dibujarPill(ctx, x, y, texto, bg, fg, font) {
 function _renderCapaCanvas(c) {
   const plantas = simAssignments.value[c.id] || []
   const res = simResults.value[c.id] || {}
+  const esActual = !!(simData.value && simData.value.es_mes_actual)
 
   const DARK = '#2C2039', GREY = '#7a6e8a', PURPLE = '#915BD8'
   const RED = '#D64455', GOLD = '#9a6700'
   const scale = 2
   const W = 760, padX = 36
-  const headerH = 156, tableHeadH = 32, rowH = 36, totalH = 46, footerH = 50
+  const headerH = 156, tableHeadH = 32, rowH = 44, totalH = 46, footerH = 50
   const bodyTop = headerH + tableHeadH
   const H = bodyTop + Math.max(plantas.length, 1) * rowH + totalH + footerH
 
@@ -1692,10 +1693,17 @@ function _renderCapaCanvas(c) {
     ctx.fillStyle = GREY
     ctx.font = '12px Inter, Arial, sans-serif'
     ctx.fillText((p.pct_despacho * 100).toFixed(0) + '%', colPctR, yMid)
-    // Energía
+    // Energía actual (+ proyección debajo, solo mes en curso)
+    const mwhProy = (esActual && !p.es_duplicado && p.month_mwh_proyectado != null)
+      ? p.month_mwh_proyectado * p.pct_despacho : null
     ctx.fillStyle = colName
     ctx.font = 'bold 13px Inter, Arial, sans-serif'
-    ctx.fillText(mwh != null ? fmtMwh(mwh) : '—', colEneR, yMid)
+    ctx.fillText(mwh != null ? fmtMwh(mwh) : '—', colEneR, mwhProy != null ? yMid - 7 : yMid)
+    if (mwhProy != null) {
+      ctx.fillStyle = PURPLE
+      ctx.font = '600 10px Inter, Arial, sans-serif'
+      ctx.fillText('◆ proy. ' + fmtMwh(mwhProy), colEneR, yMid + 9)
+    }
     ctx.textAlign = 'left'
     ctx.textBaseline = 'alphabetic'
   })
