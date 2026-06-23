@@ -235,17 +235,21 @@
       <template v-if="step === 4">
         <p class="step-title">Compromisos de energía <span class="normal-case font-normal text-gray-400">(opcional)</span></p>
         <p class="text-xs text-gray-400 mb-3">
-          Copia las columnas <strong>Año · Mes · Mín</strong> desde Excel y pégalas aquí (valores en MWh/mes). La columna <strong>Máx</strong> es opcional.
+          Copia las columnas <strong>Año · Mes · Mín · Máx · Plantas esperadas</strong> desde Excel y pégalas aquí
+          (Mín/Máx en MWh/mes; <strong>Plantas esperadas</strong> = cuántas plantas debería tener el contrato ese mes).
+          Las columnas <strong>Máx</strong> y <strong>Plantas esperadas</strong> son opcionales. Usa
+          <strong>Descargar plantilla</strong> para editar en Excel y volver a pegar.
         </p>
         <Textarea
           v-model="energiaPaste"
           rows="6"
-          placeholder="2023&#9;Noviembre&#9;90&#9;180&#10;2023&#9;Diciembre&#9;90&#9;180"
+          placeholder="2023&#9;Noviembre&#9;90&#9;180&#9;4&#10;2023&#9;Diciembre&#9;90&#9;180&#9;4"
           class="w-full font-mono text-xs"
           @paste="onPasteEnergia"
         />
-        <div class="flex items-center gap-2 mt-2">
+        <div class="flex items-center gap-2 mt-2 flex-wrap">
           <Button label="Procesar" icon="pi pi-refresh" size="small" severity="secondary" outlined @click="parseEnergia" />
+          <Button label="Descargar plantilla" icon="pi pi-download" size="small" severity="secondary" text @click="descargarPlantillaEnergia" />
           <Button v-if="energiaRows.length" label="Limpiar" icon="pi pi-times" size="small" severity="danger" text @click="energiaRows = []; energiaPaste = ''" />
           <span v-if="energiaRows.length" class="text-xs text-green-600 font-medium">
             ✓ {{ energiaRows.length }} filas listas
@@ -260,6 +264,7 @@
                 <th class="px-3 py-1.5 text-left text-gray-500 font-medium">Mes</th>
                 <th class="px-3 py-1.5 text-right text-gray-500 font-medium">Mín (MWh)</th>
                 <th class="px-3 py-1.5 text-right text-gray-500 font-medium">Máx (MWh)</th>
+                <th class="px-3 py-1.5 text-right text-gray-500 font-medium">Plantas esperadas</th>
               </tr>
             </thead>
             <tbody>
@@ -268,9 +273,10 @@
                 <td class="px-3 py-1 text-gray-700">{{ r.mes }}</td>
                 <td class="px-3 py-1 text-right text-gray-700">{{ r.energia_minima }}</td>
                 <td class="px-3 py-1 text-right text-gray-700">{{ r.energia_maxima }}</td>
+                <td class="px-3 py-1 text-right text-gray-700">{{ r.cantidad_proyectos ?? '—' }}</td>
               </tr>
               <tr v-if="energiaRows.length > PREVIEW_ROWS" class="border-t border-gray-50">
-                <td colspan="4" class="px-3 py-1 text-gray-300 italic">… y {{ energiaRows.length - PREVIEW_ROWS }} filas más</td>
+                <td colspan="5" class="px-3 py-1 text-gray-300 italic">… y {{ energiaRows.length - PREVIEW_ROWS }} filas más</td>
               </tr>
             </tbody>
           </table>
@@ -364,6 +370,7 @@ import DatePicker from 'primevue/datepicker'
 import Textarea from 'primevue/textarea'
 import NuevoClienteDialog from '@/components/NuevoClienteDialog.vue'
 import api from '@/api/client'
+import * as XLSX from 'xlsx'
 
 const props = defineProps({
   visible: Boolean,
@@ -500,10 +507,10 @@ watch(() => props.visible, (visible) => {
       tarifasRows.value = tarifasData.map(t => ({ año: t.año, mes: t.mes, tarifa: t.tarifa }))
       tarifasPaste.value = tarifasData.map(t => `${t.año}\t${t.mes}\t${t.tarifa}`).join('\n')
 
-      // Cantidades: { año, mes, energia_minima, energia_maxima }
+      // Cantidades: { año, mes, energia_minima, energia_maxima, cantidad_proyectos }
       const cantData = props.initialData.compromisos_energia ?? []
-      energiaRows.value = cantData.map(c => ({ año: c.año, mes: c.mes, energia_minima: c.energia_minima, energia_maxima: c.energia_maxima }))
-      energiaPaste.value = cantData.map(c => `${c.año}\t${c.mes}\t${c.energia_minima}\t${c.energia_maxima}`).join('\n')
+      energiaRows.value = cantData.map(c => ({ año: c.año, mes: c.mes, energia_minima: c.energia_minima, energia_maxima: c.energia_maxima, cantidad_proyectos: c.cantidad_proyectos ?? null }))
+      energiaPaste.value = cantData.map(c => `${c.año}\t${c.mes}\t${c.energia_minima ?? ''}\t${c.energia_maxima ?? ''}\t${c.cantidad_proyectos ?? ''}`).join('\n')
 
       // Proyectos: precargar seleccionados cuando todosProyectos esté disponible
       const proyectosData = props.initialData.proyectos ?? []
@@ -562,10 +569,33 @@ function parseEnergia() {
     const mes = parseMes(cols[1].trim())
     const min = parseFloat(cols[2].trim().replace(',', '.'))
     const max = cols[3] ? parseFloat(cols[3].trim().replace(',', '.')) : null
+    const plantasRaw = cols[4] ? cols[4].trim() : ''
+    const plantas = plantasRaw ? parseInt(plantasRaw.replace(',', '.'), 10) : null
     if (isNaN(año) || !mes || isNaN(min)) { energiaError.value = `Fila ${i + 1}: datos inválidos`; energiaRows.value = []; return }
-    rows.push({ año, mes, energia_minima: min, energia_maxima: (max !== null && !isNaN(max)) ? max : null })
+    rows.push({
+      año, mes,
+      energia_minima: min,
+      energia_maxima: (max !== null && !isNaN(max)) ? max : null,
+      cantidad_proyectos: (plantas !== null && !isNaN(plantas)) ? plantas : null,
+    })
   }
   energiaRows.value = rows
+}
+
+// Descarga la plantilla Excel (Año · Mes · Mín · Máx · Plantas esperadas) precargada con los
+// compromisos actuales para editarla y volver a pegarla en el cuadro de texto.
+function descargarPlantillaEnergia() {
+  const header = ['Año', 'Mes', 'Mín (MWh)', 'Máx (MWh)', 'Plantas esperadas']
+  const filas = energiaRows.value.length
+    ? energiaRows.value.map(r => [r.año, r.mes, r.energia_minima, r.energia_maxima, r.cantidad_proyectos])
+    : [[new Date().getFullYear(), 1, '', '', '']]
+  const aoa = [header, ...filas]
+  const ws = XLSX.utils.aoa_to_sheet(aoa)
+  ws['!cols'] = [{ wch: 8 }, { wch: 6 }, { wch: 12 }, { wch: 12 }, { wch: 18 }]
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, 'Compromisos')
+  const nombre = form.numero_codigo_contrato || form.nombre_interno || 'contrato'
+  XLSX.writeFile(wb, `plantilla_compromisos_${String(nombre).replace(/[^\w-]+/g, '_')}.xlsx`)
 }
 
 function onPasteTarifas(e) {

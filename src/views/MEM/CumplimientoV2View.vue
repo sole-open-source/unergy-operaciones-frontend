@@ -394,7 +394,12 @@
                     <div class="flex items-center gap-1.5">
                       <span class="font-bold text-sm truncate" style="color: #2C2039;">{{ c.nombre }}</span>
                       <span v-if="c._ficticio" class="text-xs px-1.5 py-0.5 rounded font-medium flex-shrink-0" style="background: rgba(240,192,64,0.18); color: #9a6700;">Nuevo</span>
-                      <span class="text-xs font-mono flex-shrink-0" style="color: #7a6e8a;">{{ (simAssignments[c.id] || []).length }} plantas</span>
+                      <span v-if="simResults[c.id]?.plantasEsp != null"
+                        class="text-xs font-semibold px-1.5 py-0.5 rounded flex-shrink-0"
+                        :style="estadoBadge(simResults[c.id].estadoPlantas)"
+                        v-tooltip="'Plantas registradas / esperadas este mes'"
+                      >{{ simResults[c.id].plantasReg }}/{{ simResults[c.id].plantasEsp }} plantas</span>
+                      <span v-else class="text-xs font-mono flex-shrink-0" style="color: #7a6e8a;">{{ (simAssignments[c.id] || []).length }} plantas</span>
                       <span v-if="simResults[c.id]?.pct !== null && simResults[c.id]?.pct !== undefined"
                         class="text-xs font-semibold px-1.5 py-0.5 rounded flex-shrink-0"
                         :style="estadoBadge(simResults[c.id].estado)"
@@ -502,6 +507,23 @@
                       :style="estadoBadge(simResults[c.id].estadoProy)">
                       ◆ proy. {{ estadoLabel(simResults[c.id].estadoProy) }}
                     </span>
+                  </div>
+                </div>
+
+                <!-- Cumplimiento de plantas: registradas (numerador) / esperadas (denominador) -->
+                <div v-if="simResults[c.id].plantasEsp != null" class="mt-3 pt-3 border-t" style="border-color: rgba(44,32,57,0.07);">
+                  <div class="flex items-center justify-between mb-1.5">
+                    <span class="text-[10px] font-semibold uppercase tracking-wide" style="color: #7a6e8a;">Plantas registradas / esperadas</span>
+                    <div class="flex items-center gap-1.5">
+                      <span class="font-mono text-xs font-bold" style="color: #2C2039;">{{ simResults[c.id].plantasReg }} / {{ simResults[c.id].plantasEsp }}</span>
+                      <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap" :style="estadoBadge(simResults[c.id].estadoPlantas)">
+                        {{ estadoLabel(simResults[c.id].estadoPlantas) }}
+                      </span>
+                    </div>
+                  </div>
+                  <div class="relative rounded-md overflow-hidden" style="height: 8px; background: rgba(44,32,57,0.06);">
+                    <div class="absolute inset-y-0 left-0 rounded-sm transition-all duration-300"
+                      :style="{ width: simResults[c.id].plantasPct + '%', background: estadoColor(simResults[c.id].estadoPlantas) }" />
                   </div>
                 </div>
               </div>
@@ -1493,12 +1515,24 @@ const simResults = computed(() => {
       proyPct: (esActual && genProy > 0) ? clampPct(genProy) : null,
     }
 
+    // ── Cumplimiento de plantas: registradas (numerador) vs esperadas (denominador) ──
+    const plantasEsp = c.plantas_esperadas ?? null
+    const plantasReg = plantas.length
+    let estadoPlantas = 'sin_compromisos'
+    if (plantasEsp !== null) {
+      if (plantasReg < plantasEsp) estadoPlantas = 'deficit'
+      else if (plantasReg > plantasEsp) estadoPlantas = 'excedente'
+      else estadoPlantas = 'ok'
+    }
+    const plantasPct = plantasEsp ? Math.min(100, (plantasReg / plantasEsp) * 100) : null
+
     out[c.id] = {
       gen: Math.round(gen * 10) / 10,
       genDup: Math.round(genDup * 10) / 10,
       genProy: esActual ? Math.round(genProy * 10) / 10 : null,
       estado, estadoProy, pct, dupPct, proyPct, min, max,
       diaActual: diaAct, diasRestantes: diasRest, bullet,
+      plantasReg, plantasEsp, estadoPlantas, plantasPct,
     }
   }
   return out
