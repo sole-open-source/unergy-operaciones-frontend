@@ -441,10 +441,10 @@
                     <div class="flex items-baseline gap-1 mt-1 flex-wrap">
                       <span class="font-mono text-xs font-bold" style="color: #2C2039;">{{ fmtMwh(simResults[c.id].gen) }}</span>
                       <span v-if="simResults[c.id].genDup > 0"
-                        class="font-mono text-[10px] font-semibold px-1.5 py-0.5 rounded"
-                        style="background: rgba(214,68,85,0.12); color: #D64455;"
-                        v-tooltip="'Exposición bolsa por duplicados'"
-                      >+{{ fmtMwh(simResults[c.id].genDup) }} dup</span>
+                        class="inline-flex items-center gap-1 font-mono text-[10px] font-semibold px-1.5 py-0.5 rounded"
+                        style="background: rgba(240,192,64,0.22); color: #9a6700;"
+                        v-tooltip="'De lo entregado, esta parte es compra en bolsa'"
+                      ><i class="pi pi-shopping-cart" style="font-size: 9px;" />{{ fmtMwh(simResults[c.id].genDup) }} bolsa</span>
                     </div>
                   </div>
                   <div>
@@ -473,12 +473,12 @@
                     <div class="absolute rounded-sm transition-all duration-300"
                       style="top: 50%; transform: translateY(-50%); height: 10px; left: 0;"
                       :style="{ width: simResults[c.id].bullet.measurePct + '%', background: estadoColor(simResults[c.id].estado) }" />
-                    <!-- Duplicados (exposición bolsa) -->
+                    <!-- Compra en bolsa: tramo amarillo DENTRO de la barra entregada -->
                     <div v-if="simResults[c.id].bullet.dupW"
                       class="absolute transition-all duration-300"
-                      style="top: 50%; transform: translateY(-50%); height: 10px; background: repeating-linear-gradient(135deg, #D64455, #D64455 2px, #e8697a 2px, #e8697a 4px); opacity: 0.85;"
-                      :style="{ left: simResults[c.id].bullet.measurePct + '%', width: simResults[c.id].bullet.dupW + '%' }"
-                      v-tooltip="'Exposición bolsa por duplicados'" />
+                      style="top: 50%; transform: translateY(-50%); height: 10px; background: #E0A800; opacity: 0.92;"
+                      :style="{ left: simResults[c.id].bullet.bolsaStartPct + '%', width: simResults[c.id].bullet.dupW + '%' }"
+                      v-tooltip="'Compra en bolsa (origen del suministro)'" />
                     <!-- Marcas mín / máx -->
                     <div v-if="simResults[c.id].bullet.hasMin" class="absolute rounded"
                       style="top: -1px; bottom: -1px; width: 2px; background: #2C2039; opacity: 0.45;"
@@ -524,17 +524,17 @@
                 >
                   <div class="min-w-0">
                     <span class="font-medium truncate block" style="color: #2C2039; max-width: 128px;">{{ p.nombre }}</span>
-                    <span v-if="p.es_duplicado" class="text-[10px] font-semibold px-1.5 py-0.5 rounded mt-0.5 inline-block"
-                      style="background: rgba(214,68,85,0.12); color: #D64455;"
-                      v-tooltip="'Duplicado — exposición en bolsa'"
-                    >Exp. bolsa</span>
+                    <span v-if="p.es_duplicado" class="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded mt-0.5"
+                      style="background: rgba(240,192,64,0.22); color: #9a6700;"
+                      v-tooltip="'Compra en bolsa — cuenta para el contrato, origen bolsa'"
+                    ><i class="pi pi-shopping-cart" style="font-size: 9px;" />Compra bolsa</span>
                     <span v-else-if="p.comprado_por_unergy" class="text-[10px] font-semibold px-1.5 py-0.5 rounded mt-0.5 inline-block"
                       style="background: rgba(240,192,64,0.25); color: #9a6700;"
                       v-tooltip="p.contrato_compra_nombre || 'Contrato de compra'"
                     >Compra Unergy</span>
                   </div>
                   <div class="text-right flex-shrink-0">
-                    <div class="font-mono font-semibold" :style="p.es_duplicado ? 'color: #D64455;' : p.comprado_por_unergy ? 'color: #9a6700;' : 'color: #915BD8;'">
+                    <div class="font-mono font-semibold" :style="p.es_duplicado ? 'color: #9a6700;' : p.comprado_por_unergy ? 'color: #9a6700;' : 'color: #915BD8;'">
                       {{ p.month_mwh != null ? fmtMwh(p.month_mwh * p.pct_despacho) : '—' }}
                     </div>
                     <div style="color: #7a6e8a;">{{ (p.pct_despacho * 100).toFixed(0) }}%</div>
@@ -587,13 +587,14 @@
             >
               <span class="font-medium" style="color: #2C2039;">{{ p.nombre }}</span>
               <span v-if="p.es_duplicado" class="font-semibold px-1.5 py-0.5 rounded"
-                style="background: rgba(214,68,85,0.12); color: #D64455;"
-              >Dup.</span>
+                style="background: rgba(240,192,64,0.22); color: #9a6700;"
+                v-tooltip="'Compra en bolsa'"
+              >Bolsa</span>
               <span v-else-if="p.comprado_por_unergy" class="font-semibold px-1.5 py-0.5 rounded"
                 style="background: rgba(240,192,64,0.25); color: #9a6700;"
                 v-tooltip="p.contrato_compra_nombre || 'Contrato de compra'"
               >Compra</span>
-              <span class="font-mono" :style="p.es_duplicado ? 'color: #D64455;' : p.comprado_por_unergy ? 'color: #9a6700;' : 'color: #7a6e8a;'">
+              <span class="font-mono" :style="p.es_duplicado ? 'color: #9a6700;' : p.comprado_por_unergy ? 'color: #9a6700;' : 'color: #7a6e8a;'">
                 {{ p.month_mwh != null ? fmtMwh(p.month_mwh) : '—' }}
               </span>
             </div>
@@ -669,11 +670,11 @@
             </div>
             <div v-if="c.plantas.length" class="divide-y" style="border-color: rgba(44,32,57,0.05);">
               <div v-for="p in c.plantas" :key="p.id" class="px-4 py-2.5 flex items-center justify-between text-sm"
-                :style="p.es_duplicado ? 'background: rgba(214,68,85,0.04);' : ''">
+                :style="p.es_duplicado ? 'background: rgba(240,192,64,0.08);' : ''">
                 <div class="flex items-center gap-2">
                   <span class="font-medium" style="color: #2C2039;">{{ p.nombre }}</span>
-                  <span v-if="p.es_duplicado" class="text-[10px] font-semibold px-1.5 py-0.5 rounded"
-                    style="background: rgba(214,68,85,0.12); color: #D64455;">Exp. bolsa</span>
+                  <span v-if="p.es_duplicado" class="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded"
+                    style="background: rgba(240,192,64,0.22); color: #9a6700;" v-tooltip="'Compra en bolsa'"><i class="pi pi-shopping-cart" style="font-size: 9px;" />Compra bolsa</span>
                   <span v-if="p.codigo_sic" class="text-xs font-mono px-1.5 py-0.5 rounded" style="background: rgba(44,32,57,0.06); color: #7a6e8a;">{{ p.codigo_sic }}</span>
                   <span v-if="p.pct_despacho != null" class="text-xs font-mono" style="color: #915BD8;">{{ (p.pct_despacho * 100).toFixed(0) }}%</span>
                 </div>
@@ -899,9 +900,9 @@
                 <div class="text-[10px] font-semibold uppercase tracking-wide" style="color: #7a6e8a;">Energía proyectada</div>
                 <div class="font-mono text-sm font-bold mt-0.5" style="color: #2C2039;">{{ detalleCapa.res.genProy != null && detalleCapa.res.genProy > 0 ? fmtMwh(detalleCapa.res.genProy) : '—' }}</div>
               </div>
-              <div v-if="detalleCapa.res.genDup > 0" v-tooltip.bottom="'Misma generación de la planta puesta en contrato(s) duplicado(s) — exposición en bolsa'">
-                <div class="text-[10px] font-semibold uppercase tracking-wide" style="color: #D64455;">Energía duplicada (bolsa)</div>
-                <div class="font-mono text-sm font-bold mt-0.5" style="color: #D64455;">{{ fmtMwh(detalleCapa.res.genDup) }}</div>
+              <div v-if="detalleCapa.res.genDup > 0" v-tooltip.bottom="'De la energía entregada, esta parte se suministra con compra en bolsa (cuenta para el contrato, origen bolsa)'">
+                <div class="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide" style="color: #9a6700;"><i class="pi pi-shopping-cart" style="font-size: 9px;" />Compra en bolsa</div>
+                <div class="font-mono text-sm font-bold mt-0.5" style="color: #9a6700;">{{ fmtMwh(detalleCapa.res.genDup) }}</div>
               </div>
             </div>
           </div>
@@ -919,13 +920,13 @@
               </thead>
               <tbody>
                 <tr v-for="p in detalleCapa.plantas" :key="p.id" style="border-top: 1px solid rgba(44,32,57,0.06);">
-                  <td class="py-2 pr-2 font-medium" :style="p.es_duplicado ? 'color:#D64455' : p.comprado_por_unergy ? 'color:#9a6700' : 'color:#2C2039'">
+                  <td class="py-2 pr-2 font-medium" :style="p.es_duplicado ? 'color:#9a6700' : p.comprado_por_unergy ? 'color:#9a6700' : 'color:#2C2039'">
                     {{ p.nombre }}
-                    <span v-if="p.es_duplicado" class="ml-1 text-[10px] font-semibold px-1.5 py-0.5 rounded" style="background: rgba(214,68,85,0.12); color: #D64455;">Exp. bolsa</span>
+                    <span v-if="p.es_duplicado" class="ml-1 inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded" style="background: rgba(240,192,64,0.22); color: #9a6700;" v-tooltip="'Compra en bolsa'"><i class="pi pi-shopping-cart" style="font-size: 9px;" />Compra bolsa</span>
                     <span v-else-if="p.comprado_por_unergy" class="ml-1 text-[10px] font-semibold px-1.5 py-0.5 rounded" style="background: rgba(240,192,64,0.25); color: #9a6700;">Compra</span>
                   </td>
                   <td class="py-2 px-2 text-right font-mono text-xs" style="color: #7a6e8a;">{{ (p.pct_despacho * 100).toFixed(0) }}%</td>
-                  <td class="py-2 px-2 text-right font-mono font-semibold" :style="p.es_duplicado ? 'color:#D64455' : 'color:#2C2039'">{{ p.month_mwh != null ? fmtMwh(p.month_mwh * p.pct_despacho) : '—' }}</td>
+                  <td class="py-2 px-2 text-right font-mono font-semibold" :style="p.es_duplicado ? 'color:#9a6700' : 'color:#2C2039'">{{ p.month_mwh != null ? fmtMwh(p.month_mwh * p.pct_despacho) : '—' }}</td>
                   <td class="py-2 pl-2 text-right font-mono font-semibold" style="color: #915BD8;">
                     <template v-if="plantaProyMwh(p) != null">◆ {{ fmtMwh(plantaProyMwh(p)) }}</template>
                     <span v-else style="color: rgba(44,32,57,0.3);">—</span>
@@ -944,7 +945,7 @@
                 </tr>
                 <tr v-if="detalleCapa.res.genDup > 0">
                   <td colspan="2"></td>
-                  <td class="pt-1 text-right font-mono text-xs font-semibold" style="color: #D64455;">+ {{ fmtMwh(detalleCapa.res.genDup) }} exp. bolsa</td>
+                  <td class="pt-1 text-right font-mono text-xs font-semibold" style="color: #9a6700;">de ello, {{ fmtMwh(detalleCapa.res.genDup) }} compra en bolsa</td>
                   <td></td>
                 </tr>
               </tfoot>
@@ -994,17 +995,17 @@
               <tbody>
                 <tr v-for="(p, pi) in anualData.meses[selectedMonthIdx].plantas" :key="pi"
                   style="border-top: 1px solid rgba(44,32,57,0.06);"
-                  :style="p.es_duplicado ? 'background: rgba(214,68,85,0.04);' : ''"
+                  :style="p.es_duplicado ? 'background: rgba(240,192,64,0.08);' : ''"
                 >
                   <td class="py-2 pr-2 font-medium" style="color: #2C2039;">
                     {{ p.nombre }}
-                    <span v-if="p.es_duplicado" class="ml-1 text-[10px] font-semibold px-1.5 py-0.5 rounded" style="background: rgba(214,68,85,0.12); color: #D64455;">Exp. bolsa</span>
+                    <span v-if="p.es_duplicado" class="ml-1 inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded" style="background: rgba(240,192,64,0.22); color: #9a6700;" v-tooltip="'Compra en bolsa'"><i class="pi pi-shopping-cart" style="font-size: 9px;" />Compra bolsa</span>
                     <span v-if="p.contrato" class="ml-1 text-xs font-normal px-1.5 py-0.5 rounded" style="color: #915BD8; background: rgba(145,91,216,0.08);">{{ p.contrato }}</span>
                     <span v-if="p.dias_en_contrato && p.dias_mes && p.dias_en_contrato < p.dias_mes" class="ml-1 text-xs font-normal" style="color: #7a6e8a;">{{ p.dias_en_contrato }}/{{ p.dias_mes }} días</span>
                   </td>
                   <td class="py-2 px-2 text-right font-mono text-xs" style="color: #7a6e8a;">{{ (p.pct_despacho * 100).toFixed(0) }}%</td>
                   <td class="py-2 px-2 text-right font-mono" style="color: #2C2039;">{{ p.gen_planta_mwh !== null ? fmtMwh(p.gen_planta_mwh) : '—' }}</td>
-                  <td class="py-2 pl-2 text-right font-mono font-semibold" :style="p.es_duplicado ? 'color: #D64455;' : 'color: #915BD8;'">{{ p.gen_contrato_mwh !== null ? fmtMwh(p.gen_contrato_mwh) : '—' }}</td>
+                  <td class="py-2 pl-2 text-right font-mono font-semibold" :style="p.es_duplicado ? 'color: #9a6700;' : 'color: #915BD8;'">{{ p.gen_contrato_mwh !== null ? fmtMwh(p.gen_contrato_mwh) : '—' }}</td>
                 </tr>
               </tbody>
               <tfoot>
@@ -1013,8 +1014,8 @@
                   <td class="pt-3 text-right font-mono font-bold" style="color: #2C2039;">{{ fmtMwh(genVal(anualData.meses[selectedMonthIdx])) }}</td>
                 </tr>
                 <tr v-if="anualData.meses[selectedMonthIdx].exposicion_bolsa_duplicados_mwh">
-                  <td colspan="3" class="pt-1 text-sm font-semibold" style="color: #D64455;">Exposición bolsa (duplicados)</td>
-                  <td class="pt-1 text-right font-mono font-bold" style="color: #D64455;">{{ fmtMwh(anualData.meses[selectedMonthIdx].exposicion_bolsa_duplicados_mwh) }}</td>
+                  <td colspan="3" class="pt-1 text-sm font-semibold" style="color: #9a6700;">de ello, compra en bolsa</td>
+                  <td class="pt-1 text-right font-mono font-bold" style="color: #9a6700;">{{ fmtMwh(anualData.meses[selectedMonthIdx].exposicion_bolsa_duplicados_mwh) }}</td>
                 </tr>
               </tfoot>
             </table>
@@ -1442,11 +1443,12 @@ const simResults = computed(() => {
     for (const p of plantas) {
       if (p.month_mwh == null) continue
       const mwh = p.month_mwh * p.pct_despacho
+      // Todo el suministro cuenta para el cumplimiento (real o compra en bolsa);
+      // genDup es el subconjunto cuyo origen es bolsa (informativo).
+      genReal += mwh
       if (p.es_duplicado) genDup += mwh
-      else genReal += mwh
       if (esActual && p.month_mwh_proyectado != null) {
-        const mwhProy = p.month_mwh_proyectado * p.pct_despacho
-        if (!p.es_duplicado) genProy += mwhProy
+        genProy += p.month_mwh_proyectado * p.pct_despacho
       }
     }
     const gen = genReal
@@ -1484,7 +1486,10 @@ const simResults = computed(() => {
       minPct: hasMin ? clampPct(min) : 0,
       maxPct: hasMax ? clampPct(max) : 100,
       measurePct: clampPct(gen),
-      dupW: genDup > 0 ? Math.max(0, clampPct(gen + genDup) - clampPct(gen)) : 0,
+      // Tramo de "compra en bolsa" DENTRO de la barra entregada (al final): de
+      // (gen - genDup) hasta gen. Se pinta amarillo sobre la barra de estado.
+      bolsaStartPct: genDup > 0 ? clampPct(Math.max(0, gen - genDup)) : null,
+      dupW: genDup > 0 ? Math.max(0, clampPct(gen) - clampPct(Math.max(0, gen - genDup))) : 0,
       proyPct: (esActual && genProy > 0) ? clampPct(genProy) : null,
     }
 
@@ -1659,9 +1664,10 @@ const detalleCapa = computed(() => {
   return { c, plantas: simAssignments.value[c.id] || [], res: simResults.value[c.id] || {} }
 })
 
-// Proyección de cierre del mes por planta (solo mes en curso, no duplicados)
+// Proyección de cierre del mes por planta (mes en curso; incluye duplicados,
+// porque la compra en bolsa también cubre el contrato).
 function plantaProyMwh(p) {
-  return (esMesActualSim.value && !p.es_duplicado && p.month_mwh_proyectado != null)
+  return (esMesActualSim.value && p.month_mwh_proyectado != null)
     ? p.month_mwh_proyectado * p.pct_despacho
     : null
 }
@@ -1787,11 +1793,11 @@ function _renderCapaCanvas(c) {
     ['ENERGÍA MÍNIMA', res.min !== null && res.min !== undefined ? fmtMwh(res.min) : '—', DARK],
     ['ENERGÍA PROYECTADA', (res.genProy != null && res.genProy > 0) ? fmtMwh(res.genProy) : '—', DARK],
   ]
-  if (res.genDup > 0) metrics.push(['ENERGÍA DUPLICADA (BOLSA)', fmtMwh(res.genDup), RED])
+  if (res.genDup > 0) metrics.push(['COMPRA EN BOLSA', fmtMwh(res.genDup), GOLD])
   const colW = (W - padX * 2) / metrics.length
   metrics.forEach(([lbl, val, valColor], i) => {
     const x = padX + i * colW
-    ctx.fillStyle = valColor === RED ? RED : GREY
+    ctx.fillStyle = valColor === DARK ? GREY : valColor
     ctx.font = 'bold 9px Inter, Arial, sans-serif'
     ctx.fillText(lbl, x, 100)
     ctx.fillStyle = valColor
@@ -1836,7 +1842,7 @@ function _renderCapaCanvas(c) {
       ctx.fillRect(padX - 8, yTop, W - padX * 2 + 16, rowH)
     }
     const mwh = p.month_mwh != null ? p.month_mwh * p.pct_despacho : null
-    const colName = p.es_duplicado ? RED : p.comprado_por_unergy ? GOLD : DARK
+    const colName = p.es_duplicado ? GOLD : p.comprado_por_unergy ? GOLD : DARK
     ctx.textBaseline = 'middle'
     // Nombre
     ctx.fillStyle = colName
@@ -1847,7 +1853,7 @@ function _renderCapaCanvas(c) {
     // Tag duplicado / compra
     const nx = padX + ctx.measureText(nombre).width + 8
     if (p.es_duplicado) {
-      _dibujarPill(ctx, nx, yMid - 9, 'Exp. bolsa', 'rgba(214,68,85,0.12)', RED, 'bold 10px Inter, Arial, sans-serif')
+      _dibujarPill(ctx, nx, yMid - 9, 'Compra bolsa', 'rgba(240,192,64,0.22)', GOLD, 'bold 10px Inter, Arial, sans-serif')
     } else if (p.comprado_por_unergy) {
       _dibujarPill(ctx, nx, yMid - 9, 'Compra', 'rgba(240,192,64,0.25)', GOLD, 'bold 10px Inter, Arial, sans-serif')
     }
@@ -1860,8 +1866,8 @@ function _renderCapaCanvas(c) {
     ctx.fillStyle = colName
     ctx.font = 'bold 13px Inter, Arial, sans-serif'
     ctx.fillText(mwh != null ? fmtMwh(mwh) : '—', colEneR, yMid)
-    // Proyección cierre del mes (solo mes en curso y plantas no duplicadas)
-    const mwhProy = (esActual && !p.es_duplicado && p.month_mwh_proyectado != null)
+    // Proyección cierre del mes (mes en curso; incluye duplicados — bolsa también cubre)
+    const mwhProy = (esActual && p.month_mwh_proyectado != null)
       ? p.month_mwh_proyectado * p.pct_despacho : null
     if (mwhProy != null) {
       ctx.fillStyle = PURPLE
@@ -1891,9 +1897,9 @@ function _renderCapaCanvas(c) {
   ctx.font = 'bold 16px Inter, Arial, sans-serif'
   ctx.fillText(fmtMwh(res.gen), colEneR, yTotalMid)
   if (res.genDup > 0) {
-    ctx.fillStyle = RED
+    ctx.fillStyle = GOLD
     ctx.font = 'bold 11px Inter, Arial, sans-serif'
-    ctx.fillText(`+ ${fmtMwh(res.genDup)} exposición bolsa`, colEneR, yTotalMid + 17)
+    ctx.fillText(`de ello, ${fmtMwh(res.genDup)} compra en bolsa`, colEneR, yTotalMid + 17)
   }
   // Total proyección cierre del mes
   ctx.fillStyle = PURPLE

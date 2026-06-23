@@ -110,11 +110,11 @@
           </template>
         </Column>
 
-        <Column header="Dup." style="width:55px;">
+        <Column header="Bolsa" style="width:60px;">
           <template #body="{ data }">
-            <span v-if="data.es_duplicado" class="text-[10px] font-semibold px-1.5 py-0.5 rounded"
-              style="background: rgba(214,68,85,0.12); color: #D64455;"
-              v-tooltip.top="'Duplicado — exposición en bolsa'">Bolsa</span>
+            <span v-if="data.es_duplicado" class="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded"
+              style="background: rgba(240,192,64,0.22); color: #9a6700;"
+              v-tooltip.top="'Compra en bolsa — cuenta para el contrato, origen bolsa'"><i class="pi pi-shopping-cart" style="font-size:9px;" />Bolsa</span>
           </template>
         </Column>
 
@@ -266,11 +266,11 @@
           </div>
           <div class="flex items-center gap-2 pb-1">
             <Checkbox v-model="form.es_duplicado" :binary="true" inputId="es_duplicado" />
-            <label for="es_duplicado" class="text-xs font-medium cursor-pointer" style="color:#D64455;">
-              Duplicado
+            <label for="es_duplicado" class="text-xs font-medium cursor-pointer" style="color:#9a6700;">
+              Compra en bolsa
             </label>
             <i class="pi pi-info-circle text-xs cursor-help" style="color:#9b89b5;"
-              v-tooltip.top="'Marcar si esta planta ya está en otro contrato. La generación se contará como exposición en bolsa, no como cumplimiento.'" />
+              v-tooltip.top="'Marcar si esta planta ya está en otro contrato. El suministro SÍ cuenta para el cumplimiento de este contrato; su origen se marca como compra en bolsa.'" />
           </div>
         </div>
 
