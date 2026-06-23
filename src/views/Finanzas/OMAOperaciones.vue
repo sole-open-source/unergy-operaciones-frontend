@@ -269,10 +269,14 @@ import DataTable     from 'primevue/datatable'
 import Column        from 'primevue/column'
 import InputNumber   from 'primevue/inputnumber'
 import InputText     from 'primevue/inputtext'
+import Popover       from 'primevue/popover'
 import { useToast }  from 'primevue/usetoast'
 import api           from '@/api/client'
 
 const toast = useToast()
+
+// Autofocus para el input de edición inline (expuesto como v-focus)
+const vFocus = { mounted: (el) => el.focus() }
 
 const hoy = new Date()
 const periodoOffset = ref(0)
@@ -321,6 +325,13 @@ const guardandoIPC  = ref(false)
 const notificacionIPC = ref(null)
 const ipcForm = reactive({ año: new Date().getFullYear(), tasaPct: null, fuente: 'DANE' })
 
+// ── Edición inline del Valor a Facturar ──────────────────────────────────────
+const overrides   = reactive({})   // { [contrato_id]: { valor:Number|null, dirty:Boolean } }
+const editando    = ref(null)      // contrato_id de la celda en modo input
+const inputBuffer = ref('')        // texto crudo del input activo
+const infoPopover = ref(null)      // ref al <Popover>
+const filaInfo    = ref(null)      // fila cuyo desglose se muestra
+
 const filasHabilitadas   = computed(() => filas.value.filter(f => f.habilitado))
 const filasSeleccionadas = computed(() => filasHabilitadas.value.filter(f => seleccion[f.contrato_id]).length)
 const todosMarcados      = computed(() =>
@@ -329,8 +340,8 @@ const todosMarcados      = computed(() =>
 )
 const totalSeleccionado = computed(() =>
   filas.value
-    .filter(f => f.habilitado && seleccion[f.contrato_id] && f.valor_a_facturar)
-    .reduce((s, f) => s + f.valor_a_facturar, 0)
+    .filter(f => f.habilitado && seleccion[f.contrato_id])
+    .reduce((s, f) => s + (valorEfectivo(f) || 0), 0)
 )
 
 function formatCOP(v) {
@@ -338,8 +349,55 @@ function formatCOP(v) {
   return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(v)
 }
 
+function parseCOP(str) {
+  if (str == null) return null
+  const limpio = String(str).replace(/[^\d]/g, '')   // quita $, puntos de miles, espacios
+  if (limpio === '') return null
+  const n = Number(limpio)
+  return Number.isFinite(n) ? n : null
+}
+
+// Valor a mostrar/guardar: override local dirty → valor del backend (ya resuelto)
+function valorEfectivo(fila) {
+  const ov = overrides[fila.contrato_id]
+  if (ov && ov.dirty) return ov.valor
+  return fila.valor_a_facturar
+}
+
+// True si la fila tiene override (local dirty o persistido en backend)
+function esManual(fila) {
+  const ov = overrides[fila.contrato_id]
+  if (ov && ov.dirty) return ov.valor != null
+  return !!fila.editado_manual
+}
+
 function toggleTodos(e) {
   filasHabilitadas.value.forEach(f => { seleccion[f.contrato_id] = e.target.checked })
+}
+
+function iniciarEdicion(fila) {
+  if (!fila.habilitado) return
+  editando.value = fila.contrato_id
+  inputBuffer.value = String(valorEfectivo(fila) ?? '')
+}
+
+function confirmarEdicion(fila) {
+  if (editando.value !== fila.contrato_id) return
+  const v = parseCOP(inputBuffer.value)
+  if (v != null) {
+    overrides[fila.contrato_id] = { valor: v, dirty: true }
+  }
+  editando.value = null
+}
+
+function cancelarEdicion() {
+  editando.value = null   // descarta el buffer; restaura el valor mostrado
+}
+
+function revertirCalculado(fila) {
+  // marca para enviar valor_manual:null → vuelve al valor calculado por IPC
+  overrides[fila.contrato_id] = { valor: null, dirty: true }
+  infoPopover.value?.hide()
 }
 
 async function cargarDatos() {
@@ -367,11 +425,20 @@ async function cargarDatos() {
 async function guardarSeleccion() {
   guardando.value = true
   try {
-    const items = filas.value.map(f => ({
-      contrato_id: f.contrato_id,
-      incluido: !!(seleccion[f.contrato_id] && f.habilitado),
-    }))
+    const items = filas.value.map(f => {
+      const ov = overrides[f.contrato_id]
+      let valor_manual = null
+      if (ov && ov.dirty) valor_manual = ov.valor          // override local (o null si revertido)
+      else if (f.editado_manual) valor_manual = f.valor_a_facturar  // conserva override persistido
+      return {
+        contrato_id: f.contrato_id,
+        incluido: !!(seleccion[f.contrato_id] && f.habilitado),
+        valor_manual,
+      }
+    })
     await api.post(`/om/seleccion/${periodoActual.value}`, { items })
+    Object.keys(overrides).forEach(k => delete overrides[k])
+    await cargarDatos()
     toast.add({ severity: 'success', summary: 'Selección guardada', life: 2500 })
   } catch {
     toast.add({ severity: 'error', summary: 'Error al guardar', life: 3000 })
