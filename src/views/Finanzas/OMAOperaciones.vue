@@ -241,6 +241,60 @@
       </a>
     </div>
 
+    <!-- ── Popover: desglose del cálculo ──────────────────────────────── -->
+    <Popover ref="infoPopover">
+      <div v-if="filaInfo" class="text-xs" style="min-width:280px; color:#2C2039">
+        <p class="font-semibold mb-2 flex items-center gap-1.5" style="color:#7c3aed">
+          <i class="pi pi-chart-bar text-[11px]" /> Cálculo del Valor a Facturar
+        </p>
+        <div class="space-y-1 font-mono">
+          <div class="flex justify-between gap-6">
+            <span class="text-gray-500">Valor Base Anual</span>
+            <span>{{ formatCOP(filaInfo.valor_base_anual) }}</span>
+          </div>
+          <div class="flex justify-between gap-6">
+            <span class="text-gray-500">÷ 12 meses</span>
+            <span>{{ formatCOP(filaInfo.valor_base_anual / 12) }}</span>
+          </div>
+          <div class="flex justify-between gap-6">
+            <span class="text-gray-500">Índice IPC aplicado</span>
+            <span>× {{ filaInfo.factor_acumulado.toFixed(5) }}</span>
+          </div>
+          <div class="flex justify-between gap-6">
+            <span class="text-gray-500">IPC acumulado período</span>
+            <span>{{ ipcAcumPct(filaInfo) }}%</span>
+          </div>
+          <div v-if="filaInfo.prorrateo_label && filaInfo.prorrateo_label !== 'Completo'"
+            class="flex justify-between gap-6">
+            <span class="text-gray-500">Prorrateo</span>
+            <span>{{ filaInfo.prorrateo_label }}</span>
+          </div>
+        </div>
+        <div class="border-t mt-2 pt-2">
+          <div class="flex justify-between gap-6 font-semibold">
+            <span>Valor a Facturar</span>
+            <span style="color:#7c3aed">{{ formatCOP(valorEfectivo(filaInfo)) }}</span>
+          </div>
+        </div>
+        <!-- Aviso de modificación manual -->
+        <div v-if="esManual(filaInfo)"
+          class="mt-2 pt-2 border-t rounded-md p-2 text-[11px] flex items-start gap-1.5"
+          style="background:#fffbeb; color:#92400e">
+          <i class="pi pi-exclamation-triangle text-[11px] mt-0.5" style="color:#d97706" />
+          <div class="flex-1">
+            <p>⚠️ Valor modificado manualmente.</p>
+            <p class="mt-0.5">Original calculado:
+              <strong>{{ formatCOP(filaInfo.valor_calculado) }}</strong>
+            </p>
+            <button type="button" class="mt-1 underline" style="color:#915BD8"
+              @click="revertirCalculado(filaInfo)">
+              Revertir a calculado
+            </button>
+          </div>
+        </div>
+      </div>
+    </Popover>
+
     <!-- ── Dialog administración IPC ─────────────────────────────────── -->
     <Dialog v-model:visible="showIPCDialog" modal header="Tasas IPC" :style="{ width: '420px' }">
       <div class="space-y-3 pt-1">
@@ -436,6 +490,10 @@ function revertirCalculado(fila) {
 function mostrarInfo(ev, fila) {
   filaInfo.value = fila
   infoPopover.value?.show(ev)
+}
+
+function ipcAcumPct(fila) {
+  return ((fila.factor_acumulado - 1) * 100).toFixed(3)
 }
 
 async function cargarDatos() {
