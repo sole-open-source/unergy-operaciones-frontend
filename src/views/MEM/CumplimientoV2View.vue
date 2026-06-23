@@ -405,6 +405,14 @@
                 </div>
                 <div class="flex items-center gap-0.5 flex-shrink-0">
                   <button
+                    @click.stop="abrirDetalleCapa(c)"
+                    class="rounded-md p-1 transition-colors hover:bg-purple-50"
+                    style="color: #915BD8;"
+                    v-tooltip="'Ver detalle de la capa'"
+                  >
+                    <i class="pi pi-window-maximize text-xs" />
+                  </button>
+                  <button
                     @click.stop="copiarImagenCapa(c)"
                     class="rounded-md p-1 transition-colors hover:bg-purple-50"
                     :style="copiadoCapaId === c.id ? 'color: #2e7d32;' : 'color: #915BD8;'"
@@ -849,6 +857,105 @@
 
       </template>
     </div>
+
+    <!-- Floating: detalle de la capa (misma información que la imagen) -->
+    <Teleport to="body">
+      <template v-if="detalleCapa">
+        <div class="fixed inset-0" style="z-index: 60; background: rgba(44,32,57,0.28);" @click="cerrarDetalleCapa" />
+        <div
+          class="fixed shadow-2xl"
+          style="z-index: 61; background: #ffffff; width: 700px; max-width: 94vw; max-height: 88vh; overflow-y: auto; border-radius: 16px; border: 1px solid rgba(44,32,57,0.12); top: 50%; left: 50%; transform: translate(-50%, -50%);"
+          @click.stop
+        >
+          <div style="height: 6px; background: #915BD8; border-radius: 16px 16px 0 0;" />
+          <!-- Header -->
+          <div class="px-6 pt-4 pb-3" style="border-bottom: 1px solid rgba(44,32,57,0.08);">
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <div class="font-bold text-lg truncate" style="color: #2C2039;">{{ detalleCapa.c.nombre }}</div>
+                <div class="text-sm truncate" style="color: #7a6e8a;">{{ detalleCapa.c.comprador_nombre }}</div>
+                <span class="mt-1.5 inline-flex items-center gap-1.5 text-xs font-semibold px-2 py-0.5 rounded-full" style="background: rgba(145,91,216,0.10); color: #915BD8;">
+                  <i class="pi pi-calendar text-[10px]" /> Período de consulta: {{ periodoSimLabel }}
+                </span>
+              </div>
+              <div class="flex items-center gap-2 flex-shrink-0">
+                <span v-if="detalleCapa.res.pct != null && detalleCapa.res.pct !== undefined" class="text-xs font-semibold px-2 py-0.5 rounded-full" :style="estadoBadge(detalleCapa.res.estado)">{{ Math.round(detalleCapa.res.pct) }}%</span>
+                <span class="text-xs font-semibold px-2 py-0.5 rounded-full" :style="estadoBadge(detalleCapa.res.estado)">{{ estadoLabel(detalleCapa.res.estado) }}</span>
+                <button class="rounded-lg p-1.5 transition-colors hover:bg-gray-100" style="color: #7a6e8a;" @click="cerrarDetalleCapa"><i class="pi pi-times text-sm" /></button>
+              </div>
+            </div>
+            <!-- Métricas -->
+            <div class="grid grid-cols-3 gap-3 mt-3">
+              <div>
+                <div class="text-[10px] font-semibold uppercase tracking-wide" style="color: #7a6e8a;">Energía entregada</div>
+                <div class="font-mono text-sm font-bold mt-0.5" style="color: #2C2039;">{{ fmtMwh(detalleCapa.res.gen) }}</div>
+              </div>
+              <div>
+                <div class="text-[10px] font-semibold uppercase tracking-wide" style="color: #7a6e8a;">Energía mínima</div>
+                <div class="font-mono text-sm font-bold mt-0.5" style="color: #2C2039;">{{ detalleCapa.res.min != null ? fmtMwh(detalleCapa.res.min) : '—' }}</div>
+              </div>
+              <div>
+                <div class="text-[10px] font-semibold uppercase tracking-wide" style="color: #7a6e8a;">Energía proyectada</div>
+                <div class="font-mono text-sm font-bold mt-0.5" style="color: #2C2039;">{{ detalleCapa.res.genProy != null && detalleCapa.res.genProy > 0 ? fmtMwh(detalleCapa.res.genProy) : '—' }}</div>
+              </div>
+            </div>
+          </div>
+          <!-- Tabla -->
+          <div class="px-6 py-4">
+            <p class="text-xs font-bold uppercase tracking-widest mb-2" style="color: #915BD8;">{{ detalleCapa.plantas.length }} proyecto{{ detalleCapa.plantas.length === 1 ? '' : 's' }} en el contrato</p>
+            <table class="w-full text-sm">
+              <thead>
+                <tr style="color: #7a6e8a; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;">
+                  <th class="text-left pb-2">Proyecto</th>
+                  <th class="text-right pb-2">% Despacho</th>
+                  <th class="text-right pb-2">Energía generada</th>
+                  <th class="text-right pb-2">Proyección cierre del mes</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="p in detalleCapa.plantas" :key="p.id" style="border-top: 1px solid rgba(44,32,57,0.06);">
+                  <td class="py-2 pr-2 font-medium" :style="p.es_duplicado ? 'color:#D64455' : p.comprado_por_unergy ? 'color:#9a6700' : 'color:#2C2039'">
+                    {{ p.nombre }}
+                    <span v-if="p.es_duplicado" class="ml-1 text-[10px] font-semibold px-1.5 py-0.5 rounded" style="background: rgba(214,68,85,0.12); color: #D64455;">Exp. bolsa</span>
+                    <span v-else-if="p.comprado_por_unergy" class="ml-1 text-[10px] font-semibold px-1.5 py-0.5 rounded" style="background: rgba(240,192,64,0.25); color: #9a6700;">Compra</span>
+                  </td>
+                  <td class="py-2 px-2 text-right font-mono text-xs" style="color: #7a6e8a;">{{ (p.pct_despacho * 100).toFixed(0) }}%</td>
+                  <td class="py-2 px-2 text-right font-mono font-semibold" :style="p.es_duplicado ? 'color:#D64455' : 'color:#2C2039'">{{ p.month_mwh != null ? fmtMwh(p.month_mwh * p.pct_despacho) : '—' }}</td>
+                  <td class="py-2 pl-2 text-right font-mono font-semibold" style="color: #915BD8;">
+                    <template v-if="plantaProyMwh(p) != null">◆ {{ fmtMwh(plantaProyMwh(p)) }}</template>
+                    <span v-else style="color: rgba(44,32,57,0.3);">—</span>
+                  </td>
+                </tr>
+                <tr v-if="!detalleCapa.plantas.length">
+                  <td colspan="4" class="py-6 text-center text-sm" style="color: rgba(44,32,57,0.35);">Sin proyectos asignados</td>
+                </tr>
+              </tbody>
+              <tfoot>
+                <tr style="border-top: 2px solid rgba(44,32,57,0.12);">
+                  <td class="pt-3 text-sm font-bold" style="color: #2C2039;">Total · {{ detalleCapa.plantas.length }} proyecto{{ detalleCapa.plantas.length === 1 ? '' : 's' }}</td>
+                  <td></td>
+                  <td class="pt-3 text-right font-mono font-bold text-base" style="color: #915BD8;">{{ fmtMwh(detalleCapa.res.gen) }}</td>
+                  <td class="pt-3 text-right font-mono font-bold text-base" style="color: #915BD8;">{{ detalleCapa.res.genProy != null && detalleCapa.res.genProy > 0 ? fmtMwh(detalleCapa.res.genProy) : '—' }}</td>
+                </tr>
+                <tr v-if="detalleCapa.res.genDup > 0">
+                  <td colspan="2"></td>
+                  <td class="pt-1 text-right font-mono text-xs font-semibold" style="color: #D64455;">+ {{ fmtMwh(detalleCapa.res.genDup) }} exp. bolsa</td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            </table>
+            <!-- Veredicto -->
+            <div class="mt-4 flex items-start gap-2.5 rounded-xl px-4 py-3" :style="{ background: veredictoCapa(detalleCapa.res).bg }">
+              <i class="pi mt-0.5" :class="veredictoCapa(detalleCapa.res).icon" :style="{ color: veredictoCapa(detalleCapa.res).fg }" />
+              <div>
+                <div class="font-bold text-sm" :style="{ color: veredictoCapa(detalleCapa.res).fg }">{{ veredictoCapa(detalleCapa.res).txt }}</div>
+                <div v-if="veredictoCapa(detalleCapa.res).sub" class="text-xs mt-0.5" style="color: #7a6e8a;">{{ veredictoCapa(detalleCapa.res).sub }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </template>
+    </Teleport>
 
     <!-- Floating month breakdown -->
     <Teleport to="body">
@@ -1532,6 +1639,50 @@ function estadoLabel(estado) {
 // cantidades (energía por planta + agregados).
 const copiadoCapaId = ref(null)
 
+// ── Panel flotante "ver detalle de la capa" (misma info que la imagen) ────────
+const detalleCapaId = ref(null)
+const esMesActualSim = computed(() => !!(simData.value && simData.value.es_mes_actual))
+const periodoSimLabel = computed(() => `${MESES[simMonth.value - 1]} ${simYear.value}`)
+
+function abrirDetalleCapa(c) { detalleCapaId.value = c.id }
+function cerrarDetalleCapa() { detalleCapaId.value = null }
+
+const detalleCapa = computed(() => {
+  if (detalleCapaId.value == null) return null
+  const c = allContratos.value.find(x => x.id === detalleCapaId.value)
+  if (!c) return null
+  return { c, plantas: simAssignments.value[c.id] || [], res: simResults.value[c.id] || {} }
+})
+
+// Proyección de cierre del mes por planta (solo mes en curso, no duplicados)
+function plantaProyMwh(p) {
+  return (esMesActualSim.value && !p.es_duplicado && p.month_mwh_proyectado != null)
+    ? p.month_mwh_proyectado * p.pct_despacho
+    : null
+}
+
+// Veredicto de riesgo / probabilidad (proyección vs mínimo) — espeja la imagen
+function veredictoCapa(res) {
+  const minDef = res.min != null
+  const proyOk = esMesActualSim.value && res.genProy != null && res.genProy > 0
+  if (minDef && proyOk) {
+    if (res.genProy >= res.min) {
+      return { icon: 'pi-check-circle', txt: 'Probabilidad de cumplimiento alta',
+        sub: `Proyección ${fmtMwh(res.genProy)} ≥ mínimo ${fmtMwh(res.min)}`,
+        bg: 'rgba(46,125,50,0.10)', fg: '#2e7d32' }
+    }
+    return { icon: 'pi-exclamation-triangle', txt: 'Riesgo de incumplimiento',
+      sub: `Proyección ${fmtMwh(res.genProy)} < mínimo ${fmtMwh(res.min)}`,
+      bg: 'rgba(214,68,85,0.10)', fg: '#D64455' }
+  }
+  if (minDef) {
+    return { icon: 'pi-minus-circle', txt: 'Sin proyección del mes para evaluar',
+      sub: `Mínimo ${fmtMwh(res.min)}`, bg: 'rgba(44,32,57,0.05)', fg: '#7a6e8a' }
+  }
+  return { icon: 'pi-minus-circle', txt: 'Contrato sin energía mínima definida',
+    sub: '', bg: 'rgba(44,32,57,0.05)', fg: '#7a6e8a' }
+}
+
 function _estadoTextoPlano(estado) {
   return estado === 'ok' ? 'En rango'
        : estado === 'deficit' ? 'Déficit'
@@ -1594,6 +1745,9 @@ function _renderCapaCanvas(c) {
   ctx.fillStyle = GREY
   ctx.font = '13px Inter, Arial, sans-serif'
   ctx.fillText(_truncarTexto(ctx, c.comprador_nombre || '', W - padX * 2 - 150), padX, 64)
+  ctx.fillStyle = PURPLE
+  ctx.font = 'bold 11px Inter, Arial, sans-serif'
+  ctx.fillText(`Período de consulta: ${MESES[simMonth.value - 1]} ${simYear.value}`, padX, 84)
 
   // Pills estado + % (arriba a la derecha)
   const estado = res.estado || 'sin_compromisos'
