@@ -405,6 +405,14 @@
                 </div>
                 <div class="flex items-center gap-0.5 flex-shrink-0">
                   <button
+                    @click.stop="copiarImagenCapa(c)"
+                    class="rounded-md p-1 transition-colors hover:bg-purple-50"
+                    :style="copiadoCapaId === c.id ? 'color: #2e7d32;' : 'color: #915BD8;'"
+                    v-tooltip="copiadoCapaId === c.id ? '¡Imagen copiada!' : 'Copiar imagen de la capa'"
+                  >
+                    <i class="pi text-xs" :class="copiadoCapaId === c.id ? 'pi-check' : 'pi-image'" />
+                  </button>
+                  <button
                     v-if="c._ficticio"
                     @click.stop="eliminarNuevo(c.id)"
                     class="rounded-md p-1 transition-colors hover:bg-red-50"
@@ -1515,6 +1523,248 @@ function estadoLabel(estado) {
        : estado === 'deficit'   ? '↓ Déficit'
        : estado === 'excedente' ? '↑ Excedente'
        : '— Sin datos'
+}
+
+// ── Copiar imagen de una capa (contrato + sus proyectos) ──────────────────────
+// Renderiza la capa a un PNG con Canvas (sin dependencias) y lo copia al
+// portapapeles. Si el navegador no permite escribir imágenes al portapapeles,
+// cae a descargar el PNG. Muestra el total de proyectos del contrato y las
+// cantidades (energía por planta + agregados).
+const copiadoCapaId = ref(null)
+
+function _estadoTextoPlano(estado) {
+  return estado === 'ok' ? 'En rango'
+       : estado === 'deficit' ? 'Déficit'
+       : estado === 'excedente' ? 'Excedente'
+       : 'Sin datos'
+}
+
+function _truncarTexto(ctx, texto, maxW) {
+  if (ctx.measureText(texto).width <= maxW) return texto
+  let t = texto
+  while (t.length > 1 && ctx.measureText(t + '…').width > maxW) t = t.slice(0, -1)
+  return t + '…'
+}
+
+function _dibujarPill(ctx, x, y, texto, bg, fg, font) {
+  ctx.font = font
+  const padX = 9, h = 21
+  const w = ctx.measureText(texto).width + padX * 2
+  const r = h / 2
+  ctx.fillStyle = bg
+  ctx.beginPath()
+  ctx.roundRect(x, y, w, h, r)
+  ctx.fill()
+  ctx.fillStyle = fg
+  ctx.textBaseline = 'middle'
+  ctx.fillText(texto, x + padX, y + h / 2 + 0.5)
+  return w
+}
+
+function _renderCapaCanvas(c) {
+  const plantas = simAssignments.value[c.id] || []
+  const res = simResults.value[c.id] || {}
+
+  const DARK = '#2C2039', GREY = '#7a6e8a', PURPLE = '#915BD8'
+  const RED = '#D64455', GOLD = '#9a6700'
+  const scale = 2
+  const W = 760, padX = 36
+  const headerH = 156, tableHeadH = 32, rowH = 36, totalH = 46, footerH = 50
+  const bodyTop = headerH + tableHeadH
+  const H = bodyTop + Math.max(plantas.length, 1) * rowH + totalH + footerH
+
+  const canvas = document.createElement('canvas')
+  canvas.width = W * scale
+  canvas.height = H * scale
+  const ctx = canvas.getContext('2d')
+  ctx.scale(scale, scale)
+  ctx.textBaseline = 'alphabetic'
+
+  // Fondo + barra de acento
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(0, 0, W, H)
+  ctx.fillStyle = PURPLE
+  ctx.fillRect(0, 0, W, 6)
+
+  // ── Header: nombre + comprador ──
+  ctx.fillStyle = DARK
+  ctx.font = 'bold 23px Inter, Arial, sans-serif'
+  ctx.fillText(_truncarTexto(ctx, c.nombre || 'Contrato', W - padX * 2 - 150), padX, 44)
+  ctx.fillStyle = GREY
+  ctx.font = '13px Inter, Arial, sans-serif'
+  ctx.fillText(_truncarTexto(ctx, c.comprador_nombre || '', W - padX * 2 - 150), padX, 64)
+
+  // Pills estado + % (arriba a la derecha)
+  const estado = res.estado || 'sin_compromisos'
+  const badgeBg = estado === 'ok' ? 'rgba(46,125,50,0.12)' : estado === 'deficit' ? 'rgba(214,68,85,0.12)'
+                : estado === 'excedente' ? 'rgba(20,184,166,0.16)' : 'rgba(44,32,57,0.06)'
+  const badgeFg = estado === 'ok' ? '#2e7d32' : estado === 'deficit' ? RED
+                : estado === 'excedente' ? '#0F766E' : GREY
+  ctx.textBaseline = 'middle'
+  const pctTxt = (res.pct !== null && res.pct !== undefined) ? Math.round(res.pct) + '%' : null
+  let pillX = W - padX
+  const f = 'bold 12px Inter, Arial, sans-serif'
+  // se dibujan de derecha a izquierda
+  if (pctTxt) {
+    ctx.font = f
+    const w = ctx.measureText(pctTxt).width + 18
+    pillX -= w
+    _dibujarPill(ctx, pillX, 32, pctTxt, badgeBg, badgeFg, f)
+    pillX -= 8
+  }
+  {
+    const lbl = _estadoTextoPlano(estado)
+    ctx.font = f
+    const w = ctx.measureText(lbl).width + 18
+    pillX -= w
+    _dibujarPill(ctx, pillX, 32, lbl, badgeBg, badgeFg, f)
+  }
+  ctx.textBaseline = 'alphabetic'
+
+  // ── Métricas (3 columnas) ──
+  const metrics = [
+    ['ENERGÍA ENTREGADA', fmtMwh(res.gen)],
+    ['ENERGÍA MÍNIMA', res.min !== null && res.min !== undefined ? fmtMwh(res.min) : '—'],
+    ['ENERGÍA PROYECTADA', (res.genProy != null && res.genProy > 0) ? fmtMwh(res.genProy) : '—'],
+  ]
+  const colW = (W - padX * 2) / 3
+  metrics.forEach(([lbl, val], i) => {
+    const x = padX + i * colW
+    ctx.fillStyle = GREY
+    ctx.font = 'bold 10px Inter, Arial, sans-serif'
+    ctx.fillText(lbl, x, 100)
+    ctx.fillStyle = DARK
+    ctx.font = 'bold 16px Inter, Arial, sans-serif'
+    ctx.fillText(val, x, 120)
+  })
+
+  // Línea divisoria + "N proyectos"
+  ctx.strokeStyle = 'rgba(44,32,57,0.10)'
+  ctx.lineWidth = 1
+  ctx.beginPath(); ctx.moveTo(padX, 138); ctx.lineTo(W - padX, 138); ctx.stroke()
+  ctx.fillStyle = PURPLE
+  ctx.font = 'bold 12px Inter, Arial, sans-serif'
+  ctx.fillText(`${plantas.length} proyecto${plantas.length === 1 ? '' : 's'} en el contrato`, padX, headerH - 4)
+
+  // ── Cabecera de tabla ──
+  const colPctR = W - padX - 150
+  const colEneR = W - padX
+  const yHead = headerH + 20
+  ctx.fillStyle = GREY
+  ctx.font = 'bold 10px Inter, Arial, sans-serif'
+  ctx.fillText('PROYECTO', padX, yHead)
+  ctx.textAlign = 'right'
+  ctx.fillText('% DESPACHO', colPctR, yHead)
+  ctx.fillText('ENERGÍA', colEneR, yHead)
+  ctx.textAlign = 'left'
+
+  // ── Filas de proyectos ──
+  if (!plantas.length) {
+    ctx.fillStyle = 'rgba(44,32,57,0.35)'
+    ctx.font = 'italic 13px Inter, Arial, sans-serif'
+    ctx.fillText('Sin proyectos asignados', padX, bodyTop + 24)
+  }
+  plantas.forEach((p, i) => {
+    const yTop = bodyTop + i * rowH
+    const yMid = yTop + rowH / 2
+    if (i % 2 === 1) {
+      ctx.fillStyle = 'rgba(145,91,216,0.04)'
+      ctx.fillRect(padX - 8, yTop, W - padX * 2 + 16, rowH)
+    }
+    const mwh = p.month_mwh != null ? p.month_mwh * p.pct_despacho : null
+    const colName = p.es_duplicado ? RED : p.comprado_por_unergy ? GOLD : DARK
+    ctx.textBaseline = 'middle'
+    // Nombre
+    ctx.fillStyle = colName
+    ctx.font = '600 13px Inter, Arial, sans-serif'
+    let nameMaxW = colPctR - padX - 110
+    const nombre = _truncarTexto(ctx, p.nombre || `Proyecto ${p.id}`, nameMaxW)
+    ctx.fillText(nombre, padX, yMid)
+    // Tag duplicado / compra
+    const nx = padX + ctx.measureText(nombre).width + 8
+    if (p.es_duplicado) {
+      _dibujarPill(ctx, nx, yMid - 9, 'Exp. bolsa', 'rgba(214,68,85,0.12)', RED, 'bold 10px Inter, Arial, sans-serif')
+    } else if (p.comprado_por_unergy) {
+      _dibujarPill(ctx, nx, yMid - 9, 'Compra', 'rgba(240,192,64,0.25)', GOLD, 'bold 10px Inter, Arial, sans-serif')
+    }
+    // % despacho
+    ctx.textAlign = 'right'
+    ctx.fillStyle = GREY
+    ctx.font = '12px Inter, Arial, sans-serif'
+    ctx.fillText((p.pct_despacho * 100).toFixed(0) + '%', colPctR, yMid)
+    // Energía
+    ctx.fillStyle = colName
+    ctx.font = 'bold 13px Inter, Arial, sans-serif'
+    ctx.fillText(mwh != null ? fmtMwh(mwh) : '—', colEneR, yMid)
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'alphabetic'
+  })
+
+  // ── Fila total ──
+  const yTotalTop = bodyTop + Math.max(plantas.length, 1) * rowH + 6
+  ctx.strokeStyle = 'rgba(44,32,57,0.14)'
+  ctx.beginPath(); ctx.moveTo(padX, yTotalTop); ctx.lineTo(W - padX, yTotalTop); ctx.stroke()
+  const yTotalMid = yTotalTop + totalH / 2
+  ctx.textBaseline = 'middle'
+  ctx.fillStyle = DARK
+  ctx.font = 'bold 14px Inter, Arial, sans-serif'
+  ctx.fillText(`Total · ${plantas.length} proyecto${plantas.length === 1 ? '' : 's'}`, padX, yTotalMid)
+  ctx.textAlign = 'right'
+  ctx.fillStyle = PURPLE
+  ctx.font = 'bold 16px Inter, Arial, sans-serif'
+  ctx.fillText(fmtMwh(res.gen), colEneR, yTotalMid)
+  if (res.genDup > 0) {
+    ctx.fillStyle = RED
+    ctx.font = 'bold 11px Inter, Arial, sans-serif'
+    ctx.fillText(`+ ${fmtMwh(res.genDup)} exposición bolsa`, colEneR, yTotalMid + 16)
+  }
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'alphabetic'
+
+  // ── Footer ──
+  ctx.fillStyle = '#faf8fc'
+  ctx.fillRect(0, H - footerH, W, footerH)
+  ctx.fillStyle = PURPLE
+  ctx.font = 'bold 12px Inter, Arial, sans-serif'
+  ctx.fillText('Unergy', padX, H - footerH / 2 + 1)
+  ctx.fillStyle = GREY
+  ctx.font = '11px Inter, Arial, sans-serif'
+  ctx.textBaseline = 'middle'
+  ctx.fillText('Cumplimiento PPA', padX + 58, H - footerH / 2 + 1)
+  ctx.textAlign = 'right'
+  ctx.fillText(`${MESES[simMonth.value - 1]} ${simYear.value}`, W - padX, H - footerH / 2 + 1)
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'alphabetic'
+
+  return canvas
+}
+
+async function copiarImagenCapa(c) {
+  let canvas
+  try {
+    canvas = _renderCapaCanvas(c)
+  } catch (e) {
+    console.error('No se pudo renderizar la imagen de la capa', e)
+    return
+  }
+  canvas.toBlob(async (blob) => {
+    if (!blob) return
+    try {
+      await navigator.clipboard.write([new window.ClipboardItem({ 'image/png': blob })])
+      copiadoCapaId.value = c.id
+      setTimeout(() => { if (copiadoCapaId.value === c.id) copiadoCapaId.value = null }, 2200)
+    } catch (e) {
+      // Fallback: el navegador no permite escribir imágenes al portapapeles → descargar
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `capa-${(c.nombre || 'contrato').replace(/[^\w-]+/g, '_')}.png`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    }
+  }, 'image/png')
 }
 
 // ── Data loading ──────────────────────────────────────────────────────────────
