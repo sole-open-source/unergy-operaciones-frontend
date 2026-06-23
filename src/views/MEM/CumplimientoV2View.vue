@@ -885,8 +885,8 @@
                 <button class="rounded-lg p-1.5 transition-colors hover:bg-gray-100" style="color: #7a6e8a;" @click="cerrarDetalleCapa"><i class="pi pi-times text-sm" /></button>
               </div>
             </div>
-            <!-- Métricas -->
-            <div class="grid grid-cols-3 gap-3 mt-3">
+            <!-- Métricas (energía duplicada como 4ª columna si aplica) -->
+            <div class="grid gap-3 mt-3" :class="detalleCapa.res.genDup > 0 ? 'grid-cols-4' : 'grid-cols-3'">
               <div>
                 <div class="text-[10px] font-semibold uppercase tracking-wide" style="color: #7a6e8a;">Energía entregada</div>
                 <div class="font-mono text-sm font-bold mt-0.5" style="color: #2C2039;">{{ fmtMwh(detalleCapa.res.gen) }}</div>
@@ -898,6 +898,10 @@
               <div>
                 <div class="text-[10px] font-semibold uppercase tracking-wide" style="color: #7a6e8a;">Energía proyectada</div>
                 <div class="font-mono text-sm font-bold mt-0.5" style="color: #2C2039;">{{ detalleCapa.res.genProy != null && detalleCapa.res.genProy > 0 ? fmtMwh(detalleCapa.res.genProy) : '—' }}</div>
+              </div>
+              <div v-if="detalleCapa.res.genDup > 0" v-tooltip.bottom="'Misma generación de la planta puesta en contrato(s) duplicado(s) — exposición en bolsa'">
+                <div class="text-[10px] font-semibold uppercase tracking-wide" style="color: #D64455;">Energía duplicada (bolsa)</div>
+                <div class="font-mono text-sm font-bold mt-0.5" style="color: #D64455;">{{ fmtMwh(detalleCapa.res.genDup) }}</div>
               </div>
             </div>
           </div>
@@ -1777,19 +1781,20 @@ function _renderCapaCanvas(c) {
   }
   ctx.textBaseline = 'alphabetic'
 
-  // ── Métricas (3 columnas) ──
+  // ── Métricas (energía duplicada se suma como 4ª columna si aplica) ──
   const metrics = [
-    ['ENERGÍA ENTREGADA', fmtMwh(res.gen)],
-    ['ENERGÍA MÍNIMA', res.min !== null && res.min !== undefined ? fmtMwh(res.min) : '—'],
-    ['ENERGÍA PROYECTADA', (res.genProy != null && res.genProy > 0) ? fmtMwh(res.genProy) : '—'],
+    ['ENERGÍA ENTREGADA', fmtMwh(res.gen), DARK],
+    ['ENERGÍA MÍNIMA', res.min !== null && res.min !== undefined ? fmtMwh(res.min) : '—', DARK],
+    ['ENERGÍA PROYECTADA', (res.genProy != null && res.genProy > 0) ? fmtMwh(res.genProy) : '—', DARK],
   ]
-  const colW = (W - padX * 2) / 3
-  metrics.forEach(([lbl, val], i) => {
+  if (res.genDup > 0) metrics.push(['ENERGÍA DUPLICADA (BOLSA)', fmtMwh(res.genDup), RED])
+  const colW = (W - padX * 2) / metrics.length
+  metrics.forEach(([lbl, val, valColor], i) => {
     const x = padX + i * colW
-    ctx.fillStyle = GREY
-    ctx.font = 'bold 10px Inter, Arial, sans-serif'
+    ctx.fillStyle = valColor === RED ? RED : GREY
+    ctx.font = 'bold 9px Inter, Arial, sans-serif'
     ctx.fillText(lbl, x, 100)
-    ctx.fillStyle = DARK
+    ctx.fillStyle = valColor
     ctx.font = 'bold 16px Inter, Arial, sans-serif'
     ctx.fillText(val, x, 120)
   })
