@@ -1569,8 +1569,8 @@ function _renderCapaCanvas(c) {
   const DARK = '#2C2039', GREY = '#7a6e8a', PURPLE = '#915BD8'
   const RED = '#D64455', GOLD = '#9a6700'
   const scale = 2
-  const W = 760, padX = 36
-  const headerH = 156, tableHeadH = 32, rowH = 44, totalH = 46, footerH = 50
+  const W = 880, padX = 36
+  const headerH = 156, tableHeadH = 32, rowH = 36, totalH = 52, footerH = 50
   const bodyTop = headerH + tableHeadH
   const H = bodyTop + Math.max(plantas.length, 1) * rowH + totalH + footerH
 
@@ -1648,15 +1648,18 @@ function _renderCapaCanvas(c) {
   ctx.fillText(`${plantas.length} proyecto${plantas.length === 1 ? '' : 's'} en el contrato`, padX, headerH - 4)
 
   // ── Cabecera de tabla ──
-  const colPctR = W - padX - 150
-  const colEneR = W - padX
+  const colProyR = W - padX            // proyección cierre del mes (derecha)
+  const colEneR  = W - padX - 200      // energía generada
+  const colPctR  = W - padX - 360      // % despacho
   const yHead = headerH + 20
   ctx.fillStyle = GREY
   ctx.font = 'bold 10px Inter, Arial, sans-serif'
   ctx.fillText('PROYECTO', padX, yHead)
   ctx.textAlign = 'right'
   ctx.fillText('% DESPACHO', colPctR, yHead)
-  ctx.fillText('ENERGÍA', colEneR, yHead)
+  ctx.font = 'bold 9px Inter, Arial, sans-serif'
+  ctx.fillText('ENERGÍA GENERADA', colEneR, yHead)
+  ctx.fillText('PROYECCIÓN CIERRE DEL MES', colProyR, yHead)
   ctx.textAlign = 'left'
 
   // ── Filas de proyectos ──
@@ -1678,7 +1681,7 @@ function _renderCapaCanvas(c) {
     // Nombre
     ctx.fillStyle = colName
     ctx.font = '600 13px Inter, Arial, sans-serif'
-    let nameMaxW = colPctR - padX - 110
+    let nameMaxW = colPctR - padX - 90
     const nombre = _truncarTexto(ctx, p.nombre || `Proyecto ${p.id}`, nameMaxW)
     ctx.fillText(nombre, padX, yMid)
     // Tag duplicado / compra
@@ -1693,16 +1696,21 @@ function _renderCapaCanvas(c) {
     ctx.fillStyle = GREY
     ctx.font = '12px Inter, Arial, sans-serif'
     ctx.fillText((p.pct_despacho * 100).toFixed(0) + '%', colPctR, yMid)
-    // Energía actual (+ proyección debajo, solo mes en curso)
-    const mwhProy = (esActual && !p.es_duplicado && p.month_mwh_proyectado != null)
-      ? p.month_mwh_proyectado * p.pct_despacho : null
+    // Energía generada
     ctx.fillStyle = colName
     ctx.font = 'bold 13px Inter, Arial, sans-serif'
-    ctx.fillText(mwh != null ? fmtMwh(mwh) : '—', colEneR, mwhProy != null ? yMid - 7 : yMid)
+    ctx.fillText(mwh != null ? fmtMwh(mwh) : '—', colEneR, yMid)
+    // Proyección cierre del mes (solo mes en curso y plantas no duplicadas)
+    const mwhProy = (esActual && !p.es_duplicado && p.month_mwh_proyectado != null)
+      ? p.month_mwh_proyectado * p.pct_despacho : null
     if (mwhProy != null) {
       ctx.fillStyle = PURPLE
-      ctx.font = '600 10px Inter, Arial, sans-serif'
-      ctx.fillText('◆ proy. ' + fmtMwh(mwhProy), colEneR, yMid + 9)
+      ctx.font = 'bold 13px Inter, Arial, sans-serif'
+      ctx.fillText('◆ ' + fmtMwh(mwhProy), colProyR, yMid)
+    } else {
+      ctx.fillStyle = 'rgba(44,32,57,0.3)'
+      ctx.font = '13px Inter, Arial, sans-serif'
+      ctx.fillText('—', colProyR, yMid)
     }
     ctx.textAlign = 'left'
     ctx.textBaseline = 'alphabetic'
@@ -1718,14 +1726,20 @@ function _renderCapaCanvas(c) {
   ctx.font = 'bold 14px Inter, Arial, sans-serif'
   ctx.fillText(`Total · ${plantas.length} proyecto${plantas.length === 1 ? '' : 's'}`, padX, yTotalMid)
   ctx.textAlign = 'right'
+  // Total energía generada
   ctx.fillStyle = PURPLE
   ctx.font = 'bold 16px Inter, Arial, sans-serif'
   ctx.fillText(fmtMwh(res.gen), colEneR, yTotalMid)
   if (res.genDup > 0) {
     ctx.fillStyle = RED
     ctx.font = 'bold 11px Inter, Arial, sans-serif'
-    ctx.fillText(`+ ${fmtMwh(res.genDup)} exposición bolsa`, colEneR, yTotalMid + 16)
+    ctx.fillText(`+ ${fmtMwh(res.genDup)} exposición bolsa`, colEneR, yTotalMid + 17)
   }
+  // Total proyección cierre del mes
+  ctx.fillStyle = PURPLE
+  ctx.font = 'bold 16px Inter, Arial, sans-serif'
+  const totalProy = (esActual && res.genProy != null && res.genProy > 0) ? fmtMwh(res.genProy) : '—'
+  ctx.fillText(totalProy, colProyR, yTotalMid)
   ctx.textAlign = 'left'
   ctx.textBaseline = 'alphabetic'
 
