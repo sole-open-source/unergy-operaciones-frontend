@@ -413,14 +413,6 @@
                     <i class="pi pi-window-maximize text-xs" />
                   </button>
                   <button
-                    @click.stop="copiarImagenCapa(c)"
-                    class="rounded-md p-1 transition-colors hover:bg-purple-50"
-                    :style="copiadoCapaId === c.id ? 'color: #2e7d32;' : 'color: #915BD8;'"
-                    v-tooltip="copiadoCapaId === c.id ? '¡Imagen copiada!' : 'Copiar imagen de la capa'"
-                  >
-                    <i class="pi text-xs" :class="copiadoCapaId === c.id ? 'pi-check' : 'pi-image'" />
-                  </button>
-                  <button
                     v-if="c._ficticio"
                     @click.stop="eliminarNuevo(c.id)"
                     class="rounded-md p-1 transition-colors hover:bg-red-50"
@@ -881,6 +873,15 @@
               <div class="flex items-center gap-2 flex-shrink-0">
                 <span v-if="detalleCapa.res.pct != null && detalleCapa.res.pct !== undefined" class="text-xs font-semibold px-2 py-0.5 rounded-full" :style="estadoBadge(detalleCapa.res.estado)">{{ Math.round(detalleCapa.res.pct) }}%</span>
                 <span class="text-xs font-semibold px-2 py-0.5 rounded-full" :style="estadoBadge(detalleCapa.res.estado)">{{ estadoLabel(detalleCapa.res.estado) }}</span>
+                <button
+                  @click="copiarImagenCapa(detalleCapa.c)"
+                  class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
+                  :style="copiadoCapaId === detalleCapa.c.id ? 'background: rgba(46,125,50,0.12); color: #2e7d32;' : 'background: #915BD8; color: white;'"
+                  v-tooltip="'Copia la imagen al portapapeles (o la descarga si el navegador no lo permite)'"
+                >
+                  <i class="pi text-xs" :class="copiadoCapaId === detalleCapa.c.id ? 'pi-check' : 'pi-image'" />
+                  {{ copiadoCapaId === detalleCapa.c.id ? '¡Copiado!' : 'Copiar imagen' }}
+                </button>
                 <button class="rounded-lg p-1.5 transition-colors hover:bg-gray-100" style="color: #7a6e8a;" @click="cerrarDetalleCapa"><i class="pi pi-times text-sm" /></button>
               </div>
             </div>
