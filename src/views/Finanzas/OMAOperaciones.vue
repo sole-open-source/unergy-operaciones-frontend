@@ -136,9 +136,39 @@
               <td v-if="colsVisibles.prorrateo" class="px-3 py-2 text-center text-xs text-gray-500">
                 {{ fila.prorrateo_label }}
               </td>
-              <td class="px-3 py-2 text-right font-semibold tabular-nums bg-purple-50/30"
-                :style="fila.incluido && fila.habilitado ? 'color:#7c3aed' : 'color:#9ca3af'">
-                {{ fila.valor_a_facturar != null ? formatCOP(fila.valor_a_facturar) : '—' }}
+              <td class="px-3 py-2 text-right bg-purple-50/30 group"
+                style="position:relative; min-width:150px">
+                <!-- Modo edición -->
+                <input v-if="editando === fila.contrato_id"
+                  v-model="inputBuffer"
+                  type="text" inputmode="numeric"
+                  class="w-full text-right text-sm tabular-nums font-semibold rounded-md px-1.5 py-0.5 outline-none"
+                  style="border:1.5px solid #915BD8; color:#7c3aed"
+                  @keydown.enter.prevent="confirmarEdicion(fila)"
+                  @keydown.esc.prevent="cancelarEdicion()"
+                  @blur="confirmarEdicion(fila)"
+                  v-focus />
+                <!-- Modo display -->
+                <div v-else class="flex items-center justify-end gap-1.5">
+                  <!-- Íconos en hover -->
+                  <span class="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                    <i v-if="fila.habilitado" class="pi pi-pencil text-[11px] cursor-pointer"
+                      style="color:#915BD8" title="Editar valor"
+                      @click="iniciarEdicion(fila)" />
+                    <i v-if="fila.habilitado" class="pi pi-info-circle text-[11px] cursor-pointer"
+                      style="color:#915BD8" title="Ver cálculo"
+                      @click="mostrarInfo($event, fila)" />
+                  </span>
+                  <!-- Indicador de modificación manual -->
+                  <span v-if="esManual(fila)" title="Valor modificado manualmente"
+                    style="color:#f59e0b; font-size:12px; line-height:1">●</span>
+                  <!-- Valor -->
+                  <span class="font-semibold tabular-nums cursor-text"
+                    :style="(fila.incluido && fila.habilitado) ? 'color:#7c3aed' : 'color:#9ca3af'"
+                    @click="iniciarEdicion(fila)">
+                    {{ valorEfectivo(fila) != null ? formatCOP(valorEfectivo(fila)) : '—' }}
+                  </span>
+                </div>
               </td>
               <td v-if="colsVisibles.historial" class="px-3 py-2 text-xs text-gray-400"
                 style="white-space:nowrap;max-width:280px;overflow:hidden;text-overflow:ellipsis"
@@ -360,7 +390,10 @@ function parseCOP(str) {
 // Valor a mostrar/guardar: override local dirty → valor del backend (ya resuelto)
 function valorEfectivo(fila) {
   const ov = overrides[fila.contrato_id]
-  if (ov && ov.dirty) return ov.valor
+  if (ov && ov.dirty) {
+    // override revertido (valor null) → mostrar el calculado por IPC
+    return ov.valor != null ? ov.valor : (fila.valor_calculado ?? fila.valor_a_facturar)
+  }
   return fila.valor_a_facturar
 }
 
@@ -398,6 +431,11 @@ function revertirCalculado(fila) {
   // marca para enviar valor_manual:null → vuelve al valor calculado por IPC
   overrides[fila.contrato_id] = { valor: null, dirty: true }
   infoPopover.value?.hide()
+}
+
+function mostrarInfo(ev, fila) {
+  filaInfo.value = fila
+  infoPopover.value?.show(ev)
 }
 
 async function cargarDatos() {
