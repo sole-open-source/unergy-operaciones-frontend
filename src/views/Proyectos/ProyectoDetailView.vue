@@ -38,6 +38,8 @@
             <InfoField label="Carpeta Drive" :value="proyecto.carpeta_drive_codigo" />
             <InfoField label="API ID Unergy" :value="proyecto.sub_project" />
             <InfoField label="Código TSF" :value="proyecto.codigo_tsf" />
+            <InfoField label="Fecha de entrada en operación" :value="fmtFecha(proyecto.fecha_entrada_operacion)" />
+            <InfoField label="Fecha fin de representación" :value="proyecto.fecha_fin_representacion ? fmtFecha(proyecto.fecha_fin_representacion) : '—'" />
           </template>
           <template v-else>
             <div class="flex flex-col gap-1">
@@ -79,6 +81,14 @@
             <div class="flex flex-col gap-1">
               <label class="field-label">Código TSF</label>
               <InputText v-model="editForm.codigo_tsf" class="w-full" />
+            </div>
+            <div class="flex flex-col gap-1">
+              <label class="field-label">Fecha de entrada en operación</label>
+              <DatePicker v-model="editFechaEntrada" dateFormat="yy-mm-dd" showIcon showClear class="w-full" placeholder="Seleccionar" />
+            </div>
+            <div class="flex flex-col gap-1">
+              <label class="field-label">Fecha fin de representación</label>
+              <DatePicker v-model="editFechaFinRep" dateFormat="yy-mm-dd" showIcon showClear class="w-full" placeholder="Vigente" />
             </div>
           </template>
         </div>
@@ -391,18 +401,26 @@
             <Column header="Participación (%)">
               <template #body="{ data }">
                 <template v-if="editandoInvId === data.id">
-                  <div class="flex items-center gap-2">
-                    <InputNumber v-model="editPct" :min="0" :max="100" :minFractionDigits="2" :maxFractionDigits="7"
-                      suffix="%" class="w-32" />
-                    <Button icon="pi pi-check" text severity="success" size="small" :loading="guardando"
-                      @click="guardarEdicionInversionista(data.id)" />
-                    <Button icon="pi pi-times" text severity="secondary" size="small"
-                      @click="editandoInvId = null" />
-                  </div>
+                  <InputNumber v-model="editPct" :min="0" :max="100" :minFractionDigits="2" :maxFractionDigits="7"
+                    suffix="%" class="w-32" />
                 </template>
                 <template v-else>
                   {{ data.porcentaje_participacion != null ? (data.porcentaje_participacion * 100).toFixed(4) + '%' : '—' }}
                 </template>
+              </template>
+            </Column>
+            <Column header="Inicio" style="width:170px">
+              <template #body="{ data }">
+                <DatePicker v-if="editandoInvId === data.id" v-model="editFechaInicio" dateFormat="yy-mm-dd"
+                  showIcon showClear class="w-40" placeholder="—" />
+                <span v-else>{{ fmtFecha(data.fecha_inicio) }}</span>
+              </template>
+            </Column>
+            <Column header="Fin" style="width:170px">
+              <template #body="{ data }">
+                <DatePicker v-if="editandoInvId === data.id" v-model="editFechaFin" dateFormat="yy-mm-dd"
+                  showIcon showClear class="w-40" placeholder="Vigente" />
+                <span v-else>{{ data.fecha_fin ? fmtFecha(data.fecha_fin) : 'Vigente' }}</span>
               </template>
             </Column>
             <Column header="Patrimonio autónomo">
@@ -411,13 +429,21 @@
                      :severity="data.es_patrimonio_autonomo ? 'info' : 'secondary'" />
               </template>
             </Column>
-            <Column header="" style="width:100px">
+            <Column header="" style="width:110px">
               <template #body="{ data }">
                 <div class="flex gap-1">
-                  <Button icon="pi pi-pencil" text severity="info" size="small"
-                    @click="iniciarEdicionInversionista(data)" v-tooltip="'Editar porcentaje'" />
-                  <Button icon="pi pi-trash" text severity="danger" size="small"
-                    @click="eliminarInversionista(data.id)" v-tooltip="'Eliminar'" />
+                  <template v-if="editandoInvId === data.id">
+                    <Button icon="pi pi-check" text severity="success" size="small" :loading="guardando"
+                      @click="guardarEdicionInversionista(data.id)" v-tooltip="'Guardar'" />
+                    <Button icon="pi pi-times" text severity="secondary" size="small"
+                      @click="editandoInvId = null" v-tooltip="'Cancelar'" />
+                  </template>
+                  <template v-else>
+                    <Button icon="pi pi-pencil" text severity="info" size="small"
+                      @click="iniciarEdicionInversionista(data)" v-tooltip="'Editar'" />
+                    <Button icon="pi pi-trash" text severity="danger" size="small"
+                      @click="eliminarInversionista(data.id)" v-tooltip="'Eliminar'" />
+                  </template>
                 </div>
               </template>
             </Column>
@@ -427,12 +453,36 @@
             <ColumnGroup type="footer">
               <Row>
                 <Column footer="Total" footerStyle="font-weight:600" />
-                <Column :footer="totalParticipacion.toFixed(4) + '%'" footerStyle="font-weight:600" />
+                <Column :footer="tieneVariosPeriodos ? '— (ver períodos)' : totalParticipacion.toFixed(4) + '%'"
+                  footerStyle="font-weight:600" />
+                <Column />
+                <Column />
                 <Column />
                 <Column />
               </Row>
             </ColumnGroup>
           </DataTable>
+
+          <!-- Histórico por período (cuando hay inversionistas de distintas fechas) -->
+          <div v-if="tieneVariosPeriodos" class="rounded-lg bg-gray-50 border border-gray-100 p-3 space-y-2">
+            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+              Histórico por período
+              <span class="normal-case font-normal text-gray-400">— el 100% se valida dentro de cada período, no sobre todo el histórico</span>
+            </p>
+            <div v-for="per in periodos" :key="per.key"
+              class="flex items-center justify-between text-sm border-t border-gray-100 pt-1 first:border-0 first:pt-0">
+              <span class="text-gray-600">
+                {{ per.label }}
+                <Tag v-if="per.vigente" value="Vigente" severity="success" class="ml-2 scale-90" />
+                <span class="text-gray-400 ml-1">· {{ per.count }} inversionista(s)</span>
+              </span>
+              <span class="font-semibold tabular-nums" :class="per.ok ? 'text-green-600' : 'text-amber-600'">
+                {{ per.total.toFixed(2) }}%
+                <i v-if="!per.ok" class="pi pi-exclamation-triangle text-xs ml-1"
+                  v-tooltip.left="'No suma ~100% en este período'" />
+              </span>
+            </div>
+          </div>
 
           <Divider />
           <p class="font-semibold text-gray-700">Agregar inversionista</p>
@@ -447,6 +497,16 @@
               <label class="text-xs text-gray-500">Porcentaje de participación (%)</label>
               <InputNumber v-model="nuevoInv.porcentaje_pct" :min="0" :max="100"
                 :minFractionDigits="2" :maxFractionDigits="7" suffix="%" class="w-full" />
+            </div>
+            <div class="flex flex-col gap-1">
+              <label class="text-xs text-gray-500">Fecha inicio</label>
+              <DatePicker v-model="nuevoInv.fecha_inicio" dateFormat="yy-mm-dd" showIcon showClear
+                class="w-full" placeholder="—" />
+            </div>
+            <div class="flex flex-col gap-1">
+              <label class="text-xs text-gray-500">Fecha fin (opcional = vigente)</label>
+              <DatePicker v-model="nuevoInv.fecha_fin" dateFormat="yy-mm-dd" showIcon showClear
+                class="w-full" placeholder="Vigente" />
             </div>
             <div class="flex flex-col gap-1">
               <label class="text-xs text-gray-500">Patrimonio autónomo</label>
@@ -686,6 +746,7 @@ import Row from 'primevue/row'
 import Select from 'primevue/select'
 import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
+import DatePicker from 'primevue/datepicker'
 import Checkbox from 'primevue/checkbox'
 import Divider from 'primevue/divider'
 import { useToast } from 'primevue/usetoast'
@@ -806,6 +867,31 @@ const editInfoTecnica = reactive({
   modelo_almacenamiento: null,
 })
 
+// Fechas del proyecto (DatePicker trabaja con Date; el API espera 'YYYY-MM-DD')
+const editFechaEntrada = ref(null)
+const editFechaFinRep = ref(null)
+
+// ── Helpers de fecha ──────────────────────────────────────────────────────────
+function toDate(v) {
+  if (!v) return null
+  const [y, m, d] = String(v).slice(0, 10).split('-').map(Number)
+  if (!y || !m || !d) return null
+  return new Date(y, m - 1, d) // medianoche local (evita corrimiento de zona horaria)
+}
+function formatFecha(v) {
+  if (!v) return null
+  if (v instanceof Date) {
+    const y = v.getFullYear()
+    const m = String(v.getMonth() + 1).padStart(2, '0')
+    const d = String(v.getDate()).padStart(2, '0')
+    return `${y}-${m}-${d}`
+  }
+  return String(v).slice(0, 10)
+}
+function fmtFecha(v) {
+  return v ? String(v).slice(0, 10) : '—'
+}
+
 // ── Simulación P90 / P50 / P99 ───────────────────────────────────────────────
 const editP90 = ref(Array(12).fill(null))
 const editP50 = ref(Array(12).fill(null))
@@ -888,6 +974,8 @@ function populateEditForm() {
   editP90.value = parseMonthArray(p.p90_mensual_kwh)
   editP50.value = parseMonthArray(p.p50_mensual_kwh)
   editP99.value = parseMonthArray(p.p99_mensual_kwh)
+  editFechaEntrada.value = toDate(p.fecha_entrada_operacion)
+  editFechaFinRep.value = toDate(p.fecha_fin_representacion)
 }
 
 watch(isEditMode, (entering) => {
@@ -915,6 +1003,10 @@ async function saveEdit() {
     if (p90json !== null) payload.p90_mensual_kwh = p90json
     if (p50json !== null) payload.p50_mensual_kwh = p50json
     if (p99json !== null) payload.p99_mensual_kwh = p99json
+    // Fechas: se inicializan desde los valores actuales, así que enviarlas siempre
+    // preserva lo existente y permite limpiarlas (null) explícitamente.
+    payload.fecha_entrada_operacion = formatFecha(editFechaEntrada.value)
+    payload.fecha_fin_representacion = formatFecha(editFechaFinRep.value)
 
     await api.patch(`/proyectos/${route.params.id}`, payload)
     const itPayload = {}
@@ -940,9 +1032,11 @@ async function saveEdit() {
 }
 
 // ── Inversionistas ────────────────────────────────────────────────────────────
-const nuevoInv = reactive({ cliente_id: null, porcentaje_pct: null, es_patrimonio_autonomo: false })
+const nuevoInv = reactive({ cliente_id: null, porcentaje_pct: null, es_patrimonio_autonomo: false, fecha_inicio: null, fecha_fin: null })
 const editandoInvId = ref(null)
 const editPct = ref(null)
+const editFechaInicio = ref(null)
+const editFechaFin = ref(null)
 
 const clientesDisponibles = computed(() => {
   if (!proyecto.value) return clientes.value
@@ -955,6 +1049,34 @@ const totalParticipacion = computed(() => {
   return proyecto.value.inversionistas.reduce((sum, i) => sum + (i.porcentaje_participacion ?? 0) * 100, 0)
 })
 
+// Histórico separado por período: dos inversionistas son simultáneos si comparten
+// el mismo rango [fecha_inicio, fecha_fin]. El 100% se valida dentro de cada
+// período, NO sobre todo el histórico (de ahí venía el 200% engañoso de Merengue).
+const periodos = computed(() => {
+  const invs = proyecto.value?.inversionistas ?? []
+  if (!invs.length) return []
+  const grupos = new Map()
+  for (const i of invs) {
+    const ini = i.fecha_inicio ? String(i.fecha_inicio).slice(0, 10) : null
+    const fin = i.fecha_fin ? String(i.fecha_fin).slice(0, 10) : null
+    const key = `${ini ?? '∅'}|${fin ?? '∅'}`
+    if (!grupos.has(key)) grupos.set(key, { key, ini, fin, total: 0, count: 0 })
+    const g = grupos.get(key)
+    g.total += (i.porcentaje_participacion ?? 0) * 100
+    g.count += 1
+  }
+  return [...grupos.values()]
+    .sort((a, b) => (a.ini ?? '').localeCompare(b.ini ?? ''))
+    .map(g => ({
+      ...g,
+      label: `${g.ini ?? 'Sin inicio'} → ${g.fin ?? 'Vigente'}`,
+      vigente: g.fin == null,
+      ok: Math.abs(g.total - 100) < 0.5,
+    }))
+})
+
+const tieneVariosPeriodos = computed(() => periodos.value.length > 1)
+
 async function agregarInversionista() {
   if (!nuevoInv.cliente_id) {
     toast.add({ severity: 'warn', summary: 'Selecciona un cliente', life: 2000 })
@@ -966,12 +1088,16 @@ async function agregarInversionista() {
       cliente_id: nuevoInv.cliente_id,
       porcentaje_participacion: nuevoInv.porcentaje_pct != null ? nuevoInv.porcentaje_pct / 100 : null,
       es_patrimonio_autonomo: nuevoInv.es_patrimonio_autonomo,
+      fecha_inicio: formatFecha(nuevoInv.fecha_inicio),
+      fecha_fin: formatFecha(nuevoInv.fecha_fin),
     })
     const { data } = await api.get(`/proyectos/${route.params.id}/inversionistas`)
     proyecto.value.inversionistas = Array.isArray(data) ? data : (data.items ?? [])
     nuevoInv.cliente_id = null
     nuevoInv.porcentaje_pct = null
     nuevoInv.es_patrimonio_autonomo = false
+    nuevoInv.fecha_inicio = null
+    nuevoInv.fecha_fin = null
     toast.add({ severity: 'success', summary: 'Inversionista agregado', life: 2000 })
   } catch (e) {
     toast.add({ severity: 'error', summary: 'Error al agregar', detail: e.response?.data?.detail, life: 3000 })
@@ -994,6 +1120,8 @@ async function eliminarInversionista(invId) {
 function iniciarEdicionInversionista(inv) {
   editandoInvId.value = inv.id
   editPct.value = inv.porcentaje_participacion != null ? +(inv.porcentaje_participacion * 100).toFixed(7) : null
+  editFechaInicio.value = toDate(inv.fecha_inicio)
+  editFechaFin.value = toDate(inv.fecha_fin)
 }
 
 async function guardarEdicionInversionista(invId) {
@@ -1001,9 +1129,13 @@ async function guardarEdicionInversionista(invId) {
   try {
     await api.patch(`/proyectos/${route.params.id}/inversionistas/${invId}`, {
       porcentaje_participacion: editPct.value != null ? editPct.value / 100 : null,
+      fecha_inicio: formatFecha(editFechaInicio.value),
+      fecha_fin: formatFecha(editFechaFin.value),
     })
     editandoInvId.value = null
     editPct.value = null
+    editFechaInicio.value = null
+    editFechaFin.value = null
     const { data } = await api.get(`/proyectos/${route.params.id}/inversionistas`)
     proyecto.value.inversionistas = Array.isArray(data) ? data : (data.items ?? [])
     toast.add({ severity: 'success', summary: 'Porcentaje actualizado', life: 2000 })

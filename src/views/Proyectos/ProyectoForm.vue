@@ -49,6 +49,14 @@
         <label class="field-label">Código TSF</label>
         <InputText v-model="f.codigo_tsf" class="w-full" placeholder="ej: COLCEST58P2" />
       </div>
+      <div>
+        <label class="field-label">Fecha de entrada en operación</label>
+        <DatePicker v-model="fechaEntrada" dateFormat="yy-mm-dd" showIcon showClear class="w-full" placeholder="Seleccionar" />
+      </div>
+      <div>
+        <label class="field-label">Fecha fin de representación</label>
+        <DatePicker v-model="fechaFinRep" dateFormat="yy-mm-dd" showIcon showClear class="w-full" placeholder="Vigente" />
+      </div>
     </div>
 
     <!-- Simulación P50 / P90 -->
@@ -101,6 +109,12 @@
             {{ data.porcentaje_participacion != null ? (data.porcentaje_participacion * 100).toFixed(2) + '%' : '—' }}
           </template>
         </Column>
+        <Column header="Inicio">
+          <template #body="{ data }">{{ data.fecha_inicio ? String(data.fecha_inicio).slice(0, 10) : '—' }}</template>
+        </Column>
+        <Column header="Fin">
+          <template #body="{ data }">{{ data.fecha_fin ? String(data.fecha_fin).slice(0, 10) : 'Vigente' }}</template>
+        </Column>
         <Column header="Pat. autónomo">
           <template #body="{ data }">
             <Tag :value="data.es_patrimonio_autonomo ? 'Sí' : 'No'"
@@ -132,6 +146,14 @@
             suffix="%" class="w-full" />
         </div>
         <div>
+          <label class="field-label">Fecha inicio</label>
+          <DatePicker v-model="nuevoInv.fecha_inicio" dateFormat="yy-mm-dd" showIcon showClear class="w-full" placeholder="—" />
+        </div>
+        <div>
+          <label class="field-label">Fecha fin (opcional = vigente)</label>
+          <DatePicker v-model="nuevoInv.fecha_fin" dateFormat="yy-mm-dd" showIcon showClear class="w-full" placeholder="Vigente" />
+        </div>
+        <div>
           <label class="field-label">Patrimonio autónomo</label>
           <div class="flex items-center gap-2 h-10">
             <ToggleSwitch v-model="nuevoInv.es_patrimonio_autonomo" />
@@ -154,6 +176,7 @@
 import { reactive, ref, watch, computed } from 'vue'
 import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
+import DatePicker from 'primevue/datepicker'
 import Select from 'primevue/select'
 import Button from 'primevue/button'
 import DataTable from 'primevue/datatable'
@@ -195,6 +218,27 @@ const f = reactive({
   codigo_tsf: null,
 })
 
+// Fechas del proyecto (DatePicker usa Date; el API espera 'YYYY-MM-DD')
+const fechaEntrada = ref(null)
+const fechaFinRep = ref(null)
+
+function toDate(v) {
+  if (!v) return null
+  const [y, m, d] = String(v).slice(0, 10).split('-').map(Number)
+  if (!y || !m || !d) return null
+  return new Date(y, m - 1, d) // medianoche local (evita corrimiento de zona horaria)
+}
+function formatFecha(v) {
+  if (!v) return null
+  if (v instanceof Date) {
+    const y = v.getFullYear()
+    const m = String(v.getMonth() + 1).padStart(2, '0')
+    const d = String(v.getDate()).padStart(2, '0')
+    return `${y}-${m}-${d}`
+  }
+  return String(v).slice(0, 10)
+}
+
 function parseMonthArray(jsonStr) {
   if (!jsonStr) return Array(12).fill(null)
   try {
@@ -214,13 +258,15 @@ watch(() => props.proyecto, (p) => {
     Object.keys(f).forEach(k => { if (k in p) f[k] = p[k] })
     p90Array.value = parseMonthArray(p.p90_mensual_kwh)
     p50Array.value = parseMonthArray(p.p50_mensual_kwh)
+    fechaEntrada.value = toDate(p.fecha_entrada_operacion)
+    fechaFinRep.value = toDate(p.fecha_fin_representacion)
   }
 }, { immediate: true })
 
 const toast = useToast()
 const inversionistas = ref([])
 const guardandoInv = ref(false)
-const nuevoInv = reactive({ cliente_id: null, porcentaje_pct: null, es_patrimonio_autonomo: false })
+const nuevoInv = reactive({ cliente_id: null, porcentaje_pct: null, es_patrimonio_autonomo: false, fecha_inicio: null, fecha_fin: null })
 
 watch(() => props.proyectoId, async (id) => {
   if (id) {
@@ -237,12 +283,16 @@ async function agregarInversionista() {
       cliente_id: nuevoInv.cliente_id,
       porcentaje_participacion: nuevoInv.porcentaje_pct != null ? nuevoInv.porcentaje_pct / 100 : null,
       es_patrimonio_autonomo: nuevoInv.es_patrimonio_autonomo,
+      fecha_inicio: formatFecha(nuevoInv.fecha_inicio),
+      fecha_fin: formatFecha(nuevoInv.fecha_fin),
     })
     const { data } = await api.get(`/proyectos/${props.proyectoId}/inversionistas`)
     inversionistas.value = data
     nuevoInv.cliente_id = null
     nuevoInv.porcentaje_pct = null
     nuevoInv.es_patrimonio_autonomo = false
+    nuevoInv.fecha_inicio = null
+    nuevoInv.fecha_fin = null
     toast.add({ severity: 'success', summary: 'Inversionista agregado', life: 2000 })
   } catch (e) {
     toast.add({ severity: 'error', summary: 'Error al agregar', detail: e.response?.data?.detail, life: 3000 })
@@ -276,6 +326,9 @@ function submit() {
   const p50json = serializeMonthArray(p50Array.value)
   if (p90json !== null) payload.p90_mensual_kwh = p90json
   if (p50json !== null) payload.p50_mensual_kwh = p50json
+  // Fechas del proyecto (null = sin fecha / vigente)
+  payload.fecha_entrada_operacion = formatFecha(fechaEntrada.value)
+  payload.fecha_fin_representacion = formatFecha(fechaFinRep.value)
   emit('save', payload)
 }
 </script>
