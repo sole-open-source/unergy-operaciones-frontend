@@ -1570,9 +1570,9 @@ function _renderCapaCanvas(c) {
   const RED = '#D64455', GOLD = '#9a6700'
   const scale = 2
   const W = 880, padX = 36
-  const headerH = 156, tableHeadH = 32, rowH = 36, totalH = 52, footerH = 50
+  const headerH = 156, tableHeadH = 32, rowH = 36, totalH = 52, riskH = 56, footerH = 50
   const bodyTop = headerH + tableHeadH
-  const H = bodyTop + Math.max(plantas.length, 1) * rowH + totalH + footerH
+  const H = bodyTop + Math.max(plantas.length, 1) * rowH + totalH + riskH + footerH
 
   const canvas = document.createElement('canvas')
   canvas.width = W * scale
@@ -1741,6 +1741,43 @@ function _renderCapaCanvas(c) {
   const totalProy = (esActual && res.genProy != null && res.genProy > 0) ? fmtMwh(res.genProy) : '—'
   ctx.fillText(totalProy, colProyR, yTotalMid)
   ctx.textAlign = 'left'
+  ctx.textBaseline = 'alphabetic'
+
+  // ── Veredicto: riesgo / probabilidad de cumplimiento (proyección vs mínimo) ──
+  const yRiskTop = bodyTop + Math.max(plantas.length, 1) * rowH + totalH
+  const minDef = res.min != null
+  const proyOk = esActual && res.genProy != null && res.genProy > 0
+  let riskBg, riskFg, riskIcon, riskTxt, riskSub
+  if (minDef && proyOk) {
+    if (res.genProy >= res.min) {
+      riskBg = 'rgba(46,125,50,0.10)'; riskFg = '#2e7d32'; riskIcon = '✓'
+      riskTxt = 'Probabilidad de cumplimiento alta'
+      riskSub = `Proyección ${fmtMwh(res.genProy)} ≥ mínimo ${fmtMwh(res.min)}`
+    } else {
+      riskBg = 'rgba(214,68,85,0.10)'; riskFg = RED; riskIcon = '⚠'
+      riskTxt = 'Riesgo de incumplimiento'
+      riskSub = `Proyección ${fmtMwh(res.genProy)} < mínimo ${fmtMwh(res.min)}`
+    }
+  } else if (minDef) {
+    riskBg = 'rgba(44,32,57,0.05)'; riskFg = GREY; riskIcon = '•'
+    riskTxt = 'Sin proyección del mes para evaluar'
+    riskSub = `Mínimo ${fmtMwh(res.min)}`
+  } else {
+    riskBg = 'rgba(44,32,57,0.05)'; riskFg = GREY; riskIcon = '•'
+    riskTxt = 'Contrato sin energía mínima definida'
+    riskSub = ''
+  }
+  ctx.fillStyle = riskBg
+  ctx.beginPath(); ctx.roundRect(padX, yRiskTop + 6, W - padX * 2, riskH - 12, 10); ctx.fill()
+  ctx.textBaseline = 'middle'
+  const yRiskMid = yRiskTop + riskH / 2
+  ctx.fillStyle = riskFg
+  ctx.font = 'bold 15px Inter, Arial, sans-serif'
+  ctx.fillText(`${riskIcon}  ${riskTxt}`, padX + 16, yRiskMid - (riskSub ? 8 : 0))
+  if (riskSub) {
+    ctx.font = '11px Inter, Arial, sans-serif'
+    ctx.fillText(riskSub, padX + 16, yRiskMid + 10)
+  }
   ctx.textBaseline = 'alphabetic'
 
   // ── Footer ──
