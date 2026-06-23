@@ -136,9 +136,39 @@
               <td v-if="colsVisibles.prorrateo" class="px-3 py-2 text-center text-xs text-gray-500">
                 {{ fila.prorrateo_label }}
               </td>
-              <td class="px-3 py-2 text-right font-semibold tabular-nums bg-purple-50/30"
-                :style="fila.incluido && fila.habilitado ? 'color:#7c3aed' : 'color:#9ca3af'">
-                {{ fila.valor_a_facturar != null ? formatCOP(fila.valor_a_facturar) : '—' }}
+              <td class="px-3 py-2 text-right bg-purple-50/30 group"
+                style="position:relative; min-width:150px">
+                <!-- Modo edición -->
+                <input v-if="editando === fila.contrato_id"
+                  v-model="inputBuffer"
+                  type="text" inputmode="numeric"
+                  class="w-full text-right text-sm tabular-nums font-semibold rounded-md px-1.5 py-0.5 outline-none"
+                  style="border:1.5px solid #915BD8; color:#7c3aed"
+                  @keydown.enter.prevent="confirmarEdicion(fila)"
+                  @keydown.esc.prevent="cancelarEdicion()"
+                  @blur="confirmarEdicion(fila)"
+                  v-focus />
+                <!-- Modo display -->
+                <div v-else class="flex items-center justify-end gap-1.5">
+                  <!-- Íconos en hover -->
+                  <span class="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                    <i v-if="fila.habilitado" class="pi pi-pencil text-[11px] cursor-pointer"
+                      style="color:#915BD8" title="Editar valor"
+                      @click="iniciarEdicion(fila)" />
+                    <i v-if="fila.habilitado" class="pi pi-info-circle text-[11px] cursor-pointer"
+                      style="color:#915BD8" title="Ver cálculo"
+                      @click="mostrarInfo($event, fila)" />
+                  </span>
+                  <!-- Indicador de modificación manual -->
+                  <span v-if="esManual(fila)" title="Valor modificado manualmente"
+                    style="color:#f59e0b; font-size:12px; line-height:1">●</span>
+                  <!-- Valor -->
+                  <span class="font-semibold tabular-nums cursor-text"
+                    :style="(fila.incluido && fila.habilitado) ? 'color:#7c3aed' : 'color:#9ca3af'"
+                    @click="iniciarEdicion(fila)">
+                    {{ valorEfectivo(fila) != null ? formatCOP(valorEfectivo(fila)) : '—' }}
+                  </span>
+                </div>
               </td>
               <td v-if="colsVisibles.historial" class="px-3 py-2 text-xs text-gray-400"
                 style="white-space:nowrap;max-width:280px;overflow:hidden;text-overflow:ellipsis"
@@ -211,6 +241,60 @@
       </a>
     </div>
 
+    <!-- ── Popover: desglose del cálculo ──────────────────────────────── -->
+    <Popover ref="infoPopover">
+      <div v-if="filaInfo" class="text-xs" style="min-width:280px; color:#2C2039">
+        <p class="font-semibold mb-2 flex items-center gap-1.5" style="color:#7c3aed">
+          <i class="pi pi-chart-bar text-[11px]" /> Cálculo del Valor a Facturar
+        </p>
+        <div class="space-y-1 font-mono">
+          <div class="flex justify-between gap-6">
+            <span class="text-gray-500">Valor Base Anual</span>
+            <span>{{ formatCOP(filaInfo.valor_base_anual) }}</span>
+          </div>
+          <div class="flex justify-between gap-6">
+            <span class="text-gray-500">÷ 12 meses</span>
+            <span>{{ formatCOP(filaInfo.valor_base_anual / 12) }}</span>
+          </div>
+          <div class="flex justify-between gap-6">
+            <span class="text-gray-500">Índice IPC aplicado</span>
+            <span>× {{ filaInfo.factor_acumulado.toFixed(5) }}</span>
+          </div>
+          <div class="flex justify-between gap-6">
+            <span class="text-gray-500">IPC acumulado período</span>
+            <span>{{ ipcAcumPct(filaInfo) }}%</span>
+          </div>
+          <div v-if="filaInfo.prorrateo_label && filaInfo.prorrateo_label !== 'Completo'"
+            class="flex justify-between gap-6">
+            <span class="text-gray-500">Prorrateo</span>
+            <span>{{ filaInfo.prorrateo_label }}</span>
+          </div>
+        </div>
+        <div class="border-t mt-2 pt-2">
+          <div class="flex justify-between gap-6 font-semibold">
+            <span>Valor a Facturar</span>
+            <span style="color:#7c3aed">{{ formatCOP(valorEfectivo(filaInfo)) }}</span>
+          </div>
+        </div>
+        <!-- Aviso de modificación manual -->
+        <div v-if="esManual(filaInfo)"
+          class="mt-2 pt-2 border-t rounded-md p-2 text-[11px] flex items-start gap-1.5"
+          style="background:#fffbeb; color:#92400e">
+          <i class="pi pi-exclamation-triangle text-[11px] mt-0.5" style="color:#d97706" />
+          <div class="flex-1">
+            <p>⚠️ Valor modificado manualmente.</p>
+            <p class="mt-0.5">Original calculado:
+              <strong>{{ formatCOP(filaInfo.valor_calculado) }}</strong>
+            </p>
+            <button type="button" class="mt-1 underline" style="color:#915BD8"
+              @click="revertirCalculado(filaInfo)">
+              Revertir a calculado
+            </button>
+          </div>
+        </div>
+      </div>
+    </Popover>
+
     <!-- ── Dialog administración IPC ─────────────────────────────────── -->
     <Dialog v-model:visible="showIPCDialog" modal header="Tasas IPC" :style="{ width: '420px' }">
       <div class="space-y-3 pt-1">
@@ -269,10 +353,14 @@ import DataTable     from 'primevue/datatable'
 import Column        from 'primevue/column'
 import InputNumber   from 'primevue/inputnumber'
 import InputText     from 'primevue/inputtext'
+import Popover       from 'primevue/popover'
 import { useToast }  from 'primevue/usetoast'
 import api           from '@/api/client'
 
 const toast = useToast()
+
+// Autofocus para el input de edición inline (expuesto como v-focus)
+const vFocus = { mounted: (el) => el.focus() }
 
 const hoy = new Date()
 const periodoOffset = ref(0)
@@ -321,6 +409,13 @@ const guardandoIPC  = ref(false)
 const notificacionIPC = ref(null)
 const ipcForm = reactive({ año: new Date().getFullYear(), tasaPct: null, fuente: 'DANE' })
 
+// ── Edición inline del Valor a Facturar ──────────────────────────────────────
+const overrides   = reactive({})   // { [contrato_id]: { valor:Number|null, dirty:Boolean } }
+const editando    = ref(null)      // contrato_id de la celda en modo input
+const inputBuffer = ref('')        // texto crudo del input activo
+const infoPopover = ref(null)      // ref al <Popover>
+const filaInfo    = ref(null)      // fila cuyo desglose se muestra
+
 const filasHabilitadas   = computed(() => filas.value.filter(f => f.habilitado))
 const filasSeleccionadas = computed(() => filasHabilitadas.value.filter(f => seleccion[f.contrato_id]).length)
 const todosMarcados      = computed(() =>
@@ -329,8 +424,8 @@ const todosMarcados      = computed(() =>
 )
 const totalSeleccionado = computed(() =>
   filas.value
-    .filter(f => f.habilitado && seleccion[f.contrato_id] && f.valor_a_facturar)
-    .reduce((s, f) => s + f.valor_a_facturar, 0)
+    .filter(f => f.habilitado && seleccion[f.contrato_id])
+    .reduce((s, f) => s + (valorEfectivo(f) || 0), 0)
 )
 
 function formatCOP(v) {
@@ -338,8 +433,67 @@ function formatCOP(v) {
   return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(v)
 }
 
+function parseCOP(str) {
+  if (str == null) return null
+  const limpio = String(str).replace(/[^\d]/g, '')   // quita $, puntos de miles, espacios
+  if (limpio === '') return null
+  const n = Number(limpio)
+  return Number.isFinite(n) ? n : null
+}
+
+// Valor a mostrar/guardar: override local dirty → valor del backend (ya resuelto)
+function valorEfectivo(fila) {
+  const ov = overrides[fila.contrato_id]
+  if (ov && ov.dirty) {
+    // override revertido (valor null) → mostrar el calculado por IPC
+    return ov.valor != null ? ov.valor : (fila.valor_calculado ?? fila.valor_a_facturar)
+  }
+  return fila.valor_a_facturar
+}
+
+// True si la fila tiene override (local dirty o persistido en backend)
+function esManual(fila) {
+  const ov = overrides[fila.contrato_id]
+  if (ov && ov.dirty) return ov.valor != null
+  return !!fila.editado_manual
+}
+
 function toggleTodos(e) {
   filasHabilitadas.value.forEach(f => { seleccion[f.contrato_id] = e.target.checked })
+}
+
+function iniciarEdicion(fila) {
+  if (!fila.habilitado) return
+  editando.value = fila.contrato_id
+  inputBuffer.value = String(valorEfectivo(fila) ?? '')
+}
+
+function confirmarEdicion(fila) {
+  if (editando.value !== fila.contrato_id) return
+  const v = parseCOP(inputBuffer.value)
+  if (v != null) {
+    overrides[fila.contrato_id] = { valor: v, dirty: true }
+  }
+  editando.value = null
+}
+
+function cancelarEdicion() {
+  editando.value = null   // descarta el buffer; restaura el valor mostrado
+}
+
+function revertirCalculado(fila) {
+  // marca para enviar valor_manual:null → vuelve al valor calculado por IPC
+  overrides[fila.contrato_id] = { valor: null, dirty: true }
+  infoPopover.value?.hide()
+}
+
+function mostrarInfo(ev, fila) {
+  filaInfo.value = fila
+  infoPopover.value?.show(ev)
+}
+
+function ipcAcumPct(fila) {
+  return ((fila.factor_acumulado - 1) * 100).toFixed(3)
 }
 
 async function cargarDatos() {
@@ -367,11 +521,20 @@ async function cargarDatos() {
 async function guardarSeleccion() {
   guardando.value = true
   try {
-    const items = filas.value.map(f => ({
-      contrato_id: f.contrato_id,
-      incluido: !!(seleccion[f.contrato_id] && f.habilitado),
-    }))
+    const items = filas.value.map(f => {
+      const ov = overrides[f.contrato_id]
+      let valor_manual = null
+      if (ov && ov.dirty) valor_manual = ov.valor          // override local (o null si revertido)
+      else if (f.editado_manual) valor_manual = f.valor_a_facturar  // conserva override persistido
+      return {
+        contrato_id: f.contrato_id,
+        incluido: !!(seleccion[f.contrato_id] && f.habilitado),
+        valor_manual,
+      }
+    })
     await api.post(`/om/seleccion/${periodoActual.value}`, { items })
+    Object.keys(overrides).forEach(k => delete overrides[k])
+    await cargarDatos()
     toast.add({ severity: 'success', summary: 'Selección guardada', life: 2500 })
   } catch {
     toast.add({ severity: 'error', summary: 'Error al guardar', life: 3000 })
