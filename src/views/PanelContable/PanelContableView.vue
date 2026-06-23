@@ -166,11 +166,11 @@
           <div class="cons-pool">
             <div class="fld">
               <label>Consecutivo Ingresos inicial</label>
-              <input type="number" v-model.number="consIngIni" @change="reasignar" />
+              <input type="number" v-model.number="consIngIni" @change="reasignarTodo" />
             </div>
             <div class="fld">
               <label>Consecutivo Costos inicial</label>
-              <input type="number" v-model.number="consCosIni" @change="reasignar" />
+              <input type="number" v-model.number="consCosIni" @change="reasignarTodo" />
             </div>
             <div class="hint">
               Ingresos y costos numeran por separado. Los costos solo consumen
@@ -645,10 +645,11 @@ async function cargarPaneles () {
     const { data } = await api.get('/panel-contable', { params: { periodo: periodo.value, tipo: tab.value } })
     paneles.value = data.paneles || []
     paneles.value.forEach((p, i) => { if (open[p.id] === undefined) open[p.id] = (i === 0 && esActivo(p)) })
-    // Asignar la cadena de consecutivos al cargar: si hay algún proyecto activo
-    // (liquida ingresos o costos) aún sin consecutivo, reasignar de inmediato.
+    // Al cargar: numerar SOLO los faltantes (preserva los consecutivos ya
+    // asignados/editados a mano). Así todo panel marcado queda con consecutivo
+    // sin pisar ediciones — incluida la pestaña Oficial, que antes quedaba en —.
     if (paneles.value.some(p => p.liquidar_ingresos || p.liquidar_costos)) {
-      await reasignar()
+      await reasignar(true)
     }
   } catch (e) {
     toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudieron cargar los paneles', life: 4000 })
@@ -801,13 +802,19 @@ async function onFlag (p) {
   } catch (e) { /* noop */ }
 }
 
-async function reasignar () {
+// Renumeración completa (desde el valor inicial) — al cambiar el consecutivo inicial.
+const reasignarTodo = () => reasignar(false)
+
+// soloFaltantes=true (default): rellena los consecutivos en None preservando los ya
+// asignados/editados. false: renumera todo desde el valor inicial.
+async function reasignar (soloFaltantes = true) {
   try {
     await api.post('/panel-contable/reasignar-consecutivos', {
       periodo: periodo.value,
       tipo: tab.value,
       consecutivo_ingresos_inicial: Number(consIngIni.value) || 0,
       consecutivo_costos_inicial: Number(consCosIni.value) || 0,
+      solo_faltantes: soloFaltantes,
     })
     // Refrescar consecutivos sin perder el estado de despliegue.
     const { data } = await api.get('/panel-contable', { params: { periodo: periodo.value, tipo: tab.value } })
