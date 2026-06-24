@@ -13,6 +13,10 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       port: 5173,
+      // En desarrollo el proxy hace que el frontend y la API compartan origen,
+      // por lo que no hay CORS. Tokens sensibles del lado servidor (p. ej.
+      // EVO_API_TOKEN) se inyectan aquí y NUNCA llegan al bundle del cliente.
+      // En producción, CORS y HSTS deben configurarse en el servidor. Ver SECURITY.md.
       proxy: {
         '/api/v1/evo': {
           target: env.EVO_API_URL || 'http://localhost:18800',
