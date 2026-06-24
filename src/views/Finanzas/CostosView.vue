@@ -17,6 +17,15 @@
           {{ tab.label }}
         </button>
       </div>
+
+      <!-- Exportar Excel mensual consolidado (visible desde cualquier pestaña) -->
+      <div class="flex items-center gap-2 ml-auto">
+        <input type="month" v-model="exportPeriodo"
+          class="text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-purple-200" />
+        <Button label="Descargar Excel" icon="pi pi-file-excel" size="small"
+          :loading="exportando" @click="onExportExcel"
+          style="background:#915BD8;border-color:#915BD8" />
+      </div>
     </div>
 
     <!-- ══ TAB 0 — MANTENIMIENTO ══════════════════════════════════════════ -->
@@ -275,8 +284,10 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import Select from 'primevue/select'
+import Button from 'primevue/button'
 import { useToast } from 'primevue/usetoast'
 import api from '@/api/client'
+import { generarExcelCostos } from './costosExcelExport.js'
 import FacturasMantenimiento from '@/views/Servicios/FacturasMantenimiento.vue'
 import OMAOperaciones       from './OMAOperaciones.vue'
 import OMAProveedor          from './OMAProveedor.vue'
@@ -307,6 +318,31 @@ const TABS = [
   { label: 'Mandatos',              icon: 'pi pi-file-check' },
 ]
 const activeTab = ref(0)
+
+// ── Exportar Excel mensual consolidado ──────────────────────────────────────
+const _hoy = new Date()
+const exportPeriodo = ref(`${_hoy.getFullYear()}-${String(_hoy.getMonth() + 1).padStart(2, '0')}`)
+const exportando = ref(false)
+
+async function onExportExcel() {
+  if (!exportPeriodo.value) return
+  exportando.value = true
+  try {
+    const res = await generarExcelCostos(exportPeriodo.value)
+    if (!res.filas) {
+      toast.add({ severity: 'warn', summary: 'Sin datos para exportar',
+        detail: 'Ningún proyecto seleccionado en Mantenimiento o Arriendos para ese mes.', life: 4000 })
+    } else {
+      toast.add({ severity: 'success', summary: 'Excel generado',
+        detail: `${res.proyectos} proyectos · ${res.filas} filas`, life: 3000 })
+    }
+  } catch (err) {
+    toast.add({ severity: 'error', summary: 'Error al generar el Excel',
+      detail: err?.message ?? 'Revisa la consola', life: 5000 })
+  } finally {
+    exportando.value = false
+  }
+}
 
 // ── Proyectos ──────────────────────────────────────────────────────────────────
 const proyectos            = ref([])

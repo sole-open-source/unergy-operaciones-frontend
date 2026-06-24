@@ -1,0 +1,210 @@
+/**
+ * Generación del Excel mensual consolidado de Costos.
+ *
+ * Combina, para un período (YYYY-MM):
+ *  - Mantenimiento  → /om/calculo/{periodo} (incluido + valor_a_facturar)   [mainteinance]
+ *  - Arriendos      → pagoarriendos.json + localStorage (selección + canon)  [lease]
+ *  - Internet       → /starlink/factura/{periodo} (agrupado.monto_total)     [public_services]
+ *
+ * Universo de proyectos = (✓ en Mantenimiento) ∪ (✓ en Arriendos).
+ * Cada proyecto genera 7 filas (una por payment_type). Genera y descarga el .xlsx.
+ */
+import * as XLSX from 'xlsx'
+import api from '@/api/client'
+import arriendosRaw from '@/data/pagoarriendos.json'
+
+const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+               'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+
+// Orden fijo de payment_type (strings exactos del spec, incluidos los typos)
+const PAYMENT_TYPES = ['mainteinance', 'adjustment', 'polizas', 'discounts',
+                       'interests', 'public_services', 'lease']
+
+// ── Normalización y emparejamiento de nombres ─────────────────────────────────
+function normName(s) {
+  return (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .trim().toUpperCase().replace(/\s+/g, ' ')
+}
+function stripCode(s) {
+  return normName(s).replace(/^MGS\s*\d+\s*-?\s*/, '')
+    .replace('MINIGRANJA SOLAR', ' ').replace('MINIGRANJA', ' ').trim()
+}
+const GENERIC = new Set(['LA', 'EL', 'LOS', 'LAS', 'DE', 'DEL', 'SAN', 'SUR', 'NORTE', 'SOLAR', 'MINIGRANJA', 'VALLE'])
+function tokensSig(name) {
+  const toks = stripCode(name).split(/\s+/).filter(Boolean)
+  const sig = toks.filter(t => /^\d+$/.test(t) || (t.length > 3 && !GENERIC.has(t)))
+  return sig.length ? sig : toks.filter(t => !GENERIC.has(t))
+}
+
+// Nombre panel → project_pk ("Nombre api")
+const PROJECT_PK = {
+  'Minigranja Solar Uruaco':             'uruaco_gd',
+  'Minigranja Solar Baraya':             'baraya',
+  'Minigranja Solar Gandalf':            'gandalf',
+  'Minigranja Solar Cañahuate':          'cañahuate',
+  'Minigranja Solar La Paz Vallenata':   'vallenata',
+  'Minigranja Solar Perijá':             'perija',
+  'Minigranja Solar El Molino':          'elmolino',
+  'Minigranja Solar La Paz Verso':       'verso',
+  'Minigranja Solar Esmeralda':          'esmeralda',
+  'MGS 0019 El Merengue':                'jerico_merengue',
+  'Minigranja Solar El Son':             'jerico_el_son',
+  'Minigranja Solar La Puya':            'puya',
+  'MGS 0012 La Reserva':                 'MGS 0012 La Reserva',
+  'Minigranja Solar Villanueva':         'villanueva',
+  'Minigranja Solar Joropo':             'joropo',
+  'Minigranja Solar Copey':              'copey_occidente',
+  'Minigranja Solar Mapalé':             'mapale',
+  'Minigranja Solar Ibirico':            'ibirico',
+  'Minigranja Solar La Paz Leyenda':     'mgs18',
+  'Minigranja Solar El Olimpo':          'olimpo',
+  'Minigranja Solar La Mesa':            'lamesa',
+  'Minigranja Solar San Diego Sur':      'san_diego_sur',
+  'Minigranja Solar Las Piloneras':      'piloneras',
+  'Minigranja Solar Valencia Oriente 1': 'valenciaoriente',
+  'Minigranja Solar Valencia Oriente 2': 'valencia_oriente_2',
+  'Minigranja Solar La Cacica':          'cacica',
+  'Minigranja Solar Cumbia':             'cumbia',
+  'Minigranja Solar Chiriguana 2':       'chiriguana_norte_2',
+  'Minigranja Solar Chiriguana 4':       'chiriguana_norte_4',
+}
+const PK_ENTRIES = Object.entries(PROJECT_PK).map(([nombre, pk]) => ({ pk, keys: tokensSig(nombre) }))
+
+// Devuelve project_pk para cualquier nombre (OM "MGS 00XX X", panel, etc.).
+// Si no hay match único → devuelve el nombre tal cual (fallback solicitado).
+function resolvePk(name) {
+  const toks = new Set(stripCode(name).split(/\s+/).filter(Boolean))
+  const m = PK_ENTRIES.filter(e => e.keys.length && e.keys.every(k => toks.has(k)))
+  if (m.length === 1) return m[0].pk
+  return name
+}
+
+// Nombre Starlink → nombre panel (subset con equivalencia; el resto se deja igual)
+const STARLINK_TO_PANEL = {
+  'BARAYA': 'Minigranja Solar Baraya', 'CUMBIA': 'Minigranja Solar Cumbia',
+  'EL COPEY OCCIDENTE': 'Minigranja Solar Copey', 'EL MOLINO': 'Minigranja Solar El Molino',
+  'EL OLIMPO': 'Minigranja Solar El Olimpo', 'EL SON': 'Minigranja Solar El Son',
+  'GANDALF': 'Minigranja Solar Gandalf', 'CANAHUATE': 'Minigranja Solar Cañahuate',
+  'IBIRICO': 'Minigranja Solar Ibirico', 'MAPALE': 'Minigranja Solar Mapalé',
+  'LA ESMERALDA': 'Minigranja Solar Esmeralda', 'LA MESA': 'Minigranja Solar La Mesa',
+  'VALLENATA': 'Minigranja Solar La Paz Vallenata', 'LEYENDA': 'Minigranja Solar La Paz Leyenda',
+  'LA RESERVA': 'MGS 0012 La Reserva', 'PUYA': 'Minigranja Solar La Puya',
+  'MGS LA PAZ VERSO': 'Minigranja Solar La Paz Verso', 'PERUA': 'Minigranja Solar Perijá',
+  'SAN DIEGO SUR': 'Minigranja Solar San Diego Sur', 'URUACO': 'Minigranja Solar Uruaco',
+  'VILLANUEVA': 'Minigranja Solar Villanueva', 'CACICA': 'Minigranja Solar La Cacica',
+  'PILONERAS': 'Minigranja Solar Las Piloneras', 'VALENCIA 1': 'Minigranja Solar Valencia Oriente 1',
+  'VALENCIA 2': 'Minigranja Solar Valencia Oriente 2', 'CHIRIGUANA N2': 'Minigranja Solar Chiriguana 2',
+  'CHIRIGUANA N4': 'Minigranja Solar Chiriguana 4', 'NESTLE': 'Nestle', 'OFICINA UNERGY': 'Oficina Unergy',
+}
+function starlinkPanel(desc) {
+  return STARLINK_TO_PANEL[normName(desc)] || desc
+}
+
+// ── Arriendos (réplica de la lógica de la vista, leída del navegador) ──────────
+function loadJSON(key) {
+  try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : null } catch { return null }
+}
+function arrGetIPC() {
+  const map = new Map([[2023, 0.0928], [2024, 0.0520], [2025, 0.0510]])
+  const stored = loadJSON('arriendos_ipc_tasas')
+  if (Array.isArray(stored)) stored.forEach(s => map.set(s.año, s.tasa))
+  return (año) => map.get(año)
+}
+function arrId(p) {
+  return p._extraId ?? (p.Codigo || p.Proyecto)
+}
+function arrCanon(p, añoPeriodo, getIPC) {
+  const ov = (loadJSON('arriendos_overrides') || {})[arrId(p)] || {}
+  const pp = { ...p, ...ov }
+  const valorBase = pp['Valor base']
+  const canonArchivo = pp['Canon arrendamiento']
+  if (canonArchivo != null) return canonArchivo
+  if (!pp['Fecha firma contrato'] || valorBase == null) return null
+  const añoFirma = new Date(pp['Fecha firma contrato']).getFullYear()
+  let v = valorBase
+  for (let y = añoFirma + 1; y <= añoPeriodo; y++) {
+    const ipc = getIPC(y - 1)
+    if (ipc === undefined) break
+    v = v * (1 + ipc)
+  }
+  return Math.round(v)
+}
+
+// ── Generación principal ──────────────────────────────────────────────────────
+export async function generarExcelCostos(periodo) {
+  const [yyyy, mm] = periodo.split('-').map(Number)
+  const getIPC = arrGetIPC()
+
+  // Mantenimiento (backend)
+  let omFilas = []
+  try { omFilas = (await api.get(`/om/calculo/${periodo}`)).data.filas || [] } catch { omFilas = [] }
+
+  // Internet (backend)
+  let agrupado = []
+  try { agrupado = (await api.get(`/starlink/factura/${periodo}`)).data.agrupado || [] } catch { agrupado = [] }
+
+  // Arriendos (navegador): selección por período (default ✓) + canon
+  const selData = (loadJSON('arriendos_seleccion') || {})[periodo] || {}
+  const arrFuente = [...arriendosRaw, ...(loadJSON('arriendos_proyectos_extra') || [])]
+
+  // public_services por pk
+  const pubByPk = {}
+  agrupado.forEach(it => {
+    const pk = resolvePk(starlinkPanel(it.descripcion))
+    pubByPk[pk] = (pubByPk[pk] || 0) + (it.monto_total || 0)
+  })
+
+  // Universo = proyectos ✓ en Mantenimiento ∪ ✓ en Arriendos
+  const proyectos = new Map()  // pk → { pk, mant, lease }
+  const get = (pk) => {
+    if (!proyectos.has(pk)) proyectos.set(pk, { pk, mant: 0, lease: 0 })
+    return proyectos.get(pk)
+  }
+
+  omFilas.forEach(f => {
+    if (f.incluido && f.habilitado) get(resolvePk(f.nombre_proyecto)).mant = f.valor_a_facturar || 0
+  })
+  arrFuente.forEach(p => {
+    const id = arrId(p)
+    const seleccionado = selData[id] !== undefined ? selData[id] : true  // default ✓
+    if (!seleccionado) return
+    get(resolvePk(p.Proyecto || '')).lease = arrCanon(p, yyyy, getIPC) || 0
+  })
+
+  // Fechas del período
+  const ultimo = new Date(yyyy, mm, 0).getDate()
+  const fromDate = `${yyyy}-${String(mm).padStart(2, '0')}-01`
+  const toDate   = `${yyyy}-${String(mm).padStart(2, '0')}-${String(ultimo).padStart(2, '0')}`
+
+  // Filas (7 por proyecto, orden fijo)
+  const rows = []
+  for (const o of proyectos.values()) {
+    const pub = pubByPk[o.pk] || 0
+    const valorDe = {
+      mainteinance:    o.mant,
+      public_services: pub,
+      lease:           o.lease,
+    }
+    for (const pt of PAYMENT_TYPES) {
+      rows.push({
+        project_pk:        o.pk,
+        payment_type:      pt,
+        value:             valorDe[pt] ?? 0,
+        from_date:         fromDate,
+        to_date:           toDate,
+        payment_frecuency: 'monthly',
+      })
+    }
+  }
+
+  // Hoja .xlsx plana
+  const ws = XLSX.utils.json_to_sheet(rows, {
+    header: ['project_pk', 'payment_type', 'value', 'from_date', 'to_date', 'payment_frecuency'],
+  })
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, 'Costos')
+  const filename = `proyectos_con_payment_type_${MESES[mm - 1]}_${yyyy}.xlsx`
+  XLSX.writeFile(wb, filename)
+
+  return { proyectos: proyectos.size, filas: rows.length }
+}
