@@ -73,49 +73,42 @@
         </div>
       </div>
 
-      <!-- Separador Detalle -->
-      <div class="flex items-center gap-3">
-        <div class="h-px flex-1" style="background:#ECE7F2" />
-        <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full"
-          style="background:#F1EAF9;color:#6D28D9">Detalle</span>
-        <div class="h-px flex-1" style="background:#ECE7F2" />
+      <!-- Subpestañas Detalle / Agrupado (mismo estilo que las pestañas principales) -->
+      <div class="mon-tab-group">
+        <button type="button" class="mon-tab" :class="{ 'mon-tab--active': subTab === 0 }" @click="subTab = 0">
+          <i class="pi pi-list" />Detalle
+        </button>
+        <button type="button" class="mon-tab" :class="{ 'mon-tab--active': subTab === 1 }" @click="subTab = 1">
+          <i class="pi pi-sitemap" />Agrupado
+        </button>
       </div>
 
       <!-- Tabla Detalle -->
-      <div class="rounded-xl border border-gray-100 overflow-hidden">
+      <div v-if="subTab === 0" class="rounded-xl border border-gray-100 overflow-hidden">
         <div class="overflow-x-auto">
-          <table class="w-full text-sm border-collapse" style="min-width:780px">
+          <table class="w-full text-sm border-collapse" style="min-width:680px; table-layout:fixed">
             <thead>
               <tr style="background:#1F4E79">
                 <th v-for="h in headersDetalle" :key="h.key"
                   class="px-3 py-2.5 text-xs font-semibold text-white whitespace-nowrap"
-                  :class="h.right ? 'text-right' : 'text-left'">{{ h.label }}</th>
+                  :class="h.right ? 'text-right' : 'text-left'"
+                  :style="h.key === 'descripcion' ? 'width:42%' : ''">{{ h.label }}</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="(item, i) in facturaActual.items" :key="i"
                 :style="i % 2 === 0 ? 'background:#fff' : 'background:#eaf3fb'">
-                <td class="px-3 py-2 text-xs">
-                  <span class="px-1.5 py-0.5 rounded text-[10px] font-medium"
-                    :style="item.tipo === 'servicio' ? 'background:#ede9fe;color:#6d28d9' : 'background:#dbeafe;color:#1e40af'">
-                    {{ item.tipo }}
-                  </span>
-                </td>
-                <td class="px-3 py-2 text-xs font-medium" style="color:#2C2039;white-space:nowrap">{{ item.descripcion }}</td>
+                <td class="px-3 py-2 text-xs font-medium" style="color:#2C2039;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+                  :title="item.descripcion">{{ item.descripcion }}</td>
                 <td class="px-3 py-2 text-xs text-right font-mono text-gray-600">{{ formatCOP(item.precio_unitario) }}</td>
                 <td class="px-3 py-2 text-xs text-center text-gray-600">{{ item.cantidad }}</td>
                 <td class="px-3 py-2 text-xs text-right font-mono text-gray-600">{{ formatCOP(item.total_impuestos) }}</td>
-                <td class="px-3 py-2 text-xs text-right font-mono text-gray-600">{{ formatCOP(item.sin_iva) }}</td>
-                <td class="px-3 py-2 text-xs text-right font-mono text-gray-600">{{ formatCOP(item.iva) }}</td>
                 <td class="px-3 py-2 text-xs text-right font-semibold tabular-nums" style="color:#7c3aed">{{ formatCOP(item.monto_total) }}</td>
               </tr>
               <tr style="background:#1F4E79">
                 <td colspan="2" class="px-3 py-2.5 text-xs font-bold text-white">TOTAL</td>
-                <td class="px-3 py-2.5 text-right text-xs font-bold font-mono text-white"></td>
                 <td class="px-3 py-2.5 text-center text-xs font-bold text-white">{{ totalDetalle.cantidad }}</td>
                 <td class="px-3 py-2.5 text-right text-xs font-bold font-mono text-white">{{ formatCOP(totalDetalle.impuestos) }}</td>
-                <td class="px-3 py-2.5 text-right text-xs font-bold font-mono text-white">{{ formatCOP(totalDetalle.sin_iva) }}</td>
-                <td class="px-3 py-2.5 text-right text-xs font-bold font-mono text-white">{{ formatCOP(totalDetalle.iva) }}</td>
                 <td class="px-3 py-2.5 text-right text-xs font-bold font-mono text-white">{{ formatCOP(totalDetalle.total) }}</td>
               </tr>
             </tbody>
@@ -123,29 +116,23 @@
         </div>
       </div>
 
-      <!-- Separador Agrupado -->
-      <div class="flex items-center gap-3">
-        <div class="h-px flex-1" style="background:#ECE7F2" />
-        <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full"
-          style="background:#dbeafe;color:#1e40af">Agrupado</span>
-        <div class="h-px flex-1" style="background:#ECE7F2" />
-      </div>
-
       <!-- Tabla Agrupado -->
-      <div class="rounded-xl border border-gray-100 overflow-hidden">
+      <div v-if="subTab === 1" class="rounded-xl border border-gray-100 overflow-hidden">
         <div class="overflow-x-auto">
-          <table class="w-full text-sm border-collapse" style="min-width:680px">
+          <table class="w-full text-sm border-collapse" style="min-width:680px; table-layout:fixed">
             <thead>
               <tr style="background:#1F4E79">
                 <th v-for="h in headersAgrupado" :key="h.key"
                   class="px-3 py-2.5 text-xs font-semibold text-white whitespace-nowrap"
-                  :class="h.right ? 'text-right' : 'text-left'">{{ h.label }}</th>
+                  :class="h.right ? 'text-right' : 'text-left'"
+                  :style="h.key === 'descripcion' ? 'width:34%' : ''">{{ h.label }}</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="(item, i) in facturaActual.agrupado" :key="i"
                 :style="i % 2 === 0 ? 'background:#fff' : 'background:#eaf3fb'">
-                <td class="px-3 py-2 text-xs font-medium" style="color:#2C2039;white-space:nowrap">{{ item.descripcion }}</td>
+                <td class="px-3 py-2 text-xs font-medium" style="color:#2C2039;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+                  :title="nombrePanel(item.descripcion)">{{ nombrePanel(item.descripcion) }}</td>
                 <td class="px-3 py-2 text-xs text-center text-gray-600">{{ item.cantidad_total }}</td>
                 <td class="px-3 py-2 text-xs text-right font-mono text-gray-600">{{ formatCOP(item.precio_unitario_promedio) }}</td>
                 <td class="px-3 py-2 text-xs text-right font-mono text-gray-600">{{ formatCOP(item.sin_iva) }}</td>
@@ -235,15 +222,15 @@ import api from '@/api/client'
 
 const toast = useToast()
 
+// ── Subpestañas Detalle / Agrupado ─────────────────────────────────────────────
+const subTab = ref(0)   // 0 = Detalle, 1 = Agrupado
+
 // ── Headers ───────────────────────────────────────────────────────────────────
 const headersDetalle = [
-  { key: 'tipo',            label: 'Tipo',            right: false },
   { key: 'descripcion',     label: 'Descripción',     right: false },
   { key: 'precio_unitario', label: 'Precio unitario', right: true  },
   { key: 'cantidad',        label: 'Cant.',           right: false },
   { key: 'total_impuestos', label: 'Impuestos',       right: true  },
-  { key: 'sin_iva',         label: 'Sin IVA',         right: true  },
-  { key: 'iva',             label: 'IVA',             right: true  },
   { key: 'monto_total',     label: 'Monto total',     right: true  },
 ]
 const headersAgrupado = [
@@ -254,6 +241,47 @@ const headersAgrupado = [
   { key: 'iva',                      label: 'IVA',                right: true  },
   { key: 'monto_total',              label: 'Monto total',        right: true  },
 ]
+
+// ── Mapeo nombre Starlink → nombre oficial del panel ───────────────────────────
+function _normNombre(s) {
+  return (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .trim().toUpperCase().replace(/\s+/g, ' ')
+}
+// Claves normalizadas (mayúsculas, sin acentos). Las que no estén aquí se muestran tal cual.
+const MAPEO_STARLINK = {
+  'BARAYA':             'Minigranja Solar Baraya',
+  'CUMBIA':             'Minigranja Solar Cumbia',
+  'EL COPEY OCCIDENTE': 'Minigranja Solar Copey',
+  'EL MOLINO':          'Minigranja Solar El Molino',
+  'EL OLIMPO':          'Minigranja Solar El Olimpo',
+  'EL SON':             'Minigranja Solar El Son',
+  'GANDALF':            'Minigranja Solar Gandalf',
+  'CANAHUATE':          'Minigranja Solar Cañahuate',
+  'IBIRICO':            'Minigranja Solar Ibirico',
+  'MAPALE':             'Minigranja Solar Mapalé',
+  'LA ESMERALDA':       'Minigranja Solar Esmeralda',
+  'LA MESA':            'Minigranja Solar La Mesa',
+  'VALLENATA':          'Minigranja Solar La Paz Vallenata',
+  'LEYENDA':            'Minigranja Solar La Paz Leyenda',
+  'LA RESERVA':         'MGS 0012 La Reserva',
+  'PUYA':               'Minigranja Solar La Puya',
+  'MGS LA PAZ VERSO':   'Minigranja Solar La Paz Verso',
+  'PERUA':              'Minigranja Solar Perijá',
+  'SAN DIEGO SUR':      'Minigranja Solar San Diego Sur',
+  'URUACO':             'Minigranja Solar Uruaco',
+  'VILLANUEVA':         'Minigranja Solar Villanueva',
+  'CACICA':             'Minigranja Solar La Cacica',
+  'PILONERAS':          'Minigranja Solar Las Piloneras',
+  'VALENCIA 1':         'Minigranja Solar Valencia Oriente 1',
+  'VALENCIA 2':         'Minigranja Solar Valencia Oriente 2',
+  'CHIRIGUANA N2':      'Minigranja Solar Chiriguana 2',
+  'CHIRIGUANA N4':      'Minigranja Solar Chiriguana 4',
+  'NESTLE':             'Nestle',
+  'OFICINA UNERGY':     'Oficina Unergy',
+}
+function nombrePanel(desc) {
+  return MAPEO_STARLINK[_normNombre(desc)] || desc
+}
 
 // ── Períodos guardados ────────────────────────────────────────────────────────
 const periodos       = ref([])   // ['2026-05', '2026-04', ...] — desc
@@ -431,4 +459,39 @@ onMounted(async () => {
   text-align: center;
   padding: 80px 20px;
 }
+
+/* Subpestañas Detalle / Agrupado — mismo estilo que las pestañas principales (CostosView) */
+.mon-tab-group {
+  display: inline-flex;
+  background: #F4F1FA;
+  border: 1px solid #E5E2EC;
+  border-radius: 8px;
+  padding: 2px;
+  gap: 0;
+}
+.mon-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: transparent;
+  border: none;
+  padding: 5px 12px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  color: #6B5A8A;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all .15s;
+  white-space: nowrap;
+}
+.mon-tab i { font-size: 12px; }
+.mon-tab:hover:not(.mon-tab--active) { color: #2C2039; background: rgba(145,91,216,.08); }
+.mon-tab--active {
+  background: #915BD8;
+  color: #FDFAF7;
+  box-shadow: 0 1px 4px rgba(145,91,216,.3);
+}
+.mon-tab--active:hover { color: #FDFAF7; }
 </style>
