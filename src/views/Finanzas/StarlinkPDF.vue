@@ -88,9 +88,9 @@
         <div class="overflow-x-auto">
           <table class="w-full text-sm border-collapse" style="min-width:680px; table-layout:fixed">
             <thead>
-              <tr style="background:#1F4E79">
+              <tr class="bg-gray-50 border-b border-gray-100">
                 <th v-for="h in headersDetalle" :key="h.key"
-                  class="px-3 py-2.5 text-xs font-semibold text-white whitespace-nowrap"
+                  class="px-3 py-2.5 text-xs font-semibold text-gray-500 whitespace-nowrap"
                   :class="h.right ? 'text-right' : 'text-left'"
                   :style="h.key === 'descripcion' ? 'width:42%' : ''">{{ h.label }}</th>
               </tr>
@@ -105,11 +105,11 @@
                 <td class="px-3 py-2 text-xs text-right font-mono text-gray-600">{{ formatCOP(item.total_impuestos) }}</td>
                 <td class="px-3 py-2 text-xs text-right font-semibold tabular-nums" style="color:#7c3aed">{{ formatCOP(item.monto_total) }}</td>
               </tr>
-              <tr style="background:#1F4E79">
-                <td colspan="2" class="px-3 py-2.5 text-xs font-bold text-white">TOTAL</td>
-                <td class="px-3 py-2.5 text-center text-xs font-bold text-white">{{ totalDetalle.cantidad }}</td>
-                <td class="px-3 py-2.5 text-right text-xs font-bold font-mono text-white">{{ formatCOP(totalDetalle.impuestos) }}</td>
-                <td class="px-3 py-2.5 text-right text-xs font-bold font-mono text-white">{{ formatCOP(totalDetalle.total) }}</td>
+              <tr class="bg-gray-50 border-t-2 border-gray-200">
+                <td colspan="2" class="px-3 py-2.5 text-xs font-semibold text-gray-600">TOTAL</td>
+                <td class="px-3 py-2.5 text-center text-xs font-semibold text-gray-600">{{ totalDetalle.cantidad }}</td>
+                <td class="px-3 py-2.5 text-right text-xs font-semibold font-mono text-gray-600">{{ formatCOP(totalDetalle.impuestos) }}</td>
+                <td class="px-3 py-2.5 text-right text-xs font-bold font-mono tabular-nums" style="color:#7c3aed">{{ formatCOP(totalDetalle.total) }}</td>
               </tr>
             </tbody>
           </table>
@@ -121,9 +121,9 @@
         <div class="overflow-x-auto">
           <table class="w-full text-sm border-collapse" style="min-width:680px; table-layout:fixed">
             <thead>
-              <tr style="background:#1F4E79">
+              <tr class="bg-gray-50 border-b border-gray-100">
                 <th v-for="h in headersAgrupado" :key="h.key"
-                  class="px-3 py-2.5 text-xs font-semibold text-white whitespace-nowrap"
+                  class="px-3 py-2.5 text-xs font-semibold text-gray-500 whitespace-nowrap"
                   :class="h.right ? 'text-right' : 'text-left'"
                   :style="h.key === 'descripcion' ? 'width:34%' : ''">{{ h.label }}</th>
               </tr>
@@ -139,13 +139,13 @@
                 <td class="px-3 py-2 text-xs text-right font-mono text-gray-600">{{ formatCOP(item.iva) }}</td>
                 <td class="px-3 py-2 text-xs text-right font-semibold tabular-nums" style="color:#7c3aed">{{ formatCOP(item.monto_total) }}</td>
               </tr>
-              <tr style="background:#0D2137">
-                <td class="px-3 py-2.5 text-xs font-bold text-white">TOTAL</td>
-                <td class="px-3 py-2.5 text-center text-xs font-bold text-white">{{ totalAgrupado.cantidad }}</td>
-                <td class="px-3 py-2.5 text-right text-xs font-bold font-mono text-white"></td>
-                <td class="px-3 py-2.5 text-right text-xs font-bold font-mono text-white">{{ formatCOP(totalAgrupado.sin_iva) }}</td>
-                <td class="px-3 py-2.5 text-right text-xs font-bold font-mono text-white">{{ formatCOP(totalAgrupado.iva) }}</td>
-                <td class="px-3 py-2.5 text-right text-xs font-bold font-mono text-white">{{ formatCOP(totalAgrupado.total) }}</td>
+              <tr class="bg-gray-50 border-t-2 border-gray-200">
+                <td class="px-3 py-2.5 text-xs font-semibold text-gray-600">TOTAL</td>
+                <td class="px-3 py-2.5 text-center text-xs font-semibold text-gray-600">{{ totalAgrupado.cantidad }}</td>
+                <td class="px-3 py-2.5 text-right text-xs font-semibold font-mono text-gray-600"></td>
+                <td class="px-3 py-2.5 text-right text-xs font-semibold font-mono text-gray-600">{{ formatCOP(totalAgrupado.sin_iva) }}</td>
+                <td class="px-3 py-2.5 text-right text-xs font-semibold font-mono text-gray-600">{{ formatCOP(totalAgrupado.iva) }}</td>
+                <td class="px-3 py-2.5 text-right text-xs font-bold font-mono tabular-nums" style="color:#7c3aed">{{ formatCOP(totalAgrupado.total) }}</td>
               </tr>
             </tbody>
           </table>
