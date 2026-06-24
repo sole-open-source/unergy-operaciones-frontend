@@ -115,6 +115,12 @@
               </td>
               <td class="px-3 py-2 font-medium" style="color:#2C2039; white-space:nowrap">
                 {{ fila.nombre_proyecto }}
+                <span v-if="!fila.habilitado"
+                  class="inline-flex items-center gap-1 ml-1.5 text-[10px] font-normal px-1.5 py-0.5 rounded-full align-middle"
+                  style="background:#fef3c7; color:#92400e"
+                  :title="fila.historial_indexaciones">
+                  <i class="pi pi-exclamation-triangle text-[9px]" />{{ fila.historial_indexaciones }}
+                </span>
               </td>
               <td class="px-3 py-2 font-mono text-xs text-gray-500">{{ fila.periodo }}</td>
               <td class="px-3 py-2 text-xs text-gray-600">{{ fila.mes_año }}</td>
@@ -299,7 +305,9 @@
     <Dialog v-model:visible="showIPCDialog" modal header="Tasas IPC" :style="{ width: '420px' }">
       <div class="space-y-3 pt-1">
         <p class="text-xs text-gray-500">
-          El IPC de diciembre del año N se aplica desde enero del año N+1.
+          La tasa del año N indexa la facturación de ese mismo año N. Se acumula desde
+          el año siguiente a la fecha base del contrato — max(suscripción, inicio de
+          operación) — y solo aplica si el contrato ya cumplió un año.
         </p>
         <DataTable :value="ipcTasas" class="text-sm" stripedRows>
           <Column field="año" header="Año" style="width:80px" />
