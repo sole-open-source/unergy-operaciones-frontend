@@ -306,6 +306,28 @@
           <i class="pi text-xs" :class="sortDesc ? 'pi-sort-amount-down' : 'pi-sort-amount-up'" style="color: #915BD8;" />
           {{ sortDesc ? '↓ Mayor %' : '↑ Menor %' }}
         </button>
+
+        <!-- Filtro por estado (derivado de la proyección de cierre) -->
+        <div class="flex items-center gap-1.5 flex-wrap">
+          <button
+            @click="estadoFiltro = null"
+            class="cv-btn"
+            :style="estadoFiltro === null ? 'border-color:#915BD8; background:rgba(145,91,216,0.10); color:#915BD8; font-weight:700;' : ''"
+          >Todos</button>
+          <button
+            v-for="f in ESTADO_FILTROS"
+            :key="f.key"
+            @click="toggleEstadoFiltro(f.key)"
+            class="cv-btn"
+            :style="estadoFiltro === f.key ? `border-color:${f.color}; background:${f.color}1f; color:${f.color}; font-weight:700;` : ''"
+            v-tooltip="`Estado por proyección de cierre`"
+          >
+            <span class="inline-block rounded-full" :style="`width:8px; height:8px; background:${f.color};`"></span>
+            {{ f.label }}
+            <b class="ml-0.5">{{ estadoCounts[f.key] }}</b>
+          </button>
+        </div>
+
         <div class="flex-1"></div>
         <button @click="showNuevoForm = true" class="cv-btn-cta">
           <i class="pi pi-plus text-xs" />PPA nuevo
@@ -1210,6 +1232,15 @@ const ficticioMax      = ref(0)
 let ficticioNextId     = 1
 const expandedContratos = ref([])
 const sortDesc         = ref(true)
+// Filtro por estado (deriva de la proyección, ver estadoEfectivo en simResults).
+// null = todos | 'ok' (cumplido) | 'deficit' (incumplido) | 'excedente' (exposición en bolsa)
+const estadoFiltro     = ref(null)
+const ESTADO_FILTROS = [
+  { key: 'ok',        label: 'Cumplido',            color: '#2e7d32' },
+  { key: 'deficit',   label: 'Incumplido',          color: '#D64455' },
+  { key: 'excedente', label: 'Exposición en bolsa', color: '#14B8A6' },
+]
+function toggleEstadoFiltro(k) { estadoFiltro.value = estadoFiltro.value === k ? null : k }
 const dragPlanta       = ref(null)
 const dragFromContrato = ref(undefined)
 const dragOver         = ref(null)
@@ -1359,13 +1390,29 @@ const allContratos = computed(() => {
 })
 
 const visibleContratos = computed(() => {
-  const filtered = allContratos.value.filter(c => !hiddenContratos.value.has(c.id))
   const res = simResults.value
+  const filtered = allContratos.value.filter(c => {
+    if (hiddenContratos.value.has(c.id)) return false
+    if (estadoFiltro.value && res[c.id]?.estadoEfectivo !== estadoFiltro.value) return false
+    return true
+  })
   return filtered.slice().sort((a, b) => {
     const pctA = res[a.id]?.pct ?? -1
     const pctB = res[b.id]?.pct ?? -1
     return sortDesc.value ? pctB - pctA : pctA - pctB
   })
+})
+
+// Conteo por estado (sobre los contratos no ocultos) para mostrar en los botones de filtro.
+const estadoCounts = computed(() => {
+  const res = simResults.value
+  const counts = { ok: 0, deficit: 0, excedente: 0 }
+  for (const c of allContratos.value) {
+    if (hiddenContratos.value.has(c.id)) continue
+    const e = res[c.id]?.estadoEfectivo
+    if (e in counts) counts[e]++
+  }
+  return counts
 })
 
 // ── Table with consolidated row ──────────────────────────────────────────────
@@ -1526,11 +1573,16 @@ const simResults = computed(() => {
     }
     const plantasPct = plantasEsp ? Math.min(100, (plantasReg / plantasEsp) * 100) : null
 
+    // Estado para filtrar: la proyección de cierre cuando existe (mes en curso),
+    // si no, el estado real (meses ya cerrados o sin proyección disponible).
+    const estadoEfectivo = (esActual && genProy > 0 && estadoProy !== 'sin_compromisos')
+      ? estadoProy : estado
+
     out[c.id] = {
       gen: Math.round(gen * 10) / 10,
       genDup: Math.round(genDup * 10) / 10,
       genProy: esActual ? Math.round(genProy * 10) / 10 : null,
-      estado, estadoProy, pct, dupPct, proyPct, min, max,
+      estado, estadoProy, estadoEfectivo, pct, dupPct, proyPct, min, max,
       diaActual: diaAct, diasRestantes: diasRest, bullet,
       plantasReg, plantasEsp, estadoPlantas, plantasPct,
     }
