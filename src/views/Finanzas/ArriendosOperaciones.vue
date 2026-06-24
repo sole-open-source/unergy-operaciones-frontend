@@ -129,7 +129,8 @@
                   <i v-if="fila.difiere_archivo"
                     class="pi pi-exclamation-triangle flex-shrink-0 cursor-help"
                     style="font-size:11px;color:#f59e0b"
-                    v-tooltip.top="`Valor calculado por IPC: ${formatCOP(fila.canon_calculado)}`" />
+                    @mouseenter="mostrarCanon($event, fila)"
+                    @mouseleave="ocultarCanon()" />
                 </span>
               </td>
               <td v-if="colsVisibles.historial" class="px-3 py-2 text-xs text-gray-400"
@@ -287,6 +288,13 @@
       </div>
     </Dialog>
 
+    <!-- ── Popover desglose del canon (hover sobre ⚠️) ───────────────────────── -->
+    <CalculoIpcPopover
+      ref="canonPopover"
+      :valor-base-anual="filaCanon && filaCanon.valor_base != null ? filaCanon.valor_base * 12 : null"
+      :factor="filaCanon ? filaCanon.factor_acumulado : null"
+      :valor-a-facturar="filaCanon ? filaCanon.canon_calculado : null" />
+
   </div>
 </template>
 
@@ -302,9 +310,21 @@ import InputText   from 'primevue/inputtext'
 import { useToast } from 'primevue/usetoast'
 import arriendosRaw from '@/data/pagoarriendos.json'
 import ArriendosZipUpload from './ArriendosZipUpload.vue'
+import CalculoIpcPopover from '@/components/CalculoIpcPopover.vue'
 import { docsMeta, loadDocsMeta, downloadDoc, docKey } from '@/composables/useArriendosDocs'
 
 const toast = useToast()
+
+// ── Tooltip de cálculo del canon (mismo diseño que Mantenimiento) ──────────────
+const canonPopover = ref(null)
+const filaCanon    = ref(null)
+function mostrarCanon(ev, fila) {
+  filaCanon.value = fila
+  canonPopover.value?.show(ev)
+}
+function ocultarCanon() {
+  canonPopover.value?.hide()
+}
 
 // ── Período ────────────────────────────────────────────────────────────────────
 const hoy           = new Date()
