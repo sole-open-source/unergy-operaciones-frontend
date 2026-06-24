@@ -55,30 +55,30 @@
     <!-- ── Tabla ──────────────────────────────────────────────────────────── -->
     <div class="rounded-xl border border-gray-100 overflow-hidden">
       <div class="overflow-x-auto">
-        <table class="w-full text-sm border-collapse" style="min-width:980px">
+        <table class="w-full text-sm border-collapse" style="min-width:980px; table-layout:fixed">
           <thead>
             <tr class="bg-gray-50 border-b border-gray-100">
-              <th class="px-3 py-2.5 text-left w-10">
+              <th class="px-3 py-2.5 text-left" style="width:40px">
                 <input type="checkbox" :checked="todosMarcados" @change="toggleTodos"
                   class="accent-purple-600" />
               </th>
-              <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500">Proyecto</th>
-              <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500">Período</th>
-              <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500">Mes / Año</th>
+              <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500" style="width:240px">Proyecto</th>
+              <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500" style="width:90px">Período</th>
+              <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500" style="width:110px">Mes / Año</th>
               <th v-if="colsVisibles.n_indexaciones"
-                class="px-3 py-2.5 text-right text-xs font-semibold text-gray-500">N° IPC</th>
-              <th class="px-3 py-2.5 text-right text-xs font-semibold text-gray-500">Valor Base</th>
+                class="px-3 py-2.5 text-right text-xs font-semibold text-gray-500" style="width:70px">N° IPC</th>
+              <th class="px-3 py-2.5 text-right text-xs font-semibold text-gray-500" style="width:130px">Valor Base</th>
               <th v-if="colsVisibles.factor_acumulado"
-                class="px-3 py-2.5 text-right text-xs font-semibold text-gray-500">Factor Acum.</th>
+                class="px-3 py-2.5 text-right text-xs font-semibold text-gray-500" style="width:100px">Factor Acum.</th>
               <th v-if="colsVisibles.valor_anual_indexado"
-                class="px-3 py-2.5 text-right text-xs font-semibold text-gray-500">Val. Anual Indexado</th>
-              <th class="px-3 py-2.5 text-right text-xs font-semibold text-gray-500 bg-purple-50">
+                class="px-3 py-2.5 text-right text-xs font-semibold text-gray-500" style="width:150px">Val. Anual Indexado</th>
+              <th class="px-3 py-2.5 text-right text-xs font-semibold text-gray-500 bg-purple-50" style="width:160px">
                 Canon Arrendamiento
               </th>
               <th v-if="colsVisibles.historial"
-                class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500">Historial IPC</th>
-              <th class="px-3 py-2.5 text-center text-xs font-semibold text-gray-500">Documento</th>
-              <th class="px-3 py-2.5 text-center text-xs font-semibold text-gray-500">Facturado</th>
+                class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500" style="width:240px">Historial IPC</th>
+              <th class="px-3 py-2.5 text-center text-xs font-semibold text-gray-500" style="width:100px">Documento</th>
+              <th class="px-3 py-2.5 text-center text-xs font-semibold text-gray-500" style="width:90px">Facturado</th>
             </tr>
           </thead>
           <tbody>
@@ -90,9 +90,9 @@
                 <input type="checkbox" v-model="seleccion[fila.id]" class="accent-purple-600" />
               </td>
               <!-- Proyecto + botón editar -->
-              <td class="px-3 py-2 font-medium" style="color:#2C2039; white-space:nowrap">
-                <span class="inline-flex items-center gap-1.5">
-                  {{ fila.proyecto }}
+              <td class="px-3 py-2 font-medium" style="color:#2C2039; white-space:nowrap; overflow:hidden; text-overflow:ellipsis" :title="fila.proyecto">
+                <span class="inline-flex items-center gap-1.5 max-w-full">
+                  <span class="truncate">{{ fila.proyecto }}</span>
                   <button type="button"
                     class="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-purple-600"
                     title="Editar proyecto"
@@ -126,9 +126,10 @@
                     {{ formatCOP(fila.canon_calculado) }}
                   </span>
                   <span v-else class="text-gray-300">—</span>
-                  <i v-if="fila.difiere_archivo"
-                    class="pi pi-exclamation-triangle flex-shrink-0 cursor-help"
-                    style="font-size:11px;color:#f59e0b"
+                  <i v-if="fila.canon_calculado != null"
+                    class="pi pi-info-circle flex-shrink-0 cursor-help opacity-0 group-hover:opacity-100 transition-opacity"
+                    style="font-size:11px;color:#915BD8"
+                    title="Ver cálculo"
                     @mouseenter="mostrarCanon($event, fila)"
                     @mouseleave="ocultarCanon()" />
                 </span>
