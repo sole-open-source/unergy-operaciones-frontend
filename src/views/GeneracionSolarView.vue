@@ -175,11 +175,16 @@
 
                 <!-- ── Inversores ── -->
                 <div v-if="detailData.inverters?.length" class="gs-inverters-section">
-                  <h3 class="gs-section-title">Inversores ({{ detailData.inverters.length }})</h3>
+                  <h3 class="gs-section-title">
+                    Inversores ({{ detailData.inverters.length }})
+                    <span class="gs-inv-hint">· click en un inversor para ver su detalle</span>
+                  </h3>
                   <div class="gs-inverters-grid">
                     <div v-for="inv in detailData.inverters" :key="inv.id"
-                      class="gs-inv-card"
-                      :style="{ borderLeftColor: STATUS_CFG[inv.inv_status]?.border || '#e5e7eb' }">
+                      class="gs-inv-card gs-inv-card--clickable"
+                      :class="{ 'gs-inv-card--active': expandedInv === inv.name }"
+                      :style="{ borderLeftColor: STATUS_CFG[inv.inv_status]?.border || '#e5e7eb' }"
+                      @click="toggleInverter(inv)">
                       <div class="gs-inv-top">
                         <span class="gs-inv-name">{{ inv.name }}</span>
                         <span class="gs-status-dot" :style="{ background: STATUS_CFG[inv.inv_status]?.dot || '#9ca3af' }" />
@@ -192,8 +197,118 @@
                           {{ inv.power_kw != null ? inv.power_kw.toFixed(2) : '—' }}
                         </span>
                         <span class="gs-inv-power-unit">kW</span>
+                        <i class="pi gs-inv-chevron" :class="expandedInv === inv.name ? 'pi-chevron-up' : 'pi-chevron-down'" />
                       </div>
                     </div>
+                  </div>
+
+                  <!-- ── Panel expandido de un inversor ── -->
+                  <Transition name="gs-expand">
+                    <div v-if="expandedInvDetail" class="gs-inv-expanded">
+                      <div class="gs-inv-expanded-head">
+                        <h4 class="gs-inv-expanded-title">
+                          <span class="gs-status-dot" :style="{ background: STATUS_CFG[expandedInvDetail.inv_status]?.dot || '#9ca3af' }" />
+                          {{ expandedInvDetail.name }}
+                          <span class="gs-inv-expanded-state" :style="{ color: STATUS_CFG[expandedInvDetail.inv_status]?.color || '#6b7280' }">
+                            {{ expandedInvDetail.state }}
+                          </span>
+                        </h4>
+                        <button class="gs-close-btn gs-close-btn--sm" @click="expandedInv = null">
+                          <i class="pi pi-times" />
+                        </button>
+                      </div>
+
+                      <!-- KPIs tiempo real del inversor -->
+                      <div class="gs-gaia-kpis">
+                        <div class="gs-gaia-kpi">
+                          <div class="gs-gaia-kpi-label">Potencia AC</div>
+                          <div class="gs-gaia-kpi-val" style="color:#16a34a">{{ fmtAC(expandedInvDetail.ac_metrics?.pac_kw ?? expandedInvDetail.power_kw) }}</div>
+                          <div class="gs-gaia-kpi-sub">kW</div>
+                        </div>
+                        <div class="gs-gaia-kpi">
+                          <div class="gs-gaia-kpi-label">Energía hoy</div>
+                          <div class="gs-gaia-kpi-val" style="color:#7c3aed">{{ fmtAC(expandedInvDetail.ac_metrics?.e_day_kwh) }}</div>
+                          <div class="gs-gaia-kpi-sub">kWh</div>
+                        </div>
+                        <div class="gs-gaia-kpi">
+                          <div class="gs-gaia-kpi-label">Temperatura</div>
+                          <div class="gs-gaia-kpi-val" style="color:#d97706">{{ fmtAC(expandedInvDetail.ac_metrics?.temperature_c) }}</div>
+                          <div class="gs-gaia-kpi-sub">°C</div>
+                        </div>
+                        <div class="gs-gaia-kpi">
+                          <div class="gs-gaia-kpi-label">Eficiencia</div>
+                          <div class="gs-gaia-kpi-val" :class="effClass(expandedInvDetail.ac_metrics?.efficiency_pct)">{{ fmtAC(expandedInvDetail.ac_metrics?.efficiency_pct) }}</div>
+                          <div class="gs-gaia-kpi-sub">%</div>
+                        </div>
+                        <div class="gs-gaia-kpi">
+                          <div class="gs-gaia-kpi-label">Factor de potencia</div>
+                          <div class="gs-gaia-kpi-val" :class="fpClass(expandedInvDetail.ac_metrics?.power_factor)">{{ fmtPF(expandedInvDetail.ac_metrics?.power_factor) }}</div>
+                          <div class="gs-gaia-kpi-sub">promedio</div>
+                        </div>
+                      </div>
+
+                      <!-- Métricas AC por fase -->
+                      <div v-if="expandedInvDetail.ac_metrics && (expandedInvDetail.ac_metrics.vac_a != null || expandedInvDetail.ac_metrics.iac_a != null)"
+                        class="gs-metrics-table-wrap">
+                        <table class="gs-metrics-table">
+                          <thead>
+                            <tr><th class="gs-mt-inv" style="text-align:left">Variable</th><th>Fase A</th><th>Fase B</th><th>Fase C</th></tr>
+                          </thead>
+                          <tbody>
+                            <tr>
+                              <td class="gs-mt-inv">Tensión (V)</td>
+                              <td>{{ fmtAC(expandedInvDetail.ac_metrics.vac_a) }}</td>
+                              <td>{{ fmtAC(expandedInvDetail.ac_metrics.vac_b) }}</td>
+                              <td>{{ fmtAC(expandedInvDetail.ac_metrics.vac_c) }}</td>
+                            </tr>
+                            <tr>
+                              <td class="gs-mt-inv">Corriente (A)</td>
+                              <td>{{ fmtAC(expandedInvDetail.ac_metrics.iac_a) }}</td>
+                              <td>{{ fmtAC(expandedInvDetail.ac_metrics.iac_b) }}</td>
+                              <td>{{ fmtAC(expandedInvDetail.ac_metrics.iac_c) }}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+
+                      <!-- Gráfica individual de potencia del inversor -->
+                      <div class="gs-chart-card" style="margin-top:12px">
+                        <h4 class="gs-section-title">Potencia del inversor — {{ invRangeLabel }}</h4>
+                        <div v-if="invPowerLoading" class="gs-chart-empty">
+                          <i class="pi pi-spin pi-spinner" style="font-size:22px;color:#915BD8" />
+                        </div>
+                        <div v-else-if="invIndividualData.labels.length" class="gs-chart-container">
+                          <Line :data="invIndividualData" :options="invPowerOptions" />
+                        </div>
+                        <div v-else class="gs-chart-empty">
+                          <i class="pi pi-chart-line" style="font-size:28px;color:#d1d5db" />
+                          <p>Sin datos de potencia para este inversor en el rango</p>
+                        </div>
+                      </div>
+                    </div>
+                  </Transition>
+                </div>
+
+                <!-- ── Comparativa de inversores (todas las líneas) ── -->
+                <div v-if="detailData.inverters?.length" class="gs-chart-card" style="margin-bottom:16px">
+                  <div class="gs-inv-cmp-head">
+                    <h3 class="gs-section-title" style="margin:0">Comparativa de inversores — Potencia</h3>
+                    <div class="gs-inv-date-ctrls">
+                      <input v-model="invDateFrom" type="date" class="gs-date-input" :max="todayStr" />
+                      <span class="gs-date-sep">→</span>
+                      <input v-model="invDateTo" type="date" class="gs-date-input" :max="todayStr" />
+                      <button class="gs-refresh-btn gs-refresh-btn--sm" @click="reloadInverterPower" :disabled="invPowerLoading">
+                        <i :class="invPowerLoading ? 'pi pi-spin pi-spinner' : 'pi pi-refresh'" />
+                        Aplicar
+                      </button>
+                    </div>
+                  </div>
+                  <div v-if="invComparativeData.labels.length" class="gs-chart-container">
+                    <Line :data="invComparativeData" :options="invComparativeOptions" />
+                  </div>
+                  <div v-else class="gs-chart-empty">
+                    <i class="pi pi-chart-line" style="font-size:28px;color:#d1d5db" />
+                    <p>Sin datos de potencia por inversor en el rango</p>
                   </div>
                 </div>
 
@@ -636,6 +751,14 @@ const searchText     = ref('')
 const lastUpdated    = ref('')
 const detailRef      = ref(null)
 
+// ── Detalle por inversor (expand + comparativa) ──────────────────────────────
+const todayStr        = new Date().toISOString().split('T')[0]
+const expandedInv     = ref(null)   // dev_name del inversor expandido (o null)
+const invPowerData    = ref(null)   // { inverters: [{dev_name, points, peak_kw}], ... }
+const invPowerLoading = ref(false)
+const invDateFrom     = ref(todayStr)
+const invDateTo       = ref(todayStr)
+
 // Auto-refresh countdown (300s)
 const REFRESH_INTERVAL = 300
 const countdown        = ref(REFRESH_INTERVAL)
@@ -894,6 +1017,104 @@ const gaiaEnergyOptions = {
     x: { ticks: { maxTicksLimit: 12, font: { size: 10 }, color: '#9ca3af' }, grid: { display: false } },
     y: { ticks: { font: { size: 10 }, color: '#9ca3af' }, grid: { color: 'rgba(0,0,0,0.05)' },
          title: { display: true, text: 'kWh', font: { size: 10 }, color: '#9ca3af' }, beginAtZero: true },
+  },
+}
+
+// ── Detalle por inversor: comparativa + individual ───────────────────────────
+const INV_PALETTE = [
+  '#915BD8', '#16a34a', '#d97706', '#0ea5e9', '#dc2626',
+  '#14b8a6', '#a855f7', '#f59e0b', '#2563eb', '#65a30d',
+]
+
+function fmtInvTime(t) {
+  // "2026-06-24 08:05" → "08:05"  ·  "2026-06-24 08:00" en rango multi-día → "24/06 08h"
+  if (!t) return ''
+  const [d, hm] = String(t).split(' ')
+  if (!hm) return t
+  if (invDateFrom.value !== invDateTo.value && d) {
+    const [, mm, dd] = d.split('-')
+    return `${dd}/${mm} ${hm.slice(0, 2)}h`
+  }
+  return hm.slice(0, 5)
+}
+
+const invRangeLabel = computed(() =>
+  invDateFrom.value === invDateTo.value ? invDateFrom.value : `${invDateFrom.value} → ${invDateTo.value}`
+)
+
+// El inversor expandido, tomado del detalle ya cargado (ac_metrics, strings, estado)
+const expandedInvDetail = computed(() => {
+  if (!expandedInv.value) return null
+  return (detailData.value?.inverters || []).find(i => i.name === expandedInv.value) || null
+})
+
+// Etiquetas de tiempo unión de todos los inversores, ordenadas
+const invTimeLabels = computed(() => {
+  const invs = invPowerData.value?.inverters || []
+  const set = new Set()
+  invs.forEach(i => (i.points || []).forEach(p => set.add(p.time)))
+  return Array.from(set).sort()
+})
+
+const invComparativeData = computed(() => {
+  const invs = invPowerData.value?.inverters || []
+  if (!invs.length) return { labels: [], datasets: [] }
+  const labels = invTimeLabels.value
+  const datasets = invs.map((inv, idx) => {
+    const map = {}
+    ;(inv.points || []).forEach(p => { map[p.time] = p.kw })
+    const color = INV_PALETTE[idx % INV_PALETTE.length]
+    return {
+      label: inv.dev_name,
+      data: labels.map(l => (l in map ? map[l] : null)),
+      borderColor: color,
+      backgroundColor: 'transparent',
+      fill: false, tension: 0.3, pointRadius: 0, borderWidth: 1.6, spanGaps: true,
+    }
+  })
+  return { labels: labels.map(fmtInvTime), datasets }
+})
+
+const invIndividualData = computed(() => {
+  const invs = invPowerData.value?.inverters || []
+  const inv = invs.find(i => i.dev_name === expandedInv.value)
+  if (!inv || !inv.points?.length) return { labels: [], datasets: [] }
+  return {
+    labels: inv.points.map(p => fmtInvTime(p.time)),
+    datasets: [{
+      label: `${inv.dev_name} (kW)`,
+      data: inv.points.map(p => p.kw),
+      borderColor: BRAND_PURPLE,
+      backgroundColor: 'rgba(145,91,216,0.15)',
+      fill: true, tension: 0.3, pointRadius: 0, borderWidth: 2,
+    }],
+  }
+})
+
+const invComparativeOptions = {
+  responsive: true, maintainAspectRatio: false,
+  interaction: { mode: 'index', intersect: false },
+  plugins: {
+    legend: { display: true, position: 'top', labels: { font: { size: 10 }, boxWidth: 12, padding: 8 } },
+    tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y?.toFixed(2)} kW` } },
+  },
+  scales: {
+    x: { ticks: { maxTicksLimit: 12, font: { size: 9 }, color: '#9ca3af' }, grid: { display: false } },
+    y: { ticks: { font: { size: 10 }, color: '#9ca3af' }, grid: { color: 'rgba(0,0,0,0.05)' },
+         title: { display: true, text: 'kW', font: { size: 10 }, color: '#9ca3af' }, beginAtZero: true },
+  },
+}
+
+const invPowerOptions = {
+  responsive: true, maintainAspectRatio: false,
+  plugins: {
+    legend: { display: false },
+    tooltip: { callbacks: { label: ctx => `${ctx.parsed.y?.toFixed(2)} kW` } },
+  },
+  scales: {
+    x: { ticks: { maxTicksLimit: 12, font: { size: 9 }, color: '#9ca3af' }, grid: { display: false } },
+    y: { ticks: { font: { size: 10 }, color: '#9ca3af' }, grid: { color: 'rgba(0,0,0,0.05)' },
+         title: { display: true, text: 'kW', font: { size: 10 }, color: '#9ca3af' }, beginAtZero: true },
   },
 }
 
@@ -1212,18 +1433,46 @@ async function cargar() {
 async function loadDetail(proyectoId) {
   loadingDetail.value = true
   detailData.value = null
+  // Reset estado del expand por inversor (rango = hoy)
+  expandedInv.value = null
+  invPowerData.value = null
+  invDateFrom.value = todayStr
+  invDateTo.value = todayStr
   // Scroll al panel inmediatamente (aparece el spinner)
   await nextTick()
   detailRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   try {
     const res = await api.get(`/generacion-solar/monitoring/${proyectoId}`)
     detailData.value = res.data
+    loadInverterPower(proyectoId)   // potencia por inversor (no bloquea el render)
   } catch (err) {
     toast.add({ severity: 'warn', summary: 'Sin detalle', detail: 'No se pudo cargar el detalle del proyecto', life: 3000 })
     detailData.value = null
   } finally {
     loadingDetail.value = false
   }
+}
+
+async function loadInverterPower(proyectoId) {
+  invPowerLoading.value = true
+  try {
+    const res = await api.get(`/generacion-solar/monitoring/${proyectoId}/inverters-power`, {
+      params: { date_from: invDateFrom.value, date_to: invDateTo.value },
+    })
+    invPowerData.value = res.data
+  } catch {
+    invPowerData.value = null
+  } finally {
+    invPowerLoading.value = false
+  }
+}
+
+function reloadInverterPower() {
+  if (selectedProyId.value) loadInverterPower(selectedProyId.value)
+}
+
+function toggleInverter(inv) {
+  expandedInv.value = expandedInv.value === inv.name ? null : inv.name
 }
 
 async function loadCatalogos() {
@@ -1246,6 +1495,8 @@ function selectProject(proj) {
 function closeDetail() {
   selectedProyId.value = null
   detailData.value = null
+  expandedInv.value = null
+  invPowerData.value = null
 }
 
 // ── Falla dialog ──────────────────────────────────────────────────────────────
@@ -2484,4 +2735,100 @@ onUnmounted(() => {
 .gs-overlay-rise-leave-active { transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.3s ease; }
 .gs-overlay-rise-enter-from,
 .gs-overlay-rise-leave-to { transform: translateY(60px); opacity: 0; }
+/* ── Detalle por inversor (expand + comparativa) ── */
+.gs-inv-hint {
+  font-size: 10px;
+  font-weight: 500;
+  color: #9ca3af;
+}
+
+.gs-inv-card--clickable {
+  cursor: pointer;
+  transition: box-shadow .15s, border-color .15s, background .15s;
+}
+.gs-inv-card--clickable:hover {
+  box-shadow: 0 2px 8px rgba(145,91,216,0.18);
+}
+.gs-inv-card--active {
+  background: #f3ecff;
+  border-color: #c9b3ec;
+  box-shadow: 0 2px 10px rgba(145,91,216,0.22);
+}
+
+.gs-inv-chevron {
+  font-size: 10px;
+  color: #9ca3af;
+  margin-left: auto;
+}
+
+.gs-inv-expanded {
+  margin-top: 12px;
+  padding: 14px;
+  background: #fff;
+  border: 1px solid #ece5f7;
+  border-radius: 12px;
+}
+.gs-inv-expanded-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.gs-inv-expanded-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: #2C2039;
+}
+.gs-inv-expanded-state {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.gs-close-btn--sm {
+  width: 26px;
+  height: 26px;
+  font-size: 12px;
+}
+
+.gs-inv-cmp-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.gs-inv-date-ctrls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.gs-date-input {
+  font-size: 11px;
+  padding: 4px 6px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  color: #2C2039;
+}
+.gs-date-sep {
+  color: #9ca3af;
+  font-size: 12px;
+}
+.gs-refresh-btn--sm {
+  padding: 4px 10px;
+  font-size: 11px;
+}
+
+/* Transición del panel expandido */
+.gs-expand-enter-active, .gs-expand-leave-active {
+  transition: opacity .18s ease, transform .18s ease;
+}
+.gs-expand-enter-from, .gs-expand-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
+}
 </style>
