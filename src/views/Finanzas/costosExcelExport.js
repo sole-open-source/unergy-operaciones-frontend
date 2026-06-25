@@ -3,7 +3,7 @@
  *
  * Combina, para un período (YYYY-MM):
  *  - Mantenimiento  → /om/calculo/{periodo} (incluido + valor_a_facturar)   [mainteinance]
- *  - Arriendos      → pagoarriendos.json + localStorage (selección + canon)  [lease]
+ *  - Arriendos      → /arriendos/calculo/{periodo} (incluido + canon_a_facturar) [lease]
  *  - Internet       → /starlink/factura/{periodo} (agrupado.monto_total)     [public_services]
  *
  * Universo de proyectos = (✓ en Mantenimiento) ∪ (✓ en Arriendos).
@@ -11,7 +11,6 @@
  */
 import * as XLSX from 'xlsx'
 import api from '@/api/client'
-import arriendosRaw from '@/data/pagoarriendos.json'
 
 const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
                'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
@@ -100,40 +99,9 @@ function starlinkPanel(desc) {
   return STARLINK_TO_PANEL[normName(desc)] || desc
 }
 
-// ── Arriendos (réplica de la lógica de la vista, leída del navegador) ──────────
-function loadJSON(key) {
-  try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : null } catch { return null }
-}
-function arrGetIPC() {
-  const map = new Map([[2023, 0.0928], [2024, 0.0520], [2025, 0.0510]])
-  const stored = loadJSON('arriendos_ipc_tasas')
-  if (Array.isArray(stored)) stored.forEach(s => map.set(s.año, s.tasa))
-  return (año) => map.get(año)
-}
-function arrId(p) {
-  return p._extraId ?? (p.Codigo || p.Proyecto)
-}
-function arrCanon(p, añoPeriodo, getIPC) {
-  const ov = (loadJSON('arriendos_overrides') || {})[arrId(p)] || {}
-  const pp = { ...p, ...ov }
-  const valorBase = pp['Valor base']
-  const canonArchivo = pp['Canon arrendamiento']
-  if (canonArchivo != null) return canonArchivo
-  if (!pp['Fecha firma contrato'] || valorBase == null) return null
-  const añoFirma = new Date(pp['Fecha firma contrato']).getFullYear()
-  let v = valorBase
-  for (let y = añoFirma + 1; y <= añoPeriodo; y++) {
-    const ipc = getIPC(y - 1)
-    if (ipc === undefined) break
-    v = v * (1 + ipc)
-  }
-  return Math.round(v)
-}
-
 // ── Generación principal ──────────────────────────────────────────────────────
 export async function generarExcelCostos(periodo) {
   const [yyyy, mm] = periodo.split('-').map(Number)
-  const getIPC = arrGetIPC()
 
   // Mantenimiento (backend)
   let omFilas = []
@@ -142,10 +110,6 @@ export async function generarExcelCostos(periodo) {
   // Internet (backend)
   let agrupado = []
   try { agrupado = (await api.get(`/starlink/factura/${periodo}`)).data.agrupado || [] } catch { agrupado = [] }
-
-  // Arriendos (navegador): selección por período (default ✓) + canon
-  const selData = (loadJSON('arriendos_seleccion') || {})[periodo] || {}
-  const arrFuente = [...arriendosRaw, ...(loadJSON('arriendos_proyectos_extra') || [])]
 
   // public_services por pk
   const pubByPk = {}
@@ -164,11 +128,12 @@ export async function generarExcelCostos(periodo) {
   omFilas.forEach(f => {
     if (f.incluido && f.habilitado) get(resolvePk(f.nombre_proyecto)).mant = f.valor_a_facturar || 0
   })
-  arrFuente.forEach(p => {
-    const id = arrId(p)
-    const seleccionado = selData[id] !== undefined ? selData[id] : true  // default ✓
-    if (!seleccionado) return
-    get(resolvePk(p.Proyecto || '')).lease = arrCanon(p, yyyy, getIPC) || 0
+
+  // Arriendos (backend)
+  let arrFilas = []
+  try { arrFilas = (await api.get(`/arriendos/calculo/${periodo}`)).data.filas || [] } catch { arrFilas = [] }
+  arrFilas.forEach(f => {
+    if (f.incluido && f.habilitado) get(resolvePk(f.proyecto)).lease = f.canon_a_facturar || 0
   })
 
   // Fechas del período
