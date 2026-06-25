@@ -40,7 +40,7 @@
               <td class="px-4 py-2.5 font-medium" style="color:#2C2039">{{ fila.proyecto }}</td>
               <td class="px-4 py-2.5 text-xs text-gray-500">{{ periodoLabel }}</td>
               <td class="px-4 py-2.5 text-right font-semibold tabular-nums" style="color:#7c3aed">
-                {{ formatCOP(fila.canon_calculado) }}
+                {{ formatCOP(fila.canon_a_facturar) }}
               </td>
               <td class="px-4 py-2.5 text-xs text-gray-400"
                 style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
@@ -119,7 +119,7 @@
 <script setup>
 import { ref, computed, reactive, onMounted, watch } from 'vue'
 import Tag from 'primevue/tag'
-import arriendosRaw from '@/data/pagoarriendos.json'
+import api from '@/api/client'
 
 const hoy           = new Date()
 const periodoOffset = ref(0)
@@ -145,87 +145,31 @@ function formatCOP(v) {
   return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(v)
 }
 
-// ── Leer selección y valores calculados desde localStorage ────────────────────
-const SEL_STORAGE_KEY  = 'arriendos_seleccion'
-const FACT_STORAGE_KEY = 'arriendos_facturado'
-const IPC_STORAGE_KEY  = 'arriendos_ipc_tasas'
-const SOPO_STORAGE_KEY = 'arriendos_soportes'
+// ── Datos (API) — solo lectura de lo que Operaciones incluyó ────────────────────
+const filas = ref([])
 
-const ipcTasas = ref([
-  { año: 2023, tasa: 0.0928 },
-  { año: 2024, tasa: 0.0520 },
-  { año: 2025, tasa: 0.0510 },
-])
-
-function cargarIPCStorage() {
+async function cargarDatos() {
   try {
-    const raw = localStorage.getItem(IPC_STORAGE_KEY)
-    if (raw) {
-      const stored = JSON.parse(raw)
-      stored.forEach(s => {
-        const idx = ipcTasas.value.findIndex(t => t.año === s.año)
-        if (idx >= 0) ipcTasas.value[idx] = s
-        else ipcTasas.value.push(s)
-      })
-    }
+    const { data } = await api.get(`/arriendos/calculo/${periodoActual.value}`)
+    filas.value = data.filas.filter(f => f.incluido && f.habilitado)
+  } catch {
+    filas.value = []
+  }
+}
+
+const facturadoActual = computed(() => {
+  const m = {}; filas.value.forEach(f => { m[f.id] = f.facturado }); return m
+})
+
+async function toggleFacturado(id) {
+  try {
+    await api.patch(`/arriendos/seleccion/${periodoActual.value}/${id}/facturado`)
+    await cargarDatos()
   } catch {}
 }
 
-function getIPC(año) {
-  return ipcTasas.value.find(t => t.año === año)?.tasa
-}
-
-function calcularCanon(proyecto) {
-  const valorBase = proyecto['Valor base']
-  if (!proyecto['Fecha firma contrato'] || valorBase == null) return { canon: null, historial: '—' }
-
-  const [yyyy]     = periodoActual.value.split('-').map(Number)
-  const añoPeriodo = yyyy
-  const añoFirma   = new Date(proyecto['Fecha firma contrato']).getFullYear()
-  let valor        = valorBase
-  const histItems  = []
-
-  // Indexación por año calendario: 1 ene de cada año desde año_firma+1 hasta año_periodo
-  for (let añoCorriente = añoFirma + 1; añoCorriente <= añoPeriodo; añoCorriente++) {
-    const ipc = getIPC(añoCorriente - 1)  // IPC dic del año anterior
-    if (ipc === undefined) break
-    valor *= (1 + ipc)
-    histItems.push(`IPC dic ${añoCorriente - 1}: ${(ipc * 100).toFixed(2)}%`)
-  }
-
-  return {
-    canon:    valor,
-    historial: histItems.length ? histItems.join(' → ') : `Sin indexaciones`,
-  }
-}
-
-const facturadoStore = reactive({})
-const facturadoActual = computed(() => facturadoStore[periodoActual.value] || {})
-
-function toggleFacturado(id) {
-  if (!facturadoStore[periodoActual.value]) facturadoStore[periodoActual.value] = {}
-  facturadoStore[periodoActual.value][id] = !facturadoStore[periodoActual.value][id]
-  try { localStorage.setItem(FACT_STORAGE_KEY, JSON.stringify(facturadoStore)) } catch {}
-}
-
-const filas = computed(() => {
-  try {
-    const raw    = localStorage.getItem(SEL_STORAGE_KEY)
-    const data   = raw ? JSON.parse(raw) : {}
-    const saved  = data[periodoActual.value] || {}
-    const result = []
-    arriendosRaw.forEach(p => {
-      const id = p.Codigo || p.Proyecto
-      if (!saved[id]) return
-      const { canon, historial } = calcularCanon(p)
-      if (canon == null) return
-      result.push({ id, proyecto: p.Proyecto, canon_calculado: canon, historial_texto: historial })
-    })
-    return result
-  } catch { return [] }
-})
-
-// ── Soporte del período ────────────────────────────────────────────────────────
+// ── Soporte del período (sigue en localStorage; no hay endpoint backend) ─────────
+const SOPO_STORAGE_KEY = 'arriendos_soportes'
 const soporteStore = reactive({})
 const soporte      = computed(() => soporteStore[periodoActual.value] || { enlace: '' })
 const nuevoEnlace  = ref('')
@@ -249,23 +193,9 @@ function persistSoporte() {
   try { localStorage.setItem(SOPO_STORAGE_KEY, JSON.stringify(soporteStore)) } catch {}
 }
 
-function cargarTodo() {
-  cargarIPCStorage()
-  try {
-    const raw = localStorage.getItem(FACT_STORAGE_KEY)
-    if (raw) Object.assign(facturadoStore, JSON.parse(raw))
-  } catch {}
-  cargarSoporte()
-}
-
-// Escuchar cuando Operaciones guarda selección
-function onSeleccionGuardada(e) {
-  if (e.detail?.periodo === periodoActual.value) { /* computed ya reacciona */ }
-}
-
-watch(periodoActual, () => { nuevoEnlace.value = '' })
+watch(periodoActual, () => { nuevoEnlace.value = ''; cargarDatos() })
 onMounted(() => {
-  cargarTodo()
-  window.addEventListener('arriendos-seleccion-guardada', onSeleccionGuardada)
+  cargarSoporte()
+  cargarDatos()
 })
 </script>
