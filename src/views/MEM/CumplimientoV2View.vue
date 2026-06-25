@@ -1500,8 +1500,64 @@ function toggleMatriz(id) {
   else expandedMatriz.value.push(id)
 }
 
-function exportarMatrizExcel() {
-  // Task 6
+async function exportarMatrizExcel() {
+  if (!anualMatrizData.value) return
+  const XLSX = await import('xlsx-js-style')
+  const { construirMatrizAOA } = await import('./cumplimientoMatrizExcel.js')
+  const { aoa, rowLevels, formulaCells, totalRow, headerRow } =
+    construirMatrizAOA(anualMatrizData.value, anualMatrizYear.value)
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa)
+
+  // Fórmulas
+  for (const fc of formulaCells) {
+    const ref = XLSX.utils.encode_cell({ r: fc.r, c: fc.c })
+    ws[ref] = { t: 'n', f: fc.f }
+  }
+
+  // Outline (filas de proyecto colapsables bajo su contrato)
+  ws['!rows'] = rowLevels.map(l => (l > 0 ? { level: l } : {}))
+
+  // Paleta de marca Unergy
+  const C = { morado: '915BD8', oscuro: '2C2039', blanco: 'FFFFFF' }
+
+  // Estilo encabezado (fila headerRow)
+  for (let c = 0; c < 17; c++) {
+    const ref = XLSX.utils.encode_cell({ r: headerRow, c })
+    if (!ws[ref]) ws[ref] = { t: 's', v: '' }
+    ws[ref].s = {
+      font: { bold: true, color: { rgb: C.blanco } },
+      fill: { fgColor: { rgb: C.morado } },
+      alignment: { horizontal: 'center', vertical: 'center' },
+    }
+  }
+
+  // Estilo fila total general
+  for (let c = 0; c < 17; c++) {
+    const ref = XLSX.utils.encode_cell({ r: totalRow, c })
+    if (!ws[ref]) ws[ref] = { t: 's', v: '' }
+    ws[ref].s = { font: { bold: true, color: { rgb: C.oscuro } } }
+  }
+
+  // Título
+  const titleRef = XLSX.utils.encode_cell({ r: 0, c: 0 })
+  if (ws[titleRef]) ws[titleRef].s = { font: { bold: true, sz: 14, color: { rgb: C.oscuro } } }
+
+  // Merges, anchos de columna, autofiltro
+  ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 16 } }]
+  ws['!cols'] = [
+    { wch: 34 },
+    ...Array(12).fill({ wch: 8 }),
+    { wch: 10 },
+    { wch: 10 },
+    { wch: 12 },
+    { wch: 12 },
+  ]
+  ws['!autofilter'] = { ref: `A${headerRow + 1}:Q${totalRow + 1}` }
+
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, 'Matriz anual')
+  XLSX.writeFile(wb, `matriz_anual_cumplimiento_${anualMatrizYear.value}.xlsx`)
 }
 
 const matrizFiltrada = computed(() => {
