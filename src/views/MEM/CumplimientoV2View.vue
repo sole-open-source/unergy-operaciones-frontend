@@ -895,6 +895,24 @@
       </template>
     </div>
 
+    <!-- ═══════════════ MATRIZ ANUAL TAB ═══════════════ -->
+    <div v-show="activeTab === 4" class="space-y-4">
+      <div class="flex items-center justify-between gap-3 flex-wrap">
+        <div class="flex items-center gap-2">
+          <Select v-model="anualMatrizYear" :options="years" class="w-28" @change="loadAnualMatriz" />
+          <label class="flex items-center gap-1.5 text-sm" style="color:#7a6e8a;">
+            <Checkbox v-model="matrizSoloNoCumple" :binary="true" /> Solo no cumple
+          </label>
+          <InputText v-model="matrizBusqueda" placeholder="Buscar contrato…" class="text-sm" />
+        </div>
+        <Button label="Exportar Excel" icon="pi pi-download" size="small" outlined
+                :disabled="!anualMatrizData" @click="exportarMatrizExcel" />
+      </div>
+      <ProgressSpinner v-if="anualMatrizLoading" />
+      <Message v-else-if="anualMatrizError" severity="error" :closable="false">{{ anualMatrizError }}</Message>
+      <!-- tabla: Task 5 -->
+    </div>
+
     <!-- Floating: detalle de la capa (misma información que la imagen) -->
     <Teleport to="body">
       <template v-if="detalleCapa">
@@ -1076,6 +1094,8 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { proyectoActivoEnMes } from '@/utils/proyectoActivo'
 import Select from 'primevue/select'
 import InputText from 'primevue/inputtext'
+import Checkbox from 'primevue/checkbox'
+import Button from 'primevue/button'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Message from 'primevue/message'
@@ -1166,7 +1186,7 @@ async function clearCacheAndReload() {
 }
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
-const TABS      = ['Estrategia', 'Cumplimiento', 'Proyectos', 'Energía transada']
+const TABS      = ['Estrategia', 'Cumplimiento', 'Proyectos', 'Energía transada', 'Matriz anual']
 const activeTab = ref(0)
 
 // ── Chart constants ───────────────────────────────────────────────────────────
@@ -1389,6 +1409,38 @@ function onEtPeriodChange() {
   const maxMonth = etYear.value === now.getFullYear() ? now.getMonth() + 1 : 12
   if (etMonth.value > maxMonth) etMonth.value = maxMonth
   loadEnergiaTransada()
+}
+
+// ── Matriz anual state ────────────────────────────────────────────────────────
+const anualMatrizData    = ref(null)
+const anualMatrizLoading = ref(false)
+const anualMatrizError   = ref('')
+const anualMatrizYear    = ref(now.getFullYear())
+const expandedMatriz     = ref([])
+const matrizSoloNoCumple = ref(false)
+const matrizBusqueda     = ref('')
+
+async function loadAnualMatriz() {
+  anualMatrizLoading.value = true
+  anualMatrizError.value = ''
+  try {
+    const { data } = await client.get('/cumplimiento/anual-matriz', { params: { year: anualMatrizYear.value } })
+    anualMatrizData.value = data
+  } catch (e) {
+    anualMatrizError.value = e.response?.data?.detail || e.message
+  } finally {
+    anualMatrizLoading.value = false
+  }
+}
+
+function toggleMatriz(id) {
+  const i = expandedMatriz.value.indexOf(id)
+  if (i >= 0) expandedMatriz.value.splice(i, 1)
+  else expandedMatriz.value.push(id)
+}
+
+function exportarMatrizExcel() {
+  // Task 6
 }
 
 const allContratos = computed(() => {
@@ -2300,6 +2352,7 @@ watch(activeTab, (tab) => {
   if (tab === 1 && !anualData.value) { loadAnnualData(); loadTableData() }
   if (tab === 2 && !pcData.value) loadPlantasContratos()
   if (tab === 3 && !etData.value) loadEnergiaTransada()
+  if (tab === 4 && !anualMatrizData.value) loadAnualMatriz()
 })
 
 onMounted(async () => {
