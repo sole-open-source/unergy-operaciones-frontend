@@ -259,7 +259,11 @@
                               </td>
                               <td>
                                 <input class="val-in" :class="{ neg: ln.valor_cop < 0 }"
-                                       type="number" v-model.number="ln.valor_cop" @change="markDirty(p)" />
+                                       type="text" inputmode="decimal"
+                                       :value="editandoMonto === ln.id ? montoPlano(ln.valor_cop) : fmt(ln.valor_cop)"
+                                       @focus="editandoMonto = ln.id"
+                                       @blur="commitMonto(ln, p, $event)"
+                                       @keyup.enter="$event.target.blur()" />
                               </td>
                               <td class="l">
                                 <input class="comp-in" placeholder="comprob." v-model="ln.comprobante_contable" @change="markDirty(p)" />
@@ -577,6 +581,21 @@ const fmt = (n) => {
 // sin decimales. Solo afecta cómo se muestra; no altera el dato.
 const fmtCOP = (n) => '$ ' + Math.round(Number(n) || 0).toLocaleString('es-CO')
 const shortName = (n) => (n || '').split(' ').slice(0, 2).join(' ')
+
+// Monto editable: se ve formateado ($ es-CO, mismo fmt que los totales) en reposo
+// y como número plano al enfocar, para no romper la edición. editandoMonto guarda
+// el id de la línea enfocada (solo un campo a la vez).
+const editandoMonto = ref(null)
+const montoPlano = (n) => (n === null || n === undefined || n === '') ? '' : String(n)
+const parseMonto = (s) => {
+  const v = parseFloat(String(s).replace(/[^0-9.-]/g, ''))
+  return Number.isFinite(v) ? v : 0
+}
+function commitMonto (ln, p, ev) {
+  const v = parseMonto(ev.target.value)
+  if (v !== Number(ln.valor_cop)) { ln.valor_cop = v; markDirty(p) }
+  editandoMonto.value = null
+}
 const diffClass = (v) => (v == null ? '' : (v > 0 ? 'pos' : (v < 0 ? 'neg' : '')))
 const arrow = (v) => (v == null || v === 0 ? '' : (v > 0 ? '▲ ' : '▼ '))
 
