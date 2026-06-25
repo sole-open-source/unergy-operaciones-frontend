@@ -419,7 +419,7 @@
                       <span v-if="simResults[c.id]?.plantasEsp != null"
                         class="text-xs font-semibold px-1.5 py-0.5 rounded flex-shrink-0"
                         :style="estadoBadge(simResults[c.id].estadoPlantas)"
-                        v-tooltip="'Plantas registradas en GESCON / inscritas exigidas por el contrato este mes'"
+                        v-tooltip="'Plantas inscritas (registradas y despachando vía GESCON) / plantas contrato (exigidas) — este mes'"
                       >{{ simResults[c.id].plantasReg }}/{{ simResults[c.id].plantasEsp }} plantas</span>
                       <span v-else class="text-xs font-mono flex-shrink-0" style="color: #7a6e8a;">{{ (simAssignments[c.id] || []).length }} plantas</span>
                       <span v-if="simResults[c.id]?.pct !== null && simResults[c.id]?.pct !== undefined"
@@ -532,10 +532,10 @@
                   </div>
                 </div>
 
-                <!-- Cumplimiento de plantas: registradas en GESCON (numerador) / inscritas exigidas por contrato (denominador) -->
+                <!-- Cumplimiento de plantas: inscritas = registradas y despachando vía GESCON (numerador) / plantas contrato exigidas (denominador) -->
                 <div v-if="simResults[c.id].plantasEsp != null" class="mt-3 pt-3 border-t" style="border-color: rgba(44,32,57,0.07);">
                   <div class="flex items-center justify-between mb-1.5">
-                    <span class="text-[10px] font-semibold uppercase tracking-wide" style="color: #7a6e8a;">Plantas registradas / inscritas</span>
+                    <span class="text-[10px] font-semibold uppercase tracking-wide" style="color: #7a6e8a;">Plantas inscritas / contrato</span>
                     <div class="flex items-center gap-1.5">
                       <span class="font-mono text-xs font-bold" style="color: #2C2039;">{{ simResults[c.id].plantasReg }} / {{ simResults[c.id].plantasEsp }}</span>
                       <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap" :style="estadoBadge(simResults[c.id].estadoPlantas)">
@@ -1571,7 +1571,7 @@ const simResults = computed(() => {
       proyPct: (esActual && genProy > 0) ? clampPct(genProy) : null,
     }
 
-    // ── Cumplimiento de plantas: registradas en GESCON (numerador) vs inscritas exigidas por el contrato (denominador) ──
+    // ── Cumplimiento de plantas: plantas INSCRITAS = registradas y despachando vía GESCON (numerador) vs PLANTAS CONTRATO exigidas (denominador) ──
     const plantasEsp = c.plantas_esperadas ?? null
     const plantasReg = plantas.length
     let estadoPlantas = 'sin_compromisos'

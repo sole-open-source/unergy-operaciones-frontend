@@ -235,9 +235,9 @@
       <template v-if="step === 4">
         <p class="step-title">Compromisos de energía <span class="normal-case font-normal text-gray-400">(opcional)</span></p>
         <p class="text-xs text-gray-400 mb-3">
-          Copia las columnas <strong>Año · Mes · Mín · Máx · Plantas inscritas</strong> desde Excel y pégalas aquí
-          (Mín/Máx en MWh/mes; <strong>Plantas inscritas</strong> = cuántas plantas debe tener inscritas el contrato ese mes).
-          Las columnas <strong>Máx</strong> y <strong>Plantas inscritas</strong> son opcionales. Usa
+          Copia las columnas <strong>Año · Mes · Mín · Máx · Plantas contrato</strong> desde Excel y pégalas aquí
+          (Mín/Máx en MWh/mes; <strong>Plantas contrato</strong> = nº de plantas que el contrato exige ese mes).
+          Las columnas <strong>Máx</strong> y <strong>Plantas contrato</strong> son opcionales. Usa
           <strong>Descargar plantilla</strong> para editar en Excel y volver a pegar.
         </p>
         <Textarea
@@ -264,7 +264,7 @@
                 <th class="px-3 py-1.5 text-left text-gray-500 font-medium">Mes</th>
                 <th class="px-3 py-1.5 text-right text-gray-500 font-medium">Mín (MWh)</th>
                 <th class="px-3 py-1.5 text-right text-gray-500 font-medium">Máx (MWh)</th>
-                <th class="px-3 py-1.5 text-right text-gray-500 font-medium">Plantas inscritas</th>
+                <th class="px-3 py-1.5 text-right text-gray-500 font-medium">Plantas contrato</th>
               </tr>
             </thead>
             <tbody>
@@ -582,10 +582,10 @@ function parseEnergia() {
   energiaRows.value = rows
 }
 
-// Descarga la plantilla Excel (Año · Mes · Mín · Máx · Plantas inscritas) precargada con los
+// Descarga la plantilla Excel (Año · Mes · Mín · Máx · Plantas contrato) precargada con los
 // compromisos actuales para editarla y volver a pegarla en el cuadro de texto.
 function descargarPlantillaEnergia() {
-  const header = ['Año', 'Mes', 'Mín (MWh)', 'Máx (MWh)', 'Plantas inscritas']
+  const header = ['Año', 'Mes', 'Mín (MWh)', 'Máx (MWh)', 'Plantas contrato']
   const filas = energiaRows.value.length
     ? energiaRows.value.map(r => [r.año, r.mes, r.energia_minima, r.energia_maxima, r.cantidad_proyectos])
     : [[new Date().getFullYear(), 1, '', '', '']]

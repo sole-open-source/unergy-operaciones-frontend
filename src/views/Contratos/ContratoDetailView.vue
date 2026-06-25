@@ -213,9 +213,9 @@
         <!-- Modo edición cantidades -->
         <template v-if="editandoCantidades">
           <p class="text-xs text-gray-400 mb-2">
-            Copia las columnas <strong>Año · Mes · Mín · Máx · Plantas inscritas</strong> desde Excel y pégalas aquí
-            (Mín/Máx en MWh/mes; <strong>Plantas inscritas</strong> = nº de plantas que el contrato exige ese mes).
-            Máx y Plantas inscritas son opcionales. Esto <strong>reemplazará</strong> todos los compromisos actuales.
+            Copia las columnas <strong>Año · Mes · Mín · Máx · Plantas contrato</strong> desde Excel y pégalas aquí
+            (Mín/Máx en MWh/mes; <strong>Plantas contrato</strong> = nº de plantas que el contrato exige ese mes).
+            Máx y Plantas contrato son opcionales. Esto <strong>reemplazará</strong> todos los compromisos actuales.
           </p>
           <Textarea v-model="energiaPaste" rows="7"
             placeholder="2024&#9;Enero&#9;90&#9;180&#9;4&#10;2024&#9;Febrero&#9;90&#9;180&#9;4"
@@ -235,7 +235,7 @@
                   <th class="px-3 py-1.5 text-left text-gray-500 font-medium">Mes</th>
                   <th class="px-3 py-1.5 text-right text-gray-500 font-medium">Mín (MWh)</th>
                   <th class="px-3 py-1.5 text-right text-gray-500 font-medium">Máx (MWh)</th>
-                  <th class="px-3 py-1.5 text-right text-gray-500 font-medium">Plantas inscritas</th>
+                  <th class="px-3 py-1.5 text-right text-gray-500 font-medium">Plantas contrato</th>
                 </tr>
               </thead>
               <tbody>
@@ -277,7 +277,17 @@
                 {{ data.energia_maxima != null ? Number(data.energia_maxima).toLocaleString('es-CO', { maximumFractionDigits: 1 }) : '—' }}
               </template>
             </Column>
-            <Column :header="vistaCantidades === 'anual' ? 'Plantas inscritas (máx)' : 'Plantas inscritas'" style="width:150px">
+            <Column style="width:150px">
+              <template #header>
+                <span v-tooltip.top="'Plantas registradas y despachando energía al contrato. La calcula la plataforma vía GESCON.'">
+                  {{ vistaCantidades === 'anual' ? 'Plantas inscritas (máx)' : 'Plantas inscritas' }}
+                </span>
+              </template>
+              <template #body="{ data }">
+                {{ data.plantas_inscritas != null ? data.plantas_inscritas : '—' }}
+              </template>
+            </Column>
+            <Column :header="vistaCantidades === 'anual' ? 'Plantas contrato (máx)' : 'Plantas contrato'" style="width:150px">
               <template #body="{ data }">
                 {{ data.cantidad_proyectos != null ? data.cantidad_proyectos : '—' }}
               </template>
@@ -668,6 +678,10 @@ async function guardarPartes() {
 const vistaCantidades = ref('mensual')
 const vistaTarifas = ref('mensual')
 
+// Plantas inscritas (calculadas por la plataforma): "año-mes" -> nº de plantas registradas
+// y despachando energía al contrato vía GESCON. Numerador del cumplimiento de plantas.
+const plantasInscritasMap = ref({})
+
 // Edición tarifas
 const editandoTarifas = ref(false)
 const guardandoTarifas = ref(false)
@@ -763,6 +777,7 @@ async function guardarCantidades() {
     contrato.value = { ...contrato.value, compromisos_energia: data }
     editandoCantidades.value = false
     energiaPaste.value = ''; energiaRows.value = []
+    cargarPlantasInscritas()  // los periodos pudieron cambiar → recalcular inscritas
     toast.add({ severity: 'success', summary: 'Guardado', detail: `${data.length} compromisos actualizados`, life: 2500 })
   } catch (e) {
     toast.add({ severity: 'error', summary: 'Error', detail: e.response?.data?.detail || e.message, life: 4000 })
@@ -836,20 +851,28 @@ const currentTarifas = computed(() =>
 
 const cantidadesMensuales = computed(() => {
   if (!contrato.value?.compromisos_energia) return []
-  return [...contrato.value.compromisos_energia].sort((a, b) => a.año - b.año || a.mes - b.mes)
+  return [...contrato.value.compromisos_energia]
+    .sort((a, b) => a.año - b.año || a.mes - b.mes)
+    .map(r => ({ ...r, plantas_inscritas: plantasInscritasMap.value[`${r.año}-${r.mes}`] ?? null }))
 })
 
 const cantidadesAnuales = computed(() => {
   if (!contrato.value?.compromisos_energia) return []
   const base = agregarPorAño(cantidadesMensuales.value, ['energia_minima', 'energia_maxima'], 'suma')
-  // Plantas inscritas no se suman entre meses: por año mostramos el máximo del año.
-  const maxPlantasByYear = {}
+  // Plantas (contrato e inscritas) no se suman entre meses: por año mostramos el máximo.
+  const maxContratoByYear = {}
+  const maxInscritasByYear = {}
   for (const r of cantidadesMensuales.value) {
-    if (r.cantidad_proyectos != null) {
-      maxPlantasByYear[r.año] = Math.max(maxPlantasByYear[r.año] ?? 0, r.cantidad_proyectos)
-    }
+    if (r.cantidad_proyectos != null)
+      maxContratoByYear[r.año] = Math.max(maxContratoByYear[r.año] ?? 0, r.cantidad_proyectos)
+    if (r.plantas_inscritas != null)
+      maxInscritasByYear[r.año] = Math.max(maxInscritasByYear[r.año] ?? 0, r.plantas_inscritas)
   }
-  return base.map(e => ({ ...e, cantidad_proyectos: maxPlantasByYear[e.año] ?? null }))
+  return base.map(e => ({
+    ...e,
+    cantidad_proyectos: maxContratoByYear[e.año] ?? null,
+    plantas_inscritas: maxInscritasByYear[e.año] ?? null,
+  }))
 })
 
 // Wizard edición completa
@@ -917,11 +940,25 @@ async function asociarProyecto() {
   }
 }
 
+async function cargarPlantasInscritas() {
+  if (!contrato.value?.id) return
+  try {
+    const { data } = await api.get(`/cumplimiento/ppa/${contrato.value.id}/plantas-inscritas-por-mes`)
+    const map = {}
+    for (const r of data) map[`${r.año}-${r.mes}`] = r.plantas_inscritas
+    plantasInscritasMap.value = map
+  } catch (e) {
+    // No bloquea la pestaña: si falla, la columna muestra "—".
+    plantasInscritasMap.value = {}
+  }
+}
+
 async function cargar() {
   loading.value = true
   try {
     const { data } = await api.get(`/ppa/${route.params.id}`)
     contrato.value = data
+    cargarPlantasInscritas()
     Object.assign(formGescon, {
       codigo_sic: data.codigo_sic ?? null,
       gescon_codigo: data.gescon_codigo ?? null,
