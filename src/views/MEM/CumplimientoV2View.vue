@@ -320,7 +320,7 @@
             @click="toggleEstadoFiltro(f.key)"
             class="cv-btn"
             :style="estadoFiltro === f.key ? `border-color:${f.color}; background:${f.color}1f; color:${f.color}; font-weight:700;` : ''"
-            v-tooltip="`Estado por proyección de cierre`"
+            v-tooltip="f.tip"
           >
             <span class="inline-block rounded-full" :style="`width:8px; height:8px; background:${f.color};`"></span>
             {{ f.label }}
@@ -1236,11 +1236,18 @@ const sortDesc         = ref(true)
 // null = todos | 'ok' (cumplido) | 'deficit' (incumplido) | 'excedente' (exposición en bolsa)
 const estadoFiltro     = ref(null)
 const ESTADO_FILTROS = [
-  { key: 'ok',        label: 'Cumplido',            color: '#2e7d32' },
-  { key: 'deficit',   label: 'Incumplido',          color: '#D64455' },
-  { key: 'excedente', label: 'Exposición en bolsa', color: '#14B8A6' },
+  { key: 'ok',        label: 'Cumplido',            color: '#2e7d32', tip: 'Entre el mínimo y el máximo (por proyección de cierre)' },
+  { key: 'deficit',   label: 'Incumplido',          color: '#D64455', tip: 'Déficit: por debajo del mínimo (por proyección de cierre)' },
+  { key: 'excedente', label: 'Exposición en bolsa', color: '#14B8A6', tip: 'Excedente sobre el máximo o plantas duplicadas (compra en bolsa)' },
 ]
 function toggleEstadoFiltro(k) { estadoFiltro.value = estadoFiltro.value === k ? null : k }
+// Exposición en bolsa = excedente (vende en bolsa) O plantas duplicadas (compra en bolsa,
+// genDup>0), aunque el contrato esté cumplido/déficit. Los demás estados son excluyentes.
+function contratoMatchEstado(r, key) {
+  if (!r) return false
+  if (key === 'excedente') return r.estadoEfectivo === 'excedente' || r.tieneDup
+  return r.estadoEfectivo === key
+}
 const dragPlanta       = ref(null)
 const dragFromContrato = ref(undefined)
 const dragOver         = ref(null)
@@ -1393,7 +1400,7 @@ const visibleContratos = computed(() => {
   const res = simResults.value
   const filtered = allContratos.value.filter(c => {
     if (hiddenContratos.value.has(c.id)) return false
-    if (estadoFiltro.value && res[c.id]?.estadoEfectivo !== estadoFiltro.value) return false
+    if (estadoFiltro.value && !contratoMatchEstado(res[c.id], estadoFiltro.value)) return false
     return true
   })
   return filtered.slice().sort((a, b) => {
@@ -1409,8 +1416,10 @@ const estadoCounts = computed(() => {
   const counts = { ok: 0, deficit: 0, excedente: 0 }
   for (const c of allContratos.value) {
     if (hiddenContratos.value.has(c.id)) continue
-    const e = res[c.id]?.estadoEfectivo
-    if (e in counts) counts[e]++
+    // Conteos por propiedad (no excluyentes: un contrato cumplido puede tener exposición).
+    for (const k of ['ok', 'deficit', 'excedente']) {
+      if (contratoMatchEstado(res[c.id], k)) counts[k]++
+    }
   }
   return counts
 })
@@ -1581,6 +1590,7 @@ const simResults = computed(() => {
     out[c.id] = {
       gen: Math.round(gen * 10) / 10,
       genDup: Math.round(genDup * 10) / 10,
+      tieneDup: genDup > 0,
       genProy: esActual ? Math.round(genProy * 10) / 10 : null,
       estado, estadoProy, estadoEfectivo, pct, dupPct, proyPct, min, max,
       diaActual: diaAct, diasRestantes: diasRest, bullet,
