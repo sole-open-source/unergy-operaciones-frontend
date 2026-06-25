@@ -905,8 +905,11 @@
           </label>
           <InputText v-model="matrizBusqueda" placeholder="Buscar contrato…" class="text-sm" />
         </div>
-        <Button label="Exportar Excel" icon="pi pi-download" size="small" outlined
-                :disabled="!anualMatrizData" @click="exportarMatrizExcel" />
+        <div class="flex items-center gap-2">
+          <span v-if="matrizFilasCargando" class="text-xs" style="color:#7a6e8a;">Cargando contratos…</span>
+          <Button label="Exportar Excel" icon="pi pi-download" size="small" outlined
+                  :disabled="!anualMatrizData || matrizFilasCargando" @click="exportarMatrizExcel" />
+        </div>
       </div>
       <ProgressSpinner v-if="anualMatrizLoading" />
       <Message v-else-if="anualMatrizError" severity="error" :closable="false">{{ anualMatrizError }}</Message>
@@ -928,23 +931,32 @@
                 <td class="sticky-col px-3 py-1.5">
                   <i class="pi text-xs mr-1" :class="expandedMatriz.includes(c.id) ? 'pi-chevron-down' : 'pi-chevron-right'" />
                   <span class="font-semibold">{{ c.nombre_interno || c.numero_codigo_contrato }}</span>
-                  <span class="text-xs ml-1" style="color:#7a6e8a;">{{ c.comprador_nombre }} · {{ c.n_plantas }} pl.</span>
+                  <span class="text-xs ml-1" style="color:#7a6e8a;">{{ c.comprador_nombre }}<span v-if="c.n_plantas != null"> · {{ c.n_plantas }} pl.</span></span>
+                  <i v-if="c._loading" class="pi pi-spin pi-spinner text-xs ml-1" style="color:#915BD8;" />
                 </td>
-                <td v-for="(m, i) in c.meses" :key="i" class="px-2 py-1.5 text-right font-mono"
-                    :style="{ color: estadoColor(m.estado) }"
-                    v-tooltip.top="estadoLabel(m.estado) + ' · ' + (m.tipo_datos)">{{ fmtMwh(m.valor_mwh) }}</td>
-                <td class="px-3 py-1.5 text-right font-mono font-bold">{{ fmtMwh(c.total_anual_mwh) }}</td>
+                <td v-for="i in 12" :key="i" class="px-2 py-1.5 text-right font-mono"
+                    :style="{ color: c.meses[i-1] ? estadoColor(c.meses[i-1].estado) : '#c9c0d8' }"
+                    v-tooltip.top="c.meses[i-1] ? (estadoLabel(c.meses[i-1].estado) + ' · ' + c.meses[i-1].tipo_datos) : ''">
+                  <span v-if="c.meses[i-1]">{{ fmtNum(c.meses[i-1].valor_mwh) }}</span>
+                  <span v-else-if="c._error" style="color:#D64455;">!</span>
+                  <span v-else style="color:#d4cce0;">·</span>
+                </td>
+                <td class="px-3 py-1.5 text-right font-mono font-bold">{{ c.total_anual_mwh != null ? fmtNum(c.total_anual_mwh) : '·' }}</td>
                 <td class="px-3 py-1.5 text-center">
-                  <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full"
+                  <span v-if="c._loading" class="text-[11px]" style="color:#b0a0c0;">…</span>
+                  <span v-else-if="c._error" class="text-[11px]" style="color:#D64455;">error</span>
+                  <span v-else class="text-[11px] font-semibold px-2 py-0.5 rounded-full"
                         :style="estadoBadge(c.estado_cumplimiento === 'cumple' ? 'ok' : 'deficit')"
                         v-tooltip.top="c.meses_en_deficit + ' mes(es) en déficit'">
                     {{ c.estado_cumplimiento === 'cumple' ? '✓ Cumple' : '✗ No cumple' }}
                   </span>
                 </td>
                 <td class="px-3 py-1.5 text-center">
-                  <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full"
+                  <span v-if="c._loading" class="text-[11px]" style="color:#b0a0c0;">…</span>
+                  <span v-else-if="c._error" class="text-[11px]" style="color:#D64455;">—</span>
+                  <span v-else class="text-[11px] font-semibold px-2 py-0.5 rounded-full"
                         :style="estadoBadge(c.requiere_bolsa ? 'excedente' : 'ok')"
-                        v-tooltip.top="c.requiere_bolsa ? (fmtMwh(c.bolsa_anual_mwh) + ' MWh vía bolsa') : 'Cubierto con generación real'">
+                        v-tooltip.top="c.requiere_bolsa ? (fmtMwh(c.bolsa_anual_mwh) + ' vía bolsa') : 'Cubierto con generación real'">
                     {{ c.requiere_bolsa ? '◆ Bolsa' : '● Real' }}
                   </span>
                 </td>
@@ -957,7 +969,7 @@
                     <span class="text-xs ml-1" style="color:#7a6e8a;">{{ Math.round((p.pct_despacho_rep||0)*100) }}% part.</span>
                   </td>
                   <td v-for="(m, i) in p.meses" :key="i" class="px-2 py-1 text-right font-mono text-xs" style="color:#5a5168;">
-                    {{ fmtMwh(m.valor_mwh) }}
+                    {{ fmtNum(m.valor_mwh) }}
                   </td>
                   <td colspan="3"></td>
                 </tr>
@@ -966,7 +978,7 @@
             <!-- Total general -->
             <tr class="cv-matriz-total">
               <td class="sticky-col px-3 py-2 font-bold">TOTAL ({{ matrizFiltrada.length }})</td>
-              <td v-for="(t, i) in matrizTotalesMensuales" :key="i" class="px-2 py-2 text-right font-mono font-bold">{{ fmtMwh(t) }}</td>
+              <td v-for="(t, i) in matrizTotalesMensuales" :key="i" class="px-2 py-2 text-right font-mono font-bold">{{ fmtNum(t) }}</td>
               <td colspan="3"></td>
             </tr>
           </tbody>
@@ -1481,17 +1493,51 @@ const expandedMatriz     = ref([])
 const matrizSoloNoCumple = ref(false)
 const matrizBusqueda     = ref('')
 
+// Carga progresiva: primero la lista de contratos (instantánea, sin generación) para pintar la
+// tabla, y luego el detalle de cada contrato en peticiones independientes con concurrencia limitada.
+// Evita el timeout de una sola petición agregada que golpea la API de Unergy por todos los contratos.
 async function loadAnualMatriz() {
   anualMatrizLoading.value = true
   anualMatrizError.value = ''
+  expandedMatriz.value = []
+  const year = anualMatrizYear.value
   try {
-    const { data } = await client.get('/cumplimiento/anual-matriz', { params: { year: anualMatrizYear.value } })
-    anualMatrizData.value = data
+    const { data } = await client.get('/cumplimiento/anual-matriz/contratos', { params: { year } })
+    const contratos = (data.contratos || []).map(c => ({
+      ...c,
+      meses: [], proyectos: [],
+      estado_cumplimiento: null, meses_en_deficit: 0, requiere_bolsa: false,
+      total_anual_mwh: null, bolsa_anual_mwh: null, n_plantas: null,
+      _loading: true, _error: false,
+    }))
+    anualMatrizData.value = { year, contratos }
+    anualMatrizLoading.value = false
   } catch (e) {
     anualMatrizError.value = e.response?.data?.detail || e.message
-  } finally {
     anualMatrizLoading.value = false
+    return
   }
+
+  // Filas reactivas a llenar (se mutan a través del proxy reactivo para disparar el render).
+  const rows = anualMatrizData.value.contratos
+  const queue = rows.map((_, i) => i)
+  const CONC = 4
+  const worker = async () => {
+    while (queue.length) {
+      if (anualMatrizYear.value !== year) return  // cambió el año: abortar carga vieja
+      const idx = queue.shift()
+      const row = rows[idx]
+      try {
+        const { data: det } = await client.get(`/cumplimiento/anual-matriz/contrato/${row.id}`,
+          { params: { year }, timeout: 90000 })
+        if (anualMatrizYear.value !== year) return
+        Object.assign(row, det, { _loading: false, _error: false })
+      } catch (e) {
+        Object.assign(row, { _loading: false, _error: true })
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: CONC }, worker))
 }
 
 function toggleMatriz(id) {
@@ -1573,9 +1619,19 @@ const matrizFiltrada = computed(() => {
 const matrizTotalesMensuales = computed(() => {
   const tot = Array.from({ length: 12 }, () => 0)
   for (const c of matrizFiltrada.value)
-    c.meses.forEach((m, i) => { tot[i] += m.valor_mwh || 0 })
+    (c.meses || []).forEach((m, i) => { tot[i] += m.valor_mwh || 0 })
   return tot
 })
+
+// Formato compacto para celdas de la matriz (sin sufijo " MWh", que recargaba 12 columnas).
+function fmtNum(v) {
+  return v == null ? '·' : Number(v).toLocaleString('es-CO', { maximumFractionDigits: 1 })
+}
+
+// True mientras alguna fila de contrato aún está cargando su detalle (deshabilita el export).
+const matrizFilasCargando = computed(() =>
+  (anualMatrizData.value?.contratos || []).some(c => c._loading)
+)
 
 const allContratos = computed(() => {
   if (!simData.value) return []
