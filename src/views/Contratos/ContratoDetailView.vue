@@ -213,11 +213,12 @@
         <!-- Modo edición cantidades -->
         <template v-if="editandoCantidades">
           <p class="text-xs text-gray-400 mb-2">
-            Copia las columnas <strong>Año · Mes · Mín · Máx</strong> desde Excel y pégalas aquí (valores en MWh/mes).
-            Esto <strong>reemplazará</strong> todos los compromisos actuales.
+            Copia las columnas <strong>Año · Mes · Mín · Máx · Plantas inscritas</strong> desde Excel y pégalas aquí
+            (Mín/Máx en MWh/mes; <strong>Plantas inscritas</strong> = nº de plantas que el contrato exige ese mes).
+            Máx y Plantas inscritas son opcionales. Esto <strong>reemplazará</strong> todos los compromisos actuales.
           </p>
           <Textarea v-model="energiaPaste" rows="7"
-            placeholder="2024&#9;Enero&#9;90&#9;180&#10;2024&#9;Febrero&#9;90&#9;180"
+            placeholder="2024&#9;Enero&#9;90&#9;180&#9;4&#10;2024&#9;Febrero&#9;90&#9;180&#9;4"
             class="w-full font-mono text-xs" @paste="onPasteEnergia" />
           <div class="flex items-center gap-2 mt-2">
             <Button label="Procesar" icon="pi pi-refresh" size="small" severity="secondary" outlined @click="parseEnergia" />
@@ -234,6 +235,7 @@
                   <th class="px-3 py-1.5 text-left text-gray-500 font-medium">Mes</th>
                   <th class="px-3 py-1.5 text-right text-gray-500 font-medium">Mín (MWh)</th>
                   <th class="px-3 py-1.5 text-right text-gray-500 font-medium">Máx (MWh)</th>
+                  <th class="px-3 py-1.5 text-right text-gray-500 font-medium">Plantas inscritas</th>
                 </tr>
               </thead>
               <tbody>
@@ -241,10 +243,11 @@
                   <td class="px-3 py-1 text-gray-700">{{ r.año }}</td>
                   <td class="px-3 py-1 text-gray-700">{{ MESES[r.mes - 1] }}</td>
                   <td class="px-3 py-1 text-right text-gray-700">{{ r.energia_minima }}</td>
-                  <td class="px-3 py-1 text-right text-gray-700">{{ r.energia_maxima }}</td>
+                  <td class="px-3 py-1 text-right text-gray-700">{{ r.energia_maxima ?? '—' }}</td>
+                  <td class="px-3 py-1 text-right text-gray-700">{{ r.cantidad_proyectos ?? '—' }}</td>
                 </tr>
                 <tr v-if="energiaRows.length > 8" class="border-t border-gray-50">
-                  <td colspan="4" class="px-3 py-1 text-gray-300 italic">… y {{ energiaRows.length - 8 }} filas más</td>
+                  <td colspan="5" class="px-3 py-1 text-gray-300 italic">… y {{ energiaRows.length - 8 }} filas más</td>
                 </tr>
               </tbody>
             </table>
@@ -272,6 +275,11 @@
             <Column :header="vistaCantidades === 'anual' ? 'Máx (MWh/año)' : 'Máx (MWh/mes)'">
               <template #body="{ data }">
                 {{ data.energia_maxima != null ? Number(data.energia_maxima).toLocaleString('es-CO', { maximumFractionDigits: 1 }) : '—' }}
+              </template>
+            </Column>
+            <Column :header="vistaCantidades === 'anual' ? 'Plantas inscritas (máx)' : 'Plantas inscritas'" style="width:150px">
+              <template #body="{ data }">
+                {{ data.cantidad_proyectos != null ? data.cantidad_proyectos : '—' }}
               </template>
             </Column>
             <Column header="Rango">
@@ -712,13 +720,20 @@ function parseEnergia() {
   const rows = []
   for (const [i, line] of lines.entries()) {
     const cols = splitRow(line)
-    if (cols.length < 4) { energiaError.value = `Fila ${i + 1}: se esperan 4 columnas`; energiaRows.value = []; return }
+    if (cols.length < 3) { energiaError.value = `Fila ${i + 1}: se esperan al menos 3 columnas (Año · Mes · Mín)`; energiaRows.value = []; return }
     const año = parseInt(cols[0].trim(), 10)
     const mes = parseMes(cols[1].trim())
     const min = parseFloat(cols[2].trim().replace(',', '.'))
-    const max = parseFloat(cols[3].trim().replace(',', '.'))
-    if (isNaN(año) || !mes || isNaN(min) || isNaN(max)) { energiaError.value = `Fila ${i + 1}: datos inválidos`; energiaRows.value = []; return }
-    rows.push({ año, mes, energia_minima: min, energia_maxima: max })
+    const max = cols[3] ? parseFloat(cols[3].trim().replace(',', '.')) : null
+    const plantasRaw = cols[4] ? cols[4].trim() : ''
+    const plantas = plantasRaw ? parseInt(plantasRaw.replace(',', '.'), 10) : null
+    if (isNaN(año) || !mes || isNaN(min)) { energiaError.value = `Fila ${i + 1}: datos inválidos`; energiaRows.value = []; return }
+    rows.push({
+      año, mes,
+      energia_minima: min,
+      energia_maxima: (max !== null && !isNaN(max)) ? max : null,
+      cantidad_proyectos: (plantas !== null && !isNaN(plantas)) ? plantas : null,
+    })
   }
   energiaRows.value = rows
 }
@@ -826,7 +841,15 @@ const cantidadesMensuales = computed(() => {
 
 const cantidadesAnuales = computed(() => {
   if (!contrato.value?.compromisos_energia) return []
-  return agregarPorAño(cantidadesMensuales.value, ['energia_minima', 'energia_maxima'], 'suma')
+  const base = agregarPorAño(cantidadesMensuales.value, ['energia_minima', 'energia_maxima'], 'suma')
+  // Plantas inscritas no se suman entre meses: por año mostramos el máximo del año.
+  const maxPlantasByYear = {}
+  for (const r of cantidadesMensuales.value) {
+    if (r.cantidad_proyectos != null) {
+      maxPlantasByYear[r.año] = Math.max(maxPlantasByYear[r.año] ?? 0, r.cantidad_proyectos)
+    }
+  }
+  return base.map(e => ({ ...e, cantidad_proyectos: maxPlantasByYear[e.año] ?? null }))
 })
 
 // Wizard edición completa
