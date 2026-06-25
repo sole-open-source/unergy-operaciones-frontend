@@ -895,6 +895,85 @@
       </template>
     </div>
 
+    <!-- ═══════════════ MATRIZ ANUAL TAB ═══════════════ -->
+    <div v-show="activeTab === 4" class="space-y-4">
+      <div class="flex items-center justify-between gap-3 flex-wrap">
+        <div class="flex items-center gap-2">
+          <Select v-model="anualMatrizYear" :options="years" class="w-28" @change="loadAnualMatriz" />
+          <label class="flex items-center gap-1.5 text-sm" style="color:#7a6e8a;">
+            <Checkbox v-model="matrizSoloNoCumple" :binary="true" /> Solo no cumple
+          </label>
+          <InputText v-model="matrizBusqueda" placeholder="Buscar contrato…" class="text-sm" />
+        </div>
+        <Button label="Exportar Excel" icon="pi pi-download" size="small" outlined
+                :disabled="!anualMatrizData" @click="exportarMatrizExcel" />
+      </div>
+      <ProgressSpinner v-if="anualMatrizLoading" />
+      <Message v-else-if="anualMatrizError" severity="error" :closable="false">{{ anualMatrizError }}</Message>
+      <div v-if="anualMatrizData" class="overflow-x-auto border rounded-lg" style="border-color:rgba(44,32,57,0.08);">
+        <table class="cv-matriz text-sm">
+          <thead>
+            <tr>
+              <th class="sticky-col text-left px-3 py-2">Contrato / Proyecto</th>
+              <th v-for="(mes, i) in MESES" :key="i" class="px-2 py-2 text-right">{{ mes.slice(0,3) }}</th>
+              <th class="px-3 py-2 text-right">Total</th>
+              <th class="px-3 py-2 text-center">Estado</th>
+              <th class="px-3 py-2 text-center">Energía</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template v-for="c in matrizFiltrada" :key="c.id">
+              <!-- Fila contrato -->
+              <tr class="cv-matriz-contrato cursor-pointer" @click="toggleMatriz(c.id)">
+                <td class="sticky-col px-3 py-1.5">
+                  <i class="pi text-xs mr-1" :class="expandedMatriz.includes(c.id) ? 'pi-chevron-down' : 'pi-chevron-right'" />
+                  <span class="font-semibold">{{ c.nombre_interno || c.numero_codigo_contrato }}</span>
+                  <span class="text-xs ml-1" style="color:#7a6e8a;">{{ c.comprador_nombre }} · {{ c.n_plantas }} pl.</span>
+                </td>
+                <td v-for="(m, i) in c.meses" :key="i" class="px-2 py-1.5 text-right font-mono"
+                    :style="{ color: estadoColor(m.estado) }"
+                    v-tooltip.top="estadoLabel(m.estado) + ' · ' + (m.tipo_datos)">{{ fmtMwh(m.valor_mwh) }}</td>
+                <td class="px-3 py-1.5 text-right font-mono font-bold">{{ fmtMwh(c.total_anual_mwh) }}</td>
+                <td class="px-3 py-1.5 text-center">
+                  <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full"
+                        :style="estadoBadge(c.estado_cumplimiento === 'cumple' ? 'ok' : 'deficit')"
+                        v-tooltip.top="c.meses_en_deficit + ' mes(es) en déficit'">
+                    {{ c.estado_cumplimiento === 'cumple' ? '✓ Cumple' : '✗ No cumple' }}
+                  </span>
+                </td>
+                <td class="px-3 py-1.5 text-center">
+                  <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full"
+                        :style="estadoBadge(c.requiere_bolsa ? 'excedente' : 'ok')"
+                        v-tooltip.top="c.requiere_bolsa ? (fmtMwh(c.bolsa_anual_mwh) + ' MWh vía bolsa') : 'Cubierto con generación real'">
+                    {{ c.requiere_bolsa ? '◆ Bolsa' : '● Real' }}
+                  </span>
+                </td>
+              </tr>
+              <!-- Filas proyecto (expandidas) -->
+              <template v-if="expandedMatriz.includes(c.id)">
+                <tr v-for="p in c.proyectos" :key="c.id + '-' + p.id" class="cv-matriz-proyecto">
+                  <td class="sticky-col px-3 py-1 pl-8">
+                    <span>{{ p.nombre }}</span>
+                    <span class="text-xs ml-1" style="color:#7a6e8a;">{{ Math.round((p.pct_despacho_rep||0)*100) }}% part.</span>
+                  </td>
+                  <td v-for="(m, i) in p.meses" :key="i" class="px-2 py-1 text-right font-mono text-xs" style="color:#5a5168;">
+                    {{ fmtMwh(m.valor_mwh) }}
+                  </td>
+                  <td colspan="3"></td>
+                </tr>
+              </template>
+            </template>
+            <!-- Total general -->
+            <tr class="cv-matriz-total">
+              <td class="sticky-col px-3 py-2 font-bold">TOTAL ({{ matrizFiltrada.length }})</td>
+              <td v-for="(t, i) in matrizTotalesMensuales" :key="i" class="px-2 py-2 text-right font-mono font-bold">{{ fmtMwh(t) }}</td>
+              <td colspan="3"></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
     <!-- Floating: detalle de la capa (misma información que la imagen) -->
     <Teleport to="body">
       <template v-if="detalleCapa">
@@ -1076,6 +1155,8 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { proyectoActivoEnMes } from '@/utils/proyectoActivo'
 import Select from 'primevue/select'
 import InputText from 'primevue/inputtext'
+import Checkbox from 'primevue/checkbox'
+import Button from 'primevue/button'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Message from 'primevue/message'
@@ -1166,7 +1247,7 @@ async function clearCacheAndReload() {
 }
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
-const TABS      = ['Estrategia', 'Cumplimiento', 'Proyectos', 'Energía transada']
+const TABS      = ['Estrategia', 'Cumplimiento', 'Proyectos', 'Energía transada', 'Matriz anual']
 const activeTab = ref(0)
 
 // ── Chart constants ───────────────────────────────────────────────────────────
@@ -1390,6 +1471,111 @@ function onEtPeriodChange() {
   if (etMonth.value > maxMonth) etMonth.value = maxMonth
   loadEnergiaTransada()
 }
+
+// ── Matriz anual state ────────────────────────────────────────────────────────
+const anualMatrizData    = ref(null)
+const anualMatrizLoading = ref(false)
+const anualMatrizError   = ref('')
+const anualMatrizYear    = ref(now.getFullYear())
+const expandedMatriz     = ref([])
+const matrizSoloNoCumple = ref(false)
+const matrizBusqueda     = ref('')
+
+async function loadAnualMatriz() {
+  anualMatrizLoading.value = true
+  anualMatrizError.value = ''
+  try {
+    const { data } = await client.get('/cumplimiento/anual-matriz', { params: { year: anualMatrizYear.value } })
+    anualMatrizData.value = data
+  } catch (e) {
+    anualMatrizError.value = e.response?.data?.detail || e.message
+  } finally {
+    anualMatrizLoading.value = false
+  }
+}
+
+function toggleMatriz(id) {
+  const i = expandedMatriz.value.indexOf(id)
+  if (i >= 0) expandedMatriz.value.splice(i, 1)
+  else expandedMatriz.value.push(id)
+}
+
+async function exportarMatrizExcel() {
+  if (!anualMatrizData.value) return
+  const XLSX = await import('xlsx-js-style')
+  const { construirMatrizAOA } = await import('./cumplimientoMatrizExcel.js')
+  const { aoa, rowLevels, formulaCells, totalRow, headerRow } =
+    construirMatrizAOA(anualMatrizData.value, anualMatrizYear.value)
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa)
+
+  // Fórmulas
+  for (const fc of formulaCells) {
+    const ref = XLSX.utils.encode_cell({ r: fc.r, c: fc.c })
+    ws[ref] = { t: 'n', f: fc.f }
+  }
+
+  // Outline (filas de proyecto colapsables bajo su contrato)
+  ws['!rows'] = rowLevels.map(l => (l > 0 ? { level: l } : {}))
+
+  // Paleta de marca Unergy
+  const C = { morado: '915BD8', oscuro: '2C2039', blanco: 'FFFFFF' }
+
+  // Estilo encabezado (fila headerRow)
+  for (let c = 0; c < 17; c++) {
+    const ref = XLSX.utils.encode_cell({ r: headerRow, c })
+    if (!ws[ref]) ws[ref] = { t: 's', v: '' }
+    ws[ref].s = {
+      font: { bold: true, color: { rgb: C.blanco } },
+      fill: { fgColor: { rgb: C.morado } },
+      alignment: { horizontal: 'center', vertical: 'center' },
+    }
+  }
+
+  // Estilo fila total general
+  for (let c = 0; c < 17; c++) {
+    const ref = XLSX.utils.encode_cell({ r: totalRow, c })
+    if (!ws[ref]) ws[ref] = { t: 's', v: '' }
+    ws[ref].s = { font: { bold: true, color: { rgb: C.oscuro } } }
+  }
+
+  // Título
+  const titleRef = XLSX.utils.encode_cell({ r: 0, c: 0 })
+  if (ws[titleRef]) ws[titleRef].s = { font: { bold: true, sz: 14, color: { rgb: C.oscuro } } }
+
+  // Merges, anchos de columna, autofiltro
+  ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 16 } }]
+  ws['!cols'] = [
+    { wch: 34 },
+    ...Array(12).fill({ wch: 8 }),
+    { wch: 10 },
+    { wch: 10 },
+    { wch: 12 },
+    { wch: 12 },
+  ]
+  ws['!autofilter'] = { ref: `A${headerRow + 1}:Q${totalRow + 1}` }
+
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, 'Matriz anual')
+  XLSX.writeFile(wb, `matriz_anual_cumplimiento_${anualMatrizYear.value}.xlsx`)
+}
+
+const matrizFiltrada = computed(() => {
+  const cs = anualMatrizData.value?.contratos || []
+  const q = matrizBusqueda.value.trim().toLowerCase()
+  return cs.filter(c =>
+    (!matrizSoloNoCumple.value || c.estado_cumplimiento === 'no_cumple') &&
+    (!q || (c.nombre_interno || c.numero_codigo_contrato || '').toLowerCase().includes(q)
+        || (c.comprador_nombre || '').toLowerCase().includes(q))
+  )
+})
+
+const matrizTotalesMensuales = computed(() => {
+  const tot = Array.from({ length: 12 }, () => 0)
+  for (const c of matrizFiltrada.value)
+    c.meses.forEach((m, i) => { tot[i] += m.valor_mwh || 0 })
+  return tot
+})
 
 const allContratos = computed(() => {
   if (!simData.value) return []
@@ -2300,6 +2486,7 @@ watch(activeTab, (tab) => {
   if (tab === 1 && !anualData.value) { loadAnnualData(); loadTableData() }
   if (tab === 2 && !pcData.value) loadPlantasContratos()
   if (tab === 3 && !etData.value) loadEnergiaTransada()
+  if (tab === 4 && !anualMatrizData.value) loadAnualMatriz()
 })
 
 onMounted(async () => {
@@ -2309,6 +2496,18 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+/* ── Matriz anual ── */
+.cv-matriz { width: 100%; border-collapse: separate; border-spacing: 0; }
+.cv-matriz thead th { position: sticky; top: 0; background: #faf8fd; z-index: 2; font-weight: 600; color: #2C2039; border-bottom: 1px solid rgba(44,32,57,0.1); }
+.cv-matriz .sticky-col { position: sticky; left: 0; background: #fff; z-index: 1; min-width: 240px; }
+.cv-matriz thead .sticky-col { z-index: 3; background: #faf8fd; }
+.cv-matriz-contrato:hover { background: #f6f2fb; }
+.cv-matriz-contrato .sticky-col { background: #fff; }
+.cv-matriz-proyecto { background: #fbfafd; }
+.cv-matriz-proyecto .sticky-col { background: #fbfafd; }
+.cv-matriz-total td { border-top: 2px solid rgba(44,32,57,0.15); background: #f3eefb; }
+.cv-matriz-total .sticky-col { background: #f3eefb; }
+
 /* ── Rediseño Notion + brand Unergy (header, tabs, toolbar, tarjetas) ── */
 .cv-icon-tile {
   width: 40px; height: 40px; border-radius: 12px; flex-shrink: 0;
