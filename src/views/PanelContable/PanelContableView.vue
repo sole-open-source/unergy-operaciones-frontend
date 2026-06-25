@@ -155,8 +155,8 @@
                   <td><span class="pmeta">{{ p.inversionistas.map(i => i.nombre).join(', ') }}</span></td>
                   <td style="text-align:right;">{{ fmtCOP(p.ingreso_bruto_cop) }}</td>
                   <td><input type="checkbox" class="chk" v-model="p.liquidar_ingresos" @change="onFlag(p)" /></td>
-                  <td><input type="checkbox" class="chk" v-model="p.liquidar_costos" :disabled="!p.tiene_costos"
-                             :title="!p.tiene_costos ? 'sin costos' : ''" @change="onFlag(p)" /></td>
+                  <td><input type="checkbox" class="chk" v-model="p.liquidar_costos"
+                             :title="!p.tiene_costos ? 'Este mes el ER no trajo costos; puedes marcarlo igual (los costos pueden venir de la vista de costos)' : ''" @change="onFlag(p)" /></td>
                   <td><input type="checkbox" class="gen-chk" v-model="p.generar_mandatos" @change="onFlag(p)" /></td>
                 </tr>
               </tbody>
@@ -219,7 +219,7 @@
                   <div class="inv-name">{{ inv.nombre }} · {{ (inv.porcentaje ?? 0).toFixed(2) }}%</div>
                   <div class="inv-cons">
                     <span>Ing: <b>{{ p.liquidar_ingresos ? (p.consecutivo_ingresos ?? '—') : '—' }}</b></span>
-                    <span>Cost: <b>{{ (p.liquidar_costos && p.tiene_costos) ? (p.consecutivo_costos ?? '—') : '—' }}</b></span>
+                    <span>Cost: <b>{{ p.liquidar_costos ? (p.consecutivo_costos ?? '—') : '—' }}</b></span>
                   </div>
                 </div>
 
@@ -292,7 +292,7 @@
                   <div class="inv-name">100% — Total proyecto</div>
                   <div class="inv-cons">
                     <span>Ing: <b>{{ p.liquidar_ingresos ? (p.consecutivo_ingresos ?? '—') : '—' }}</b></span>
-                    <span>Cost: <b>{{ (p.liquidar_costos && p.tiene_costos) ? (p.consecutivo_costos ?? '—') : '—' }}</b></span>
+                    <span>Cost: <b>{{ p.liquidar_costos ? (p.consecutivo_costos ?? '—') : '—' }}</b></span>
                   </div>
                 </div>
 
@@ -564,7 +564,7 @@ const periodoLabel = computed(() => {
   return `${MESES[Number(m) - 1] || ''} ${y}`
 })
 const nLiqIng = computed(() => paneles.value.filter(p => p.liquidar_ingresos).length)
-const nLiqCost = computed(() => paneles.value.filter(p => p.liquidar_costos && p.tiene_costos).length)
+const nLiqCost = computed(() => paneles.value.filter(p => p.liquidar_costos).length)
 const nGeneran = computed(() => paneles.value.filter(p => p.generar_mandatos).length)
 const esActivo = (p) => p.liquidar_ingresos || p.liquidar_costos
 
@@ -774,11 +774,9 @@ async function onErSelected (e) {
 }
 
 function selAll (campo, val) {
-  // 'liquidar_costos' solo aplica a proyectos con costos.
-  paneles.value.forEach(p => {
-    if (campo === 'liquidar_costos' && !p.tiene_costos) return
-    p[campo] = val
-  })
+  // El usuario decide qué liquidar; 'liquidar_costos' ya no se ata a si el ER trajo
+  // costos (pueden faltar este mes o venir luego de la vista de costos).
+  paneles.value.forEach(p => { p[campo] = val })
   Promise.all(paneles.value.map(p => api.patch(`/panel-contable/${p.id}`, {
     [campo]: p[campo],
   }).catch(() => {}))).then(() => { if (campo !== 'generar_mandatos') reasignar() })
