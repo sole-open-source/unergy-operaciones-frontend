@@ -42,9 +42,6 @@
           :proyectos="filasParaZip"
           :periodo="periodoActual"
           :periodo-label="periodoLabel" />
-        <Button label="Agregar proyecto" icon="pi pi-plus" size="small" outlined
-          @click="openAgregar"
-          style="border-color:#915BD8;color:#915BD8" />
         <Button label="Guardar selección" icon="pi pi-save" size="small"
           :loading="guardando"
           style="background:#915BD8;border-color:#915BD8"
@@ -93,12 +90,6 @@
               <td class="px-3 py-2 font-medium" style="color:#2C2039; white-space:nowrap; overflow:hidden; text-overflow:ellipsis" :title="fila.proyecto">
                 <span class="inline-flex items-center gap-1.5 max-w-full">
                   <span class="truncate">{{ fila.proyecto }}</span>
-                  <button type="button"
-                    class="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-purple-600"
-                    title="Editar proyecto"
-                    @click="openEditar(fila)">
-                    <i class="pi pi-pencil" style="font-size:11px" />
-                  </button>
                 </span>
               </td>
               <td class="px-3 py-2 font-mono text-xs text-gray-500">{{ periodoActual }}</td>
@@ -239,62 +230,12 @@
       </div>
     </Dialog>
 
-    <!-- ── Dialog Agregar / Editar proyecto ──────────────────────────────── -->
-    <Dialog v-model:visible="showFormDialog" modal
-      :header="formMode === 'agregar' ? 'Agregar proyecto' : 'Editar proyecto'"
-      :style="{ width: '480px' }">
-      <div class="space-y-3 pt-1">
-        <div class="grid grid-cols-2 gap-3">
-          <div class="flex flex-col gap-1 col-span-2">
-            <label class="text-xs font-medium text-gray-500">Proyecto <span class="text-red-400">*</span></label>
-            <InputText v-model="formData.Proyecto" class="w-full" placeholder="Minigranja Solar …" />
-          </div>
-          <div class="flex flex-col gap-1">
-            <label class="text-xs font-medium text-gray-500">Código</label>
-            <InputText v-model="formData.Codigo" class="w-full" placeholder="COLCEST…" />
-          </div>
-          <div class="flex flex-col gap-1">
-            <label class="text-xs font-medium text-gray-500">Fecha firma contrato</label>
-            <input type="date" v-model="formData['Fecha firma contrato']"
-              class="text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-purple-200" />
-          </div>
-          <div class="flex flex-col gap-1">
-            <label class="text-xs font-medium text-gray-500">Valor base (COP/mes)</label>
-            <InputNumber v-model="formData['Valor base']" :useGrouping="true" class="w-full"
-              placeholder="0" />
-          </div>
-          <div class="flex flex-col gap-1">
-            <label class="text-xs font-medium text-gray-500">Canon arrendamiento (COP/mes)</label>
-            <InputNumber v-model="formData['Canon arrendamiento']" :useGrouping="true" class="w-full"
-              placeholder="0" />
-          </div>
-        </div>
-        <div class="flex items-center justify-between pt-2 border-t">
-          <button v-if="formMode === 'editar' && formEsExtra"
-            type="button"
-            class="text-xs text-red-500 hover:text-red-700 flex items-center gap-1"
-            @click="eliminarProyecto">
-            <i class="pi pi-trash text-xs" /> Eliminar
-          </button>
-          <div v-else />
-          <div class="flex gap-2">
-            <Button label="Cancelar" size="small" outlined severity="secondary"
-              @click="showFormDialog = false" />
-            <Button label="Guardar" icon="pi pi-check" size="small"
-              :disabled="!formData.Proyecto"
-              @click="guardarForm"
-              style="background:#915BD8;border-color:#915BD8" />
-          </div>
-        </div>
-      </div>
-    </Dialog>
-
     <!-- ── Popover desglose del canon (hover sobre ⚠️) ───────────────────────── -->
     <CalculoIpcPopover
       ref="canonPopover"
       :valor-base-anual="filaCanon && filaCanon.valor_base != null ? filaCanon.valor_base * 12 : null"
       :factor="filaCanon ? filaCanon.factor_acumulado : null"
-      :valor-a-facturar="filaCanon ? filaCanon.canon_calculado : null" />
+      :valor-a-facturar="filaCanon ? filaCanon.canon_a_facturar : null" />
 
   </div>
 </template>
@@ -309,7 +250,7 @@ import Column      from 'primevue/column'
 import InputNumber from 'primevue/inputnumber'
 import InputText   from 'primevue/inputtext'
 import { useToast } from 'primevue/usetoast'
-import arriendosRaw from '@/data/pagoarriendos.json'
+import api          from '@/api/client'
 import ArriendosZipUpload from './ArriendosZipUpload.vue'
 import CalculoIpcPopover from '@/components/CalculoIpcPopover.vue'
 import { docsMeta, loadDocsMeta, downloadDoc, docKey } from '@/composables/useArriendosDocs'
@@ -362,230 +303,78 @@ const colsVisibles = reactive({
 })
 const showColMenu = ref(false)
 
-// ── Tasas IPC ──────────────────────────────────────────────────────────────────
-const IPC_STORAGE_KEY = 'arriendos_ipc_tasas'
-
-const ipcTasas = ref([
-  { año: 2023, tasa: 0.0928, confirmado: true, fuente: 'DANE' },
-  { año: 2024, tasa: 0.0520, confirmado: true, fuente: 'DANE' },
-  { año: 2025, tasa: 0.0510, confirmado: true, fuente: 'DANE' },
-])
-
-function cargarIPCStorage() {
-  try {
-    const raw = localStorage.getItem(IPC_STORAGE_KEY)
-    if (raw) {
-      const stored = JSON.parse(raw)
-      stored.forEach(s => {
-        const idx = ipcTasas.value.findIndex(t => t.año === s.año)
-        if (idx >= 0) ipcTasas.value[idx] = s
-        else ipcTasas.value.push(s)
-      })
-      ipcTasas.value.sort((a, b) => a.año - b.año)
-    }
-  } catch {}
-}
-
-function getIPC(año) {
-  return ipcTasas.value.find(t => t.año === año)?.tasa
-}
-
-const showIPCDialog = ref(false)
-const ipcForm       = reactive({ año: new Date().getFullYear() - 1, tasaPct: null, fuente: 'DANE' })
-
-function guardarIPC() {
-  if (!ipcForm.año || ipcForm.tasaPct == null) return
-  const tasa = ipcForm.tasaPct / 100
-  const idx  = ipcTasas.value.findIndex(t => t.año === ipcForm.año)
-  if (idx >= 0) {
-    ipcTasas.value[idx] = { año: ipcForm.año, tasa, confirmado: true, fuente: ipcForm.fuente || 'DANE' }
-  } else {
-    ipcTasas.value.push({ año: ipcForm.año, tasa, confirmado: true, fuente: ipcForm.fuente || 'DANE' })
-    ipcTasas.value.sort((a, b) => a.año - b.año)
-  }
-  try { localStorage.setItem(IPC_STORAGE_KEY, JSON.stringify(ipcTasas.value)) } catch {}
-  toast.add({ severity: 'success', summary: 'Tasa IPC guardada', life: 2500 })
-}
-
-// ── Proyectos extra (agregados manualmente) y overrides de edición ─────────────
-const EXTRA_STORAGE_KEY    = 'arriendos_proyectos_extra'
-const OVERRIDE_STORAGE_KEY = 'arriendos_overrides'
-
-const proyectosExtra    = ref([])   // array de objetos con misma estructura que arriendosRaw
-const proyectosOverride = ref({})   // { id: { campos sobreescritos } }
-
-function cargarProyectosStorage() {
-  try {
-    const rawExtra = localStorage.getItem(EXTRA_STORAGE_KEY)
-    if (rawExtra) proyectosExtra.value = JSON.parse(rawExtra)
-  } catch {}
-  try {
-    const rawOv = localStorage.getItem(OVERRIDE_STORAGE_KEY)
-    if (rawOv) proyectosOverride.value = JSON.parse(rawOv)
-  } catch {}
-}
-
-function persistExtra() {
-  try { localStorage.setItem(EXTRA_STORAGE_KEY, JSON.stringify(proyectosExtra.value)) } catch {}
-}
-function persistOverride() {
-  try { localStorage.setItem(OVERRIDE_STORAGE_KEY, JSON.stringify(proyectosOverride.value)) } catch {}
-}
-
-// ── Cálculo de indexaciones ────────────────────────────────────────────────────
-function calcularFila(proyectoRaw) {
-  // Aplicar override si existe
-  const id  = proyectoRaw._extraId ?? (proyectoRaw.Codigo || proyectoRaw.Proyecto)
-  const ov  = proyectosOverride.value[id] || {}
-  const p   = { ...proyectoRaw, ...ov }
-
-  const valorBase    = p['Valor base']
-  const canonArchivo = p['Canon arrendamiento']
-
-  const sinDatos = !p['Fecha firma contrato'] || valorBase == null
-  if (sinDatos) {
-    return {
-      id,
-      proyecto:            p.Proyecto,
-      valor_base:          valorBase ?? null,
-      canon_calculado:     null,
-      canon_archivo:       canonArchivo ?? null,
-      difiere_archivo:     false,
-      n_indexaciones:      null,
-      factor_acumulado:    null,
-      valor_anual_indexado:null,
-      historial_texto:     '—',
-      historial_detalle:   '—',
-      habilitado:          false,
-      ipc_faltante:        false,
-      esExtra:             !!proyectoRaw._extraId,
-    }
-  }
-
-  const [yyyy]     = periodoActual.value.split('-').map(Number)
-  const añoPeriodo = yyyy
-  const añoFirma   = new Date(p['Fecha firma contrato']).getFullYear()
-
-  let valorActual   = valorBase
-  let factorAcum    = 1
-  let nIndexaciones = 0
-  let ipcFaltante   = false
-  const histItems   = []
-  const histDetalle = [`Base ${añoFirma} (${p['Fecha firma contrato']}): ${formatCOP(valorBase)}`]
-
-  for (let añoCorriente = añoFirma + 1; añoCorriente <= añoPeriodo; añoCorriente++) {
-    const añoDic = añoCorriente - 1
-    const ipc    = getIPC(añoDic)
-    if (ipc === undefined) {
-      ipcFaltante = true
-      histDetalle.push(`Ene ${añoCorriente}: IPC dic ${añoDic} no disponible`)
-      break
-    }
-    valorActual  = valorActual * (1 + ipc)
-    factorAcum  *= (1 + ipc)
-    nIndexaciones++
-    const label = `Ene ${añoCorriente} (IPC dic ${añoDic}: ${(ipc * 100).toFixed(2)}%) → ${formatCOP(valorActual)}`
-    histItems.push(`IPC dic ${añoDic}: ${(ipc * 100).toFixed(2)}%`)
-    histDetalle.push(label + (añoCorriente <= hoy.getFullYear() ? '' : ' [Proyectado]'))
-  }
-
-  if (!ipcFaltante && getIPC(añoPeriodo) === undefined) ipcFaltante = true
-
-  const TOLERANCIA = 0.001
-  const difiere = canonArchivo != null &&
-    Math.abs(valorActual - canonArchivo) / Math.max(Math.abs(canonArchivo), 1) > TOLERANCIA
-
-  return {
-    id,
-    proyecto:            p.Proyecto,
-    valor_base:          valorBase,
-    canon_calculado:     valorActual,
-    canon_archivo:       canonArchivo,
-    difiere_archivo:     difiere,
-    n_indexaciones:      nIndexaciones,
-    factor_acumulado:    factorAcum,
-    valor_anual_indexado:valorActual * 12,
-    historial_texto:     histItems.length ? histItems.join(' → ') : `Sin indexaciones (base: ${formatCOP(valorBase)})`,
-    historial_detalle:   histDetalle.join('\n'),
-    habilitado:          true,
-    ipc_faltante:        ipcFaltante,
-    esExtra:             !!proyectoRaw._extraId,
-  }
-}
-
 function formatCOP(v) {
   if (v == null) return '—'
   return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(v)
 }
 
-// ── Filas (JSON + extras) ──────────────────────────────────────────────────────
-const filas = computed(() => {
-  const base   = arriendosRaw.map(p => calcularFila(p))
-  const extras = proyectosExtra.value.map(p => calcularFila(p))
-  return [...base, ...extras]
+// ── Tasas IPC ──────────────────────────────────────────────────────────────────
+const showIPCDialog = ref(false)
+const ipcForm       = reactive({ año: new Date().getFullYear() - 1, tasaPct: null, fuente: 'DANE' })
+
+async function guardarIPC() {
+  if (!ipcForm.año || ipcForm.tasaPct == null) return
+  try {
+    await api.put(`/arriendos/ipc/${ipcForm.año}`, {
+      tasa: ipcForm.tasaPct / 100,
+      confirmado: true,
+      fuente: ipcForm.fuente || 'DANE',
+    })
+    toast.add({ severity: 'success', summary: 'Tasa IPC guardada', life: 2500 })
+    await cargarDatos()
+  } catch {
+    toast.add({ severity: 'error', summary: 'Error al guardar IPC', life: 3000 })
+  }
+}
+
+// ── Estado (API) ─────────────────────────────────────────────────────────────
+const loading   = ref(false)
+const guardando = ref(false)
+const filas     = ref([])
+const seleccion = reactive({})   // { [id]: bool }
+const ipcTasas  = ref([])
+
+async function cargarDatos() {
+  loading.value = true
+  try {
+    const [calc, ipc] = await Promise.all([
+      api.get(`/arriendos/calculo/${periodoActual.value}`),
+      api.get('/arriendos/ipc'),
+    ])
+    filas.value = calc.data.filas
+    ipcTasas.value = ipc.data
+    filas.value.forEach(f => { seleccion[f.id] = f.incluido && f.habilitado })
+  } catch {
+    toast.add({ severity: 'error', summary: 'Error al cargar arriendos', life: 3000 })
+  } finally {
+    loading.value = false
+  }
+}
+
+const facturadoActual = computed(() => {
+  const m = {}; filas.value.forEach(f => { m[f.id] = f.facturado }); return m
 })
-
-const proyectosSinIPC = computed(() =>
-  filas.value.filter(f => f.habilitado && f.ipc_faltante).map(f => f.proyecto)
-)
-
-// ── Selección (todos los proyectos, habilitados o no) ─────────────────────────
-const SEL_STORAGE_KEY  = 'arriendos_seleccion'
-const FACT_STORAGE_KEY = 'arriendos_facturado'
-
-const seleccion      = reactive({})
-const facturadoStore = reactive({})
-
-const facturadoActual    = computed(() => facturadoStore[periodoActual.value] || {})
+const filasHabilitadas   = computed(() => filas.value.filter(f => f.habilitado))
 const todosMarcados      = computed(() =>
-  filas.value.length > 0 && filas.value.every(f => seleccion[f.id])
-)
-const filasSeleccionadas = computed(() => filas.value.filter(f => seleccion[f.id]).length)
+  filasHabilitadas.value.length > 0 && filasHabilitadas.value.every(f => seleccion[f.id]))
+const filasSeleccionadas = computed(() => filasHabilitadas.value.filter(f => seleccion[f.id]).length)
 const totalSeleccionado  = computed(() =>
-  filas.value
-    .filter(f => seleccion[f.id])
-    .reduce((s, f) => s + (f.canon_archivo ?? f.canon_calculado ?? 0), 0)
-)
+  filas.value.filter(f => f.habilitado && seleccion[f.id]).reduce((s, f) => s + (f.canon_a_facturar || 0), 0))
+
+// IPC faltante no lo expone el backend → notificación deshabilitada
+const proyectosSinIPC = computed(() => [])
 
 function toggleTodos(e) {
-  filas.value.forEach(f => { seleccion[f.id] = e.target.checked })
+  filasHabilitadas.value.forEach(f => { seleccion[f.id] = e.target.checked })
 }
 
-function toggleFacturado(id) {
-  if (!facturadoStore[periodoActual.value]) facturadoStore[periodoActual.value] = {}
-  facturadoStore[periodoActual.value][id] = !facturadoStore[periodoActual.value][id]
-  try { localStorage.setItem(FACT_STORAGE_KEY, JSON.stringify(facturadoStore)) } catch {}
-}
-
-// ── Persistencia ───────────────────────────────────────────────────────────────
-function cargarStorage() {
-  try {
-    const rawSel = localStorage.getItem(SEL_STORAGE_KEY)
-    const data   = rawSel ? JSON.parse(rawSel) : {}
-    const saved  = data[periodoActual.value] || {}
-    filas.value.forEach(f => {
-      seleccion[f.id] = saved[f.id] !== undefined ? saved[f.id] : true
-    })
-  } catch {
-    filas.value.forEach(f => { seleccion[f.id] = true })
-  }
-  try {
-    const rawFact = localStorage.getItem(FACT_STORAGE_KEY)
-    if (rawFact) Object.assign(facturadoStore, JSON.parse(rawFact))
-  } catch {}
-}
-
-const guardando = ref(false)
-function guardarSeleccion() {
+async function guardarSeleccion() {
   guardando.value = true
   try {
-    const raw  = localStorage.getItem(SEL_STORAGE_KEY)
-    const data = raw ? JSON.parse(raw) : {}
-    data[periodoActual.value] = {}
-    filas.value.forEach(f => { data[periodoActual.value][f.id] = !!seleccion[f.id] })
-    localStorage.setItem(SEL_STORAGE_KEY, JSON.stringify(data))
-    window.dispatchEvent(new CustomEvent('arriendos-seleccion-guardada', { detail: { periodo: periodoActual.value } }))
+    const items = filas.value.map(f => ({ proyecto_id: f.id, incluido: !!(seleccion[f.id] && f.habilitado) }))
+    await api.post(`/arriendos/seleccion/${periodoActual.value}`, { items })
     toast.add({ severity: 'success', summary: 'Selección guardada', life: 2500 })
+    await cargarDatos()
   } catch {
     toast.add({ severity: 'error', summary: 'Error al guardar', life: 3000 })
   } finally {
@@ -593,115 +382,20 @@ function guardarSeleccion() {
   }
 }
 
-// ── Dialog Agregar / Editar ────────────────────────────────────────────────────
-const showFormDialog = ref(false)
-const formMode       = ref('agregar')   // 'agregar' | 'editar'
-const formTargetId   = ref(null)
-const formEsExtra    = ref(false)
-const formData       = reactive({
-  Proyecto: '',
-  Codigo: '',
-  'Fecha firma contrato': '',
-  'Valor base': null,
-  'Canon arrendamiento': null,
-})
-
-function resetForm() {
-  formData.Proyecto               = ''
-  formData.Codigo                 = ''
-  formData['Fecha firma contrato'] = ''
-  formData['Valor base']          = null
-  formData['Canon arrendamiento'] = null
-}
-
-function openAgregar() {
-  resetForm()
-  formMode.value    = 'agregar'
-  formTargetId.value = null
-  formEsExtra.value  = false
-  showFormDialog.value = true
-}
-
-function openEditar(fila) {
-  // Reconstruir campos actuales (override + raw)
-  const raw = fila.esExtra
-    ? proyectosExtra.value.find(p => p._extraId === fila.id)
-    : arriendosRaw.find(p => (p.Codigo || p.Proyecto) === fila.id)
-  const ov  = proyectosOverride.value[fila.id] || {}
-  const src = { ...(raw || {}), ...ov }
-
-  formData.Proyecto               = src.Proyecto || ''
-  formData.Codigo                 = src.Codigo || ''
-  formData['Fecha firma contrato'] = src['Fecha firma contrato'] || ''
-  formData['Valor base']          = src['Valor base'] ?? null
-  formData['Canon arrendamiento'] = src['Canon arrendamiento'] ?? null
-
-  formMode.value    = 'editar'
-  formTargetId.value = fila.id
-  formEsExtra.value  = fila.esExtra
-  showFormDialog.value = true
-}
-
-function guardarForm() {
-  if (!formData.Proyecto) return
-
-  if (formMode.value === 'agregar') {
-    const extraId = `extra_${Date.now()}`
-    proyectosExtra.value.push({
-      _extraId:                 extraId,
-      Proyecto:                 formData.Proyecto,
-      Codigo:                   formData.Codigo || undefined,
-      'Fecha firma contrato':   formData['Fecha firma contrato'] || undefined,
-      'Valor base':             formData['Valor base'] ?? undefined,
-      'Canon arrendamiento':    formData['Canon arrendamiento'] ?? undefined,
-    })
-    persistExtra()
-    // Seleccionar el nuevo proyecto por defecto
-    seleccion[extraId] = true
-  } else {
-    // Editar: guardar como override (para JSON) o actualizar directamente (para extra)
-    if (formEsExtra.value) {
-      const idx = proyectosExtra.value.findIndex(p => p._extraId === formTargetId.value)
-      if (idx >= 0) {
-        proyectosExtra.value[idx] = {
-          ...proyectosExtra.value[idx],
-          Proyecto:               formData.Proyecto,
-          Codigo:                 formData.Codigo || undefined,
-          'Fecha firma contrato': formData['Fecha firma contrato'] || undefined,
-          'Valor base':           formData['Valor base'] ?? undefined,
-          'Canon arrendamiento':  formData['Canon arrendamiento'] ?? undefined,
-        }
-        persistExtra()
-      }
-    } else {
-      proyectosOverride.value[formTargetId.value] = {
-        Proyecto:               formData.Proyecto,
-        Codigo:                 formData.Codigo || undefined,
-        'Fecha firma contrato': formData['Fecha firma contrato'] || undefined,
-        'Valor base':           formData['Valor base'] ?? undefined,
-        'Canon arrendamiento':  formData['Canon arrendamiento'] ?? undefined,
-      }
-      persistOverride()
-    }
+async function toggleFacturado(id) {
+  try {
+    await api.patch(`/arriendos/seleccion/${periodoActual.value}/${id}/facturado`)
+    await cargarDatos()
+  } catch {
+    toast.add({ severity: 'error', summary: 'Error al marcar facturado', life: 3000 })
   }
-
-  showFormDialog.value = false
-  toast.add({ severity: 'success', summary: formMode.value === 'agregar' ? 'Proyecto agregado' : 'Proyecto actualizado', life: 2500 })
-}
-
-function eliminarProyecto() {
-  if (!formEsExtra.value) return
-  proyectosExtra.value = proyectosExtra.value.filter(p => p._extraId !== formTargetId.value)
-  persistExtra()
-  showFormDialog.value = false
-  toast.add({ severity: 'info', summary: 'Proyecto eliminado', life: 2500 })
 }
 
 // ── Proyectos para el componente ZipUpload ─────────────────────────────────────
 const filasParaZip = computed(() =>
-  filas.value.map(f => ({ id: f.id, proyecto: f.proyecto, codigo: f.id }))
+  filas.value.map(f => ({ id: f.id, proyecto: f.proyecto, codigo: f.codigo }))
 )
 
-watch(periodoActual, () => { cargarStorage() })
-onMounted(() => { cargarIPCStorage(); cargarProyectosStorage(); loadDocsMeta(); cargarStorage() })
+watch(periodoActual, cargarDatos)
+onMounted(() => { loadDocsMeta(); cargarDatos() })
 </script>
