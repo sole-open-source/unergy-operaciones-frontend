@@ -767,20 +767,42 @@
 
         <!-- BOLSA mode -->
         <template v-if="pcMode === 'bolsa'">
-          <div class="cv-card">
+          <!-- En bolsa con el comercializador (UNGC) -->
+          <div v-if="pcBolsaComercializador.length" class="cv-card">
             <div class="px-4 py-3" style="background: rgba(44,32,57,0.04); border-bottom: 1px solid rgba(44,32,57,0.07);">
-              <span class="font-bold text-sm" style="color: #2C2039;">Plantas en bolsa</span>
-              <span class="ml-2 text-xs" style="color: #7a6e8a;">Sin asignación GESCON en {{ MESES[pcMonth - 1] }} {{ pcYear }}</span>
+              <span class="font-bold text-sm" style="color: #2C2039;">En bolsa con el comercializador (UNGC)</span>
+              <span class="ml-2 text-xs" style="color: #7a6e8a;">SIC vigente con comprador UNGC en {{ MESES[pcMonth - 1] }} {{ pcYear }}</span>
               <span class="ml-2 text-xs font-mono px-2 py-0.5 rounded" style="background: rgba(44,32,57,0.08); color: #7a6e8a;">
-                {{ pcData.bolsa.length }}
+                {{ pcBolsaComercializador.length }}
               </span>
             </div>
-            <div v-if="pcData.bolsa.length" class="divide-y" style="border-color: rgba(44,32,57,0.05);">
-              <div v-for="p in pcData.bolsa" :key="p.id" class="px-4 py-2.5 text-sm font-medium" style="color: #2C2039;">
+            <div class="divide-y" style="border-color: rgba(44,32,57,0.05);">
+              <div v-for="p in pcBolsaComercializador" :key="p.id" class="px-4 py-2.5 flex items-center gap-2 text-sm font-medium" style="color: #2C2039;">
+                <span>{{ p.nombre }}</span>
+                <span v-if="p.codigo_sic" class="text-xs font-mono px-1.5 py-0.5 rounded" style="background: rgba(44,32,57,0.06); color: #7a6e8a;">{{ p.codigo_sic }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Libre en bolsa -->
+          <div v-if="pcBolsaLibre.length" class="cv-card">
+            <div class="px-4 py-3" style="background: rgba(44,32,57,0.04); border-bottom: 1px solid rgba(44,32,57,0.07);">
+              <span class="font-bold text-sm" style="color: #2C2039;">Libre en bolsa</span>
+              <span class="ml-2 text-xs" style="color: #7a6e8a;">Sin SIC vigente en {{ MESES[pcMonth - 1] }} {{ pcYear }}</span>
+              <span class="ml-2 text-xs font-mono px-2 py-0.5 rounded" style="background: rgba(44,32,57,0.08); color: #7a6e8a;">
+                {{ pcBolsaLibre.length }}
+              </span>
+            </div>
+            <div class="divide-y" style="border-color: rgba(44,32,57,0.05);">
+              <div v-for="p in pcBolsaLibre" :key="p.id" class="px-4 py-2.5 text-sm font-medium" style="color: #2C2039;">
                 {{ p.nombre }}
               </div>
             </div>
-            <div v-else class="px-4 py-8 text-xs text-center" style="color: rgba(44,32,57,0.3);">
+          </div>
+
+          <!-- Sin plantas en bolsa -->
+          <div v-if="!pcBolsaComercializador.length && !pcBolsaLibre.length" class="cv-card">
+            <div class="px-4 py-8 text-xs text-center" style="color: rgba(44,32,57,0.3);">
               Todas las plantas tienen asignación GESCON este mes
             </div>
           </div>
@@ -1357,6 +1379,21 @@ const pcMode    = ref('venta')
 const pcData    = ref(null)
 const pcLoading = ref(false)
 const pcError   = ref(null)
+
+// Sub-listas de bolsa (backend de828e3): comercializador (SIC vigente, comprador UNGC)
+// vs libre (sin SIC vigente). Fallback a partir de "piscina" si el backend solo trae bolsa.
+const pcBolsaComercializador = computed(() => {
+  const d = pcData.value
+  if (!d) return []
+  if (Array.isArray(d.bolsa_comercializador)) return d.bolsa_comercializador
+  return (d.bolsa || []).filter(p => p.piscina === 'comercializador')
+})
+const pcBolsaLibre = computed(() => {
+  const d = pcData.value
+  if (!d) return []
+  if (Array.isArray(d.bolsa_libre)) return d.bolsa_libre
+  return (d.bolsa || []).filter(p => p.piscina !== 'comercializador')
+})
 
 // ── Energía transada state ────────────────────────────────────────────────────
 // Histórico por mes en localStorage: los meses cerrados son inmutables y se
