@@ -101,6 +101,7 @@
               <th v-if="colsVisibles.historial"
                 class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500">Historial IPC</th>
               <th class="px-3 py-2.5 text-center text-xs font-semibold text-gray-500">Facturado</th>
+              <th class="px-3 py-2.5 text-center text-xs font-semibold text-gray-500">Documento</th>
             </tr>
           </thead>
           <tbody>
@@ -189,6 +190,16 @@
                 </span>
                 <span v-else class="text-xs text-gray-300">—</span>
               </td>
+              <td class="px-3 py-2 text-center">
+                <button v-if="fila.documento_disponible" type="button"
+                  class="inline-flex items-center gap-1 text-xs font-medium hover:opacity-70 transition-opacity"
+                  style="color:#915BD8"
+                  :disabled="descargando[fila.contrato_id]"
+                  @click="descargarDocumento(fila)">
+                  <i class="pi pi-file-pdf text-sm"/>
+                </button>
+                <span v-else class="text-xs text-gray-300">—</span>
+              </td>
             </tr>
             <!-- Fila total -->
             <tr v-if="filas.length" class="bg-gray-50 border-t-2 border-gray-200">
@@ -206,6 +217,7 @@
                 {{ formatCOP(totalSeleccionado) }}
               </td>
               <td v-if="colsVisibles.historial"></td>
+              <td></td>
               <td></td>
             </tr>
           </tbody>
@@ -408,6 +420,7 @@ const colsVisibles = reactive({
 const showColMenu = ref(false)
 
 const loading   = ref(false)
+const descargando = reactive({})
 const guardando = ref(false)
 const filas     = ref([])
 const seleccion = reactive({})
@@ -600,6 +613,26 @@ async function cargarFacturaProveedor() {
     const { data } = await api.get(`/om/factura/${periodoActual.value}`)
     facturaProveedor.value = data
   } catch { facturaProveedor.value = { nombre_archivo: null, enlace_pdf: null, tiene_archivo: false, subido_en: null } }
+}
+
+async function descargarDocumento(fila) {
+  descargando[fila.contrato_id] = true
+  try {
+    const resp = await api.get(
+      `/om/documento/${fila.periodo}/${fila.contrato_id}`,
+      { responseType: 'blob' }
+    )
+    const url = URL.createObjectURL(resp.data)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `SOFV_${fila.nombre_proyecto}_${fila.periodo}_mantenimiento.pdf`
+    a.click()
+    URL.revokeObjectURL(url)
+  } catch {
+    toast.add({ severity: 'error', summary: 'Error al descargar documento', life: 3000 })
+  } finally {
+    descargando[fila.contrato_id] = false
+  }
 }
 
 watch(periodoActual, () => { cargarDatos(); cargarFacturaProveedor() })
