@@ -192,8 +192,8 @@
               </td>
               <td class="px-3 py-2 text-center">
                 <DocumentoIcon
-                  :doc="fila.documento_disponible ? { nombre_archivo: fila.proyecto } : null"
-                  :tooltip="fila.documento_disponible ? fila.proyecto : null"
+                  :doc="fila.documento_disponible ? { nombre_archivo: fila.documento_nombre || fila.nombre_proyecto } : null"
+                  :tooltip="fila.documento_disponible ? (fila.documento_nombre || fila.nombre_proyecto) : null"
                   @click="descargarDocumento(fila)" />
               </td>
             </tr>
