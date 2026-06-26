@@ -191,14 +191,10 @@
                 <span v-else class="text-xs text-gray-300">—</span>
               </td>
               <td class="px-3 py-2 text-center">
-                <button v-if="fila.documento_disponible" type="button"
-                  class="inline-flex items-center gap-1 text-xs font-medium hover:opacity-70 transition-opacity"
-                  style="color:#915BD8"
-                  :disabled="descargando[fila.contrato_id]"
-                  @click="descargarDocumento(fila)">
-                  <i class="pi pi-file-pdf text-sm"/>
-                </button>
-                <span v-else class="text-xs text-gray-300">—</span>
+                <DocumentoIcon
+                  :doc="fila.documento_disponible ? { nombre_archivo: fila.proyecto } : null"
+                  :tooltip="fila.documento_disponible ? fila.proyecto : null"
+                  @click="descargarDocumento(fila)" />
               </td>
             </tr>
             <!-- Fila total -->
@@ -376,6 +372,7 @@ import InputText     from 'primevue/inputtext'
 import Popover       from 'primevue/popover'
 import { useToast }  from 'primevue/usetoast'
 import api           from '@/api/client'
+import DocumentoIcon  from '@/components/DocumentoIcon.vue'
 
 const toast = useToast()
 

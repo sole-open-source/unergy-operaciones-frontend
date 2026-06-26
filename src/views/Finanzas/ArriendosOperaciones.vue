@@ -42,7 +42,7 @@
           :proyectos="filasParaZip"
           :periodo="periodoActual"
           :periodo-label="periodoLabel"
-          @docs-actualizados="loadDocs" />
+          @docs-actualizados="() => loadDocs(periodoActual.value)" />
         <Button label="Guardar selección" icon="pi pi-save" size="small"
           :loading="guardando"
           style="background:#915BD8;border-color:#915BD8"
