@@ -627,7 +627,7 @@ async function descargarDocumento(fila) {
     a.href = url
     a.download = `SOFV_${fila.nombre_proyecto}_${fila.periodo}_mantenimiento.pdf`
     a.click()
-    URL.revokeObjectURL(url)
+    setTimeout(() => URL.revokeObjectURL(url), 100)
   } catch {
     toast.add({ severity: 'error', summary: 'Error al descargar documento', life: 3000 })
   } finally {

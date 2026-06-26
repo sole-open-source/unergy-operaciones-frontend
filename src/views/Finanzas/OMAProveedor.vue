@@ -152,31 +152,31 @@
         </div>
       </div>
 
-        <!-- Resultado división PDF -->
-        <div v-if="splitResult" class="mx-4 mb-3 rounded-lg border px-3 py-2.5 space-y-1.5"
-          :style="splitResult.sin_match?.length
-            ? 'background:#fffbeb;border-color:#fcd34d40'
-            : 'background:#f0fdf4;border-color:#bbf7d0'">
-          <p class="text-xs font-semibold" style="color:#166534">
-            <i class="pi pi-check-circle mr-1"/>
-            {{ splitResult.procesados }} {{ splitResult.procesados === 1 ? 'proyecto asociado' : 'proyectos asociados' }} correctamente
+      <!-- Resultado división PDF -->
+      <div v-if="splitResult" class="mx-4 mb-3 rounded-lg border px-3 py-2.5 space-y-1.5"
+        :style="splitResult.sin_match?.length
+          ? 'background:#fffbeb;border-color:#fcd34d40'
+          : 'background:#f0fdf4;border-color:#bbf7d0'">
+        <p class="text-xs font-semibold" style="color:#166534">
+          <i class="pi pi-check-circle mr-1"/>
+          {{ splitResult.procesados }} {{ splitResult.procesados === 1 ? 'proyecto asociado' : 'proyectos asociados' }} correctamente
+        </p>
+        <div v-if="splitResult.sin_match?.length" class="space-y-0.5">
+          <p class="text-xs font-semibold" style="color:#92400e">
+            <i class="pi pi-exclamation-triangle mr-1"/>
+            {{ splitResult.sin_match.length }} {{ splitResult.sin_match.length === 1 ? 'página sin match' : 'páginas sin match' }}:
           </p>
-          <div v-if="splitResult.sin_match?.length" class="space-y-0.5">
-            <p class="text-xs font-semibold" style="color:#92400e">
-              <i class="pi pi-exclamation-triangle mr-1"/>
-              {{ splitResult.sin_match.length }} {{ splitResult.sin_match.length === 1 ? 'página sin match' : 'páginas sin match' }}:
-            </p>
-            <p v-for="(item, i) in splitResult.sin_match" :key="i"
-              class="text-[10px] text-gray-500 pl-3 truncate"
-              :title="item.texto_extraido">
-              Pág. {{ item.pagina }}: {{ item.texto_extraido }}
-            </p>
-          </div>
-          <button type="button" class="text-[10px] text-gray-400 hover:text-gray-600"
-            @click="splitResult = null">
-            Cerrar
-          </button>
+          <p v-for="(item, i) in splitResult.sin_match" :key="i"
+            class="text-[10px] text-gray-500 pl-3 truncate"
+            :title="item.texto_extraido">
+            Pág. {{ item.pagina }}: {{ item.texto_extraido }}
+          </p>
         </div>
+        <button type="button" class="text-[10px] text-gray-400 hover:text-gray-600"
+          @click="splitResult = null">
+          Cerrar
+        </button>
+      </div>
     </div>
 
   </div>
