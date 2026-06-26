@@ -170,6 +170,7 @@ import { parseFacturas, viernesDeEstaSemana } from '../composables/useFacturasPD
 import { parseSemanales } from '../composables/useGarantiasParser.js'
 import { useGarantiasHistorial } from '../composables/useGarantiasHistorial.js'
 import { fmtCOP, fmtISODate } from '../utils/formatters.js'
+import { add, subtract, toNumber } from '@/utils/financialCalculations.js'
 import { exportHojaMadreExcel } from '../utils/excelExport.js'
 
 const toast = useToast()
@@ -211,16 +212,17 @@ const facturasDescontadas = computed(() =>
   facturas.value?.documentos?.length ? (Number(totalDescontado.value) || 0) : 0,
 )
 
-// Disponible neto = crudo − facturas descontadas.
+// Disponible neto = crudo − facturas descontadas. (aritmética decimal)
 const disponibleNeto = computed(() =>
-  disponibleCrudo.value == null ? null : disponibleCrudo.value - facturasDescontadas.value,
+  disponibleCrudo.value == null ? null : toNumber(subtract(disponibleCrudo.value, facturasDescontadas.value)),
 )
 
 const disponibleAplicacion = computed(() => {
   if (disponibleNeto.value == null) return 0
   // Disponible neto − TOTAL A PAGAR (UNGG+UNGC). Ese total suele ser negativo,
   // por lo que restarlo aumenta el disponible.
-  return disponibleNeto.value - ((resultado.value?.totalUNGG ?? 0) + (resultado.value?.totalUNGC ?? 0))
+  const totalAPagar = add(resultado.value?.totalUNGG ?? 0, resultado.value?.totalUNGC ?? 0)
+  return toNumber(subtract(disponibleNeto.value, totalAPagar))
 })
 
 const montoEditable = ref(0)

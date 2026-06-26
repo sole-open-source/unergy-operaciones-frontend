@@ -14,6 +14,7 @@
 
 <script setup>
 import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { subtract, round, toNumber } from '@/utils/financialCalculations.js'
 import * as XLSX from 'xlsx'
 import {
   parseAsientos, extractMandate, suggestTag, reconciliar, fmt, norm as normNombre,
@@ -558,7 +559,9 @@ function initValidador(el) {
       const rec = (d.mandante || d.projName)
                 ? matchIngresoContab({ mandante: d.mandante, projName: d.projName }, contabilidadData) : null
       const contVal   = rec ? Math.abs(rec.valor_contabilidad) : null
-      const diferencia= contVal !== null ? Math.round(d.valorPagar - contVal) : null
+      // Resta con precisión decimal y redondeo a peso entero (HALF_UP) para la
+      // comparación contra contabilidad — evita arrastrar error de coma flotante.
+      const diferencia= contVal !== null ? toNumber(round(subtract(d.valorPagar, contVal), 0)) : null
       const tol       = parseInt($('toleranceInput').value) || 200
       let estado
       if (d.error)        estado = 'ERROR_PDF'

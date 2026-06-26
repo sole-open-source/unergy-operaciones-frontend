@@ -89,6 +89,7 @@ import { ref, computed, watch } from 'vue'
 import InputNumber from 'primevue/inputnumber'
 import Checkbox from 'primevue/checkbox'
 import { fmtCOP } from './utils/formatters.js'
+import { createDecimal, add, multiply, subtract, toNumber } from '@/utils/financialCalculations.js'
 
 const props = defineProps({
   documentos: { type: Array, default: () => [] },
@@ -117,10 +118,12 @@ watch(() => props.documentos, initFilas, { immediate: true })
 watch(() => props.fechaObjetivo, initFilas)
 
 // Total NETO: débitos/cargos suman (+), notas crédito y ajustes a favor restan (−).
+// Aritmética con precisión decimal (decimal.js) para no acumular error al sumar.
 const totalDescontado = computed(() =>
-  filas.value.filter((f) => f.marcado).reduce((s, f) => s + (Number(f.valorTotal) || 0) * (f.signo ?? 1), 0),
+  toNumber(filas.value.filter((f) => f.marcado).reduce(
+    (s, f) => add(s, multiply(f.valorTotal, f.signo ?? 1)), createDecimal(0))),
 )
-const disponibleAjustado = computed(() => (Number(props.disponible) || 0) - totalDescontado.value)
+const disponibleAjustado = computed(() => toNumber(subtract(props.disponible, totalDescontado.value)))
 
 watch([totalDescontado, disponibleAjustado], () => {
   emit('update:totalDescontado', totalDescontado.value)

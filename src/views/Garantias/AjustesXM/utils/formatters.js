@@ -1,10 +1,9 @@
+import { formatCurrency } from '@/utils/financialCalculations.js'
+
+// Formato de moneda centralizado (decimal.js + Intl). Garantías muestra COP sin
+// decimales, así que se conserva displayPrecision = 0 al delegar.
 export function fmtCOP(v) {
-  if (v == null || isNaN(v)) return '—'
-  return new Intl.NumberFormat('es-CO', {
-    style: 'currency',
-    currency: 'COP',
-    maximumFractionDigits: 0,
-  }).format(v)
+  return formatCurrency(v, 'COP', 'es-CO', 0)
 }
 
 export function addBusinessDays(date, days) {
