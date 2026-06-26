@@ -105,6 +105,7 @@
                     <option value="Mensual">Mensual</option>
                     <option value="Trimestral">Trimestral</option>
                     <option value="Semestral">Semestral</option>
+                    <option value="Anual">Anual</option>
                   </select>
                 </td>
                 <td class="px-3 py-2">
@@ -297,6 +298,7 @@ function tipoPagoStyle(tipo) {
   if (tipo === 'Mensual')    return 'background:#ede9fe;color:#6d28d9'
   if (tipo === 'Trimestral') return 'background:#dbeafe;color:#1e40af'
   if (tipo === 'Semestral')  return 'background:#dcfce7;color:#166534'
+  if (tipo === 'Anual')      return 'background:#fef3c7;color:#92400e'
   return 'background:#f3f4f6;color:#6b7280'
 }
 
