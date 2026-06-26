@@ -182,7 +182,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Button from 'primevue/button'
@@ -191,7 +191,6 @@ import InputNumber from 'primevue/inputnumber'
 import DatePicker from 'primevue/datepicker'
 import Select from 'primevue/select'
 import { useEnergizationProjects } from '@/composables/useEnergizationProjects'
-import { usePolling } from '@/composables/usePolling'
 
 const {
   projects, loading, warning, syncing, lastSync,
@@ -201,22 +200,14 @@ const {
 const STATUS_OPTIONS = ['En construcción', 'Pruebas', 'Próximo a energizar', 'Energizado']
 const MESES_CORTOS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 
-// Sondeo del pipeline (carga inicial en onMounted + refresco periódico, con
-// limpieza automática en onUnmounted). El intervalo es deliberadamente amplio:
-// la tabla se edita inline con persistencia debounced, así que un refresco
-// agresivo podría pisar las ediciones en curso del operador. La UI sigue
-// consumiendo projects/loading/warning de useEnergizationProjects (más ricos);
-// usePolling solo gobierna la cadencia, el ciclo de vida y el backoff.
-usePolling(
-  async () => {
-    const ok = await loadProjects()
-    // loadProjects atrapa su propio error y devuelve false; relanzamos para que
-    // usePolling aplique el backoff adaptativo cuando la fuente está caída.
-    if (!ok) throw new Error('No se pudo cargar el pipeline de próximos a energizar')
-    return projects.value
-  },
-  { initialInterval: 60000, onErrorIntervalMultiplier: 2, maxInterval: 300000 },
-)
+// Carga única al montar — SIN sondeo periódico. Este es un pipeline de
+// planeación que el operador edita inline (commercialName, status, fecha de
+// energización, MWh esperado) con persistencia debounced (600ms). Un refresco
+// de fondo reasigna `projects.value` por completo y, mientras el operador
+// teclea o tiene un DatePicker abierto, le arrebataría el foco y revertiría
+// la celda recién editada al valor stale del servidor hasta el próximo PATCH.
+// La actualización contra Solenium es explícita (botón "Sincronizar" → onSync).
+onMounted(loadProjects)
 
 async function onSync(force) {
   if (force && !window.confirm('Esto sobrescribirá las fechas que hayas editado manualmente con la información de Solenium. ¿Continuar?')) {
