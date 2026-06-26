@@ -395,12 +395,10 @@ async function toggleFacturado(id) {
   }
 }
 
-// ── Tooltip del ícono de documento: "N° cuenta | arrendatario" ─────────────────
+// ── Tooltip del ícono de documento: nombre de archivo + pago_id ────────────────
 function tooltipDoc(doc) {
-  const partes = []
-  if (doc.numero_cuenta_cobro) partes.push(doc.numero_cuenta_cobro)
-  if (doc.nombre_arrendatario) partes.push(doc.nombre_arrendatario)
-  return partes.length ? partes.join(' | ') : doc.nombre_archivo
+  const base = doc.nombre_archivo || doc.numero_cuenta_cobro || 'documento'
+  return doc.pago_id ? `${base} · pago ${doc.pago_id}` : base
 }
 
 // ── Proyectos para el componente ZipUpload ─────────────────────────────────────

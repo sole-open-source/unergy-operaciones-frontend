@@ -51,8 +51,22 @@ export async function uploadDoc({ file, fileSecundario, arrProyectoId, periodo, 
 }
 
 /**
- * Sube UNA cuenta de cobro y la asocia a MÚLTIPLES predios.
- * El archivo se guarda una sola vez en backend; se crea una fila por predio.
+ * Devuelve (sin mutar el estado global) los documentos de un período.
+ * Útil para detectar duplicados antes de subir.
+ */
+export async function fetchDocsPeriodo(periodo) {
+  try {
+    const { data } = await api.get(`/arriendos/documentos/${periodo}`)
+    return Array.isArray(data) ? data : []
+  } catch (err) {
+    console.error('Error consultando documentos del período:', err)
+    return []
+  }
+}
+
+/**
+ * Sube UN documento (cuenta de cobro/factura) y genera una copia renombrada por predio.
+ * El backend escribe una copia por cada predio (incluyendo los sin match).
  *
  * @param {object}   p
  * @param {File}     p.file
@@ -61,25 +75,23 @@ export async function uploadDoc({ file, fileSecundario, arrProyectoId, periodo, 
  * @param {number}   p.pagoId
  * @param {string}   p.codigoContrato
  * @param {string}   p.tipoDocumento
- * @param {string}   p.nombreResultante
  * @param {string|null} p.numeroCuentaCobro
  * @param {string|null} p.nombreArrendatario
- * @param {Array<{arr_proyecto_id:number, codigo_predio:string, valor_individual:number|null}>} p.predios
+ * @param {Array<{arr_proyecto_id:number|null, codigo_predio:string, valor_individual:number|null, nombre_resultante:string}>} p.predios
  */
 export async function uploadCuentaCobro({
   file, fileSecundario, periodo, pagoId, codigoContrato, tipoDocumento,
-  nombreResultante, numeroCuentaCobro, nombreArrendatario, predios,
+  numeroCuentaCobro, nombreArrendatario, predios,
 }) {
   const form = new FormData()
-  form.append('periodo',           periodo)
-  form.append('pago_id',           pagoId)
-  form.append('codigo_contrato',   codigoContrato)
-  form.append('tipo_documento',    tipoDocumento)
-  form.append('nombre_resultante', nombreResultante)
-  form.append('predios',           JSON.stringify(predios))
-  if (numeroCuentaCobro) form.append('numero_cuenta_cobro', numeroCuentaCobro)
+  form.append('periodo',         periodo)
+  form.append('pago_id',         pagoId)
+  form.append('codigo_contrato', codigoContrato)
+  form.append('tipo_documento',  tipoDocumento)
+  form.append('predios',         JSON.stringify(predios))
+  if (numeroCuentaCobro)  form.append('numero_cuenta_cobro', numeroCuentaCobro)
   if (nombreArrendatario) form.append('nombre_arrendatario', nombreArrendatario)
-  form.append('file', file, nombreResultante)
+  form.append('file', file, file.name)
   if (fileSecundario) {
     form.append('file_secundario', fileSecundario, fileSecundario.name)
   }

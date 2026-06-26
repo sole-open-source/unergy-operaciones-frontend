@@ -10,8 +10,8 @@
 
   <!-- ── Dialog preview ──────────────────────────────────────────────────── -->
   <Dialog v-model:visible="showDialog" modal
-    header="Vista previa — Predios por cuenta de cobro"
-    :style="{ width: '1080px', maxWidth: '98vw' }"
+    header="Vista previa — Predios por documento"
+    :style="{ width: '1120px', maxWidth: '98vw' }"
     :closable="!guardando">
 
     <div class="space-y-4 pt-1">
@@ -27,79 +27,98 @@
         </p>
       </div>
 
-      <!-- Alertas de predios sin match -->
-      <div v-if="prediosSinMatch.length"
+      <!-- Advertencia de documentos ya existentes -->
+      <div v-if="hayDuplicados"
         class="rounded-xl border p-3 flex items-start gap-3"
         style="background:#fef3c7;border-color:#f59e0b40">
         <i class="pi pi-exclamation-triangle text-sm flex-shrink-0 mt-0.5" style="color:#d97706"/>
         <div class="flex-1 text-xs" style="color:#92400e">
           <p class="font-semibold mb-1">
-            {{ prediosSinMatch.length }} predio(s) sin proyecto identificado
+            Ya existe documento para {{ predioscDuplicados.length }} predio(s) en este período
           </p>
-          <p class="font-mono text-[11px]">
-            {{ prediosSinMatch.map(p => p.codigoPredio).join(', ') }}
-          </p>
+          <p>Si confirmas, se <strong>reemplazarán</strong> los documentos existentes de esos predios.</p>
         </div>
       </div>
 
-      <!-- Tabla de preview agrupada por carpeta/cuenta -->
+      <!-- Predios sin match -->
+      <div v-if="prediosSinMatch.length"
+        class="rounded-xl border p-3 flex items-start gap-3"
+        style="background:#fef2f2;border-color:#fca5a540">
+        <i class="pi pi-exclamation-circle text-sm flex-shrink-0 mt-0.5" style="color:#dc2626"/>
+        <div class="flex-1 text-xs" style="color:#991b1b">
+          <p class="font-semibold mb-1">{{ prediosSinMatch.length }} predio(s) sin proyecto en BD</p>
+          <p class="font-mono text-[11px]">{{ prediosSinMatch.map(p => p.codigoPredio).join(', ') }}</p>
+          <p class="mt-0.5">Se guardarán como <span class="font-mono">…_SIN-MATCH.pdf</span> para revisión manual.</p>
+        </div>
+      </div>
+
+      <!-- Tabla de preview agrupada por carpeta/documento -->
       <div class="rounded-xl border border-gray-100 overflow-hidden">
-        <div class="overflow-x-auto" style="max-height:60vh">
-          <table class="w-full text-sm border-collapse" style="min-width:960px">
+        <div class="overflow-x-auto" style="max-height:58vh">
+          <table class="w-full text-sm border-collapse" style="min-width:1000px">
             <thead>
               <tr class="bg-gray-50 border-b border-gray-100">
                 <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500">Código predio</th>
                 <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500">Proyecto identificado</th>
-                <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 w-28">Estado</th>
                 <th class="px-3 py-2.5 text-right text-xs font-semibold text-gray-500 w-32">Valor (COP)</th>
+                <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500">Archivo resultante</th>
                 <th class="px-3 py-2.5 text-center text-xs font-semibold text-gray-500 w-20">Match</th>
               </tr>
             </thead>
             <tbody>
               <template v-for="grupo in gruposPreview" :key="grupo.uid">
-                <!-- Encabezado de grupo (carpeta + cuenta de cobro) -->
+                <!-- Encabezado de grupo -->
                 <tr class="bg-purple-50/40 border-b border-purple-100">
-                  <td colspan="5" class="px-3 py-1.5">
+                  <td colspan="5" class="px-3 py-2">
                     <div class="flex items-center gap-2 flex-wrap text-[11px]">
                       <span class="font-mono text-gray-500">{{ grupo.carpeta }}</span>
                       <span class="text-gray-300">·</span>
-                      <span class="font-semibold" style="color:#6d28d9">
-                        {{ grupo.numeroCuentaCobro || 'Sin N° de cuenta' }}
-                      </span>
-                      <span v-if="grupo.nombreArrendatario" class="text-gray-300">·</span>
-                      <span v-if="grupo.nombreArrendatario" class="text-gray-600">
-                        {{ grupo.nombreArrendatario }}
+                      <span class="text-[10px] px-1.5 py-0.5 rounded font-semibold"
+                        :style="formatoStyle(grupo.formato)">Formato {{ grupo.formato }}</span>
+                      <span v-if="grupo.numeroCuentaCobro" class="text-gray-300">·</span>
+                      <span v-if="grupo.numeroCuentaCobro" class="font-semibold" style="color:#6d28d9">
+                        {{ grupo.numeroCuentaCobro }}
                       </span>
                       <span class="text-gray-300">·</span>
-                      <span class="text-gray-400">{{ grupo.predios.length }} predio(s)</span>
-                      <span v-if="grupo.tipoArchivo"
-                        class="ml-auto text-[10px] px-1.5 py-0.5 rounded font-medium"
-                        style="background:#f3f4f6;color:#6b7280">{{ grupo.tipoArchivo }}</span>
+                      <span class="text-gray-500">Arrendatario:</span>
+                      <input v-model="grupo.nombreArrendatario" type="text"
+                        placeholder="(vacío)"
+                        class="text-[11px] border border-gray-200 rounded px-1.5 py-0.5 bg-white focus:outline-none focus:ring-1 focus:ring-purple-300"
+                        style="min-width:200px" />
+                      <span class="ml-auto text-gray-400">{{ grupo.predios.length }} predio(s)</span>
                     </div>
                   </td>
                 </tr>
                 <!-- Filas de predios -->
                 <tr v-for="predio in grupo.predios" :key="predio.uid"
                   class="border-b border-gray-50 hover:bg-gray-50/50"
-                  :class="!predio.proyectoId ? 'bg-amber-50/40' : ''">
-                  <td class="px-3 py-2 font-mono text-xs text-gray-600">{{ predio.codigoPredio }}</td>
+                  :class="!predio.proyectoId ? 'bg-red-50/40' : (predio.yaExiste ? 'bg-amber-50/40' : '')">
+                  <td class="px-3 py-2 font-mono text-xs text-gray-600">
+                    {{ predio.codigoPredio }}
+                    <i v-if="predio.yaExiste" class="pi pi-refresh text-[9px] ml-1" style="color:#d97706"
+                      title="Ya existe — se reemplazará" />
+                  </td>
                   <td class="px-3 py-2">
                     <div v-if="predio.proyectoId" class="text-xs font-medium" style="color:#2C2039">
                       {{ predio.proyectoNombre }}
                     </div>
                     <select v-else
                       v-model="predio.proyectoId"
-                      class="text-xs border border-amber-300 rounded px-2 py-1 w-full bg-white"
+                      class="text-xs border border-red-300 rounded px-2 py-1 w-full bg-white"
                       @change="onProyectoSeleccionado(predio)">
-                      <option :value="null">— Seleccionar proyecto —</option>
+                      <option :value="null">— Sin match (SIN-MATCH) —</option>
                       <option v-for="p in props.proyectos" :key="p.id" :value="p.id">
                         {{ p.proyecto }}{{ p.codigo ? ` (${p.codigo})` : '' }}
                       </option>
                     </select>
                   </td>
-                  <td class="px-3 py-2 text-xs text-gray-500">{{ predio.estado || '—' }}</td>
                   <td class="px-3 py-2 text-right font-mono text-xs text-gray-600">
                     {{ predio.valor != null ? formatCOP(predio.valor) : '—' }}
+                  </td>
+                  <td class="px-3 py-2 text-[11px] font-mono" style="color:#7c3aed;max-width:320px">
+                    <span class="truncate block" :title="nombrePredio(grupo, predio)">
+                      {{ nombrePredio(grupo, predio) }}
+                    </span>
                   </td>
                   <td class="px-3 py-2 text-center">
                     <span v-if="predio.proyectoId"
@@ -109,8 +128,8 @@
                     </span>
                     <span v-else
                       class="inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full font-medium"
-                      style="background:#fef3c7;color:#92400e">
-                      <i class="pi pi-exclamation-triangle text-[10px]" />Revisar
+                      style="background:#fee2e2;color:#991b1b">
+                      <i class="pi pi-times text-[10px]" />Sin match
                     </span>
                   </td>
                 </tr>
@@ -123,13 +142,15 @@
       <!-- Acciones -->
       <div class="flex items-center justify-between pt-1">
         <span class="text-xs text-gray-400">
-          {{ prediosListos }} de {{ totalPredios }} predios listos · {{ gruposPreview.length }} cuentas
+          {{ totalPredios }} predio(s) en {{ gruposPreview.length }} documento(s) ·
+          {{ prediosListos }} con match
         </span>
         <div class="flex gap-2">
           <Button label="Cancelar" size="small" outlined severity="secondary"
             :disabled="guardando" @click="showDialog = false" />
-          <Button label="Confirmar y guardar" icon="pi pi-check" size="small"
-            :loading="guardando" :disabled="prediosListos === 0"
+          <Button :label="hayDuplicados ? 'Reemplazar y guardar' : 'Confirmar y guardar'"
+            icon="pi pi-check" size="small"
+            :loading="guardando" :disabled="totalPredios === 0"
             @click="confirmar"
             style="background:#915BD8;border-color:#915BD8" />
         </div>
@@ -139,7 +160,7 @@
   </Dialog>
 
   <!-- ── Dialog resumen post-guardado ────────────────────────────────────── -->
-  <Dialog v-model:visible="showResumen" modal header="Resultado del procesamiento" :style="{ width: '560px' }">
+  <Dialog v-model:visible="showResumen" modal header="Resultado del procesamiento" :style="{ width: '580px' }">
     <div class="space-y-3 pt-1 text-sm">
       <!-- Asociados -->
       <div class="rounded-lg border p-3 space-y-1.5" style="background:#f0fdf4;border-color:#bbf7d0">
@@ -160,7 +181,7 @@
       <div v-if="resumen.sinMatch.length" class="rounded-lg border p-3 space-y-1.5" style="background:#fffbeb;border-color:#fcd34d40">
         <p class="text-xs font-semibold" style="color:#92400e">
           <i class="pi pi-exclamation-triangle mr-1"/>
-          {{ resumen.sinMatch.length }} predio(s) sin match en BD
+          {{ resumen.sinMatch.length }} predio(s) sin match — revisión manual
         </p>
         <div v-for="(item, idx) in resumen.sinMatch" :key="idx"
           class="flex items-center gap-2 text-[11px] pl-3">
@@ -172,7 +193,7 @@
 
       <!-- Totales -->
       <div class="flex items-center gap-4 text-xs text-gray-500 pt-1 border-t">
-        <span><i class="pi pi-paperclip mr-1"/>{{ resumen.archivosGuardados }} archivos guardados</span>
+        <span><i class="pi pi-copy mr-1"/>{{ resumen.copiasGeneradas }} copias generadas</span>
         <span><i class="pi pi-folder mr-1"/>{{ resumen.carpetasProcesadas }} carpetas procesadas</span>
       </div>
     </div>
@@ -190,7 +211,7 @@ import { useToast } from 'primevue/usetoast'
 import JSZip from 'jszip'
 import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist'
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
-import { uploadCuentaCobro } from '@/composables/useArriendosDocs'
+import { uploadCuentaCobro, fetchDocsPeriodo } from '@/composables/useArriendosDocs'
 
 GlobalWorkerOptions.workerSrc = pdfWorkerUrl
 
@@ -208,23 +229,34 @@ const procesando    = ref(false)
 const guardando     = ref(false)
 const showDialog    = ref(false)
 const showResumen   = ref(false)
-const gruposPreview = ref([])      // [{ uid, carpeta, pagoId, codigoExtraido, numeroCuentaCobro, nombreArrendatario, tipoArchivo, pdfBlob, pdfSecBlob, pdfSecNombre, predios:[...] }]
+const gruposPreview = ref([])
 const periodoZip    = ref(null)
 
-const resumen = ref({ asociados: [], sinMatch: [], archivosGuardados: 0, carpetasProcesadas: 0 })
+const resumen = ref({ asociados: [], sinMatch: [], copiasGeneradas: 0, carpetasProcesadas: 0 })
 
 let uidCounter = 0
 const uid = () => `n_${++uidCounter}`
 
-const todosPredios     = computed(() => gruposPreview.value.flatMap(g => g.predios))
-const totalPredios     = computed(() => todosPredios.value.length)
-const prediosListos    = computed(() => todosPredios.value.filter(p => p.proyectoId).length)
-const prediosSinMatch  = computed(() => todosPredios.value.filter(p => !p.proyectoId))
+const todosPredios    = computed(() => gruposPreview.value.flatMap(g => g.predios))
+const totalPredios    = computed(() => todosPredios.value.length)
+const prediosListos   = computed(() => todosPredios.value.filter(p => p.proyectoId).length)
+const prediosSinMatch = computed(() => todosPredios.value.filter(p => !p.proyectoId))
+const predioscDuplicados = computed(() => todosPredios.value.filter(p => p.yaExiste))
+const hayDuplicados   = computed(() => predioscDuplicados.value.length > 0)
 
 // ── Formato COP ────────────────────────────────────────────────────────────────
 function formatCOP(v) {
   if (v == null) return '—'
   return '$ ' + Math.round(v).toLocaleString('es-CO')
+}
+
+function formatoStyle(f) {
+  return {
+    A: 'background:#dcfce7;color:#166534',
+    B: 'background:#dbeafe;color:#1e40af',
+    C: 'background:#fef3c7;color:#92400e',
+    D: 'background:#f3f4f6;color:#6b7280',
+  }[f] ?? 'background:#f3f4f6;color:#6b7280'
 }
 
 // ── Período del nombre del ZIP ──────────────────────────────────────────────────
@@ -235,22 +267,22 @@ function extraerPeriodoDeZip(filename) {
   return (mm >= 1 && mm <= 12) ? m[1] : null
 }
 
-function mesLabel(periodoStr) {
-  const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
-                 'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
-  return MESES[parseInt(periodoStr.split('-')[1]) - 1]
-}
-
-// ── Nombre de archivo resultante (uno por cuenta de cobro) ──────────────────────
-function nombreArchivo(grupo) {
-  const sanitize = s => (s || '').replace(/[/\\:*?"<>|]/g, '_').trim()
-  const mes = mesLabel(periodoZip.value || props.periodo)
-  const num = sanitize(grupo.numeroCuentaCobro || grupo.codigoExtraido || 'cuenta_cobro')
-  return `cuenta_cobro_${num}_${mes}.pdf`
+// ── Nombre de archivo por predio ────────────────────────────────────────────────
+// [CODIGO_PREDIO]_[YYYY-MM]_[Arrendatario]_[Nombre Proyecto].pdf  (+ _pagoN si aplica)
+function nombrePredio(grupo, predio) {
+  const sani = s => (s || '').replace(/[/\\:*?"<>|]/g, '_').replace(/\s+/g, ' ').trim()
+  const periodo = periodoZip.value || props.periodo
+  const arr  = sani(grupo.nombreArrendatario)
+  const proy = predio.proyectoId ? sani(predio.proyectoNombre) : 'SIN-MATCH'
+  const partes = [predio.codigoPredio, periodo]
+  if (arr) partes.push(arr)
+  partes.push(proy)
+  let base = partes.join('_')
+  if (predio.conPago) base += `_pago${grupo.pagoId}`
+  return base + '.pdf'
 }
 
 // ── Selección del archivo principal según prioridad ───────────────────────────
-// 1. cuenta_cobro.pdf (no enviada) → 2. factura_electronica.pdf → 3. .jpg
 function seleccionarPrincipal(archivos) {
   const cc = archivos.filter(a =>
     a.nombre.toLowerCase().includes('cuenta_cobro') &&
@@ -280,7 +312,7 @@ function seleccionarSecundario(archivos, principal) {
     a.nombre.toLowerCase().endsWith('.pdf')) ?? null
 }
 
-// ── Extracción de texto del PDF → líneas por página, aplanadas ────────────────
+// ── Extracción de texto del PDF → líneas ──────────────────────────────────────
 async function extraerLineas(arrayBuffer) {
   try {
     const pdf = await getDocument({ data: new Uint8Array(arrayBuffer) }).promise
@@ -311,17 +343,28 @@ function parseValor(s) {
   if (!t) return null
   const lastComma = t.lastIndexOf(',')
   const lastDot   = t.lastIndexOf('.')
-  if (lastComma > lastDot) t = t.replace(/\./g, '').replace(',', '.')   // CO: coma decimal
-  else                     t = t.replace(/,/g, '')                       // US: punto decimal
+  if (lastComma > lastDot) t = t.replace(/\./g, '').replace(',', '.')
+  else                     t = t.replace(/,/g, '')
   const v = parseFloat(t)
   return isNaN(v) ? null : v
 }
 
-// ── Código corto de predio (sin sufijo _CIUDAD_ZONA) ───────────────────────────
+// ── Código corto de predio ─────────────────────────────────────────────────────
 function predioShort(codigo) {
   if (!codigo) return null
   const m = codigo.match(/COL[A-Z0-9]+P\d+/i)
   return m ? m[0].toUpperCase() : null
+}
+
+function prediosDeNombre(nombre) {
+  const out = [], seen = new Set()
+  const re = /COL[A-Z0-9]+P\d+/gi
+  let m
+  while ((m = re.exec(nombre)) !== null) {
+    const s = m[0].toUpperCase()
+    if (!seen.has(s)) { seen.add(s); out.push(s) }
+  }
+  return out
 }
 
 function matchPredio(short) {
@@ -329,16 +372,7 @@ function matchPredio(short) {
   return props.proyectos.find(p => predioShort(p.codigo) === short) ?? null
 }
 
-// Fallback: proyecto por código de carpeta (contrato sin P#)
-function matchPorCodigoCarpeta(folderCode) {
-  if (!folderCode) return null
-  let p = props.proyectos.find(p => p.codigo === folderCode)
-  if (p) return p
-  p = props.proyectos.find(p => p.codigo && p.codigo.startsWith(folderCode))
-  return p ?? null
-}
-
-// ── Encabezado de la cuenta de cobro ───────────────────────────────────────────
+// ── Encabezado: N° de cuenta + arrendatario (DEBE A) ───────────────────────────
 function extraerEncabezado(lineas) {
   const texto = lineas.join('\n')
   let numero = null, arrendatario = null
@@ -351,35 +385,58 @@ function extraerEncabezado(lineas) {
     if (m && m[1].trim()) { arrendatario = m[1].trim(); break }
     if (/DEBE\s+A\s*:?\s*$/i.test(lineas[i]) && lineas[i + 1]) { arrendatario = lineas[i + 1].trim(); break }
   }
-  if (arrendatario) {
-    arrendatario = arrendatario.replace(/\s*(C\.?C\.?|NIT)\.?\s*[\d.\-]+.*$/i, '').trim()
-  }
+  if (arrendatario) arrendatario = arrendatario.replace(/\s*(C\.?C\.?|NIT)\.?\s*[\d.\-]+.*$/i, '').trim()
   return { numero, arrendatario }
 }
 
-// ── Predios de la tabla de conceptos ───────────────────────────────────────────
-function extraerPredios(lineas) {
+// Emisora de una factura de tercero (best-effort)
+function extraerEmisora(lineas) {
+  for (const l of lineas) {
+    const m = l.match(/raz[oó]n\s+social\s*:?\s*(.+)/i)
+    if (m && m[1].trim()) return m[1].split(/[,;|]/)[0].trim().slice(0, 80)
+  }
+  for (const l of lineas) {
+    if (/\b(S\.?A\.?S|LTDA|E\.?U|S\.?A)\b/i.test(l) && /[A-Za-z]{4,}/.test(l)) {
+      return l.replace(/\s*(NIT|C\.?C)\.?.*$/i, '').trim().slice(0, 80)
+    }
+  }
+  return null
+}
+
+// Predios desde la tabla de conceptos (Formato A)
+function extraerPrediosTabla(lineas) {
   const predios = []
   const seen = new Set()
   for (const l of lineas) {
+    if (!/Arriendo\s+de\s+Proyecto/i.test(l) && !/COL[A-Z0-9]+P\d+/i.test(l)) continue
     const mFull = l.match(/COL[A-Z0-9]+P\d+(?:_[A-Z0-9\-]+)*/i)
     if (!mFull) continue
-    const full  = mFull[0].toUpperCase()
-    const short = predioShort(full)
+    const short = predioShort(mFull[0])
     if (!short || seen.has(short)) continue
-
     const nums  = l.match(/\d[\d.,]*\d/g) || []
     const valor = nums.length ? parseValor(nums[nums.length - 1]) : null
-
-    let estado = ''
-    const after   = l.slice(l.indexOf(mFull[0]) + mFull[0].length)
-    const mEstado = after.match(/[A-Za-zÁÉÍÓÚáéíóúÑñ]+/)
-    if (mEstado) estado = mEstado[0]
-
     seen.add(short)
-    predios.push({ codigoPredioFull: full, codigoPredio: short, estado, valor })
+    predios.push({ codigoPredio: short, valor })
   }
   return predios
+}
+
+// Monto total (para repartir en Formato B)
+function extraerTotal(lineas) {
+  for (const l of lineas) {
+    if (/total/i.test(l)) {
+      const nums = l.match(/\d[\d.,]*\d/g)
+      if (nums?.length) { const v = parseValor(nums[nums.length - 1]); if (v) return v }
+    }
+  }
+  let best = null
+  for (const l of lineas) {
+    for (const n of (l.match(/\d[\d.,]*\d/g) || [])) {
+      const v = parseValor(n)
+      if (v && (best === null || v > best)) best = v
+    }
+  }
+  return best
 }
 
 // ── Procesamiento del ZIP ─────────────────────────────────────────────────────
@@ -408,7 +465,6 @@ async function onZipSelected(e) {
     const grupos = []
 
     for (const carpeta of [...carpetas].sort()) {
-      // pago_3554_COLCEST17 → pagoId=3554, codigoExtraido=COLCEST17
       const partes         = carpeta.split('_')
       const pagoId         = parseInt(partes[1]) || 0
       const codigoExtraido = partes.slice(2).join('_')
@@ -426,6 +482,7 @@ async function onZipSelected(e) {
       if (!principal) continue
 
       const esPdf     = principal.nombre.toLowerCase().endsWith('.pdf')
+      const esJpg     = !esPdf
       const pdfBuffer = await principal.entry.async('arraybuffer')
       const pdfBlob   = new Blob([pdfBuffer], { type: esPdf ? 'application/pdf' : 'image/jpeg' })
 
@@ -435,50 +492,63 @@ async function onZipSelected(e) {
         pdfSecNombre = secundario.nombre
       }
 
-      let numeroCuentaCobro = null, nombreArrendatario = null
-      let prediosRaw = []
-
+      let numeroCuentaCobro = null, nombreArrendatario = null, total = null
+      let prediosTabla = []
+      let lineas = []
       if (esPdf) {
-        const lineas = await extraerLineas(pdfBuffer)
+        lineas = await extraerLineas(pdfBuffer)
         const enc = extraerEncabezado(lineas)
         numeroCuentaCobro  = enc.numero
         nombreArrendatario = enc.arrendatario
-        prediosRaw = extraerPredios(lineas)
+        prediosTabla = extraerPrediosTabla(lineas)
+        total = extraerTotal(lineas)
       }
 
-      let predios
-      if (prediosRaw.length) {
-        // Cada predio del PDF → una fila, matcheada por prefijo
-        predios = prediosRaw.map(pr => {
-          const m = matchPredio(pr.codigoPredio)
-          return {
-            uid: uid(),
-            codigoPredio:     pr.codigoPredio,
-            codigoPredioFull: pr.codigoPredioFull,
-            estado:           pr.estado,
-            valor:            pr.valor,
-            proyectoId:       m?.id ?? null,
-            proyectoNombre:   m?.proyecto ?? null,
-          }
-        })
+      const esCuentaCobro = tipoArchivo === 'cuenta_cobro'
+
+      // Determinar formato y lista de códigos de predio
+      let formato, codigosPredio
+      if (prediosTabla.length) {
+        formato = 'A'
+        codigosPredio = prediosTabla.map(p => p.codigoPredio)
       } else {
-        // Fallback: sin tabla parseable (factura/jpg) → match por código de carpeta
-        const m = matchPorCodigoCarpeta(codigoExtraido)
-        predios = [{
-          uid: uid(),
-          codigoPredio:     codigoExtraido,
-          codigoPredioFull: codigoExtraido,
-          estado:           '',
-          valor:            null,
-          proyectoId:       m?.id ?? null,
-          proyectoNombre:   m?.proyecto ?? null,
-        }]
+        codigosPredio = prediosDeNombre(principal.nombre)
+        if (esJpg)              formato = 'D'
+        else if (esCuentaCobro) formato = 'B'
+        else                    formato = 'C'
       }
+
+      // Arrendatario según formato
+      if (formato === 'C' && !nombreArrendatario) nombreArrendatario = extraerEmisora(lineas)
+      if (formato === 'D') nombreArrendatario = nombreArrendatario || ''
+
+      // Valor por predio
+      const valoresTabla = Object.fromEntries(prediosTabla.map(p => [p.codigoPredio, p.valor]))
+      const nPredios = codigosPredio.length || 1
+      function valorDe(codigo) {
+        if (formato === 'A') return valoresTabla[codigo] ?? null
+        if (formato === 'B' && total) return Math.round(total / nPredios)
+        return null
+      }
+
+      const predios = (codigosPredio.length ? codigosPredio : [codigoExtraido]).map(codigo => {
+        const short = predioShort(codigo) || codigo
+        const m = matchPredio(short)
+        return {
+          uid: uid(),
+          codigoPredio:   short,
+          valor:          valorDe(short),
+          proyectoId:     m?.id ?? null,
+          proyectoNombre: m?.proyecto ?? null,
+          conPago:        false,   // se calcula luego (predio repetido entre pagos)
+          yaExiste:       false,
+        }
+      })
 
       grupos.push({
         uid: uid(), carpeta, pagoId, codigoExtraido,
-        numeroCuentaCobro, nombreArrendatario, tipoArchivo,
-        pdfBlob, pdfSecBlob, pdfSecNombre, predios,
+        numeroCuentaCobro, nombreArrendatario, tipoArchivo, formato,
+        pdfBlob, pdfSecBlob, pdfSecNombre, originalName: principal.nombre, predios,
       })
     }
 
@@ -486,6 +556,20 @@ async function onZipSelected(e) {
       toast.add({ severity: 'warn', summary: 'No se encontraron documentos procesables', life: 4000 })
       return
     }
+
+    // Marcar predios repetidos entre pagos (para el sufijo _pagoN)
+    const conteo = {}
+    for (const g of grupos) for (const p of g.predios) conteo[p.codigoPredio] = (conteo[p.codigoPredio] || 0) + 1
+    for (const g of grupos) for (const p of g.predios) p.conPago = conteo[p.codigoPredio] > 1
+
+    // Advertencia: documentos ya existentes en el período (mismo proyecto + pago)
+    try {
+      const existentes = await fetchDocsPeriodo(periodoZip.value || props.periodo)
+      const clave = new Set(existentes.map(d => `${d.arr_proyecto_id}|${d.pago_id}`))
+      for (const g of grupos) for (const p of g.predios) {
+        if (p.proyectoId && clave.has(`${p.proyectoId}|${g.pagoId}`)) p.yaExiste = true
+      }
+    } catch { /* no bloquea */ }
 
     gruposPreview.value = grupos
     showDialog.value = true
@@ -508,41 +592,34 @@ async function confirmar() {
   const periodoParse = periodoZip.value || props.periodo
   const asociados = []
   const sinMatch  = []
-  let archivosGuardados  = 0
+  let copiasGeneradas    = 0
   let carpetasProcesadas = 0
 
   try {
     for (const grupo of gruposPreview.value) {
       carpetasProcesadas++
-      const prediosOk = grupo.predios.filter(p => p.proyectoId)
-      const prediosNo = grupo.predios.filter(p => !p.proyectoId)
-
-      for (const p of prediosNo) {
-        sinMatch.push({ codigo: p.codigoPredio, carpeta: grupo.carpeta })
-      }
-      if (!prediosOk.length) continue
-
-      const filename = nombreArchivo(grupo)
+      const filename = `documento_pago${grupo.pagoId}.pdf`   // nombre del archivo original enviado
       try {
         await uploadCuentaCobro({
-          file:           new File([grupo.pdfBlob], filename),
+          file:           new File([grupo.pdfBlob], grupo.originalName || filename),
           fileSecundario: grupo.pdfSecBlob ? new File([grupo.pdfSecBlob], grupo.pdfSecNombre || 'enviada.pdf') : null,
           periodo:        periodoParse,
           pagoId:         grupo.pagoId,
           codigoContrato: grupo.codigoExtraido,
           tipoDocumento:  grupo.tipoArchivo,
-          nombreResultante:   filename,
           numeroCuentaCobro:  grupo.numeroCuentaCobro,
           nombreArrendatario: grupo.nombreArrendatario,
-          predios: prediosOk.map(p => ({
+          predios: grupo.predios.map(p => ({
             arr_proyecto_id:  p.proyectoId,
             codigo_predio:    p.codigoPredio,
             valor_individual: p.valor,
+            nombre_resultante: nombrePredio(grupo, p),
           })),
         })
-        archivosGuardados++
-        for (const p of prediosOk) {
-          asociados.push({ codigo: p.codigoPredio, proyecto: p.proyectoNombre })
+        for (const p of grupo.predios) {
+          copiasGeneradas++
+          if (p.proyectoId) asociados.push({ codigo: p.codigoPredio, proyecto: p.proyectoNombre })
+          else              sinMatch.push({ codigo: p.codigoPredio, carpeta: grupo.carpeta })
         }
       } catch (uploadErr) {
         console.error('Error subiendo', grupo.carpeta, uploadErr)
@@ -550,7 +627,7 @@ async function confirmar() {
       }
     }
 
-    resumen.value = { asociados, sinMatch, archivosGuardados, carpetasProcesadas }
+    resumen.value = { asociados, sinMatch, copiasGeneradas, carpetasProcesadas }
     showDialog.value  = false
     showResumen.value = true
     emit('docs-actualizados', periodoParse)
