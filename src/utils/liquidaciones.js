@@ -6,6 +6,11 @@ import {
   ESTADO_SEVERITY, ESTADO_LABEL, ETIQUETAS, LABEL_SERVICIO,
   TIPOS_INGRESO_BRUTO, TIPOS_COMERCIALIZACION,
 } from '@/constants/liquidaciones'
+// Aritmética con precisión decimal (decimal.js) — sustituye los +/-/*//
+// nativos para que las sumas de muchas líneas no acumulen error de coma flotante.
+import {
+  createDecimal, add, subtract, multiply, divide, sum as decSum, toNumber,
+} from './financialCalculations.js'
 
 // ── Formato ────────────────────────────────────────────────────────────────
 
@@ -57,12 +62,12 @@ export const normTipo = (t) => (t || '').replace(/^TipoLineaMandatoEnum\./, '')
 /** Normaliza un porcentaje de participación que puede venir en 0–1 o 0–100 → fracción 0–1. */
 export function normPct(p) {
   const n = Number(p) || 0
-  return n > 1 ? n / 100 : n
+  return n > 1 ? toNumber(divide(n, 100)) : n
 }
 
 /** Porcentaje legible "11.06%". Acepta 0–1 o 0–100. */
 export function pct(p) {
-  return `${(normPct(p) * 100).toFixed(2)}%`
+  return `${toNumber(multiply(normPct(p), 100)).toFixed(2)}%`
 }
 
 export const estadoSeverity = (e) => ESTADO_SEVERITY[e] || 'secondary'
@@ -82,7 +87,9 @@ export function facturaEstadoSeverity(e) {
 //   ± ajuste de protocolo (incluye el caso NEU, que resta compras/ajustes extra).
 // Por eso usamos valor_neto_cop directo y NO recalculamos línea por línea.
 
-const _sum = (arr, key) => (arr || []).reduce((s, x) => s + (Number(x?.[key]) || 0), 0)
+// Suma decimal por clave → devuelve un Decimal (las funciones públicas hacen
+// toNumber() al final para no cambiar el tipo de retorno que consumen las vistas).
+const _sum = (arr, key) => decSum(arr, (x) => x?.[key])
 
 /**
  * Neto a partir de la forma que devuelve GET /liquidaciones/vistas/por-proyecto
@@ -99,7 +106,7 @@ export function netoFromVista(liqResumen) {
     const valorAPagar = _sum(ingTotal, 'valor_neto_cop')
     const costos = _sum(cosTotal, 'valor_neto_cop')
     const serv = _sum(facturas, 'valor_cop')
-    return valorAPagar - costos - serv
+    return toNumber(subtract(subtract(valorAPagar, costos), serv))
   }
   // Respaldo: el resumen pre-calculado del backend
   return Number(liqResumen.resumen?.ingreso_neto_cop) || 0
@@ -109,7 +116,7 @@ export function netoFromVista(liqResumen) {
 export function valorAPagarFromVista(liqResumen) {
   if (!liqResumen) return 0
   const ingTotal = liqResumen.mandatos_total_ingresos || []
-  if (ingTotal.length) return _sum(ingTotal, 'valor_neto_cop')
+  if (ingTotal.length) return toNumber(_sum(ingTotal, 'valor_neto_cop'))
   return Number(liqResumen.resumen?.total_ingresos_cop) || 0
 }
 
@@ -118,7 +125,7 @@ export function costosFromVista(liqResumen) {
   if (!liqResumen) return 0
   const cosTotal = liqResumen.mandatos_total_costos || []
   const facturas = liqResumen.facturas_servicio || []
-  return _sum(cosTotal, 'valor_neto_cop') + _sum(facturas, 'valor_cop')
+  return toNumber(add(_sum(cosTotal, 'valor_neto_cop'), _sum(facturas, 'valor_cop')))
 }
 
 // ── Desglose del Estado de Resultados (grupos + neto, con soportes) ──────────
@@ -234,15 +241,15 @@ export function construirEstadoResultados({
   const conNetoIng = ingresosMandatos.filter(x => x.valor_neto_cop != null)
   let valorAPagar
   if (conNetoIng.length) {
-    valorAPagar = conNetoIng.reduce((s, x) => s + _num(x.valor_neto_cop), 0)
+    valorAPagar = toNumber(decSum(conNetoIng, x => x.valor_neto_cop))
   } else {
-    let bruto = 0, comer = 0
+    let bruto = createDecimal(0), comer = createDecimal(0)
     for (const x of ingresosMandatos) for (const l of (x.lineas || [])) {
       const t = normTipo(l.tipo_linea)
-      if (TIPOS_INGRESO_BRUTO.has(t)) bruto += _num(l.valor_cop)
-      if (TIPOS_COMERCIALIZACION.has(t)) comer += Math.abs(_num(l.valor_cop))
+      if (TIPOS_INGRESO_BRUTO.has(t)) bruto = add(bruto, l.valor_cop)
+      if (TIPOS_COMERCIALIZACION.has(t)) comer = add(comer, createDecimal(l.valor_cop).abs())
     }
-    valorAPagar = bruto - comer
+    valorAPagar = toNumber(subtract(bruto, comer))
   }
 
   // Costos operativos (OPEX). representación/CGM/administración NO van aquí: son
@@ -250,9 +257,9 @@ export function construirEstadoResultados({
   let cos = _lineasDeMandatos(costosMandatos, t => !TIPOS_FACTURA_SERVICIO.has(t), { soportes })
   let costosOperativos
   if (cos.length) {
-    costosOperativos = cos.reduce((s, l) => s + l.valor, 0)
+    costosOperativos = toNumber(decSum(cos, l => l.valor))
   } else if (costosMandatos.some(x => x.valor_neto_cop != null)) {
-    costosOperativos = costosMandatos.reduce((s, x) => s + _num(x.valor_neto_cop), 0)
+    costosOperativos = toNumber(decSum(costosMandatos, x => x.valor_neto_cop))
   } else {
     cos = (costos || []).filter(c => _num(c.valor_cop) !== 0 && !TIPOS_FACTURA_SERVICIO.has(c.tipo_costo)).map(c => ({
       tipo: c.tipo_costo,
@@ -260,7 +267,7 @@ export function construirEstadoResultados({
       valor: _num(c.valor_cop), soporte_url: c.soporte_url || null,
       referencia: c.nro_soporte || null, refCodigo: codigoSoporte(c.nro_soporte), requiereSoporte: true,
     }))
-    costosOperativos = cos.reduce((s, l) => s + l.valor, 0)
+    costosOperativos = toNumber(decSum(cos, l => l.valor))
   }
 
   // Dedupe facturas duplicadas (mismo servicio y valor): defensa ante registros
@@ -273,22 +280,22 @@ export function construirEstadoResultados({
     _seenFac.add(k)
     _facturas.push(f)
   }
-  const facturasTotal = _facturas.reduce((s, f) => s + _num(f.valor_cop), 0)
-  const neto = valorAPagar - costosOperativos - facturasTotal
+  const facturasTotal = toNumber(decSum(_facturas, f => f.valor_cop))
+  const neto = toNumber(subtract(subtract(valorAPagar, costosOperativos), facturasTotal))
 
   const grupos = []
 
   const ing = _lineasDeMandatos(ingresosMandatos, t => TIPOS_INGRESO_BRUTO.has(t), { soportes })
-  if (ing.length) grupos.push({ key: 'ingresos', label: 'Ingresos', lineas: ing, total: ing.reduce((s, l) => s + l.valor, 0), sign: 1 })
+  if (ing.length) grupos.push({ key: 'ingresos', label: 'Ingresos', lineas: ing, total: toNumber(decSum(ing, l => l.valor)), sign: 1 })
 
   if (!esAutoconsumo) {
     const com = _lineasDeMandatos(ingresosMandatos, t => TIPOS_COMERCIALIZACION.has(t), { abs: true, soportes })
-    if (com.length) grupos.push({ key: 'comercializacion', label: 'Comercialización / Bolsa', lineas: com, total: com.reduce((s, l) => s + l.valor, 0), sign: -1 })
+    if (com.length) grupos.push({ key: 'comercializacion', label: 'Comercialización / Bolsa', lineas: com, total: toNumber(decSum(com, l => l.valor)), sign: -1 })
   }
 
   const aj = _lineasDeMandatos(ingresosMandatos, t => !TIPOS_INGRESO_BRUTO.has(t) && !TIPOS_COMERCIALIZACION.has(t), { soportes })
   if (aj.length) {
-    const t = aj.reduce((s, l) => s + l.valor, 0)
+    const t = toNumber(decSum(aj, l => l.valor))
     grupos.push({ key: 'ajustes', label: 'Ajustes', lineas: aj, total: t, sign: t < 0 ? -1 : 1 })
   }
 

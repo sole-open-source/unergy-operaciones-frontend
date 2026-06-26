@@ -158,6 +158,7 @@
 
 <script setup>
 import { ref, computed, reactive, onMounted, watch } from 'vue'
+import { useFinanceStore } from '@/stores/finance.js'
 import Tag             from 'primevue/tag'
 import ProgressSpinner from 'primevue/progressspinner'
 import { useToast }    from 'primevue/usetoast'
@@ -242,9 +243,10 @@ async function subirFactura() {
   }
 }
 
+// Formato de moneda centralizado vía finance store (COP, 0 decimales por defecto).
+const financeStore = useFinanceStore()
 function formatCOP(v) {
-  if (v == null) return '—'
-  return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(v)
+  return financeStore.format(v)
 }
 
 async function cargarDatos() {

@@ -353,6 +353,7 @@
 
 <script setup>
 import { ref, computed, reactive, onMounted, watch } from 'vue'
+import { useFinanceStore } from '@/stores/finance.js'
 import Button        from 'primevue/button'
 import Tag           from 'primevue/tag'
 import ProgressSpinner from 'primevue/progressspinner'
@@ -436,9 +437,10 @@ const totalSeleccionado = computed(() =>
     .reduce((s, f) => s + (valorEfectivo(f) || 0), 0)
 )
 
+// Formato de moneda centralizado vía finance store (COP, 0 decimales por defecto).
+const financeStore = useFinanceStore()
 function formatCOP(v) {
-  if (v == null) return '—'
-  return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(v)
+  return financeStore.format(v)
 }
 
 function parseCOP(str) {
