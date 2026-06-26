@@ -11,10 +11,21 @@
   <!-- ── Dialog preview ──────────────────────────────────────────────────── -->
   <Dialog v-model:visible="showDialog" modal
     header="Vista previa — Renombrado de archivos"
-    :style="{ width: '980px', maxWidth: '98vw' }"
+    :style="{ width: '1020px', maxWidth: '98vw' }"
     :closable="!guardando">
 
     <div class="space-y-4 pt-1">
+
+      <!-- Período detectado del ZIP -->
+      <div v-if="periodoZip && periodoZip !== periodo"
+        class="rounded-xl border p-3 flex items-center gap-3"
+        style="background:#eff6ff;border-color:#bfdbfe">
+        <i class="pi pi-info-circle text-sm flex-shrink-0" style="color:#2563eb"/>
+        <p class="text-xs" style="color:#1e40af">
+          El ZIP corresponde al período <strong>{{ periodoZip }}</strong>.
+          Los documentos se guardarán en ese período, no en el período actual de la vista.
+        </p>
+      </div>
 
       <!-- Alertas de filas con problemas -->
       <div v-if="filasConError.length"
@@ -37,7 +48,7 @@
       <!-- Tabla de preview -->
       <div class="rounded-xl border border-gray-100 overflow-hidden">
         <div class="overflow-x-auto">
-          <table class="w-full text-sm border-collapse" style="min-width:860px">
+          <table class="w-full text-sm border-collapse" style="min-width:920px">
             <thead>
               <tr class="bg-gray-50 border-b border-gray-100">
                 <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500">Carpeta / Tipo</th>
@@ -54,11 +65,18 @@
                 <!-- Carpeta + tipo detectado -->
                 <td class="px-3 py-2">
                   <p class="text-xs font-mono text-gray-500 whitespace-nowrap">{{ fila.carpeta }}</p>
-                  <span v-if="fila.tipo"
-                    class="inline-block mt-0.5 text-[10px] px-1.5 py-0.5 rounded font-medium"
-                    :style="tipoStyle(fila.tipo)">
-                    {{ tipoLabel(fila.tipo) }}
-                  </span>
+                  <div class="flex items-center gap-1 mt-0.5">
+                    <span v-if="fila.tipo"
+                      class="inline-block text-[10px] px-1.5 py-0.5 rounded font-medium"
+                      :style="tipoStyle(fila.tipo)">
+                      {{ tipoLabel(fila.tipo) }}
+                    </span>
+                    <span v-if="fila.tipoArchivo"
+                      class="inline-block text-[10px] px-1.5 py-0.5 rounded font-medium"
+                      style="background:#f3f4f6;color:#6b7280">
+                      {{ fila.tipoArchivo }}
+                    </span>
+                  </div>
                 </td>
                 <!-- Proyecto: selector si no fue identificado -->
                 <td class="px-3 py-2">
@@ -127,6 +145,50 @@
 
     </div>
   </Dialog>
+
+  <!-- ── Dialog resumen post-guardado ────────────────────────────────────── -->
+  <Dialog v-model:visible="showResumen" modal header="Resultado del procesamiento" :style="{ width: '540px' }">
+    <div class="space-y-3 pt-1 text-sm">
+      <!-- Asociados -->
+      <div class="rounded-lg border p-3 space-y-1.5" style="background:#f0fdf4;border-color:#bbf7d0">
+        <p class="text-xs font-semibold" style="color:#166534">
+          <i class="pi pi-check-circle mr-1"/>
+          {{ resumen.asociados.length }} contrato(s) asociados correctamente
+        </p>
+        <div v-for="item in resumen.asociados" :key="item.codigo"
+          class="flex items-center gap-2 text-[11px] text-gray-600 pl-3">
+          <i class="pi pi-file-pdf text-[9px]" style="color:#16a34a"/>
+          <span class="font-mono text-gray-400">{{ item.codigo }}</span>
+          <i class="pi pi-arrow-right text-[9px] text-gray-300"/>
+          <span>{{ item.proyecto }}</span>
+          <span v-if="item.pago_id" class="ml-auto text-gray-400 font-mono">pago_{{ item.pago_id }}</span>
+        </div>
+      </div>
+
+      <!-- Sin match -->
+      <div v-if="resumen.sinMatch.length" class="rounded-lg border p-3 space-y-1.5" style="background:#fffbeb;border-color:#fcd34d40">
+        <p class="text-xs font-semibold" style="color:#92400e">
+          <i class="pi pi-exclamation-triangle mr-1"/>
+          {{ resumen.sinMatch.length }} código(s) sin match en BD
+        </p>
+        <div v-for="item in resumen.sinMatch" :key="item.codigo"
+          class="flex items-center gap-2 text-[11px] pl-3">
+          <span class="font-mono font-semibold text-amber-700">{{ item.codigo }}</span>
+          <span class="text-gray-400">—</span>
+          <span class="text-gray-500">{{ item.carpeta }}</span>
+        </div>
+      </div>
+
+      <!-- Totales -->
+      <div class="flex items-center gap-4 text-xs text-gray-500 pt-1 border-t">
+        <span><i class="pi pi-paperclip mr-1"/>{{ resumen.archivosGuardados }} archivos guardados</span>
+        <span><i class="pi pi-folder mr-1"/>{{ resumen.carpetasProcesadas }} carpetas procesadas</span>
+      </div>
+    </div>
+    <template #footer>
+      <Button label="Cerrar" size="small" @click="showResumen = false; $emit('docs-actualizados', periodoZip || periodo)" />
+    </template>
+  </Dialog>
 </template>
 
 <script setup>
@@ -137,7 +199,7 @@ import { useToast } from 'primevue/usetoast'
 import JSZip from 'jszip'
 import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist'
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
-import { docsMeta, storeBlob, saveDocsMeta, docKey } from '@/composables/useArriendosDocs'
+import { uploadDoc } from '@/composables/useArriendosDocs'
 
 GlobalWorkerOptions.workerSrc = pdfWorkerUrl
 
@@ -148,12 +210,17 @@ const props = defineProps({
   periodo:      { type: String, required: true },   // 'YYYY-MM'
   periodoLabel: { type: String, required: true },   // 'Mayo 2026'
 })
+const emit = defineEmits(['docs-actualizados'])
 
 const zipInputRef  = ref(null)
 const procesando   = ref(false)
 const guardando    = ref(false)
 const showDialog   = ref(false)
+const showResumen  = ref(false)
 const filasPreview = ref([])
+const periodoZip   = ref(null)   // período extraído del nombre del ZIP
+
+const resumen = ref({ asociados: [], sinMatch: [], archivosGuardados: 0, carpetasProcesadas: 0 })
 
 let uidCounter = 0
 const uid = () => `row_${++uidCounter}`
@@ -172,7 +239,7 @@ function tipoStyle(tipo) {
   return 'background:#f3f4f6;color:#6b7280'
 }
 
-// ── Nombre de archivo resultante ──────────────────────────────────────────────
+// ── Nombre de archivo resultante (misma lógica existente, no modificar) ────────
 function mesLabel(periodoStr) {
   const [, mm] = periodoStr.split('-')
   const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
@@ -185,9 +252,60 @@ function nombreResultante(fila) {
   const sanitize = s => (s || '').replace(/[/\\:*?"<>|]/g, '_').trim()
   const codigo  = sanitize(fila.codigoExtraido || fila.proyectoId)
   const nombre  = sanitize(fila.proyectoNombre || '')
-  const mes     = mesLabel(props.periodo)
+  const mes     = mesLabel(periodoZip.value || props.periodo)
   const persona = sanitize(fila.persona)
   return `${codigo}_${nombre}_${mes}_${persona}.pdf`
+}
+
+// ── Extraer período del nombre del ZIP ─────────────────────────────────────────
+function extraerPeriodoDeZip(filename) {
+  // soportes_2026-06_operation_all.zip → 2026-06
+  const m = filename.match(/(\d{4}-\d{2})/)
+  if (!m) return null
+  const [yyyy, mm] = m[1].split('-')
+  if (parseInt(mm) >= 1 && parseInt(mm) <= 12) return m[1]
+  return null
+}
+
+// ── Selección del archivo principal según prioridad ───────────────────────────
+// 1. cuenta_cobro.pdf (nunca cuenta_cobro_enviada.pdf)
+// 2. factura_electronica.pdf
+// 3. factura_electronica.jpg
+function seleccionarPrincipal(archivos) {
+  // archivos: array de { path, entry, nombre }
+  const porNombre = nombre => archivos.filter(a => a.nombre.toLowerCase() === nombre)
+
+  const cuentaCobro = archivos.filter(a =>
+    a.nombre.toLowerCase().includes('cuenta_cobro') &&
+    !a.nombre.toLowerCase().includes('enviada') &&
+    !a.nombre.toLowerCase().includes('_env')
+  )
+  if (cuentaCobro.length) return { principal: cuentaCobro[0], tipoArchivo: 'cuenta_cobro' }
+
+  const factPdf = archivos.filter(a =>
+    a.nombre.toLowerCase().includes('factura_electronica') && a.nombre.toLowerCase().endsWith('.pdf')
+  )
+  if (factPdf.length) return { principal: factPdf[0], tipoArchivo: 'factura_electronica' }
+
+  const factJpg = archivos.filter(a =>
+    a.nombre.toLowerCase().includes('factura_electronica') &&
+    (a.nombre.toLowerCase().endsWith('.jpg') || a.nombre.toLowerCase().endsWith('.jpeg'))
+  )
+  if (factJpg.length) return { principal: factJpg[0], tipoArchivo: 'factura_electronica_jpg' }
+
+  // Fallback: primer PDF
+  const cualquierPdf = archivos.filter(a => a.nombre.toLowerCase().endsWith('.pdf') && !a.nombre.toLowerCase().includes('enviada'))
+  if (cualquierPdf.length) return { principal: cualquierPdf[0], tipoArchivo: 'pdf' }
+
+  return { principal: archivos[0] || null, tipoArchivo: 'desconocido' }
+}
+
+function seleccionarSecundario(archivos, principal) {
+  return archivos.find(a =>
+    a !== principal &&
+    a.nombre.toLowerCase().includes('enviada') &&
+    a.nombre.toLowerCase().endsWith('.pdf')
+  ) ?? null
 }
 
 // ── Extracción de texto del PDF → líneas ──────────────────────────────────────
@@ -195,12 +313,9 @@ async function extraerLineas(arrayBuffer) {
   try {
     const pdf   = await getDocument({ data: new Uint8Array(arrayBuffer) }).promise
     const pages = []
-
     for (let p = 1; p <= pdf.numPages; p++) {
       const page    = await pdf.getPage(p)
       const content = await page.getTextContent()
-
-      // Agrupar items por posición Y → reconstruir líneas
       const byY = {}
       for (const item of content.items) {
         if (!item.str?.trim()) continue
@@ -212,57 +327,52 @@ async function extraerLineas(arrayBuffer) {
       const lineas   = sortedYs.map(y =>
         byY[y].sort((a, b) => a.x - b.x).map(i => i.str).join(' ').trim()
       ).filter(l => l)
-
       pages.push(lineas)
     }
     return pages
-  } catch (err) {
-    console.error('Error PDF:', err)
-    return []
-  }
+  } catch { return [] }
 }
 
 // ── Detección de tipo ─────────────────────────────────────────────────────────
 function detectarTipo(paginasLineas) {
   const primeras = paginasLineas[0] ?? []
   const texto    = primeras.join('\n')
-
   if (/FACTURA ELECTR[OÓ]NICA\s+DE\s+VENTA/i.test(texto)) return 4
   if (/CUENTA DE COBRO\s+N[\.º°]\s*UNERGY/i.test(texto))   return 3
   if (/CUENTA DE COBRO/i.test(texto))                        return 1
   return 0
 }
 
-// ── Strip de páginas ZapSign ──────────────────────────────────────────────────
 function stripZapSign(paginasLineas) {
   const resultado = []
   for (const pagLineas of paginasLineas) {
-    const textoPage = pagLineas.join('\n')
-    if (/ZapSign|Informe de Firmas|Audit Trail/i.test(textoPage)) break
+    if (/ZapSign|Informe de Firmas|Audit Trail/i.test(pagLineas.join('\n'))) break
     resultado.push(pagLineas)
   }
   return resultado
 }
 
-// ── Parser Tipo 1 / 2: Cuenta de cobro simple ─────────────────────────────────
-// Estructura: ... DEBE A \n <Nombre> \n CC. XXXXXXX
+function esNombreValido(texto) {
+  if (!texto || texto.length < 4 || texto.length > 100) return false
+  if (/^\d+$/.test(texto)) return false
+  if (/^\$|^COP\s*\d/i.test(texto)) return false
+  if (/^(CUENTA|FACTURA|DEBE|FIRMA|FECHA|VALOR|TOTAL|CONCEPTO|PROYECTO|ESTADO)/i.test(texto)) return false
+  if (!/[a-zA-ZáéíóúñÁÉÍÓÚÑ]/.test(texto)) return false
+  return true
+}
+
 function parseTipo1(paginasLineas) {
   const lineas = paginasLineas.flat()
-
   for (let i = 0; i < lineas.length; i++) {
     if (/^\s*DEBE\s+A\s*$/i.test(lineas[i])) {
-      // Siguiente línea no vacía = nombre
       for (let j = i + 1; j < lineas.length; j++) {
         const candidato = lineas[j].trim()
         if (!candidato) continue
-        // La línea siguiente debe tener CC. o C.C.
         const siguiente = lineas.slice(j + 1, j + 4).join(' ')
         if (/C\.?C\.?\s*\d/i.test(siguiente) || /C\.?C\.?/i.test(candidato)) {
-          // Si el CC está en la misma línea, separar
           const nombre = candidato.replace(/C\.?C\.?\s*\d+.*/i, '').trim()
           if (esNombreValido(nombre)) return { nombre, error: null }
         }
-        // Aceptar si parece nombre aunque no veamos CC inmediatamente
         if (esNombreValido(candidato)) return { nombre: candidato, error: null }
         break
       }
@@ -271,13 +381,9 @@ function parseTipo1(paginasLineas) {
   return { nombre: '', error: 'No se encontró "DEBE A" seguido de nombre' }
 }
 
-// ── Parser Tipo 3: Cuenta de cobro múltiple (ZapSign) ────────────────────────
-// Estructura: DEBE A \n <Nombre> \n NIT. + tabla Concepto|Proyecto|Estado|Valor
 function parseTipo3(paginasLineas) {
   const pagsFiltradas = stripZapSign(paginasLineas)
   const lineas        = pagsFiltradas.flat()
-
-  // 1. Extraer nombre (igual que tipo 1 pero confirma con NIT)
   let nombre = ''
   for (let i = 0; i < lineas.length; i++) {
     if (/^\s*DEBE\s+A\s*$/i.test(lineas[i])) {
@@ -296,79 +402,40 @@ function parseTipo3(paginasLineas) {
       break
     }
   }
-
-  // 2. Extraer filas de la tabla (Concepto | Proyecto | Estado | Valor)
-  //    Los PDFs de texto extraen celdas en orden de lectura.
-  //    Buscar segmentos que contengan nombre de proyecto reconocible.
   const proyectosEnTabla = []
   const nombreProyectoRegex = /(?:Minigranja\s+Solar[\w\s]+|MINIGRANJA\s+SOLAR[\w\s]+)/i
-
-  for (let i = 0; i < lineas.length; i++) {
-    const m = lineas[i].match(nombreProyectoRegex)
+  for (const l of lineas) {
+    const m = l.match(nombreProyectoRegex)
     if (m) {
-      // Limpiar: quitar texto después de separadores típicos de tabla
       const proyecto = m[0].replace(/\s+(?:Aprobado|Pendiente|Pagado|\$|COP)\b.*/i, '').trim()
-      if (proyecto && !proyectosEnTabla.includes(proyecto)) {
-        proyectosEnTabla.push(proyecto)
-      }
+      if (proyecto && !proyectosEnTabla.includes(proyecto)) proyectosEnTabla.push(proyecto)
     }
   }
-
-  return {
-    nombre,
-    proyectos: proyectosEnTabla.length ? proyectosEnTabla : null,
-    error: nombre ? null : 'No se encontró "DEBE A" seguido de nombre',
-  }
+  return { nombre, proyectos: proyectosEnTabla.length ? proyectosEnTabla : null, error: nombre ? null : 'No se encontró "DEBE A"' }
 }
 
-// ── Parser Tipo 4: Factura electrónica DIAN ──────────────────────────────────
 function parseTipo4(paginasLineas) {
   const lineas = paginasLineas.flat()
-  let enSeccionEmisor = false
-
   for (let i = 0; i < lineas.length; i++) {
     const l = lineas[i]
-
-    // Detectar sección del emisor
-    if (/Datos del Emisor|Datos del Vendedor|EMISOR|VENDEDOR/i.test(l)) {
-      enSeccionEmisor = true
+    const mInline = l.match(/Raz[oó]n\s+Social\s*[:\s]+(.+)/i)
+    if (mInline) {
+      const nombre = mInline[1].split(/[,;|]/)[0].trim()
+      if (esNombreValido(nombre)) return { nombre, error: null }
     }
-
-    // Buscar Razón Social (puede estar en la misma línea o la siguiente)
-    if (enSeccionEmisor || true) {   // buscar en todo el doc por seguridad
-      const mInline = l.match(/Raz[oó]n\s+Social\s*[:\s]+(.+)/i)
-      if (mInline) {
-        const nombre = mInline[1].split(/[,;|]/)[0].trim()
-        if (esNombreValido(nombre)) return { nombre, error: null }
-      }
-      // Razón Social en una línea, valor en la siguiente
-      if (/Raz[oó]n\s+Social\s*[:\s]*$/i.test(l) && lineas[i + 1]) {
-        const nombre = lineas[i + 1].trim().split(/[,;|]/)[0].trim()
-        if (esNombreValido(nombre)) return { nombre, error: null }
-      }
+    if (/Raz[oó]n\s+Social\s*[:\s]*$/i.test(l) && lineas[i + 1]) {
+      const nombre = lineas[i + 1].trim().split(/[,;|]/)[0].trim()
+      if (esNombreValido(nombre)) return { nombre, error: null }
     }
   }
-  return { nombre: '', error: 'No se encontró "Razón Social" del emisor' }
+  return { nombre: '', error: 'No se encontró "Razón Social"' }
 }
 
-// ── Validación de nombre ──────────────────────────────────────────────────────
-function esNombreValido(texto) {
-  if (!texto || texto.length < 4 || texto.length > 100) return false
-  // Descartar si es sólo números, fechas, valores monetarios o palabras clave
-  if (/^\d+$/.test(texto)) return false
-  if (/^\$|^COP\s*\d/i.test(texto)) return false
-  if (/^(CUENTA|FACTURA|DEBE|FIRMA|FECHA|VALOR|TOTAL|CONCEPTO|PROYECTO|ESTADO)/i.test(texto)) return false
-  // Debe tener al menos una letra
-  if (!/[a-zA-ZáéíóúñÁÉÍÓÚÑ]/.test(texto)) return false
-  return true
-}
-
-// ── Matching carpeta-código → proyecto ────────────────────────────────────────
+// ── Matching ──────────────────────────────────────────────────────────────────
 function matchPorCodigo(folderCode) {
   if (!folderCode) return null
   let p = props.proyectos.find(p => p.codigo === folderCode)
   if (p) return p
-  // Prefijo: el código del ZIP es prefijo del código completo
   p = props.proyectos.find(p => p.codigo && p.codigo.startsWith(folderCode))
   return p ?? null
 }
@@ -377,10 +444,8 @@ function matchPorNombre(nombreTabla) {
   if (!nombreTabla) return null
   const norm = s => s.toLowerCase().replace(/\s+/g, ' ').trim()
   const needle = norm(nombreTabla)
-  // Exacto
   let p = props.proyectos.find(p => norm(p.proyecto) === needle)
   if (p) return p
-  // Contiene
   p = props.proyectos.find(p => norm(p.proyecto).includes(needle) || needle.includes(norm(p.proyecto)))
   return p ?? null
 }
@@ -393,6 +458,7 @@ async function onZipSelected(e) {
 
   procesando.value = true
   filasPreview.value = []
+  periodoZip.value = extraerPeriodoDeZip(file.name)
 
   try {
     const zip      = await JSZip.loadAsync(file)
@@ -411,100 +477,103 @@ async function onZipSelected(e) {
     const nuevasFilas = []
 
     for (const carpeta of [...carpetas].sort()) {
-      // Extraer código del nombre de carpeta: pago_2213_COLCEST49 → COLCEST49
+      // pago_3554_COLCEST17 → pagoId=3554, codigoExtraido=COLCEST17
       const partes         = carpeta.split('_')
+      const pagoId         = parseInt(partes[1]) || 0
       const codigoExtraido = partes.slice(2).join('_')
 
-      // Buscar primer PDF en la carpeta
-      let pdfEntry = null
+      // Recopilar todos los archivos de la carpeta
+      const archivosEnCarpeta = []
       zip.forEach((path, entry) => {
-        if (path.startsWith(carpeta + '/') && path.toLowerCase().endsWith('.pdf') && !entry.dir) {
-          if (!pdfEntry) pdfEntry = entry
+        if (path.startsWith(carpeta + '/') && !entry.dir) {
+          const nombre = path.split('/').pop()
+          archivosEnCarpeta.push({ path, entry, nombre })
         }
       })
 
-      if (!pdfEntry) {
+      if (!archivosEnCarpeta.length) {
         nuevasFilas.push({
-          uid: uid(), carpeta, codigoExtraido,
+          uid: uid(), carpeta, codigoExtraido, pagoId,
           proyectoId: null, proyectoNombre: null,
-          persona: '', pdfBlob: null, tipo: 0,
-          errorDetalle: 'Sin PDF en la carpeta',
+          persona: '', pdfBlob: null, pdfSecBlob: null, tipo: 0, tipoArchivo: null,
+          errorDetalle: 'Sin archivos en la carpeta',
         })
         continue
       }
 
-      const pdfBuffer  = await pdfEntry.async('arraybuffer')
-      const paginas    = await extraerLineas(pdfBuffer)
-      const tipo       = detectarTipo(paginas)
-      const pdfBlob    = new Blob([pdfBuffer], { type: 'application/pdf' })
+      // Seleccionar principal y secundario según prioridad
+      const { principal, tipoArchivo } = seleccionarPrincipal(archivosEnCarpeta)
+      const secundario = seleccionarSecundario(archivosEnCarpeta, principal)
 
-      if (tipo === 0) {
+      if (!principal) {
         nuevasFilas.push({
-          uid: uid(), carpeta, codigoExtraido,
+          uid: uid(), carpeta, codigoExtraido, pagoId,
           proyectoId: null, proyectoNombre: null,
-          persona: '', pdfBlob, tipo,
-          errorDetalle: 'Tipo de documento no reconocido',
+          persona: '', pdfBlob: null, pdfSecBlob: null, tipo: 0, tipoArchivo,
+          errorDetalle: 'Sin documento principal reconocible',
         })
         continue
       }
 
-      if (tipo === 1) {
-        const { nombre, error } = parseTipo1(paginas)
-        const match = matchPorCodigo(codigoExtraido)
-        nuevasFilas.push({
-          uid: uid(), carpeta, codigoExtraido,
-          proyectoId:     match?.id ?? null,
-          proyectoNombre: match?.proyecto ?? null,
-          persona:        nombre,
-          pdfBlob, tipo,
-          errorDetalle: !match ? 'Proyecto no identificado' : !nombre ? error : null,
-        })
-        continue
+      const esPdf = principal.nombre.toLowerCase().endsWith('.pdf')
+      const pdfBuffer = await principal.entry.async('arraybuffer')
+      const pdfBlob   = new Blob([pdfBuffer], { type: esPdf ? 'application/pdf' : 'image/jpeg' })
+
+      let pdfSecBlob = null
+      let pdfSecNombre = null
+      if (secundario) {
+        const secBuffer = await secundario.entry.async('arraybuffer')
+        pdfSecBlob   = new Blob([secBuffer], { type: 'application/pdf' })
+        pdfSecNombre = secundario.nombre
       }
 
-      if (tipo === 3) {
-        const { nombre, proyectos, error } = parseTipo3(paginas)
+      let tipo = 0
+      let parsedPersona = ''
+      let parsedError = null
 
-        if (proyectos?.length) {
-          // Una entrada por proyecto en la tabla
-          for (const nomProyecto of proyectos) {
-            const match = matchPorNombre(nomProyecto) ?? matchPorCodigo(codigoExtraido)
-            nuevasFilas.push({
-              uid: uid(), carpeta, codigoExtraido,
-              proyectoId:     match?.id ?? null,
-              proyectoNombre: match?.proyecto ?? nomProyecto,
-              persona:        nombre,
-              pdfBlob, tipo,
-              errorDetalle: !match ? 'Proyecto no identificado' : !nombre ? error : null,
-            })
+      if (esPdf) {
+        const paginas = await extraerLineas(pdfBuffer)
+        tipo = detectarTipo(paginas)
+
+        if (tipo === 1) {
+          const r = parseTipo1(paginas)
+          parsedPersona = r.nombre
+          parsedError   = r.error
+        } else if (tipo === 3) {
+          const r = parseTipo3(paginas)
+          if (r.proyectos?.length) {
+            // Tipo 3 con múltiples proyectos → una fila por proyecto
+            for (const nomProyecto of r.proyectos) {
+              const match = matchPorNombre(nomProyecto) ?? matchPorCodigo(codigoExtraido)
+              nuevasFilas.push({
+                uid: uid(), carpeta, codigoExtraido, pagoId,
+                proyectoId:     match?.id ?? null,
+                proyectoNombre: match?.proyecto ?? nomProyecto,
+                persona:        r.nombre,
+                pdfBlob, pdfSecBlob, pdfSecNombre, tipo, tipoArchivo,
+                errorDetalle: !match ? 'Proyecto no identificado' : !r.nombre ? r.error : null,
+              })
+            }
+            continue
           }
-        } else {
-          // Sin tabla identificada: una entrada con el código de la carpeta
-          const match = matchPorCodigo(codigoExtraido)
-          nuevasFilas.push({
-            uid: uid(), carpeta, codigoExtraido,
-            proyectoId:     match?.id ?? null,
-            proyectoNombre: match?.proyecto ?? null,
-            persona:        nombre,
-            pdfBlob, tipo,
-            errorDetalle: !match ? 'Proyecto no identificado' : !nombre ? error : null,
-          })
+          parsedPersona = r.nombre
+          parsedError   = r.error
+        } else if (tipo === 4) {
+          const r = parseTipo4(paginas)
+          parsedPersona = r.nombre
+          parsedError   = r.error
         }
-        continue
       }
 
-      if (tipo === 4) {
-        const { nombre, error } = parseTipo4(paginas)
-        const match = matchPorCodigo(codigoExtraido)
-        nuevasFilas.push({
-          uid: uid(), carpeta, codigoExtraido,
-          proyectoId:     match?.id ?? null,
-          proyectoNombre: match?.proyecto ?? null,
-          persona:        nombre,
-          pdfBlob, tipo,
-          errorDetalle: !match ? 'Proyecto no identificado' : !nombre ? error : null,
-        })
-      }
+      const match = matchPorCodigo(codigoExtraido)
+      nuevasFilas.push({
+        uid: uid(), carpeta, codigoExtraido, pagoId,
+        proyectoId:     match?.id ?? null,
+        proyectoNombre: match?.proyecto ?? null,
+        persona:        parsedPersona,
+        pdfBlob, pdfSecBlob, pdfSecNombre, tipo, tipoArchivo,
+        errorDetalle: !match ? 'Proyecto no identificado' : (!parsedPersona && parsedError) ? parsedError : null,
+      })
     }
 
     filasPreview.value = nuevasFilas
@@ -525,32 +594,63 @@ function onProyectoSeleccionado(i) {
 // ── Confirmar y guardar ───────────────────────────────────────────────────────
 async function confirmar() {
   guardando.value = true
-  let guardados = 0
+  const periodoParse = periodoZip.value || props.periodo
+  const asociados    = []
+  const sinMatch     = []
+  let archivosGuardados = 0
+
   try {
     for (const fila of filasPreview.value) {
-      if (!fila.proyectoId || !fila.persona || !fila.pdfBlob) continue
+      if (!fila.proyectoId || !fila.persona || !fila.pdfBlob) {
+        if (fila.codigoExtraido && !fila.proyectoId) {
+          sinMatch.push({ codigo: fila.codigoExtraido, carpeta: fila.carpeta })
+        }
+        continue
+      }
 
       const filename = nombreResultante(fila)
-      const key      = docKey(fila.proyectoId, props.periodo)
+      const tipoDoc  = fila.tipoArchivo || (fila.tipo === 4 ? 'factura_electronica' : 'cuenta_cobro')
 
-      await storeBlob(key, new Blob([fila.pdfBlob], { type: 'application/pdf' }))
-      docsMeta.value[key] = {
-        filename,
-        proyecto: fila.proyectoNombre,
-        persona:  fila.persona.trim(),
-        periodo:  props.periodo,
-        codigo:   fila.codigoExtraido,
+      try {
+        await uploadDoc({
+          file:            new File([fila.pdfBlob], filename),
+          fileSecundario:  fila.pdfSecBlob ? new File([fila.pdfSecBlob], fila.pdfSecNombre || 'enviada.pdf') : null,
+          arrProyectoId:   fila.proyectoId,
+          periodo:         periodoParse,
+          pagoId:          fila.pagoId,
+          codigoContrato:  fila.codigoExtraido,
+          tipoDocumento:   tipoDoc,
+          nombreResultante: filename,
+        })
+        archivosGuardados++
+        asociados.push({
+          codigo:   fila.codigoExtraido,
+          proyecto: fila.proyectoNombre,
+          pago_id:  fila.pagoId,
+        })
+      } catch (uploadErr) {
+        console.error('Error subiendo', fila.carpeta, uploadErr)
+        toast.add({ severity: 'warn', summary: `Error al subir ${fila.carpeta}`, life: 4000 })
       }
-      guardados++
     }
-    saveDocsMeta()
-    showDialog.value = false
-    toast.add({
-      severity: 'success',
-      summary:  `${guardados} archivo(s) guardados`,
-      detail:   'Visibles en la columna Documento.',
-      life: 3500,
-    })
+
+    // Carpetas sin match en BD
+    for (const fila of filasPreview.value) {
+      if (!fila.proyectoId && fila.codigoExtraido && !sinMatch.find(s => s.codigo === fila.codigoExtraido)) {
+        sinMatch.push({ codigo: fila.codigoExtraido, carpeta: fila.carpeta })
+      }
+    }
+
+    resumen.value = {
+      asociados,
+      sinMatch,
+      archivosGuardados,
+      carpetasProcesadas: filasPreview.value.length,
+    }
+
+    showDialog.value  = false
+    showResumen.value = true
+    emit('docs-actualizados', periodoParse)
   } catch (err) {
     console.error(err)
     toast.add({ severity: 'error', summary: 'Error al guardar', detail: err.message, life: 4000 })

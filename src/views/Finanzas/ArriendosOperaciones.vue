@@ -41,7 +41,8 @@
         <ArriendosZipUpload
           :proyectos="filasParaZip"
           :periodo="periodoActual"
-          :periodo-label="periodoLabel" />
+          :periodo-label="periodoLabel"
+          @docs-actualizados="loadDocs" />
         <Button label="Guardar selección" icon="pi pi-save" size="small"
           :loading="guardando"
           style="background:#915BD8;border-color:#915BD8"
@@ -132,15 +133,17 @@
               </td>
               <!-- Documento adjunto -->
               <td class="px-3 py-2 text-center">
-                <button v-if="docsMeta[docKey(fila.id, periodoActual)]"
-                  type="button"
-                  class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium hover:opacity-80 transition-opacity"
-                  style="background:#ede9fe;color:#6d28d9"
-                  v-tooltip.top="docsMeta[docKey(fila.id, periodoActual)].filename"
-                  @click="downloadDoc(docKey(fila.id, periodoActual))">
-                  <i class="pi pi-file-pdf text-[10px]" />PDF
-                </button>
-                <span v-else class="text-xs text-gray-200">—</span>
+                <div class="inline-flex items-center gap-0.5 flex-wrap justify-center">
+                  <template v-if="docsPorProyecto[fila.id]?.length">
+                    <DocumentoIcon
+                      v-for="doc in docsPorProyecto[fila.id]"
+                      :key="doc.id"
+                      :doc="doc"
+                      :tooltip="`pago_${doc.pago_id} — ${doc.nombre_archivo}`"
+                      @click="downloadDoc(doc.id, doc.nombre_archivo)" />
+                  </template>
+                  <DocumentoIcon v-else :doc="null" />
+                </div>
               </td>
               <td class="px-3 py-2 text-center">
                 <button type="button" @click="toggleFacturado(fila.id)">
@@ -253,7 +256,8 @@ import { useToast } from 'primevue/usetoast'
 import api          from '@/api/client'
 import ArriendosZipUpload from './ArriendosZipUpload.vue'
 import CalculoIpcPopover from '@/components/CalculoIpcPopover.vue'
-import { docsMeta, loadDocsMeta, downloadDoc, docKey } from '@/composables/useArriendosDocs'
+import { docsPorProyecto, loadDocs, downloadDoc } from '@/composables/useArriendosDocs'
+import DocumentoIcon from '@/components/DocumentoIcon.vue'
 
 const toast = useToast()
 
@@ -396,6 +400,6 @@ const filasParaZip = computed(() =>
   filas.value.map(f => ({ id: f.id, proyecto: f.proyecto, codigo: f.codigo }))
 )
 
-watch(periodoActual, cargarDatos)
-onMounted(() => { loadDocsMeta(); cargarDatos() })
+watch(periodoActual, (p) => { loadDocs(p); cargarDatos() })
+onMounted(() => { loadDocs(periodoActual.value); cargarDatos() })
 </script>
