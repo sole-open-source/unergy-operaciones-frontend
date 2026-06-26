@@ -139,7 +139,7 @@
                       v-for="doc in docsPorProyecto[fila.id]"
                       :key="doc.id"
                       :doc="doc"
-                      :tooltip="`pago_${doc.pago_id} — ${doc.nombre_archivo}`"
+                      :tooltip="tooltipDoc(doc)"
                       @click="downloadDoc(doc.id, doc.nombre_archivo)" />
                   </template>
                   <DocumentoIcon v-else :doc="null" />
@@ -393,6 +393,14 @@ async function toggleFacturado(id) {
   } catch {
     toast.add({ severity: 'error', summary: 'Error al marcar facturado', life: 3000 })
   }
+}
+
+// ── Tooltip del ícono de documento: "N° cuenta | arrendatario" ─────────────────
+function tooltipDoc(doc) {
+  const partes = []
+  if (doc.numero_cuenta_cobro) partes.push(doc.numero_cuenta_cobro)
+  if (doc.nombre_arrendatario) partes.push(doc.nombre_arrendatario)
+  return partes.length ? partes.join(' | ') : doc.nombre_archivo
 }
 
 // ── Proyectos para el componente ZipUpload ─────────────────────────────────────
