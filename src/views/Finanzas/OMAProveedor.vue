@@ -164,14 +164,27 @@
           <p class="text-xs text-red-700">Error al procesar el PDF: {{ splitResult.error }}</p>
         </div>
 
-        <!-- Proyectos asociados -->
-        <p class="text-xs font-semibold" style="color:#166534">
-          <i class="pi pi-check-circle mr-1"/>
-          {{ splitResult.procesados }} {{ splitResult.procesados === 1 ? 'proyecto asociado' : 'proyectos asociados' }} correctamente
-        </p>
+        <!-- Proyectos asociados correctamente -->
+        <div>
+          <p class="text-xs font-semibold mb-1" style="color:#166534">
+            <i class="pi pi-check-circle mr-1"/>
+            {{ splitResult.procesados }} {{ splitResult.procesados === 1 ? 'proyecto asociado' : 'proyectos asociados' }} correctamente
+          </p>
+          <div v-if="splitResult.detalle?.length" class="space-y-0.5 pl-3">
+            <div v-for="(item, i) in splitResult.detalle" :key="i"
+              class="flex items-center gap-2 text-[10px] text-gray-600">
+              <i class="pi pi-file-pdf text-[9px] flex-shrink-0" style="color:#16a34a"/>
+              <span class="font-medium truncate" style="max-width:160px" :title="item.nombre">{{ item.nombre }}</span>
+              <span v-if="item.numero_factura" class="font-mono text-gray-400">{{ item.numero_factura }}</span>
+              <span v-if="item.total_pagar" class="ml-auto font-semibold tabular-nums" style="color:#7c3aed">
+                {{ formatCOP(item.total_pagar) }}
+              </span>
+            </div>
+          </div>
+        </div>
 
         <!-- Páginas sin match -->
-        <div v-if="splitResult.sin_match?.length" class="space-y-1.5">
+        <div v-if="splitResult.sin_match?.length" class="space-y-1.5 pt-1 border-t" style="border-color:#fcd34d60">
           <p class="text-xs font-semibold" style="color:#92400e">
             <i class="pi pi-exclamation-triangle mr-1"/>
             {{ splitResult.sin_match.length }} {{ splitResult.sin_match.length === 1 ? 'página sin identificar' : 'páginas sin identificar' }}:
@@ -180,14 +193,12 @@
             class="pl-3 py-1 rounded" style="background:#fef3c740">
             <p class="text-[10px] font-semibold text-amber-800">
               Pág. {{ item.pagina }}
-              <span v-if="item.estrategia" class="font-normal text-gray-500"> — encontrado via {{ item.estrategia }}</span>
+              <span v-if="item.numero_factura" class="font-mono font-normal text-gray-500"> · {{ item.numero_factura }}</span>
             </p>
-            <p class="text-[10px] text-gray-600 mt-0.5">
-              <span class="font-medium">Razón:</span> {{ item.razon }}
+            <p v-if="item.nombre_extraido" class="text-[10px] text-gray-700 mt-0.5">
+              Nombre extraído: <span class="font-medium">"{{ item.nombre_extraido }}"</span>
             </p>
-            <p v-if="item.muestra_texto" class="text-[10px] text-gray-500 mt-0.5 font-mono break-all">
-              "{{ item.muestra_texto }}"
-            </p>
+            <p class="text-[10px] text-gray-500 mt-0.5">{{ item.razon }}</p>
           </div>
         </div>
 
