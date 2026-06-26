@@ -225,6 +225,7 @@ import {
 import { Line } from 'vue-chartjs'
 import draggable from 'vuedraggable'
 import api from '@/api/client'
+import { usePolling } from '@/composables/usePolling'
 import GeneracionView from '@/views/Operaciones/GeneracionView.vue'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Filler)
@@ -235,12 +236,11 @@ const STORAGE_KEY = 'solar_project_order'
 const tab = ref('live')
 
 // ── Estado ─────────────────────────────────────────────────────────────────
-const loading     = ref(false)
 const proyectos   = ref([])
 const detailMap   = reactive({})
 const lastUpdated = ref('')
 const cols        = ref(1)
-let refreshTimer  = null
+// `loading` y `error` los provee usePolling (ver más abajo).
 
 // ── Generación de hoy ──────────────────────────────────────────────────────
 const genHoyMap  = reactive({})   // proyecto_id → { kwh_real, fuente }
@@ -295,8 +295,12 @@ function setAuto(ms) {
   autoMenuOpen.value = false
   autoInterval.value = ms
   localStorage.setItem(AUTO_KEY, String(ms))
-  if (refreshTimer) clearInterval(refreshTimer)
-  refreshTimer = ms ? setInterval(cargar, ms) : null
+  if (ms) {
+    setPollInterval(ms)
+    startPolling()
+  } else {
+    stopPolling()
+  }
 }
 
 function toggleAutoMenu() { autoMenuOpen.value = !autoMenuOpen.value }
@@ -501,23 +505,43 @@ const chartOptionsInv = makeOptions('#915BD8')
 const chartOptionsMed = makeOptions('#D4A017')
 
 // ── Carga ─────────────────────────────────────────────────────────────────
-async function cargar() {
-  loading.value = true
-  try {
-    const res = await api.get('/generacion-solar/monitoring')
-    proyectos.value = applyOrder(res.data.projects ?? [])
-    lastUpdated.value = new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
-  } catch { /* silencioso */ } finally {
-    loading.value = false
-  }
-  // Cargar gen-hoy y detalles en paralelo
+// El fetch principal trae el monitoring y dispara las cargas secundarias
+// (gen-hoy + detalle por proyecto) en segundo plano para no bloquear el
+// spinner. No captura el error a propósito: que se propague a usePolling para
+// que aplique el backoff adaptativo.
+async function fetchMonitoring() {
+  const res = await api.get('/generacion-solar/monitoring')
+  proyectos.value = applyOrder(res.data.projects ?? [])
+  lastUpdated.value = new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
+  // Cargar gen-hoy y detalles en segundo plano
   cargarGenHoy()
-  const ids = proyectos.value.map(p => p.proyecto_id)
+  loadAllDetails(proyectos.value.map(p => p.proyecto_id))
+  return proyectos.value
+}
+
+async function loadAllDetails(ids) {
   const BATCH = 10
   for (let i = 0; i < ids.length; i += BATCH) {
     await Promise.all(ids.slice(i, i + BATCH).map(id => loadDetail(id)))
   }
 }
+
+// Sondeo centralizado: el auto-refresh es opt-in (lo gobierna el dropdown), por
+// eso autoStart/immediate van en false y la carga inicial se dispara en onMounted.
+const {
+  loading,
+  error,
+  refresh: cargar,
+  start: startPolling,
+  stop: stopPolling,
+  setInterval: setPollInterval,
+} = usePolling(fetchMonitoring, {
+  initialInterval: autoInterval.value || 300000,
+  onErrorIntervalMultiplier: 2,
+  maxInterval: 1800000,
+  autoStart: false,
+  immediate: false,
+})
 
 async function loadDetail(id) {
   try {
@@ -534,12 +558,15 @@ function fmtKw(kw) {
 
 
 onMounted(() => {
-  cargar()
-  if (autoInterval.value) refreshTimer = setInterval(cargar, autoInterval.value)
+  cargar()                       // carga inicial inmediata
+  if (autoInterval.value) {      // restaura el auto-refresh persistido
+    setPollInterval(autoInterval.value)
+    startPolling()
+  }
   document.addEventListener('click', onClickOutside)
 })
 onUnmounted(() => {
-  if (refreshTimer) clearInterval(refreshTimer)
+  // usePolling limpia su propio temporizador en su onUnmounted.
   document.removeEventListener('click', onClickOutside)
 })
 </script>
