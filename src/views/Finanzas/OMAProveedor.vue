@@ -153,26 +153,45 @@
       </div>
 
       <!-- Resultado división PDF -->
-      <div v-if="splitResult" class="mx-4 mb-3 rounded-lg border px-3 py-2.5 space-y-1.5"
+      <div v-if="splitResult" class="mx-4 mb-3 rounded-lg border px-3 py-2.5 space-y-2"
         :style="splitResult.sin_match?.length
           ? 'background:#fffbeb;border-color:#fcd34d40'
           : 'background:#f0fdf4;border-color:#bbf7d0'">
+
+        <!-- Error de sistema -->
+        <div v-if="splitResult.error" class="flex items-start gap-1.5">
+          <i class="pi pi-times-circle text-xs mt-0.5 flex-shrink-0" style="color:#dc2626"/>
+          <p class="text-xs text-red-700">Error al procesar el PDF: {{ splitResult.error }}</p>
+        </div>
+
+        <!-- Proyectos asociados -->
         <p class="text-xs font-semibold" style="color:#166534">
           <i class="pi pi-check-circle mr-1"/>
           {{ splitResult.procesados }} {{ splitResult.procesados === 1 ? 'proyecto asociado' : 'proyectos asociados' }} correctamente
         </p>
-        <div v-if="splitResult.sin_match?.length" class="space-y-0.5">
+
+        <!-- Páginas sin match -->
+        <div v-if="splitResult.sin_match?.length" class="space-y-1.5">
           <p class="text-xs font-semibold" style="color:#92400e">
             <i class="pi pi-exclamation-triangle mr-1"/>
-            {{ splitResult.sin_match.length }} {{ splitResult.sin_match.length === 1 ? 'página sin match' : 'páginas sin match' }}:
+            {{ splitResult.sin_match.length }} {{ splitResult.sin_match.length === 1 ? 'página sin identificar' : 'páginas sin identificar' }}:
           </p>
-          <p v-for="(item, i) in splitResult.sin_match" :key="i"
-            class="text-[10px] text-gray-500 pl-3 truncate"
-            :title="item.texto_extraido">
-            Pág. {{ item.pagina }}: {{ item.texto_extraido }}
-          </p>
+          <div v-for="(item, i) in splitResult.sin_match" :key="i"
+            class="pl-3 py-1 rounded" style="background:#fef3c740">
+            <p class="text-[10px] font-semibold text-amber-800">
+              Pág. {{ item.pagina }}
+              <span v-if="item.estrategia" class="font-normal text-gray-500"> — encontrado via {{ item.estrategia }}</span>
+            </p>
+            <p class="text-[10px] text-gray-600 mt-0.5">
+              <span class="font-medium">Razón:</span> {{ item.razon }}
+            </p>
+            <p v-if="item.muestra_texto" class="text-[10px] text-gray-500 mt-0.5 font-mono break-all">
+              "{{ item.muestra_texto }}"
+            </p>
+          </div>
         </div>
-        <button type="button" class="text-[10px] text-gray-400 hover:text-gray-600"
+
+        <button type="button" class="text-[10px] text-gray-400 hover:text-gray-600 mt-1"
           @click="splitResult = null">
           Cerrar
         </button>
