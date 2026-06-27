@@ -15,9 +15,34 @@ api.interceptors.request.use((config) => {
   return config
 })
 
+// ── Reintento con backoff exponencial para errores 5xx transitorios ──────────
+// Solo en GET (idempotente): un 502/503/504 suele ser un hiccup del gateway o
+// del backend reiniciando. Reintentamos hasta 3 veces con espera creciente
+// (~0.5s, 1s, 2s) antes de propagar el error. No aplica a POST/PUT/etc. para
+// evitar duplicar operaciones con efectos secundarios.
+const MAX_RETRIES = 3
+const RETRY_STATUSES = [502, 503, 504]
+
+function backoffDelay(attempt) {
+  // attempt empieza en 1 → 500ms, 1000ms, 2000ms (con jitter leve)
+  return Math.min(500 * 2 ** (attempt - 1), 4000) + Math.random() * 100
+}
+
 api.interceptors.response.use(
   (r) => r,
-  (err) => {
+  async (err) => {
+    const config = err.config
+    const status = err.response?.status
+    const method = (config?.method || 'get').toLowerCase()
+
+    if (config && method === 'get' && RETRY_STATUSES.includes(status)) {
+      config.__retryCount = (config.__retryCount || 0) + 1
+      if (config.__retryCount <= MAX_RETRIES) {
+        await new Promise((resolve) => setTimeout(resolve, backoffDelay(config.__retryCount)))
+        return api(config)
+      }
+    }
+
     if (err.response?.status === 401) {
       const token = localStorage.getItem('token')
       if (import.meta.env.DEV && token?.endsWith('.preview')) return Promise.reject(err)
