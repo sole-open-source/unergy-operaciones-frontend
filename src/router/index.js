@@ -42,6 +42,11 @@ const routes = [
   { path: '/solar-live',   name: 'SolarLive',   component: () => import('@/views/Solar/SolarLiveView.vue'),          meta: { roles: ['admin', 'operaciones', 'monitoreo'] } },
 
   // ── Alertas ──────────────────────────────────────────────────────
+  // Vista unificada (store + composable + componente reutilizable). Se agrega
+  // de forma aditiva: las vistas especializadas de abajo siguen vigentes porque
+  // ofrecen UX/acciones (resumen PPA, poll MGS, tabs de fallas) que el listado
+  // unificado no reemplaza. `type` selecciona el subconjunto inicial.
+  { path: '/alertas/unificadas',  name: 'AlertasUnificadas',  component: () => import('@/views/Alerts/UnifiedAlertsView.vue'), props: { type: 'all' }, meta: { roles: ['admin', 'operaciones', 'monitoreo'] } },
   { path: '/alertas',             name: 'Alertas',            component: () => import('@/views/Alertas/AlertasView.vue'),           meta: { roles: ['admin', 'operaciones', 'monitoreo'] } },
   { path: '/alertas/contratos-ppa', name: 'AlertasContratosPPA', component: () => import('@/views/Alertas/AlertasContratosPPAView.vue'), meta: { roles: ['admin', 'operaciones'] } },
   { path: '/alertas/monitoreo',   name: 'AlertasMonitoreo',   component: () => import('@/views/Alertas/AlertasMonitoreoView.vue'),  meta: { roles: ['admin', 'operaciones', 'monitoreo'] } },
