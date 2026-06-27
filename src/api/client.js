@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { shouldRetry, backoffDelay } from './retry'
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api/v1',
@@ -17,7 +18,19 @@ api.interceptors.request.use((config) => {
 
 api.interceptors.response.use(
   (r) => r,
-  (err) => {
+  async (err) => {
+    // Reintento con backoff para 5xx transitorios en peticiones idempotentes (GET).
+    const config = err.config
+    const status = err.response?.status
+    if (config) {
+      const nextAttempt = (config.__retryCount || 0) + 1
+      if (shouldRetry(config.method, status, nextAttempt)) {
+        config.__retryCount = nextAttempt
+        await new Promise((resolve) => setTimeout(resolve, backoffDelay(nextAttempt)))
+        return api(config)
+      }
+    }
+
     if (err.response?.status === 401) {
       const token = localStorage.getItem('token')
       if (import.meta.env.DEV && token?.endsWith('.preview')) return Promise.reject(err)
