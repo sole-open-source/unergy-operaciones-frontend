@@ -277,10 +277,12 @@ import ConfirmDialog from 'primevue/confirmdialog'
 import PPAContratoWizard from './PPAContratoWizard.vue'
 import ContratoServicioWizard from './ContratoServicioWizard.vue'
 import api from '@/api/client'
+import { useReferenceData } from '@/stores/referenceData'
 
 const router = useRouter()
 const toast = useToast()
 const confirm = useConfirm()
+const refData = useReferenceData()
 
 const SERVICIOS = [
   { key: 'ppa',           label: 'PPA',           icon: 'pi pi-bolt',      color: '#f59e0b', bg: '#fffbeb' },
@@ -489,8 +491,9 @@ async function cargar() {
 async function cargarPlantasRepresentacion() {
   loadingPlantas.value = true
   try {
-    const { data } = await api.get('/proyectos', { params: { servicio: 'representacion', size: 500 } })
-    plantasRepresentacion.value = data.items
+    // Lista semi-estática: se sirve de caché (TTL) vía referenceData; la lista
+    // dinámica de contratos PPA/servicio sigue yendo siempre a la red.
+    plantasRepresentacion.value = await refData.ensureRepresentacionPlantas()
   } catch (e) {
     toast.add({ severity: 'error', summary: 'Error al cargar plantas', detail: e.message, life: 3000 })
   } finally {

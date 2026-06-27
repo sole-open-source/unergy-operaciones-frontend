@@ -223,9 +223,18 @@ import InputIcon from 'primevue/inputicon'
 import { useToast } from 'primevue/usetoast'
 import api from '@/api/client'
 import ProyectoForm from './ProyectoForm.vue'
+import { useReferenceData } from '@/stores/referenceData'
 
 const router = useRouter()
 const toast  = useToast()
+const refData = useReferenceData()
+
+// Invalida las listas de apoyo de proyectos cacheadas (wizards, representación)
+// tras una mutación, para que el próximo consumidor reciba datos frescos.
+function invalidarCacheProyectos() {
+  refData.invalidate('proyectos')
+  refData.invalidate('representacionPlantas')
+}
 
 // ── Catálogos ──────────────────────────────────────────────────────────────────
 const ESTADOS       = ['en_desarrollo', 'en_operacion', 'suspendido', 'cancelado']
@@ -404,6 +413,7 @@ async function onCreate(payload) {
   try {
     await api.post('/proyectos', payload)
     toast.add({ severity: 'success', summary: 'Proyecto creado', life: 3000 })
+    invalidarCacheProyectos()
     dialogVisible.value = false
     load()
   } catch (e) {
@@ -416,6 +426,7 @@ async function doDelete() {
   try {
     await api.delete(`/proyectos/${deleteProyecto.value.id}`)
     toast.add({ severity: 'success', summary: 'Proyecto eliminado', life: 3000 })
+    invalidarCacheProyectos()
     deleteVisible.value = false
     load()
   } catch (e) {

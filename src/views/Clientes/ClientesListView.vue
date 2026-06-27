@@ -46,8 +46,10 @@ import InputIcon from 'primevue/inputicon'
 import { useToast } from 'primevue/usetoast'
 import api from '@/api/client'
 import ClienteForm from './ClienteForm.vue'
+import { useReferenceData } from '@/stores/referenceData'
 
 const toast = useToast()
+const refData = useReferenceData()
 const items = ref([])
 const total = ref(0)
 const page = ref(1)
@@ -103,6 +105,9 @@ async function onSave(payload) {
       await api.post('/clientes', payload)
       toast.add({ severity: 'success', summary: 'Cliente creado', life: 3000 })
     }
+    // El catálogo de clientes (lista de apoyo cacheada que consumen los
+    // wizards) quedó desactualizado: invalidamos para forzar re-fetch.
+    refData.invalidate('clientes')
     dialogVisible.value = false
     load()
   } catch (e) {

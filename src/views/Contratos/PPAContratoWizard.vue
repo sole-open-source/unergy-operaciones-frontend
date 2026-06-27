@@ -370,7 +370,10 @@ import DatePicker from 'primevue/datepicker'
 import Textarea from 'primevue/textarea'
 import NuevoClienteDialog from '@/components/NuevoClienteDialog.vue'
 import api from '@/api/client'
+import { useReferenceData } from '@/stores/referenceData'
 import * as XLSX from 'xlsx'
+
+const refData = useReferenceData()
 
 const props = defineProps({
   visible: Boolean,
@@ -462,6 +465,9 @@ function abrirNuevoCliente(rol) {
 
 function onClienteCreado(cliente) {
   todosClientes.value.push(cliente)
+  // El catálogo de clientes cambió: invalidamos la caché para que el próximo
+  // consumidor reciba la lista actualizada.
+  refData.invalidate('clientes')
   seleccionarCliente({ value: cliente.razon_social_nombre }, nuevoClienteRol.value)
 }
 
@@ -670,12 +676,14 @@ async function guardar() {
 
 onMounted(async () => {
   try {
-    const [{ data: proy }, { data: clientes }] = await Promise.all([
-      api.get('/proyectos', { params: { size: 500 } }),
-      api.get('/clientes', { params: { size: 500 } }),
+    // Listas de apoyo cacheadas (TTL) vía referenceData en vez de pedirlas
+    // a la red en cada apertura del wizard.
+    const [proy, clientes] = await Promise.all([
+      refData.ensureProyectos(),
+      refData.ensureClientes(),
     ])
-    todosProyectos.value = proy.items
-    todosClientes.value = clientes.items
+    todosProyectos.value = proy
+    todosClientes.value = clientes
   } catch { /* silencioso */ }
 })
 </script>

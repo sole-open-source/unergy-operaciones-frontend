@@ -294,6 +294,7 @@ import DatePicker from 'primevue/datepicker'
 import ToggleSwitch from 'primevue/toggleswitch'
 import Textarea from 'primevue/textarea'
 import NuevoClienteDialog from '@/components/NuevoClienteDialog.vue'
+import { useReferenceData } from '@/stores/referenceData'
 import api from '@/api/client'
 
 const props = defineProps({
@@ -303,6 +304,7 @@ const props = defineProps({
 })
 const emit = defineEmits(['update:visible', 'cerrar', 'creado'])
 
+const refData = useReferenceData()
 const toast = useToast()
 const step = ref(0)
 const guardando = ref(false)
@@ -415,6 +417,7 @@ function abrirNuevoCliente(rol) {
 
 function onClienteCreado(cliente) {
   todosClientes.value.push(cliente)
+  refData.invalidate('clientes') // el catálogo de clientes cambió
   seleccionarCliente({ value: cliente.razon_social_nombre }, nuevoClienteRol.value)
 }
 
@@ -470,9 +473,10 @@ async function guardar() {
 }
 
 onMounted(async () => {
-  const [{ data: proyectos }, { data: clientes }] = await Promise.all([
-    api.get('/proyectos', { params: { size: 500 } }),
-    api.get('/clientes', { params: { size: 500 } }),
+  // Listas de apoyo cacheadas (TTL) vía referenceData.
+  const [proyectos, clientes] = await Promise.all([
+    refData.ensureProyectos(),
+    refData.ensureClientes(),
   ])
   todosProyectos.value = proyectos
   todosClientes.value = clientes

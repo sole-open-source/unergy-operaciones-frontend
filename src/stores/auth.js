@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { cache } from '@/utils/cache'
 
 const BASE = import.meta.env.VITE_API_URL || ''
 
@@ -114,6 +115,8 @@ export const useAuthStore = defineStore('auth', () => {
     user.value  = null
     localStorage.removeItem('token')
     localStorage.removeItem('user')
+    // Limpiar datos de referencia cacheados para evitar fuga entre usuarios.
+    cache.invalidatePrefix('refdata:')
   }
 
   // Solo en desarrollo: simula login sin backend para preview de vistas
