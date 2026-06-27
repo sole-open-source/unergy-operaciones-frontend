@@ -120,13 +120,24 @@ export const useReferenceData = defineStore('referenceData', () => {
     return Promise.all(Object.keys(SETS).map((name) => _fetchCached(name, true)))
   }
 
+  /**
+   * Purga TODO: caché persistente (localStorage) Y estado en memoria.
+   * Necesario en logout — la navegación es SPA (router.push, sin recarga), así
+   * que sin resetear las refs el próximo usuario vería los datos del anterior
+   * vía el atajo de memoria de sesión de `_fetchCached` (`hasValue(state)`).
+   */
+  function resetAll() {
+    cache.invalidatePrefix('refdata:')
+    for (const name of Object.keys(SETS)) SETS[name].state.value = SETS[name].empty
+  }
+
   return {
     // estado
     fallasCatalogos, proyectos, clientes, usuarios, representacionPlantas,
     // acciones
     ensureFallasCatalogos, ensureProyectos, ensureClientes, ensureUsuarios,
     ensureRepresentacionPlantas,
-    invalidate, refreshAll,
+    invalidate, refreshAll, resetAll,
     // flags
     isLoadingFallasCatalogos, isLoadingProyectos, isLoadingClientes,
     isLoadingUsuarios, isLoadingRepresentacionPlantas,

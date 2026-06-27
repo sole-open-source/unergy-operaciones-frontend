@@ -60,8 +60,10 @@ import { useToast } from 'primevue/usetoast'
 import api from '@/api/client'
 import UsuarioForm from './UsuarioForm.vue'
 import ApiKeysDialog from './ApiKeysDialog.vue'
+import { useReferenceData } from '@/stores/referenceData'
 
 const toast = useToast()
+const refData = useReferenceData()
 const items = ref([])
 const loading = ref(false)
 const q = ref('')
@@ -141,6 +143,8 @@ async function onSave(payload) {
       await api.post('/usuarios', payload)
       toast.add({ severity: 'success', summary: 'Usuario creado', life: 3000 })
     }
+    // Lista de apoyo cacheada (asignación de fallas, etc.): invalidar tras mutar.
+    refData.invalidate('usuarios')
     dialogVisible.value = false
     load()
   } catch (e) {

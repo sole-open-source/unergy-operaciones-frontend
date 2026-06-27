@@ -449,9 +449,11 @@ import Textarea from 'primevue/textarea'
 import DatePicker from 'primevue/datepicker'
 import api from '@/api/client'
 import ClienteForm from './ClienteForm.vue'
+import { useReferenceData } from '@/stores/referenceData'
 
 const route = useRoute()
 const toast = useToast()
+const refData = useReferenceData()
 const cliente = ref(null)
 const activeTab = ref('info')
 const guardando = ref(false)
@@ -680,6 +682,8 @@ async function eliminarDocumento(doc) {
 
 async function saveInfo(payload) {
   await api.patch(`/clientes/${route.params.id}`, payload)
+  // El nombre del cliente alimenta los dropdowns cacheados de los wizards.
+  refData.invalidate('clientes')
   toast.add({ severity: 'success', summary: 'Información actualizada', life: 3000 })
   await cargar()
 }

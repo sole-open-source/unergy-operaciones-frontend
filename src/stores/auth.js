@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { cache } from '@/utils/cache'
+import { useReferenceData } from '@/stores/referenceData'
 
 const BASE = import.meta.env.VITE_API_URL || ''
 
@@ -115,8 +115,10 @@ export const useAuthStore = defineStore('auth', () => {
     user.value  = null
     localStorage.removeItem('token')
     localStorage.removeItem('user')
-    // Limpiar datos de referencia cacheados para evitar fuga entre usuarios.
-    cache.invalidatePrefix('refdata:')
+    // Purga datos de referencia (caché EN MEMORIA + localStorage) para evitar
+    // fuga entre usuarios: el logout es navegación SPA sin recarga, así que las
+    // refs del store sobreviven si no se resetean explícitamente.
+    useReferenceData().resetAll()
   }
 
   // Solo en desarrollo: simula login sin backend para preview de vistas

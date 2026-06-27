@@ -753,10 +753,12 @@ import { useToast } from 'primevue/usetoast'
 import * as XLSX from 'xlsx'
 import api from '@/api/client'
 import ContratoServicioWizard from '@/views/Contratos/ContratoServicioWizard.vue'
+import { useReferenceData } from '@/stores/referenceData'
 
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
+const refData = useReferenceData()
 
 // ── Constantes (sin hardcode en template) ────────────────────────────────────
 const ESTADOS = ['en_desarrollo', 'en_operacion', 'suspendido', 'cancelado']
@@ -1022,6 +1024,11 @@ async function saveEdit() {
       ...proyRes.data,
       inversionistas: Array.isArray(invRes.data) ? invRes.data : (invRes.data.items ?? []),
     }
+    // El nombre/estado del proyecto alimenta las listas de apoyo cacheadas que
+    // consumen los wizards y ContratosListView: invalidar para que no muestren
+    // datos viejos durante el TTL.
+    refData.invalidate('proyectos')
+    refData.invalidate('representacionPlantas')
     router.push({ query: {} })
     toast.add({ severity: 'success', summary: 'Proyecto actualizado', life: 3000 })
   } catch (e) {
@@ -1158,6 +1165,10 @@ async function toggleServicio(key, value) {
       ...proyRes.data,
       inversionistas: Array.isArray(invRes.data) ? invRes.data : (invRes.data.items ?? []),
     }
+    // El servicio 'representacion' decide la membresía de representacionPlantas;
+    // invalidar para que ContratosListView refleje el cambio sin esperar el TTL.
+    refData.invalidate('representacionPlantas')
+    refData.invalidate('proyectos')
     toast.add({ severity: 'success', summary: 'Servicio actualizado', life: 2000 })
   } catch {
     srvFlags[key] = !value
