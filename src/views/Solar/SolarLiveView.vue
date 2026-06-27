@@ -65,6 +65,15 @@
       <span>Cargando proyectos...</span>
     </div>
 
+    <!-- ══ ERROR (fuente caída, sin datos que mostrar) ══ -->
+    <!-- Sin esto, un fallo del primer fetch dejaba proyectos=[] y loading=false,
+         indistinguible de una flota vacía. usePolling sigue reintentando con
+         backoff; aquí lo hacemos visible para el monitor. -->
+    <div v-else-if="error && !proyectos.length" class="sl-empty">
+      <i class="pi pi-exclamation-triangle" style="font-size:32px;color:#e0a106" />
+      <p>No se pudo cargar el monitoreo. Reintentando…</p>
+    </div>
+
     <!-- ══ EMPTY ══ -->
     <div v-else-if="!loading && !proyectos.length" class="sl-empty">
       <i class="pi pi-sun" style="font-size:32px;color:#cbd5e1" />
