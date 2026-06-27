@@ -192,13 +192,20 @@ async function fetchNotifications() {
 }
 
 async function markAsRead(n) {
-  if (n.leida) return
-  try {
-    await api.patch(`/notificaciones/${n.id}/leer`)
-    n.leida = true
-    if (unreadCount.value > 0) unreadCount.value--
-  } catch {
-    // non-critical
+  if (!n.leida) {
+    try {
+      await api.patch(`/notificaciones/${n.id}/leer`)
+      n.leida = true
+      if (unreadCount.value > 0) unreadCount.value--
+    } catch {
+      // non-critical: igual navegamos al detalle si hay enlace
+    }
+  }
+  // Click-through: si la notificación trae un enlace interno, navegar a él
+  // (p. ej. /fallas/:id de una alerta crítica MGS) en vez de quedarse inerte.
+  if (n.link) {
+    showNotifications.value = false
+    router.push(n.link)
   }
 }
 

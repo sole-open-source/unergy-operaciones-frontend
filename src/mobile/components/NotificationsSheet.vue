@@ -36,7 +36,10 @@
 
 <script setup>
 import { ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import api from '@/api/client'
+
+const router = useRouter()
 
 const props = defineProps({ open: { type: Boolean, default: false } })
 const emit = defineEmits(['close', 'changed'])
@@ -57,12 +60,19 @@ async function cargar() {
 }
 
 async function leer(n) {
-  if (n.leida) return
-  try {
-    await api.patch(`/notificaciones/${n.id}/leer`)
-    n.leida = true
-    emit('changed')
-  } catch { /* ignore */ }
+  if (!n.leida) {
+    try {
+      await api.patch(`/notificaciones/${n.id}/leer`)
+      n.leida = true
+      emit('changed')
+    } catch { /* ignore: igual navegamos al detalle si hay enlace */ }
+  }
+  // Click-through: navegar al detalle enlazado (p. ej. /fallas/:id de una
+  // alerta crítica MGS) y cerrar la hoja, en vez de quedarse inerte.
+  if (n.link) {
+    close()
+    router.push(n.link)
+  }
 }
 
 async function marcarTodas() {
