@@ -753,10 +753,20 @@ import { useToast } from 'primevue/usetoast'
 import * as XLSX from 'xlsx'
 import api from '@/api/client'
 import ContratoServicioWizard from '@/views/Contratos/ContratoServicioWizard.vue'
+import { useReferenceData } from '@/stores/referenceData'
 
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
+const refData = useReferenceData()
+
+// Editar un proyecto desde el detalle puede cambiar su nombre o su servicio de
+// representación, que alimentan las listas de apoyo cacheadas (TTL) que consumen
+// los wizards. Invalidamos para que el próximo consumidor reciba datos frescos.
+function invalidarCacheProyectos() {
+  refData.invalidate('proyectos')
+  refData.invalidate('representacionPlantas')
+}
 
 // ── Constantes (sin hardcode en template) ────────────────────────────────────
 const ESTADOS = ['en_desarrollo', 'en_operacion', 'suspendido', 'cancelado']
@@ -1014,6 +1024,7 @@ async function saveEdit() {
       if (v !== null && v !== undefined && v !== '') itPayload[k] = v
     }
     if (Object.keys(itPayload).length) await api.put(`/proyectos/${route.params.id}/info-tecnica`, itPayload)
+    invalidarCacheProyectos()
     const [proyRes, invRes] = await Promise.all([
       api.get(`/proyectos/${route.params.id}`),
       api.get(`/proyectos/${route.params.id}/inversionistas`),
@@ -1150,6 +1161,7 @@ async function guardarEdicionInversionista(invId) {
 async function toggleServicio(key, value) {
   try {
     await api.patch(`/proyectos/${route.params.id}/servicios`, { [key]: value })
+    invalidarCacheProyectos()
     const [proyRes, invRes] = await Promise.all([
       api.get(`/proyectos/${route.params.id}`),
       api.get(`/proyectos/${route.params.id}/inversionistas`),
