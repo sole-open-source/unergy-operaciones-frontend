@@ -8,16 +8,19 @@
         optionLabel="label"
         optionValue="value"
         class="w-44 text-sm"
+        aria-label="Filtrar por tipo de alerta"
         @update:modelValue="updateFilter('type', $event)"
       />
-      <span class="p-input-icon-left flex-1 min-w-[200px]">
+      <IconField class="flex-1 min-w-[200px]">
+        <InputIcon class="pi pi-search" />
         <InputText
           :modelValue="currentFilters.search"
           placeholder="Buscar en alertas…"
           class="w-full text-sm"
+          aria-label="Buscar en alertas"
           @update:modelValue="updateFilter('search', $event)"
         />
-      </span>
+      </IconField>
       <label class="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
         <Checkbox
           :modelValue="currentFilters.onlyUnread"
@@ -27,6 +30,19 @@
         Solo sin atender
       </label>
       <Tag :value="`${unreadCount} sin atender`" severity="danger" class="text-xs" />
+    </div>
+
+    <!-- Aviso de degradación: alguna fuente no respondió → lista incompleta -->
+    <div
+      v-if="!loading && degradedSources.length"
+      class="flex items-center gap-2 rounded-lg px-3 py-2 text-xs"
+      style="background: rgba(234,88,12,0.08); color: #C2410C; border: 1px solid rgba(234,88,12,0.2);"
+    >
+      <i class="pi pi-exclamation-triangle" />
+      <span>
+        No se pudieron cargar
+        {{ degradedSources.map(typeLabel).join(', ') }} — la lista puede estar incompleta.
+      </span>
     </div>
 
     <!-- Estados -->
@@ -128,6 +144,8 @@ import { watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import Select from 'primevue/select'
 import InputText from 'primevue/inputtext'
+import IconField from 'primevue/iconfield'
+import InputIcon from 'primevue/inputicon'
 import Checkbox from 'primevue/checkbox'
 import Paginator from 'primevue/paginator'
 import DataTable from 'primevue/datatable'
@@ -148,6 +166,7 @@ const {
   error,
   unreadCount,
   filteredCount,
+  degradedSources,
   currentFilters,
   pagination,
   loadAlerts,

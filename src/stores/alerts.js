@@ -133,6 +133,10 @@ export const useAlertsStore = defineStore('alerts', () => {
   const error = ref(null)
   const filters = ref({ type: 'all', search: '', onlyUnread: false })
   const pagination = ref({ page: 1, pageSize: 10, total: 0 })
+  // Fuentes que fallaron en la última carga (cada leg se captura por separado
+  // para no tumbar el resto). Permite avisar al operador que la lista puede
+  // estar incompleta en vez de mostrar un falso "todo en orden".
+  const degradedSources = ref([])
 
   // ── Getters ─────────────────────────────────────────────────────────────────
   const getAlerts = computed(() => allAlerts.value)
@@ -177,20 +181,21 @@ export const useAlertsStore = defineStore('alerts', () => {
     const type = payload.type || 'all'
     loading.value = true
     error.value = null
+    const degraded = []
     try {
       const wants = (t) => type === 'all' || type === t
 
       const [mgsRes, ppaRes, fallasRes] = await Promise.all([
         wants('monitoreo')
-          ? api.get('/mgs/alarms').catch(() => ({ data: [] }))
+          ? api.get('/mgs/alarms').catch(() => { degraded.push('monitoreo'); return { data: [] } })
           : Promise.resolve(null),
         wants('ppa')
-          ? api.get('/alertas/contratos-ppa').catch(() => ({ data: {} }))
+          ? api.get('/alertas/contratos-ppa').catch(() => { degraded.push('ppa'); return { data: {} } })
           : Promise.resolve(null),
         wants('general')
           ? api
               .get('/fallas', { params: { size: 100, solo_alerta: false } })
-              .catch(() => ({ data: { items: [] } }))
+              .catch(() => { degraded.push('general'); return { data: { items: [] } } })
           : Promise.resolve(null),
       ])
 
@@ -205,11 +210,13 @@ export const useAlertsStore = defineStore('alerts', () => {
       allAlerts.value = collected
       pagination.value.total = collected.length
       pagination.value.page = 1
+      degradedSources.value = degraded
     } catch (e) {
       console.error('Error cargando alertas:', e)
       error.value = e?.message || 'No se pudieron cargar las alertas'
       allAlerts.value = []
       pagination.value.total = 0
+      degradedSources.value = degraded
     } finally {
       loading.value = false
     }
@@ -255,6 +262,7 @@ export const useAlertsStore = defineStore('alerts', () => {
     error,
     filters,
     pagination,
+    degradedSources,
     // getters
     getAlerts,
     getUnreadCount,

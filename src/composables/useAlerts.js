@@ -11,15 +11,29 @@ import { useAlertsStore } from '@/stores/alerts'
 
 export function useAlerts() {
   const store = useAlertsStore()
-  const { loading, error, filters, pagination } = storeToRefs(store)
+  // IMPORTANTE: en un setup store de Pinia, acceder a `store.<computed>`
+  // devuelve el VALOR desenvuelto en ese instante (no el ref), por lo que
+  // asignarlo a una propiedad lo congela en su valor inicial (lista vacía).
+  // `storeToRefs` también extrae los getters/computeds como refs reactivos.
+  const {
+    loading,
+    error,
+    filters,
+    pagination,
+    degradedSources,
+    getFilteredAndPaginatedAlerts,
+    getUnreadCount,
+    filteredCount,
+  } = storeToRefs(store)
 
   return {
     // ── Estado reactivo ──────────────────────────────────────────────────────
-    alerts: store.getFilteredAndPaginatedAlerts, // computed (ya reactivo)
+    alerts: getFilteredAndPaginatedAlerts,
     loading,
     error,
-    unreadCount: store.getUnreadCount,
-    filteredCount: store.filteredCount,
+    unreadCount: getUnreadCount,
+    filteredCount,
+    degradedSources,
     currentFilters: filters,
     pagination,
 
