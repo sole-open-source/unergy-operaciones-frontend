@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import api from '@/api/client'
+import { useReferenceData } from '@/stores/referenceData'
 
 // ── Fuente de datos ─────────────────────────────────────────────────────────
 // "Proyectos próximos a energizarse" vive 100% en la BD de operaciones. Un job
@@ -90,6 +91,11 @@ export function useEnergizationProjects() {
     try {
       await api.delete(`/proyectos/${projectId}`)
       projects.value = projects.value.filter(p => p.id !== projectId)
+      // El proyecto borrado seguía vivo en las listas de apoyo cacheadas (TTL)
+      // que consumen los wizards: invalidamos para que no lo sigan ofreciendo.
+      const refData = useReferenceData()
+      refData.invalidate('proyectos')
+      refData.invalidate('representacionPlantas')
     } catch (e) {
       console.error('Error al eliminar el proyecto', e)
     }
