@@ -1,6 +1,6 @@
 <template>
   <div class="space-y-5">
-    <PageHeader title="Centro de Alertas" subtitle="Alertas operacionales unificadas">
+    <PageHeader title="Listado Unificado de Alertas" subtitle="MGS, contratos PPA y fallas en una sola vista filtrable">
       <template #lead>
         <div class="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style="background: rgba(214,68,85,0.1);">
           <i class="pi pi-exclamation-circle text-sm" style="color: #D64455;" />

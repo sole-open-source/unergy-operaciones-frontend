@@ -312,6 +312,7 @@ const ALL_GROUPS = [
     label: 'Alertas',
     items: [
       { to: '/alertas', label: 'Centro de Alertas', icon: 'pi pi-exclamation-circle' },
+      { to: '/alertas/unificadas', label: 'Listado Unificado', icon: 'pi pi-list', roles: ['admin', 'operaciones', 'monitoreo'] },
     ],
   },
   {
