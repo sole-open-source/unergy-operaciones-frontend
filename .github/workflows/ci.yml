@@ -1,0 +1,39 @@
+name: CI
+
+# Valida que el codigo y las actualizaciones de dependencias (incluidas las que
+# proponga Renovate) no rompan el build ni la logica critica. Sirve como senal de
+# revision; el merge SIEMPRE lo decide una persona (no hay auto-merge).
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+# Evita ejecuciones duplicadas en pushes consecutivos a la misma rama/PR.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      # El repo no tiene runner (vitest/jest); este test nativo de Node cubre el
+      # motor de conciliacion de mandatos y aborta con codigo !=0 si algo se rompe.
+      - name: Run tests
+        run: node src/utils/conciliacionMandatos.test.mjs

@@ -1,0 +1,65 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":dependencyDashboard",
+    ":semanticCommits"
+  ],
+  "timezone": "America/Bogota",
+  "schedule": ["before 6am on monday"],
+  "labels": ["dependencies"],
+  "prConcurrentLimit": 10,
+  "rangeStrategy": "bump",
+  "packageRules": [
+    {
+      "description": "Politica del repositorio: NINGUNA actualizacion se auto-mergea. Todas las PR de dependencias (incluidas patch/minor) requieren revision humana, alineado con BUILDER_AUTODEPLOY=0 y 'el humano revisa'. Renovate abre la PR y deja el merge al equipo.",
+      "matchUpdateTypes": ["patch", "minor", "major"],
+      "automerge": false
+    },
+    {
+      "description": "Marcar las actualizaciones mayores para que reciban escrutinio extra en revision.",
+      "matchUpdateTypes": ["major"],
+      "addLabels": ["major-update"]
+    },
+    {
+      "description": "Agrupar el ecosistema Vue (vue, vue-router, vuedraggable, vue-chartjs, @vitejs/plugin-vue)",
+      "matchPackageNames": [
+        "vue",
+        "vue-router",
+        "vuedraggable",
+        "vue-chartjs",
+        "@vitejs/plugin-vue"
+      ],
+      "groupName": "vue ecosystem"
+    },
+    {
+      "description": "Agrupar paquetes de PrimeVue",
+      "matchPackageNames": ["primevue", "@primevue/themes", "primeicons"],
+      "groupName": "primevue ecosystem"
+    },
+    {
+      "description": "Agrupar paquetes relacionados con chart.js",
+      "matchPackageNames": ["chart.js", "vue-chartjs"],
+      "groupName": "chart.js"
+    },
+    {
+      "description": "Agrupar tooling de build (vite, postcss, tailwind, autoprefixer)",
+      "matchPackageNames": [
+        "vite",
+        "postcss",
+        "tailwindcss",
+        "autoprefixer"
+      ],
+      "groupName": "build tooling"
+    },
+    {
+      "description": "Mantener axios por separado para revisar los cambios del cliente HTTP de forma aislada",
+      "matchPackageNames": ["axios"],
+      "groupName": "axios"
+    }
+  ],
+  "vulnerabilityAlerts": {
+    "labels": ["security"],
+    "automerge": false
+  }
+}
