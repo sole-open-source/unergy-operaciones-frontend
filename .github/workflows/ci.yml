@@ -13,6 +13,10 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Solo lectura: este CI compila y prueba, no necesita escribir nada (least privilege).
+permissions:
+  contents: read
+
 jobs:
   build:
     name: Build & Test

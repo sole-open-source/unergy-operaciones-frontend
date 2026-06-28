@@ -22,12 +22,11 @@
       "addLabels": ["major-update"]
     },
     {
-      "description": "Agrupar el ecosistema Vue (vue, vue-router, vuedraggable, vue-chartjs, @vitejs/plugin-vue)",
+      "description": "Agrupar el ecosistema Vue (vue, vue-router, vuedraggable, @vitejs/plugin-vue). vue-chartjs se agrupa con chart.js mas abajo.",
       "matchPackageNames": [
         "vue",
         "vue-router",
         "vuedraggable",
-        "vue-chartjs",
         "@vitejs/plugin-vue"
       ],
       "groupName": "vue ecosystem"
