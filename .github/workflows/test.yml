@@ -1,0 +1,21 @@
+name: test
+
+# Ejecuta la suite de utilidades financieras (node:test, sin dependencias
+# externas) en cada PR y push a master, para que las pruebas de
+# conciliacionMandatos/liquidaciones realmente bloqueen regresiones.
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm test
