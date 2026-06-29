@@ -926,6 +926,19 @@
             <Checkbox v-model="matrizSoloNoCumple" :binary="true" /> Solo no cumple
           </label>
           <InputText v-model="matrizBusqueda" placeholder="Buscar contrato…" class="text-sm" />
+          <MultiSelect v-model="matrizContratosSel" :options="matrizContratoOpts" optionLabel="label" optionValue="value"
+                       filter :showToggleAll="false" placeholder="Todos los contratos"
+                       :maxSelectedLabels="2" selectedItemsLabel="{0} contratos" class="text-sm" style="min-width:13rem;">
+            <template #option="{ option }">
+              <div class="flex flex-col leading-tight">
+                <span>{{ option.label }}</span>
+                <span v-if="option.offtaker" class="text-xs" style="color:#7a6e8a;">{{ option.offtaker }}</span>
+              </div>
+            </template>
+          </MultiSelect>
+          <MultiSelect v-model="matrizOfftakersSel" :options="matrizOfftakerOpts"
+                       filter :showToggleAll="false" placeholder="Todos los offtakers"
+                       :maxSelectedLabels="2" selectedItemsLabel="{0} offtakers" class="text-sm" style="min-width:12rem;" />
         </div>
         <div class="flex items-center gap-2">
           <span v-if="matrizFilasCargando" class="text-xs" style="color:#7a6e8a;">Cargando contratos…</span>
@@ -1188,6 +1201,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { proyectoActivoEnMes } from '@/utils/proyectoActivo'
 import Select from 'primevue/select'
+import MultiSelect from 'primevue/multiselect'
 import InputText from 'primevue/inputtext'
 import Checkbox from 'primevue/checkbox'
 import Button from 'primevue/button'
@@ -1529,6 +1543,8 @@ const anualMatrizYear    = ref(now.getFullYear())
 const expandedMatriz     = ref([])
 const matrizSoloNoCumple = ref(false)
 const matrizBusqueda     = ref('')
+const matrizContratosSel = ref([])   // ids de contratos elegidos (vacío = todos)
+const matrizOfftakersSel = ref([])   // nombres de offtaker elegidos (vacío = todos)
 
 // Carga progresiva: primero la lista de contratos (instantánea, sin generación) para pintar la
 // tabla, y luego el detalle de cada contrato en peticiones independientes con concurrencia limitada.
@@ -1537,6 +1553,8 @@ async function loadAnualMatriz() {
   anualMatrizLoading.value = true
   anualMatrizError.value = ''
   expandedMatriz.value = []
+  matrizContratosSel.value = []
+  matrizOfftakersSel.value = []
   const year = anualMatrizYear.value
   try {
     const { data } = await client.get('/cumplimiento/anual-matriz/contratos', { params: { year } })
@@ -1643,11 +1661,31 @@ async function exportarMatrizExcel() {
   XLSX.writeFile(wb, `matriz_anual_cumplimiento_${anualMatrizYear.value}.xlsx`)
 }
 
+// Opciones de los dropdowns: se construyen de los contratos ya cargados, así
+// aparecen apenas llega la lista (antes de que termine el detalle de cada fila).
+const matrizContratoOpts = computed(() =>
+  (anualMatrizData.value?.contratos || []).map(c => ({
+    value: c.id,
+    label: c.nombre_interno || c.numero_codigo_contrato || ('#' + c.id),
+    offtaker: c.comprador_nombre || '',
+  }))
+)
+const matrizOfftakerOpts = computed(() => {
+  const set = new Set()
+  for (const c of anualMatrizData.value?.contratos || [])
+    if (c.comprador_nombre) set.add(c.comprador_nombre)
+  return [...set].sort((a, b) => a.localeCompare(b, 'es'))
+})
+
 const matrizFiltrada = computed(() => {
   const cs = anualMatrizData.value?.contratos || []
   const q = matrizBusqueda.value.trim().toLowerCase()
+  const cSel = matrizContratosSel.value
+  const oSel = matrizOfftakersSel.value
   return cs.filter(c =>
     (!matrizSoloNoCumple.value || c.estado_cumplimiento === 'no_cumple') &&
+    (!cSel.length || cSel.includes(c.id)) &&
+    (!oSel.length || oSel.includes(c.comprador_nombre)) &&
     (!q || (c.nombre_interno || c.numero_codigo_contrato || '').toLowerCase().includes(q)
         || (c.comprador_nombre || '').toLowerCase().includes(q))
   )
