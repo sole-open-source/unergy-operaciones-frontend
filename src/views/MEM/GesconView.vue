@@ -2,6 +2,10 @@
   <div class="space-y-4">
     <PageHeader title="GESCON — Contratos ASIC" :subtitle="`${total} registros`">
       <template #actions>
+        <Button label="Completar nombres internos" icon="pi pi-wand-magic-sparkles" size="small" outlined
+          @click="previewBackfill" :loading="backfillLoading"
+          v-tooltip.bottom="'Rellena el nombre interno de los registros que lo tengan vacío, tomándolo del contrato PPA'"
+          style="color:#6b5a8a; border-color:#d8cfe8;" />
         <Button label="Descargar Excel" icon="pi pi-file-excel" size="small" outlined
           @click="descargarGesconExcel" :loading="exportando"
           style="color:#915BD8; border-color:#915BD8;" />
@@ -215,6 +219,23 @@
         <!-- ── Campos completos (registro / modificación / desistimiento) ── -->
         <template v-if="!esTerminacion">
 
+        <!-- Selector de contrato: al elegir, llena código interno + nombre interno de una vez -->
+        <div class="flex flex-col gap-1">
+          <label class="text-xs font-medium" style="color:#6b5a8a;">
+            Contrato <span style="color:#9b89b5;">— elígelo y se llenan código + nombre interno</span>
+          </label>
+          <Select v-model="form.contrato_ppa_id" :options="contratos" optionValue="id" optionLabel="_label"
+            filter showClear placeholder="Buscar contrato por código o nombre…" class="w-full"
+            @change="onSelectContrato">
+            <template #option="{ option }">
+              <div class="flex flex-col leading-tight py-0.5">
+                <span class="font-medium" style="color:#2C2039;">{{ option.numero_codigo_contrato || '(sin código)' }}</span>
+                <span class="text-xs" style="color:#6b5a8a;">{{ option.nombre_interno || '(sin nombre interno)' }}</span>
+              </div>
+            </template>
+          </Select>
+        </div>
+
         <!-- Fila 2: SIC Contrato + Contrato interno + Nombre interno -->
         <div class="grid grid-cols-3 gap-4">
           <div class="flex flex-col gap-1">
@@ -347,6 +368,46 @@
             style="background:#915BD8; border-color:#915BD8;" />
         </div>
       </form>
+    </Dialog>
+
+    <!-- Diálogo: completar nombres internos faltantes (backfill) -->
+    <Dialog v-model:visible="backfillDialog" modal header="Completar nombres internos" :style="{ width: '46rem' }">
+      <div v-if="backfillReport" class="space-y-3 text-sm">
+        <p style="color:#5a5168;">
+          Se rellenará el <b>nombre interno</b> de los registros que lo tengan vacío, tomándolo del
+          contrato PPA correspondiente. No se inventan nombres: los que no tengan un PPA con nombre se
+          listan sin tocar.
+        </p>
+        <div class="flex gap-6">
+          <span><b>{{ backfillReport.a_actualizar }}</b> se completarán</span>
+          <span style="color:#9a6700;"><b>{{ backfillReport.sin_resolver }}</b> sin resolver</span>
+          <span style="color:#7a6e8a;">{{ backfillReport.total_sin_nombre }} sin nombre en total</span>
+        </div>
+        <div v-if="backfillReport.resueltos.length" class="max-h-60 overflow-y-auto border rounded-lg" style="border-color:#eee;">
+          <table class="w-full text-xs border-collapse">
+            <thead><tr style="background:#faf8fd;"><th class="text-left p-1.5">Contrato</th><th class="text-left p-1.5">Nombre interno a aplicar</th></tr></thead>
+            <tbody>
+              <tr v-for="r in backfillReport.resueltos" :key="r.id" class="border-t" style="border-color:#f0f0f0;">
+                <td class="p-1.5 font-mono">{{ r.contrato_interno || '—' }}</td>
+                <td class="p-1.5">{{ r.nombre_propuesto }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <details v-if="backfillReport.no_resueltos.length" class="text-xs">
+          <summary class="cursor-pointer" style="color:#9a6700;">{{ backfillReport.no_resueltos.length }} sin resolver (ver)</summary>
+          <ul class="mt-1 pl-4 list-disc" style="color:#7a6e8a;">
+            <li v-for="r in backfillReport.no_resueltos" :key="r.id">{{ r.contrato_interno || ('ID ' + r.id) }} — {{ r.motivo }}</li>
+          </ul>
+        </details>
+        <p v-if="!backfillReport.a_actualizar" class="text-xs" style="color:#7a6e8a;">No hay nada para completar.</p>
+      </div>
+      <template #footer>
+        <Button label="Cancelar" text @click="backfillDialog = false" :disabled="backfillExecuting" />
+        <Button label="Aplicar" icon="pi pi-check" :loading="backfillExecuting"
+          :disabled="!backfillReport || !backfillReport.a_actualizar" @click="applyBackfill"
+          style="background:#915BD8; border-color:#915BD8;" />
+      </template>
     </Dialog>
   </div>
 </template>
@@ -589,6 +650,28 @@ async function cargarProyectos() {
   } catch { /* silencioso */ }
 }
 
+// ── Contratos PPA (fuente del selector que llena código + nombre interno) ──
+const contratos = ref([])
+async function cargarContratos() {
+  try {
+    const { data } = await api.get('/ppa')
+    const items = Array.isArray(data) ? data : (data.items ?? [])
+    contratos.value = items.map(c => ({
+      ...c,
+      // _label = "código — nombre" pegados, para la búsqueda y la vista cerrada del Select
+      _label: `${c.numero_codigo_contrato || '(sin código)'} — ${c.nombre_interno || '(sin nombre)'}`,
+    }))
+  } catch { /* silencioso */ }
+}
+
+// Al elegir un contrato, llena ambos campos (código interno + nombre interno) de una vez.
+function onSelectContrato() {
+  const c = contratos.value.find(x => x.id === form.value.contrato_ppa_id)
+  if (!c) return  // showClear -> no borra lo ya escrito
+  if (c.numero_codigo_contrato) form.value.contrato_interno = c.numero_codigo_contrato
+  if (c.nombre_interno) form.value.nombre_interno = c.nombre_interno
+}
+
 // ── Formulario ────────────────────────────────────────────────────
 const dialogVisible = ref(false)
 const guardando = ref(false)
@@ -601,6 +684,7 @@ const FORM_INICIAL = () => ({
   codigo_sic_contrato: '',
   contrato_interno: '',
   nombre_interno: '',
+  contrato_ppa_id: null,
   codigo_sic_vendedor: 'UNGG',
   codigo_sic_comprador: '',
   cedula_agente_vendedor: '',
@@ -654,6 +738,7 @@ function abrirEditar(row) {
     codigo_sic_contrato: row.codigo_sic_contrato || '',
     contrato_interno: row.contrato_interno || '',
     nombre_interno: row.nombre_interno || '',
+    contrato_ppa_id: row.contrato_ppa_id ?? null,
     codigo_sic_vendedor: row.codigo_sic_vendedor || '',
     codigo_sic_comprador: row.codigo_sic_comprador || '',
     cedula_agente_vendedor: row.cedula_agente_vendedor || '',
@@ -795,5 +880,42 @@ const ESTADO_SEV = { publicado: 'success', en_proceso: 'info', rechazado: 'dange
 function estadoLabel(v) { return ESTADO_LABELS[v] || v }
 function estadoSeverity(v) { return ESTADO_SEV[v] || 'secondary' }
 
-onMounted(() => { cargar(); cargarProyectos() })
+// ── Backfill de nombres internos faltantes ─────────────────────────
+const backfillDialog    = ref(false)
+const backfillReport    = ref(null)
+const backfillLoading   = ref(false)
+const backfillExecuting = ref(false)
+
+async function previewBackfill() {
+  backfillLoading.value = true
+  try {
+    const { data } = await api.post('/asic/backfill-nombre-interno', null, { params: { dry_run: true } })
+    backfillReport.value = data
+    backfillDialog.value = true
+  } catch (e) {
+    toast.add({ severity: 'error', summary: 'No se pudo previsualizar',
+      detail: e.response?.data?.detail || e.message, life: 5000 })
+  } finally {
+    backfillLoading.value = false
+  }
+}
+
+async function applyBackfill() {
+  backfillExecuting.value = true
+  try {
+    const { data } = await api.post('/asic/backfill-nombre-interno', null, { params: { dry_run: false } })
+    toast.add({ severity: 'success', summary: 'Nombres internos completados',
+      detail: `${data.a_actualizar} registro(s) actualizados.`, life: 4000 })
+    backfillDialog.value = false
+    backfillReport.value = null
+    await cargar()  // recarga la tabla ya con los nombres completos
+  } catch (e) {
+    toast.add({ severity: 'error', summary: 'El backfill falló (se revirtió)',
+      detail: e.response?.data?.detail || e.message, life: 7000 })
+  } finally {
+    backfillExecuting.value = false
+  }
+}
+
+onMounted(() => { cargar(); cargarProyectos(); cargarContratos() })
 </script>
