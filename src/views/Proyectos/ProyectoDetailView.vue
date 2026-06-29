@@ -717,6 +717,75 @@
         </div>
       </TabPanel>
     </TabView>
+
+    <!-- ═══ Fusionar proyecto duplicado (solo en modo edición) ═══ -->
+    <div v-if="isEditMode" class="mt-6 rounded-xl border p-4" style="border-color:#f0d4d4; background:#fdf7f7;">
+      <h4 class="text-sm font-semibold mb-1" style="color:#9a2a2a;">
+        <i class="pi pi-exclamation-triangle mr-1.5" />Fusionar proyecto duplicado
+      </h4>
+      <p class="text-xs mb-3" style="color:#7a6e8a; max-width:46rem;">
+        Mueve TODO (servicios, fallas, generación, contratos, liquidaciones, etc.) de otro proyecto
+        duplicado hacia <b>este</b> proyecto y borra el otro de forma permanente. En caso de choque
+        (mismo período/fecha) se conserva el dato de este proyecto. Nada se modifica hasta que
+        previsualices y confirmes.
+      </p>
+      <div class="flex items-center gap-2 flex-wrap">
+        <AutoComplete v-model="mergeLoser" :suggestions="mergeSuggestions" @complete="searchMergeProyectos"
+                      optionLabel="nombre_comercial" placeholder="Buscar el proyecto duplicado a absorber…"
+                      class="text-sm" :inputStyle="{ minWidth: '24rem' }" forceSelection dropdown>
+          <template #option="{ option }">
+            <div class="flex flex-col leading-tight">
+              <span>{{ option.nombre_comercial }}</span>
+              <span class="text-xs" style="color:#7a6e8a;">ID {{ option.id }}<span v-if="option.sub_project"> · API: {{ option.sub_project }}</span></span>
+            </div>
+          </template>
+        </AutoComplete>
+        <Button label="Previsualizar fusión" icon="pi pi-search" size="small" outlined
+                :loading="mergeLoading" :disabled="!mergeLoser?.id" @click="previewMerge" />
+      </div>
+    </div>
+
+    <!-- Diálogo de previsualización / confirmación de fusión -->
+    <Dialog v-model:visible="showMergeDialog" modal header="Previsualización de fusión" :style="{ width: '48rem' }">
+      <div v-if="mergeReport" class="space-y-3 text-sm">
+        <div class="rounded-lg p-3" style="background:#f6f2fb;">
+          <div><b>Conservar (ganador):</b> {{ mergeReport.ganador.nombre }}
+            <span class="text-xs" style="color:#7a6e8a;">ID {{ mergeReport.ganador.id }}</span></div>
+          <div style="color:#9a2a2a;"><b>Borrar (perdedor):</b> {{ mergeReport.perdedor.nombre }}
+            <span class="text-xs">ID {{ mergeReport.perdedor.id }}</span></div>
+        </div>
+        <div class="flex gap-6">
+          <span><b>{{ mergeReport.total_filas_a_mover }}</b> filas se mueven al ganador</span>
+          <span style="color:#9a2a2a;"><b>{{ mergeReport.total_filas_descartadas }}</b> se descartan por colisión</span>
+        </div>
+        <table v-if="mergeReport.movimientos.length" class="w-full text-xs border-collapse">
+          <thead>
+            <tr style="background:#faf8fd;">
+              <th class="text-left p-1.5">Tabla</th>
+              <th class="text-right p-1.5">Se mueven</th>
+              <th class="text-right p-1.5">Descartadas</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="m in mergeReport.movimientos" :key="m.tabla" class="border-t" style="border-color:#eee;">
+              <td class="p-1.5 font-mono">{{ m.tabla }}</td>
+              <td class="p-1.5 text-right">{{ m.a_mover }}</td>
+              <td class="p-1.5 text-right" :style="m.descartadas_por_colision ? 'color:#9a2a2a; font-weight:600;' : 'color:#c9c0d8;'">{{ m.descartadas_por_colision }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <p v-else class="text-xs" style="color:#7a6e8a;">El proyecto perdedor no tiene registros hijos; solo se borrará.</p>
+        <div v-if="mergeReport.campos_copiados_al_ganador.length" class="rounded-lg p-2 text-xs" style="background:#f0faf4; color:#1d6b3f;">
+          Se copiarán al ganador (estaban vacíos):
+          <span v-for="c in mergeReport.campos_copiados_al_ganador" :key="c.campo" class="font-mono ml-1">{{ c.campo }}={{ c.valor }}</span>
+        </div>
+      </div>
+      <template #footer>
+        <Button label="Cancelar" text @click="showMergeDialog = false" :disabled="mergeExecuting" />
+        <Button label="Ejecutar fusión (borra el perdedor)" icon="pi pi-exclamation-triangle" severity="danger"
+                :loading="mergeExecuting" @click="executeMerge" />
+      </template>
+    </Dialog>
   </div>
 
   <div v-else-if="loading" class="flex justify-center py-20">
@@ -749,6 +818,8 @@ import InputNumber from 'primevue/inputnumber'
 import DatePicker from 'primevue/datepicker'
 import Checkbox from 'primevue/checkbox'
 import Divider from 'primevue/divider'
+import Dialog from 'primevue/dialog'
+import AutoComplete from 'primevue/autocomplete'
 import { useToast } from 'primevue/usetoast'
 import * as XLSX from 'xlsx'
 import api from '@/api/client'
@@ -1033,6 +1104,65 @@ async function saveEdit() {
     })
   } finally {
     guardando.value = false
+  }
+}
+
+// ── Fusión de proyectos duplicados ─────────────────────────────────────────────
+const mergeLoser       = ref(null)
+const mergeSuggestions = ref([])
+const mergeReport      = ref(null)
+const mergeLoading     = ref(false)
+const mergeExecuting   = ref(false)
+const showMergeDialog  = ref(false)
+
+async function searchMergeProyectos(e) {
+  try {
+    const { data } = await api.get('/proyectos', { params: { q: e.query || '', size: 20 } })
+    const items = Array.isArray(data) ? data : (data.items || [])
+    mergeSuggestions.value = items.filter(p => String(p.id) !== String(route.params.id))
+  } catch {
+    mergeSuggestions.value = []
+  }
+}
+
+async function previewMerge() {
+  if (!mergeLoser.value?.id) return
+  mergeLoading.value = true
+  try {
+    const { data } = await api.post(
+      `/proyectos/${route.params.id}/merge/${mergeLoser.value.id}`, null,
+      { params: { dry_run: true } },
+    )
+    mergeReport.value = data
+    showMergeDialog.value = true
+  } catch (e) {
+    toast.add({ severity: 'error', summary: 'No se pudo previsualizar la fusión',
+      detail: e.response?.data?.detail || e.message, life: 5000 })
+  } finally {
+    mergeLoading.value = false
+  }
+}
+
+async function executeMerge() {
+  if (!mergeReport.value || !mergeLoser.value?.id) return
+  mergeExecuting.value = true
+  try {
+    await api.post(
+      `/proyectos/${route.params.id}/merge/${mergeLoser.value.id}`, null,
+      { params: { dry_run: false } },
+    )
+    toast.add({ severity: 'success', summary: 'Fusión completada',
+      detail: `Se absorbió "${mergeReport.value.perdedor.nombre}" y se eliminó.`, life: 4000 })
+    showMergeDialog.value = false
+    mergeLoser.value = null
+    mergeReport.value = null
+    router.push({ query: {} })
+    setTimeout(() => router.go(0), 400)  // recarga el ganador ya con todo migrado
+  } catch (e) {
+    toast.add({ severity: 'error', summary: 'La fusión falló (se revirtió)',
+      detail: e.response?.data?.detail || e.message, life: 8000 })
+  } finally {
+    mergeExecuting.value = false
   }
 }
 
