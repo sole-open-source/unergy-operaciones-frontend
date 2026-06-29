@@ -1025,7 +1025,12 @@ async function saveEdit() {
     router.push({ query: {} })
     toast.add({ severity: 'success', summary: 'Proyecto actualizado', life: 3000 })
   } catch (e) {
-    toast.add({ severity: 'error', summary: 'Error', detail: e.response?.data?.detail, life: 4000 })
+    toast.add({
+      severity: 'error',
+      summary: 'Error al guardar',
+      detail: e.response?.data?.detail || e.message || 'No se pudo actualizar el proyecto.',
+      life: 5000,
+    })
   } finally {
     guardando.value = false
   }
