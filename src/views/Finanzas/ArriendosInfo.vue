@@ -151,7 +151,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import Button from 'primevue/button'
-import arriendosRaw from '@/data/pagoarriendos.json'
+import api from '@/api/client'
 
 // ── Storage ────────────────────────────────────────────────────────────────────
 const INFO_KEY  = 'arriendos_info'
@@ -185,9 +185,40 @@ function persistirInfo() {
 // ── Filas ──────────────────────────────────────────────────────────────────────
 const filas = ref([])
 
+// Proyectos de arriendo, traídos del backend (antes en src/data/pagoarriendos.json,
+// que exponía valores financieros sensibles en el bundle del cliente). Se mapean a la
+// misma forma { Codigo, Proyecto } que consumía esta vista, para no romper la lógica
+// de ids ni la información guardada en localStorage.
+// Nota: el id de cada fila es `Codigo || Proyecto`. Renombrar un proyecto sin código
+// (vía PUT /arriendos/proyectos) cambiaría su id y dejaría huérfana su info en
+// localStorage. Las filas con código son estables ante renombres.
+const proyectos = ref([])
+
+async function cargarProyectos() {
+  try {
+    const { data } = await api.get('/arriendos/proyectos')
+    proyectos.value = (Array.isArray(data) ? data : []).map(p => ({
+      Codigo:   p.codigo ?? null,
+      Proyecto: p.nombre,
+    }))
+  } catch (err) {
+    console.error('Error cargando proyectos de arriendo:', err)
+    proyectos.value = []
+    // Señal visible para que una caída del backend no se confunda con "sin proyectos".
+    if (typeof window.__primeToast === 'function') {
+      window.__primeToast({
+        severity: 'warn',
+        summary: 'No se pudieron cargar los proyectos',
+        detail: 'Revisa tu conexión y recarga la página. Las filas manuales siguen disponibles.',
+        life: 5000,
+      })
+    }
+  }
+}
+
 function construirFilas() {
-  // 1. Proyectos del JSON
-  const fuente = [...arriendosRaw]
+  // 1. Proyectos del backend
+  const fuente = [...proyectos.value]
 
   // 2. Proyectos extras (agregados manualmente en el panel)
   try {
@@ -319,7 +350,11 @@ function proximaFechaStyle(iso) {
   return 'color:#2C2039'
 }
 
-onMounted(() => { cargarInfo(); construirFilas() })
+onMounted(async () => {
+  cargarInfo()
+  await cargarProyectos()
+  construirFilas()
+})
 </script>
 
 <style scoped>
