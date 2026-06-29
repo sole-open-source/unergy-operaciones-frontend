@@ -687,6 +687,10 @@
            : pcMode === 'compra' ? 'Plantas que Unergy compra energía'
            : 'Plantas sin asignación GESCON este mes (van a bolsa)' }}
         </span>
+        <Button label="Exportar resumen (Excel)" icon="pi pi-file-excel" size="small" outlined class="ml-auto"
+          :disabled="!pcData || pcLoading" @click="exportarResumenPlantasContratos"
+          v-tooltip.bottom="'Contratos con sus plantas (venta + compra) y, al final, plantas sin contrato o en bolsa con UNGC'"
+          style="color:#915BD8; border-color:#915BD8;" />
       </div>
 
       <div v-if="pcLoading" class="flex flex-col items-center justify-center py-20 gap-3">
@@ -1408,6 +1412,58 @@ const pcBolsaLibre = computed(() => {
   if (Array.isArray(d.bolsa_libre)) return d.bolsa_libre
   return (d.bolsa || []).filter(p => p.piscina !== 'comercializador')
 })
+
+// Exporta un resumen plano y filtrable: cada contrato (venta + compra) con sus plantas,
+// y al final las plantas SIN contrato (libre) o en bolsa con el comercializador UNGC.
+async function exportarResumenPlantasContratos() {
+  if (!pcData.value) return
+  const XLSX = await import('xlsx-js-style')
+  const mes = MESES[pcMonth.value - 1]
+  const pct = v => (v != null ? Number((v * 100).toFixed(0)) : '')
+
+  const aoa = [[`UNERGY — Resumen contratos y plantas · ${mes} ${pcYear.value}`], []]
+  const header = ['Categoría', 'Contrato', 'Contraparte', 'Planta', 'SIC', '% Despacho', 'Inicio', 'Fin', 'Nota']
+  const headerRow = aoa.length
+  aoa.push(header)
+
+  for (const c of (pcData.value.venta || [])) {
+    if (c.plantas.length) {
+      for (const p of c.plantas)
+        aoa.push(['Venta', c.nombre, c.comprador_nombre || '', p.nombre, p.codigo_sic || '',
+          pct(p.pct_despacho), p.fecha_inicio || '', p.fecha_fin || '', p.es_duplicado ? 'Compra bolsa' : ''])
+    } else {
+      aoa.push(['Venta', c.nombre, c.comprador_nombre || '', '(sin plantas en GESCON)', '', '', '', '', ''])
+    }
+  }
+  for (const c of (pcData.value.compra || [])) {
+    if (c.plantas.length) {
+      for (const p of c.plantas)
+        aoa.push(['Compra', c.nombre, c.vendedor_nombre || '', p.nombre, '', '', p.fecha_inicio || '', p.fecha_fin || '', ''])
+    } else {
+      aoa.push(['Compra', c.nombre, c.vendedor_nombre || '', '(sin plantas)', '', '', '', '', ''])
+    }
+  }
+  for (const p of pcBolsaComercializador.value)
+    aoa.push(['Bolsa UNGC', '', 'UNGC (comercializador)', p.nombre, p.codigo_sic || '', '', '', '', 'En contrato con UNGC'])
+  for (const p of pcBolsaLibre.value)
+    aoa.push(['Sin contrato', '', '', p.nombre, '', '', '', '', 'Sin SIC vigente'])
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa)
+  const C = { morado: '915BD8', oscuro: '2C2039', blanco: 'FFFFFF' }
+  for (let c = 0; c < header.length; c++) {
+    const ref = XLSX.utils.encode_cell({ r: headerRow, c })
+    if (!ws[ref]) ws[ref] = { t: 's', v: '' }
+    ws[ref].s = { font: { bold: true, color: { rgb: C.blanco } }, fill: { fgColor: { rgb: C.morado } }, alignment: { horizontal: 'center' } }
+  }
+  const titleRef = XLSX.utils.encode_cell({ r: 0, c: 0 })
+  if (ws[titleRef]) ws[titleRef].s = { font: { bold: true, sz: 14, color: { rgb: C.oscuro } } }
+  ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: header.length - 1 } }]
+  ws['!cols'] = [{ wch: 14 }, { wch: 28 }, { wch: 24 }, { wch: 32 }, { wch: 10 }, { wch: 11 }, { wch: 12 }, { wch: 12 }, { wch: 16 }]
+  ws['!autofilter'] = { ref: `A${headerRow + 1}:I${aoa.length}` }
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, `Resumen ${mes} ${pcYear.value}`.slice(0, 31))
+  XLSX.writeFile(wb, `resumen_contratos_plantas_${pcYear.value}_${String(pcMonth.value).padStart(2, '0')}.xlsx`)
+}
 
 // ── Energía transada state ────────────────────────────────────────────────────
 // Histórico por mes en localStorage: los meses cerrados son inmutables y se
