@@ -166,9 +166,9 @@ import { useToast } from 'primevue/usetoast'
 import DropZone from '../DropZone.vue'
 import HojaMadreView from '../HojaMadreView.vue'
 import FacturasDescuento from '../FacturasDescuento.vue'
-import { parseFacturas, viernesDeEstaSemana } from '../composables/useFacturasPDF.js'
-import { parseSemanales } from '../composables/useGarantiasParser.js'
+import { viernesDeEstaSemana } from '../composables/useFacturasPDF.js'
 import { useGarantiasHistorial } from '../composables/useGarantiasHistorial.js'
+import workerService from '@/utils/workers/workerService'
 import { fmtCOP, fmtISODate } from '../utils/formatters.js'
 import { exportHojaMadreExcel } from '../utils/excelExport.js'
 
@@ -272,14 +272,18 @@ async function procesar() {
   loading.value = true
   parseErrors.value = []
   try {
-    const res = await parseSemanales(files.value.garantia, files.value.saldo, files.value.web)
+    const res = await workerService.postMessage('parseSemanales', {
+      garantia: files.value.garantia,
+      saldo:    files.value.saldo,
+      web:      files.value.web,
+    })
     if (res.errors.length) {
       parseErrors.value = res.errors
     }
     resultado.value = res
     if (files.value.pdfs.length) {
       try {
-        const f = await parseFacturas(files.value.pdfs)
+        const f = await workerService.postMessage('parseFacturas', { files: files.value.pdfs })
         facturas.value = f
         if (f.errors.length) parseErrors.value = [...parseErrors.value, ...f.errors]
       } catch (e) {

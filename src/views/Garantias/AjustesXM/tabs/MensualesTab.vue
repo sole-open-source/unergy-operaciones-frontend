@@ -103,8 +103,8 @@ import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
 import Textarea from 'primevue/textarea'
 import { useToast } from 'primevue/usetoast'
-import { parseMensual } from '../composables/useGarantiasParser.js'
 import { useGarantiasHistorial } from '../composables/useGarantiasHistorial.js'
+import workerService from '@/utils/workers/workerService'
 import { fmtCOP, fmtISODate } from '../utils/formatters.js'
 import { exportTablaExcel } from '../utils/excelExport.js'
 
@@ -153,7 +153,7 @@ async function procesar() {
   loading.value = true
   errors.value = []
   try {
-    const res = await parseMensual(pendingFile.value)
+    const res = await workerService.postMessage('parseMensual', { file: pendingFile.value })
     if (res.errors.length) errors.value = res.errors
     if (res.rows.length || !res.errors.length) {
       resultado.value = res
