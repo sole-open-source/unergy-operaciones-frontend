@@ -1,9 +1,10 @@
 /**
  * Servicio de Arriendos — llamadas a la API de datos de arriendos.
  *
- * Reemplaza al antiguo `src/data/pagoarriendos.json`, que exponía valores
- * financieros sensibles (valor base, canon de arrendamiento) directamente en
- * el bundle del cliente. Esos datos ahora se sirven desde el backend seguro.
+ * Reemplaza al antiguo `src/data/pagoarriendos.json`, que duplicaba —y exponía
+ * en el bundle del cliente— valores financieros sensibles (valor base, canon de
+ * arrendamiento). La fuente única ahora es el backend: la tabla `arr_proyectos`,
+ * servida por `GET /arriendos/proyectos`.
  */
 import api from '@/api/client'
 
@@ -14,8 +15,11 @@ let _paymentConfigCache = null
 /**
  * Configuración de pago de arriendos por proyecto.
  *
- * GET /arriendos/payment-config
- * Devuelve un arreglo de objetos con la misma forma que tenía el JSON:
+ * GET /arriendos/proyectos → [{ id, nombre, codigo, fecha_firma_contrato,
+ *   valor_base, canon_archivo, activo }]
+ *
+ * El backend usa snake_case; aquí lo mapeamos a la forma histórica que
+ * `ArriendosInfo.vue` espera, para no tocar la lógica de la vista:
  *   { Codigo, Proyecto, "Fecha firma contrato", "Valor base", "Canon arrendamiento" }
  *
  * @param {{ force?: boolean }} [opts] - `force: true` ignora la caché.
@@ -24,10 +28,18 @@ let _paymentConfigCache = null
 export async function getPaymentConfig({ force = false } = {}) {
   if (_paymentConfigCache && !force) return _paymentConfigCache
   try {
-    const { data } = await api.get('/arriendos/payment-config')
-    _paymentConfigCache = Array.isArray(data) ? data : []
+    const { data } = await api.get('/arriendos/proyectos')
+    const filas = Array.isArray(data) ? data : []
+    _paymentConfigCache = filas.map((p) => ({
+      Codigo: p.codigo ?? null,
+      Proyecto: p.nombre,
+      'Fecha firma contrato': p.fecha_firma_contrato ?? null,
+      'Valor base': p.valor_base ?? null,
+      'Canon arrendamiento': p.canon_archivo ?? null,
+    }))
   } catch (err) {
     console.error('Error cargando configuración de pago de arriendos:', err)
+    // No cacheamos el fallo: el siguiente llamado reintenta.
     _paymentConfigCache = null
     return []
   }
