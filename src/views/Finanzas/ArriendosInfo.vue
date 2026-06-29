@@ -151,7 +151,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import Button from 'primevue/button'
-import arriendosRaw from '@/data/pagoarriendos.json'
+import { getPaymentConfig } from '@/services/arriendosService'
 
 // ── Storage ────────────────────────────────────────────────────────────────────
 const INFO_KEY  = 'arriendos_info'
@@ -185,9 +185,12 @@ function persistirInfo() {
 // ── Filas ──────────────────────────────────────────────────────────────────────
 const filas = ref([])
 
+// Configuración de pago por proyecto, traída del backend (antes pagoarriendos.json)
+const paymentConfig = ref([])
+
 function construirFilas() {
-  // 1. Proyectos del JSON
-  const fuente = [...arriendosRaw]
+  // 1. Proyectos provenientes del backend
+  const fuente = [...paymentConfig.value]
 
   // 2. Proyectos extras (agregados manualmente en el panel)
   try {
@@ -319,7 +322,11 @@ function proximaFechaStyle(iso) {
   return 'color:#2C2039'
 }
 
-onMounted(() => { cargarInfo(); construirFilas() })
+onMounted(async () => {
+  cargarInfo()
+  paymentConfig.value = await getPaymentConfig()
+  construirFilas()
+})
 </script>
 
 <style scoped>
