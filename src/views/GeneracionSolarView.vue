@@ -1196,7 +1196,7 @@ const medidorPowerChartData = computed(() => {
       pointRadius: 0,
       pointHoverRadius: 4,
       borderWidth: 2,
-      spanGaps: true,
+      spanGaps: false,
     }],
   }
 })
