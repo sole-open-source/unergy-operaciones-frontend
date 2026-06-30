@@ -151,6 +151,62 @@
           </button>
         </div>
       </div>
+
+      <!-- Resultado división PDF -->
+      <div v-if="splitResult" class="mx-4 mb-3 rounded-lg border px-3 py-2.5 space-y-2"
+        :style="splitResult.sin_match?.length
+          ? 'background:#fffbeb;border-color:#fcd34d40'
+          : 'background:#f0fdf4;border-color:#bbf7d0'">
+
+        <!-- Error de sistema -->
+        <div v-if="splitResult.error" class="flex items-start gap-1.5">
+          <i class="pi pi-times-circle text-xs mt-0.5 flex-shrink-0" style="color:#dc2626"/>
+          <p class="text-xs text-red-700">Error al procesar el PDF: {{ splitResult.error }}</p>
+        </div>
+
+        <!-- Proyectos asociados correctamente -->
+        <div>
+          <p class="text-xs font-semibold mb-1" style="color:#166534">
+            <i class="pi pi-check-circle mr-1"/>
+            {{ splitResult.procesados }} {{ splitResult.procesados === 1 ? 'proyecto asociado' : 'proyectos asociados' }} correctamente
+          </p>
+          <div v-if="splitResult.detalle?.length" class="space-y-0.5 pl-3">
+            <div v-for="(item, i) in splitResult.detalle" :key="i"
+              class="flex items-center gap-2 text-[10px] text-gray-600">
+              <i class="pi pi-file-pdf text-[9px] flex-shrink-0" style="color:#16a34a"/>
+              <span class="font-medium truncate" style="max-width:160px" :title="item.nombre">{{ item.nombre }}</span>
+              <span v-if="item.numero_factura" class="font-mono text-gray-400">{{ item.numero_factura }}</span>
+              <span v-if="item.total_pagar" class="ml-auto font-semibold tabular-nums" style="color:#7c3aed">
+                {{ formatCOP(item.total_pagar) }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Páginas sin match -->
+        <div v-if="splitResult.sin_match?.length" class="space-y-1.5 pt-1 border-t" style="border-color:#fcd34d60">
+          <p class="text-xs font-semibold" style="color:#92400e">
+            <i class="pi pi-exclamation-triangle mr-1"/>
+            {{ splitResult.sin_match.length }} {{ splitResult.sin_match.length === 1 ? 'página sin identificar' : 'páginas sin identificar' }}:
+          </p>
+          <div v-for="(item, i) in splitResult.sin_match" :key="i"
+            class="pl-3 py-1 rounded" style="background:#fef3c740">
+            <p class="text-[10px] font-semibold text-amber-800">
+              Pág. {{ item.pagina }}
+              <span v-if="item.numero_factura" class="font-mono font-normal text-gray-500"> · {{ item.numero_factura }}</span>
+            </p>
+            <p v-if="item.nombre_extraido" class="text-[10px] text-gray-700 mt-0.5">
+              Nombre extraído: <span class="font-medium">"{{ item.nombre_extraido }}"</span>
+            </p>
+            <p class="text-[10px] text-gray-500 mt-0.5">{{ item.razon }}</p>
+          </div>
+        </div>
+
+        <button type="button" class="text-[10px] text-gray-400 hover:text-gray-600 mt-1"
+          @click="splitResult = null">
+          Cerrar
+        </button>
+      </div>
     </div>
 
   </div>
@@ -193,6 +249,7 @@ const factura          = ref({ nombre_archivo: null, enlace_pdf: null, tiene_arc
 const archivoSeleccionado = ref(null)
 const linkExterno      = ref('')
 const subiendoFactura  = ref(false)
+const splitResult      = ref(null)
 const apiBase          = import.meta.env.VITE_API_URL?.replace(/\/$/, '') + '/api/v1'
 
 const puedeSubir = computed(() => !!(archivoSeleccionado.value || linkExterno.value.startsWith('http')))
@@ -222,14 +279,16 @@ async function subirFactura() {
     if (archivoSeleccionado.value) {
       const form = new FormData()
       form.append('file', archivoSeleccionado.value)
-      await api.post(`/om/factura/${periodoActual.value}/upload`, form, {
+      const { data } = await api.post(`/om/factura/${periodoActual.value}/upload`, form, {
         headers: { 'Content-Type': 'multipart/form-data' },
       })
+      splitResult.value = data.splitting_result ?? null
     } else {
       await api.put(`/om/factura/${periodoActual.value}/enlace`, {
         enlace_pdf: linkExterno.value,
         nombre_archivo: linkExterno.value,
       })
+      splitResult.value = null
     }
     archivoSeleccionado.value = null
     linkExterno.value = ''
@@ -271,6 +330,6 @@ async function toggleFacturado(fila) {
   }
 }
 
-watch(periodoActual, () => { cargarDatos(); cargarFactura() })
+watch(periodoActual, () => { cargarDatos(); cargarFactura(); splitResult.value = null })
 onMounted(() => { cargarDatos(); cargarFactura() })
 </script>

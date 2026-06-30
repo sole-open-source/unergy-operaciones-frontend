@@ -29,7 +29,114 @@
           <small v-if="errors.proyecto_id" class="ff-error">{{ errors.proyecto_id }}</small>
         </div>
 
-        <div class="ff-field">
+        <!-- ── Clasificación jerárquica por sistema afectado (fallas nuevas) ── -->
+        <div v-if="usarEstructura" class="ff-field ff-span2 ff-estructura">
+          <label class="ff-label">Sistema afectado *</label>
+          <div class="ff-sysgrid">
+            <button v-for="c in estructura" :key="c.codigo" type="button"
+              :class="['ff-syscard', cls.categoria === c.codigo && 'ff-syscard--on']"
+              @click="seleccionarCategoria(c.codigo)">
+              <i :class="c.icono" :style="{ color: c.color_hex }" />
+              <span>{{ c.etiqueta }}</span>
+            </button>
+          </div>
+          <small v-if="errors.categoria" class="ff-error">{{ errors.categoria }}</small>
+
+          <!-- RED / EVENTOS ADVERSOS: opción única -->
+          <div v-if="catActual && catActual.tipo === 'opcion'" class="ff-sub">
+            <label class="ff-label">{{ catActual.codigo === 'red' ? 'Evento de red *' : 'Evento *' }}</label>
+            <Select v-model="cls.subtipo" :options="catActual.opciones"
+              optionLabel="etiqueta" optionValue="codigo" placeholder="Seleccionar…"
+              class="w-full" :class="{ 'p-invalid': errors.subtipo }" />
+            <small v-if="errors.subtipo" class="ff-error">{{ errors.subtipo }}</small>
+            <div v-if="opcionActual?.pendiente_reclasificar" class="ff-banner ff-banner--warn">
+              <i class="pi pi-clock" /> Quedará <strong>pendiente de reclasificar</strong> hasta conocer la causa definitiva.
+            </div>
+            <div v-if="opcionActual?.requiere_detalle" class="ff-subfield">
+              <label class="ff-label">{{ opcionActual.detalle_label || 'Detalle *' }}</label>
+              <Textarea v-model="cls.detalle" rows="2" autoResize class="w-full"
+                :class="{ 'p-invalid': errors.detalle }" placeholder="Describe el motivo específico…" />
+              <small v-if="errors.detalle" class="ff-error">{{ errors.detalle }}</small>
+            </div>
+          </div>
+
+          <!-- FRONTERA: equipo + flags -->
+          <div v-else-if="catActual && catActual.tipo === 'equipo'" class="ff-sub">
+            <label class="ff-label">Equipo de frontera *</label>
+            <Select v-model="cls.subtipo" :options="catActual.opciones"
+              optionLabel="etiqueta" optionValue="codigo" placeholder="Seleccionar equipo…"
+              class="w-full" :class="{ 'p-invalid': errors.subtipo }" />
+            <small v-if="errors.subtipo" class="ff-error">{{ errors.subtipo }}</small>
+            <div class="ff-flags">
+              <label class="ff-check"><input type="checkbox" v-model="cls.afecta_medicion" /> Afecta la medición de la frontera</label>
+              <label class="ff-check"><input type="checkbox" v-model="cls.perdida_comunicacion" /> Pérdida de comunicación (datos) de la frontera</label>
+            </div>
+            <div v-if="cls.perdida_comunicacion" class="ff-banner ff-banner--info">
+              <i class="pi pi-bell" /> Generará una alarma de comunicaciones de frontera.
+            </div>
+          </div>
+
+          <!-- INVERSORES: selección múltiple + tipos + gestión parametrizable -->
+          <div v-else-if="catActual && catActual.tipo === 'inversores'" class="ff-sub">
+            <div v-if="!proyectoUnicoId" class="ff-banner ff-banner--warn">
+              <i class="pi pi-info-circle" /> Para reportar inversores selecciona <strong>un solo proyecto</strong> arriba.
+            </div>
+            <template v-else>
+              <div class="ff-invhead">
+                <label class="ff-label" style="margin:0">Inversores afectados *</label>
+                <button type="button" class="ff-link" @click="gestionInversores = !gestionInversores">
+                  <i class="pi pi-cog" /> {{ gestionInversores ? 'Cerrar gestión' : 'Gestionar inversores' }}
+                </button>
+              </div>
+              <div v-if="cargandoInv" class="ff-hint">Cargando inversores…</div>
+              <div v-else-if="!inversoresProyecto.length && !gestionInversores" class="ff-banner ff-banner--warn">
+                Este proyecto no tiene inversores configurados.
+                <button type="button" class="ff-link" @click="gestionInversores = true">Configurar</button>
+              </div>
+              <MultiSelect v-else-if="inversoresProyecto.length" v-model="cls.inversores_ids" :options="inversoresProyecto"
+                optionLabel="_label" optionValue="id" placeholder="Seleccionar inversor(es)"
+                display="chip" class="w-full" :class="{ 'p-invalid': errors.inversores }" />
+              <small v-if="errors.inversores" class="ff-error">{{ errors.inversores }}</small>
+
+              <!-- gestión parametrizable de inversores del proyecto -->
+              <div v-if="gestionInversores" class="ff-invmanage">
+                <div class="ff-invmanage-head">
+                  <span>Potencia AC: <strong>{{ potenciaAc != null ? potenciaAc + ' kW' : 'sin definir' }}</strong>
+                    · Suma inversores: <strong :class="{ 'ff-text-danger': sumaExcede }">{{ sumaInversores }} kW</strong></span>
+                  <button v-if="!inversoresProyecto.length" type="button" class="ff-link" @click="prefillMinigranja">
+                    Usar config típica minigranja
+                  </button>
+                </div>
+                <div v-for="inv in inversoresProyecto" :key="inv.id" class="ff-invrow">
+                  <InputText v-model="inv.nombre" placeholder="Nombre" class="ff-invname" @blur="guardarInv(inv)" />
+                  <InputNumber v-model="inv.potencia_nominal_kw" placeholder="kW" suffix=" kW" :min="0"
+                    class="ff-invkw" @blur="guardarInv(inv)" />
+                  <button type="button" class="ff-invdel" @click="eliminarInv(inv)"><i class="pi pi-trash" /></button>
+                </div>
+                <div class="ff-invrow ff-invrow--new">
+                  <InputText v-model="nuevoInv.nombre" placeholder="Nombre nuevo inversor" class="ff-invname" />
+                  <InputNumber v-model="nuevoInv.potencia_nominal_kw" placeholder="kW" suffix=" kW" :min="0" class="ff-invkw" />
+                  <button type="button" class="ff-invadd" @click="agregarInv"><i class="pi pi-plus" /></button>
+                </div>
+                <small v-if="invError" class="ff-error">{{ invError }}</small>
+              </div>
+
+              <div class="ff-subfield">
+                <label class="ff-label">Tipo(s) de falla *</label>
+                <MultiSelect v-model="cls.inversores_tipos" :options="catActual.tipos_falla"
+                  optionLabel="etiqueta" optionValue="codigo" placeholder="Seleccionar tipo(s)"
+                  display="chip" class="w-full" :class="{ 'p-invalid': errors.invtipos }" />
+                <small v-if="errors.invtipos" class="ff-error">{{ errors.invtipos }}</small>
+                <div v-if="cls.inversores_tipos.includes('perdida_comunicacion')" class="ff-banner ff-banner--info">
+                  <i class="pi pi-bell" /> Generará una alarma de comunicaciones de inversores.
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- Tipo de falla LEGACY (solo edición de fallas viejas sin categoría) -->
+        <div v-else class="ff-field">
           <label class="ff-label">Tipo de falla *</label>
           <Select v-model="form.tipo_id" :options="tiposAgrupados"
             optionLabel="etiqueta" optionValue="id"
@@ -380,6 +487,137 @@ const tiposAgrupados = computed(() => {
   return Object.values(groups)
 })
 
+// ── Reporte estructurado (jerárquico por sistema) ───────────────────────────
+const estructura = ref([])  // categorías canónicas desde GET /fallas/estructura
+const cls = ref({
+  categoria: props.initial?.categoria_codigo ?? null,
+  subtipo: props.initial?.subtipo_codigo ?? null,
+  detalle: props.initial?.subtipo_detalle ?? '',
+  afecta_medicion: props.initial?.frontera_afecta_medicion ?? false,
+  perdida_comunicacion: props.initial?.frontera_perdida_comunicacion ?? false,
+  inversores_ids: (props.initial?.inversores_afectados ?? [])
+    .map(i => i.proyecto_inversor_id).filter(Boolean),
+  inversores_tipos: [...new Set((props.initial?.inversores_afectados ?? [])
+    .flatMap(i => i.tipos ?? []))],
+})
+
+// Editar una falla legacy (sin categoría) usa el form viejo; crear o editar
+// una falla estructurada usa la jerarquía nueva.
+const usarEstructura = computed(() => !props.initial || !!props.initial?.categoria_codigo)
+const catActual = computed(() => estructura.value.find(c => c.codigo === cls.value.categoria) || null)
+const opcionActual = computed(() => {
+  if (!catActual.value || !cls.value.subtipo) return null
+  return (catActual.value.opciones ?? []).find(o => o.codigo === cls.value.subtipo) || null
+})
+const proyectoUnicoId = computed(() => {
+  if (props.initial) return form.value.proyecto_id
+  return form.value.proyecto_ids?.length === 1 ? form.value.proyecto_ids[0] : null
+})
+
+function seleccionarCategoria(codigo) {
+  if (cls.value.categoria === codigo) return
+  cls.value.categoria = codigo
+  cls.value.subtipo = null
+  cls.value.detalle = ''
+  cls.value.afecta_medicion = false
+  cls.value.perdida_comunicacion = false
+  cls.value.inversores_ids = []
+  cls.value.inversores_tipos = []
+}
+
+// ── Inversores del proyecto (parametrizable) ────────────────────────────────
+const inversoresProyecto = ref([])
+const cargandoInv = ref(false)
+const gestionInversores = ref(false)
+const nuevoInv = ref({ nombre: '', potencia_nominal_kw: null })
+const invError = ref('')
+const potenciaAc = ref(null)
+
+function _label(inv) {
+  const kw = inv.potencia_nominal_kw != null ? `${inv.potencia_nominal_kw} kW` : 's/d'
+  return `${inv.nombre || 'Inversor'} · ${kw}`
+}
+const sumaInversores = computed(() =>
+  inversoresProyecto.value.reduce((s, i) => s + (Number(i.potencia_nominal_kw) || 0), 0))
+const sumaExcede = computed(() => potenciaAc.value != null && sumaInversores.value > potenciaAc.value + 0.001)
+
+async function cargarInversores(pid) {
+  if (!pid) { inversoresProyecto.value = []; return }
+  cargandoInv.value = true
+  try {
+    const { data } = await api.get(`/proyectos/${pid}/inversores`)
+    inversoresProyecto.value = (data ?? []).map(i => ({ ...i, _label: _label(i) }))
+    // potencia AC nominal del proyecto (para feedback de la regla de suma)
+    try {
+      const { data: p } = await api.get(`/proyectos/${pid}`)
+      potenciaAc.value = p?.info_tecnica?.potencia_ac_kw != null ? Number(p.info_tecnica.potencia_ac_kw) : null
+    } catch { potenciaAc.value = null }
+  } catch { inversoresProyecto.value = [] }
+  finally { cargandoInv.value = false }
+}
+
+async function guardarInv(inv) {
+  invError.value = ''
+  try {
+    const { data } = await api.patch(`/proyectos/${proyectoUnicoId.value}/inversores/${inv.id}`,
+      { nombre: inv.nombre, potencia_nominal_kw: inv.potencia_nominal_kw })
+    Object.assign(inv, data, { _label: _label(data) })
+  } catch (e) {
+    invError.value = e.response?.data?.detail || 'No se pudo guardar el inversor'
+    await cargarInversores(proyectoUnicoId.value)
+  }
+}
+async function agregarInv() {
+  invError.value = ''
+  if (!nuevoInv.value.nombre && nuevoInv.value.potencia_nominal_kw == null) return
+  try {
+    await api.post(`/proyectos/${proyectoUnicoId.value}/inversores`, {
+      nombre: nuevoInv.value.nombre || null,
+      potencia_nominal_kw: nuevoInv.value.potencia_nominal_kw,
+      orden: inversoresProyecto.value.length,
+    })
+    nuevoInv.value = { nombre: '', potencia_nominal_kw: null }
+    await cargarInversores(proyectoUnicoId.value)
+  } catch (e) {
+    invError.value = e.response?.data?.detail || 'No se pudo agregar el inversor'
+  }
+}
+async function eliminarInv(inv) {
+  invError.value = ''
+  try {
+    await api.delete(`/proyectos/${proyectoUnicoId.value}/inversores/${inv.id}`)
+    cls.value.inversores_ids = cls.value.inversores_ids.filter(id => id !== inv.id)
+    await cargarInversores(proyectoUnicoId.value)
+  } catch (e) {
+    invError.value = e.response?.data?.detail || 'No se pudo eliminar el inversor'
+  }
+}
+// Config típica de minigranja (Baraya/San Pedro son excepciones → se ajustan a mano)
+async function prefillMinigranja() {
+  const tipica = [
+    { nombre: 'Inversor 1', potencia_nominal_kw: 300 },
+    { nombre: 'Inversor 2', potencia_nominal_kw: 300 },
+    { nombre: 'Inversor 3', potencia_nominal_kw: 300 },
+    { nombre: 'Inversor 4', potencia_nominal_kw: 50 },
+    { nombre: 'Inversor 5', potencia_nominal_kw: 40 },
+  ]
+  invError.value = ''
+  for (let i = 0; i < tipica.length; i++) {
+    try {
+      await api.post(`/proyectos/${proyectoUnicoId.value}/inversores`, { ...tipica[i], orden: i })
+    } catch (e) {
+      invError.value = e.response?.data?.detail || 'No se pudieron crear todos los inversores'
+      break
+    }
+  }
+  await cargarInversores(proyectoUnicoId.value)
+}
+
+// Cargar inversores cuando se elige la categoría inversores y hay un único proyecto.
+watch([() => cls.value.categoria, proyectoUnicoId], ([cat, pid]) => {
+  if (cat === 'inversores' && pid) cargarInversores(pid)
+}, { immediate: true })
+
 function validate() {
   const e = {}
   if (props.initial) {
@@ -387,7 +625,23 @@ function validate() {
   } else {
     if (!form.value.proyecto_ids?.length) e.proyecto_ids = 'Selecciona al menos un proyecto'
   }
-  if (!form.value.tipo_id && !form.value.tipo_libre?.trim()) e.tipo_id = 'Requerido'
+  if (usarEstructura.value) {
+    // Clasificación jerárquica por sistema
+    if (!cls.value.categoria) {
+      e.categoria = 'Selecciona el sistema afectado'
+    } else if (catActual.value?.tipo === 'inversores') {
+      if (!props.initial && form.value.proyecto_ids?.length !== 1) {
+        e.proyecto_ids = 'Para inversores selecciona un solo proyecto'
+      }
+      if (!cls.value.inversores_ids.length) e.inversores = 'Selecciona al menos un inversor'
+      if (!cls.value.inversores_tipos.length) e.invtipos = 'Selecciona al menos un tipo de falla'
+    } else {
+      if (!cls.value.subtipo) e.subtipo = 'Requerido'
+      if (opcionActual.value?.requiere_detalle && !cls.value.detalle?.trim()) e.detalle = 'Requerido'
+    }
+  } else if (!form.value.tipo_id && !form.value.tipo_libre?.trim()) {
+    e.tipo_id = 'Requerido'
+  }
   if (!form.value.estado_id)            e.estado_id = 'Requerido'
   if (!form.value.prioridad_id)         e.prioridad_id = 'Requerido'
   if (!form.value.descripcion?.trim())  e.descripcion = 'Requerido'
@@ -491,10 +745,42 @@ async function submit() {
     if (form.value.fecha_programada)             base.fecha_programada     = formatDate(form.value.fecha_programada)
     base.notificacion = !!form.value.notificacion
 
+    // ── Clasificación estructurada ─────────────────────────────────────────
+    let forzarProyectoUnico = null
+    if (usarEstructura.value && cls.value.categoria) {
+      base.categoria_codigo = cls.value.categoria
+      const cat = catActual.value
+      if (cat?.tipo === 'inversores') {
+        // tipos compartidos aplicados a cada inversor seleccionado
+        const tipos = [...cls.value.inversores_tipos]
+        base.inversores = cls.value.inversores_ids.map(id => {
+          const inv = inversoresProyecto.value.find(x => x.id === id) || {}
+          return {
+            proyecto_inversor_id: id,
+            nombre: inv.nombre ?? null,
+            potencia_kw: inv.potencia_nominal_kw ?? null,
+            tipos,
+          }
+        })
+        base.tipo_id = null  // el backend deriva el tipo
+        forzarProyectoUnico = proyectoUnicoId.value
+      } else {
+        base.subtipo_codigo = cls.value.subtipo
+        if (cls.value.detalle?.trim()) base.subtipo_detalle = cls.value.detalle.trim()
+        if (cat?.tipo === 'equipo') {
+          base.frontera_afecta_medicion = !!cls.value.afecta_medicion
+          base.frontera_perdida_comunicacion = !!cls.value.perdida_comunicacion
+        }
+        base.tipo_id = null  // el backend mapea subtipo → tipo
+      }
+    }
+
     if (props.initial) {
       emit('save', { ...base, proyecto_id: form.value.proyecto_id, _archivos: archivosStaged.value })
     } else {
-      emit('save', { ...base, proyecto_ids: form.value.proyecto_ids, _archivos: archivosStaged.value })
+      // Para inversores se fuerza un único proyecto (los inversores le pertenecen).
+      const ids = forzarProyectoUnico ? [forzarProyectoUnico] : form.value.proyecto_ids
+      emit('save', { ...base, proyecto_ids: ids, _archivos: archivosStaged.value })
     }
   } finally {
     saving.value = false
@@ -505,6 +791,10 @@ onMounted(async () => {
   try {
     const { data } = await api.get('/proyectos', { params: { size: 500 } })
     proyectos.value = data.items ?? []
+  } catch { /* no crítico */ }
+  try {
+    const { data } = await api.get('/fallas/estructura')
+    estructura.value = data.categorias ?? []
   } catch { /* no crítico */ }
 })
 </script>
@@ -530,6 +820,46 @@ onMounted(async () => {
   border: 1px solid #bbf7d0;
   margin-bottom: 4px;
 }
+
+/* ── Clasificación estructurada (jerárquica por sistema) ───────────────── */
+.ff-estructura { background: #faf8ff; border: 1px solid #ece4fb; border-radius: 12px; padding: 12px; }
+.ff-sysgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 6px; }
+.ff-syscard {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 12px 6px; border: 1.5px solid #e8e0f0; border-radius: 10px; background: #fff;
+  font-size: 12px; font-weight: 600; color: #4a3b6b; cursor: pointer; transition: all .12s;
+}
+.ff-syscard i { font-size: 18px; }
+.ff-syscard:hover { border-color: #c9b6ee; }
+.ff-syscard--on { border-color: #915BD8; background: #f3ecff; box-shadow: 0 0 0 2px #915BD833; }
+@media (max-width: 640px) { .ff-sysgrid { grid-template-columns: repeat(2, 1fr); } }
+
+.ff-sub { margin-top: 12px; }
+.ff-subfield { margin-top: 10px; }
+.ff-flags { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.ff-check { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #4a3b6b; cursor: pointer; }
+.ff-check input { accent-color: #915BD8; width: 16px; height: 16px; }
+
+.ff-banner {
+  display: flex; align-items: center; gap: 8px; margin-top: 10px;
+  font-size: 12.5px; border-radius: 8px; padding: 8px 10px;
+}
+.ff-banner--warn { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+.ff-banner--info { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
+.ff-link { background: none; border: none; color: #915BD8; font-weight: 600; font-size: 12px; cursor: pointer; padding: 0; }
+.ff-link i { font-size: 11px; margin-right: 3px; }
+.ff-text-danger { color: #dc2626; }
+
+.ff-invhead { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
+.ff-invmanage { margin-top: 10px; background: #fff; border: 1px solid #ece4fb; border-radius: 10px; padding: 10px; }
+.ff-invmanage-head { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: #6b5a8a; margin-bottom: 8px; flex-wrap: wrap; gap: 6px; }
+.ff-invrow { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.ff-invrow--new { margin-top: 6px; padding-top: 8px; border-top: 1px dashed #ece4fb; }
+.ff-invname { flex: 1; }
+.ff-invkw { width: 120px; }
+.ff-invadd, .ff-invdel { border: none; border-radius: 8px; width: 32px; height: 32px; cursor: pointer; flex-shrink: 0; }
+.ff-invadd { background: #915BD8; color: #fff; }
+.ff-invdel { background: #fef2f2; color: #dc2626; }
 
 .ff-section-title {
   font-size: 11px;

@@ -687,6 +687,10 @@
            : pcMode === 'compra' ? 'Plantas que Unergy compra energía'
            : 'Plantas sin asignación GESCON este mes (van a bolsa)' }}
         </span>
+        <Button label="Exportar resumen (Excel)" icon="pi pi-file-excel" size="small" outlined class="ml-auto"
+          :disabled="!pcData || pcLoading" @click="exportarResumenPlantasContratos"
+          v-tooltip.bottom="'Contratos con sus plantas (venta + compra) y, al final, plantas sin contrato o en bolsa con UNGC'"
+          style="color:#915BD8; border-color:#915BD8;" />
       </div>
 
       <div v-if="pcLoading" class="flex flex-col items-center justify-center py-20 gap-3">
@@ -926,6 +930,19 @@
             <Checkbox v-model="matrizSoloNoCumple" :binary="true" /> Solo no cumple
           </label>
           <InputText v-model="matrizBusqueda" placeholder="Buscar contrato…" class="text-sm" />
+          <MultiSelect v-model="matrizContratosSel" :options="matrizContratoOpts" optionLabel="label" optionValue="value"
+                       filter :showToggleAll="false" placeholder="Todos los contratos"
+                       :maxSelectedLabels="2" selectedItemsLabel="{0} contratos" class="text-sm" style="min-width:13rem;">
+            <template #option="{ option }">
+              <div class="flex flex-col leading-tight">
+                <span>{{ option.label }}</span>
+                <span v-if="option.offtaker" class="text-xs" style="color:#7a6e8a;">{{ option.offtaker }}</span>
+              </div>
+            </template>
+          </MultiSelect>
+          <MultiSelect v-model="matrizOfftakersSel" :options="matrizOfftakerOpts"
+                       filter :showToggleAll="false" placeholder="Todos los offtakers"
+                       :maxSelectedLabels="2" selectedItemsLabel="{0} offtakers" class="text-sm" style="min-width:12rem;" />
         </div>
         <div class="flex items-center gap-2">
           <span v-if="matrizFilasCargando" class="text-xs" style="color:#7a6e8a;">Cargando contratos…</span>
@@ -1188,6 +1205,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { proyectoActivoEnMes } from '@/utils/proyectoActivo'
 import Select from 'primevue/select'
+import MultiSelect from 'primevue/multiselect'
 import InputText from 'primevue/inputtext'
 import Checkbox from 'primevue/checkbox'
 import Button from 'primevue/button'
@@ -1395,6 +1413,58 @@ const pcBolsaLibre = computed(() => {
   return (d.bolsa || []).filter(p => p.piscina !== 'comercializador')
 })
 
+// Exporta un resumen plano y filtrable: cada contrato (venta + compra) con sus plantas,
+// y al final las plantas SIN contrato (libre) o en bolsa con el comercializador UNGC.
+async function exportarResumenPlantasContratos() {
+  if (!pcData.value) return
+  const XLSX = await import('xlsx-js-style')
+  const mes = MESES[pcMonth.value - 1]
+  const pct = v => (v != null ? Number((v * 100).toFixed(0)) : '')
+
+  const aoa = [[`UNERGY — Resumen contratos y plantas · ${mes} ${pcYear.value}`], []]
+  const header = ['Categoría', 'Contrato', 'Contraparte', 'Planta', 'SIC', '% Despacho', 'Inicio', 'Fin', 'Nota']
+  const headerRow = aoa.length
+  aoa.push(header)
+
+  for (const c of (pcData.value.venta || [])) {
+    if (c.plantas.length) {
+      for (const p of c.plantas)
+        aoa.push(['Venta', c.nombre, c.comprador_nombre || '', p.nombre, p.codigo_sic || '',
+          pct(p.pct_despacho), p.fecha_inicio || '', p.fecha_fin || '', p.es_duplicado ? 'Compra bolsa' : ''])
+    } else {
+      aoa.push(['Venta', c.nombre, c.comprador_nombre || '', '(sin plantas en GESCON)', '', '', '', '', ''])
+    }
+  }
+  for (const c of (pcData.value.compra || [])) {
+    if (c.plantas.length) {
+      for (const p of c.plantas)
+        aoa.push(['Compra', c.nombre, c.vendedor_nombre || '', p.nombre, '', '', p.fecha_inicio || '', p.fecha_fin || '', ''])
+    } else {
+      aoa.push(['Compra', c.nombre, c.vendedor_nombre || '', '(sin plantas)', '', '', '', '', ''])
+    }
+  }
+  for (const p of pcBolsaComercializador.value)
+    aoa.push(['Bolsa UNGC', '', 'UNGC (comercializador)', p.nombre, p.codigo_sic || '', '', '', '', 'En contrato con UNGC'])
+  for (const p of pcBolsaLibre.value)
+    aoa.push(['Sin contrato', '', '', p.nombre, '', '', '', '', 'Sin SIC vigente'])
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa)
+  const C = { morado: '915BD8', oscuro: '2C2039', blanco: 'FFFFFF' }
+  for (let c = 0; c < header.length; c++) {
+    const ref = XLSX.utils.encode_cell({ r: headerRow, c })
+    if (!ws[ref]) ws[ref] = { t: 's', v: '' }
+    ws[ref].s = { font: { bold: true, color: { rgb: C.blanco } }, fill: { fgColor: { rgb: C.morado } }, alignment: { horizontal: 'center' } }
+  }
+  const titleRef = XLSX.utils.encode_cell({ r: 0, c: 0 })
+  if (ws[titleRef]) ws[titleRef].s = { font: { bold: true, sz: 14, color: { rgb: C.oscuro } } }
+  ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: header.length - 1 } }]
+  ws['!cols'] = [{ wch: 14 }, { wch: 28 }, { wch: 24 }, { wch: 32 }, { wch: 10 }, { wch: 11 }, { wch: 12 }, { wch: 12 }, { wch: 16 }]
+  ws['!autofilter'] = { ref: `A${headerRow + 1}:I${aoa.length}` }
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, `Resumen ${mes} ${pcYear.value}`.slice(0, 31))
+  XLSX.writeFile(wb, `resumen_contratos_plantas_${pcYear.value}_${String(pcMonth.value).padStart(2, '0')}.xlsx`)
+}
+
 // ── Energía transada state ────────────────────────────────────────────────────
 // Histórico por mes en localStorage: los meses cerrados son inmutables y se
 // guardan sin TTL; el mes actual siempre se consulta fresco y se va guardando
@@ -1529,6 +1599,8 @@ const anualMatrizYear    = ref(now.getFullYear())
 const expandedMatriz     = ref([])
 const matrizSoloNoCumple = ref(false)
 const matrizBusqueda     = ref('')
+const matrizContratosSel = ref([])   // ids de contratos elegidos (vacío = todos)
+const matrizOfftakersSel = ref([])   // nombres de offtaker elegidos (vacío = todos)
 
 // Carga progresiva: primero la lista de contratos (instantánea, sin generación) para pintar la
 // tabla, y luego el detalle de cada contrato en peticiones independientes con concurrencia limitada.
@@ -1537,6 +1609,8 @@ async function loadAnualMatriz() {
   anualMatrizLoading.value = true
   anualMatrizError.value = ''
   expandedMatriz.value = []
+  matrizContratosSel.value = []
+  matrizOfftakersSel.value = []
   const year = anualMatrizYear.value
   try {
     const { data } = await client.get('/cumplimiento/anual-matriz/contratos', { params: { year } })
@@ -1643,11 +1717,31 @@ async function exportarMatrizExcel() {
   XLSX.writeFile(wb, `matriz_anual_cumplimiento_${anualMatrizYear.value}.xlsx`)
 }
 
+// Opciones de los dropdowns: se construyen de los contratos ya cargados, así
+// aparecen apenas llega la lista (antes de que termine el detalle de cada fila).
+const matrizContratoOpts = computed(() =>
+  (anualMatrizData.value?.contratos || []).map(c => ({
+    value: c.id,
+    label: c.nombre_interno || c.numero_codigo_contrato || ('#' + c.id),
+    offtaker: c.comprador_nombre || '',
+  }))
+)
+const matrizOfftakerOpts = computed(() => {
+  const set = new Set()
+  for (const c of anualMatrizData.value?.contratos || [])
+    if (c.comprador_nombre) set.add(c.comprador_nombre)
+  return [...set].sort((a, b) => a.localeCompare(b, 'es'))
+})
+
 const matrizFiltrada = computed(() => {
   const cs = anualMatrizData.value?.contratos || []
   const q = matrizBusqueda.value.trim().toLowerCase()
+  const cSel = matrizContratosSel.value
+  const oSel = matrizOfftakersSel.value
   return cs.filter(c =>
     (!matrizSoloNoCumple.value || c.estado_cumplimiento === 'no_cumple') &&
+    (!cSel.length || cSel.includes(c.id)) &&
+    (!oSel.length || oSel.includes(c.comprador_nombre)) &&
     (!q || (c.nombre_interno || c.numero_codigo_contrato || '').toLowerCase().includes(q)
         || (c.comprador_nombre || '').toLowerCase().includes(q))
   )

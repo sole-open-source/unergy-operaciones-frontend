@@ -461,20 +461,20 @@ onUnmounted(() => {
 .ms-retry { margin-top: 4px; padding: 10px 20px; border: none; border-radius: 11px; background: #915BD8; color: #fff; font-weight: 600; font-size: 15px; }
 
 /* Chips "ahora" */
-.ms-now { display: flex; gap: 10px; margin-bottom: 10px; flex-shrink: 0; }
+.ms-now { display: flex; gap: 8px; margin-bottom: 8px; flex-shrink: 0; }
 .ms-now-chip {
-  flex: 1; min-width: 0; display: flex; align-items: center; gap: 9px;
-  background: #fff; border: 1px solid #eceaf2; border-radius: 14px; padding: 10px 12px;
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 7px;
+  background: #fff; border: 1px solid #eceaf2; border-radius: 11px; padding: 6px 10px;
 }
-.ms-now-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.ms-now-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 .ms-now-text { display: flex; flex-direction: column; min-width: 0; }
-.ms-now-label { font-size: clamp(10.5px, 3vw, 12px); color: #6b5a8a; font-weight: 600; }
-.ms-now-val { font-size: clamp(16px, 4.8vw, 21px); font-weight: 800; color: #2C2039; line-height: 1.15; letter-spacing: -0.3px; white-space: nowrap; }
+.ms-now-label { font-size: clamp(9.5px, 2.6vw, 10.5px); color: #787774; font-weight: 500; }
+.ms-now-val { font-size: clamp(13px, 3.8vw, 16px); font-weight: 700; color: #2C2039; line-height: 1.15; letter-spacing: -0.2px; white-space: nowrap; }
 
 .ms-chart {
   flex: 1; min-height: 0; position: relative;
-  /* tope de alto ≈ 45% del ancho: formato panorámico, eje X mucho más largo que el Y */
-  max-height: min(45vw, 34vh);
+  /* tope de alto ≈ 52% del ancho: panorámica pero con más presencia que las chips */
+  max-height: min(52vw, 38vh);
   background: #fff; border: 1px solid #eceaf2; border-radius: 16px; padding: 12px 10px 6px;
 }
 
