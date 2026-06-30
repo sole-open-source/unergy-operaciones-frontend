@@ -65,6 +65,15 @@
       <!-- ── PASO 1: Partes ─────────────────────────────────────────────── -->
       <template v-if="step === 1">
         <p class="step-title">Partes del contrato</p>
+        <div class="flex flex-col gap-1 mb-4">
+          <label class="field-label">Tipo de contrato</label>
+          <SelectButton v-model="form.tipo_contrato" :options="TIPOS_CONTRATO"
+            optionLabel="label" optionValue="value" :allowEmpty="false" />
+          <span class="text-xs text-gray-400">
+            <strong>Venta:</strong> Unergy vende energía a la contraparte ·
+            <strong>Compra:</strong> Unergy compra energía (ej. a un generador).
+          </span>
+        </div>
         <div class="grid grid-cols-2 gap-1 mb-1 px-1">
           <span class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Comprador</span>
           <span class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Vendedor</span>
@@ -327,6 +336,7 @@
             </div>
           </div>
           <div class="grid grid-cols-2 gap-x-6 gap-y-1.5 text-xs text-gray-600 mt-3">
+            <ResumenFila label="Tipo" :value="form.tipo_contrato === 'compra' ? 'Compra' : 'Venta'" />
             <ResumenFila label="Número" :value="form.numero_codigo_contrato" />
             <ResumenFila label="Nombre interno" :value="form.nombre_interno" />
             <ResumenFila label="Comprador" :value="form.comprador_nombre" />
@@ -364,6 +374,7 @@ import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import Select from 'primevue/select'
+import SelectButton from 'primevue/selectbutton'
 import MultiSelect from 'primevue/multiselect'
 import AutoComplete from 'primevue/autocomplete'
 import DatePicker from 'primevue/datepicker'
@@ -389,6 +400,11 @@ const STEPS = [
   { label: 'Tarifas' },
   { label: 'Energía' },
   { label: 'GESCON' },
+]
+
+const TIPOS_CONTRATO = [
+  { label: 'Venta', value: 'venta' },
+  { label: 'Compra', value: 'compra' },
 ]
 
 const PERIODICIDADES = [
@@ -478,6 +494,7 @@ const energiaError = ref('')
 const energiaPreview = computed(() => energiaRows.value.slice(0, PREVIEW_ROWS))
 
 const form = reactive({
+  tipo_contrato: 'venta',
   numero_codigo_contrato: null, nombre_interno: null,
   comprador_id: null, comprador_nombre: null, comprador_nit: null,
   vendedor_id: null, vendedor_nombre: null, vendedor_nit: null,
@@ -500,6 +517,8 @@ watch(() => props.visible, (visible) => {
       const limpiar = !esEdicion && EXCLUIR_DUPLICADO.includes(k)
       form[k] = limpiar ? null : (props.initialData[k] ?? null)
     })
+    // El tipo de contrato nunca debe quedar vacío en el selector: backend usa 'venta' por defecto.
+    if (!form.tipo_contrato) form.tipo_contrato = 'venta'
 
     if (esEdicion) {
       // Tarifas: { año, mes, tarifa } — mismo formato que tarifasRows

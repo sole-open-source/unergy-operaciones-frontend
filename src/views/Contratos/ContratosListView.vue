@@ -54,6 +54,14 @@
             <span class="font-medium text-gray-800">{{ data.nombre_interno || '—' }}</span>
           </template>
         </Column>
+        <Column field="tipo_contrato" header="Tipo" sortable style="width:90px">
+          <template #body="{ data }">
+            <Tag :value="(data.tipo_contrato === 'compra') ? 'Compra' : 'Venta'"
+              :style="(data.tipo_contrato === 'compra')
+                ? 'background:#915BD8;color:#fff'
+                : 'background:#F6FF72;color:#2C2039'" class="text-xs" />
+          </template>
+        </Column>
         <Column field="numero_codigo_contrato" header="N° contrato" sortable style="width:160px">
           <template #body="{ data }">
             <span class="font-mono text-xs text-gray-500">{{ data.numero_codigo_contrato || '—' }}</span>

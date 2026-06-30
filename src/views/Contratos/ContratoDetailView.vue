@@ -13,6 +13,10 @@
               {{ contrato.numero_codigo_contrato }}
             </span>
             <Tag value="PPA" severity="warning" class="text-xs" />
+            <Tag :value="(contrato.tipo_contrato === 'compra') ? 'Compra' : 'Venta'"
+              :style="(contrato.tipo_contrato === 'compra')
+                ? 'background:#915BD8;color:#fff'
+                : 'background:#F6FF72;color:#2C2039'" class="text-xs" />
             <span class="text-xs text-gray-400">{{ contrato.proyectos?.length || 0 }} proyectos</span>
           </div>
         </div>
