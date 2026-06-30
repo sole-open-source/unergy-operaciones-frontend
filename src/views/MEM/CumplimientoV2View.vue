@@ -568,7 +568,7 @@
                 >
                   <div class="min-w-0">
                     <span class="font-medium truncate block" style="color: #2C2039; max-width: 128px;">{{ p.nombre }}</span>
-                    <span v-if="p.es_duplicado" class="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded mt-0.5"
+                    <span v-if="p.es_duplicado && !p.comprado_por_unergy" class="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded mt-0.5"
                       style="background: rgba(240,192,64,0.22); color: #9a6700;"
                       v-tooltip="'Compra en bolsa — cuenta para el contrato, origen bolsa'"
                     ><i class="pi pi-shopping-cart" style="font-size: 9px;" />Compra bolsa</span>
@@ -630,7 +630,7 @@
               ]"
             >
               <span class="font-medium" style="color: #2C2039;">{{ p.nombre }}</span>
-              <span v-if="p.es_duplicado" class="font-semibold px-1.5 py-0.5 rounded"
+              <span v-if="p.es_duplicado && !p.comprado_por_unergy" class="font-semibold px-1.5 py-0.5 rounded"
                 style="background: rgba(240,192,64,0.22); color: #9a6700;"
                 v-tooltip="'Compra en bolsa'"
               >Bolsa</span>
@@ -1096,7 +1096,7 @@
                 <tr v-for="p in detalleCapa.plantas" :key="p.id" style="border-top: 1px solid rgba(44,32,57,0.06);">
                   <td class="py-2 pr-2 font-medium" :style="p.es_duplicado ? 'color:#9a6700' : p.comprado_por_unergy ? 'color:#9a6700' : 'color:#2C2039'">
                     {{ p.nombre }}
-                    <span v-if="p.es_duplicado" class="ml-1 inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded" style="background: rgba(240,192,64,0.22); color: #9a6700;" v-tooltip="'Compra en bolsa'"><i class="pi pi-shopping-cart" style="font-size: 9px;" />Compra bolsa</span>
+                    <span v-if="p.es_duplicado && !p.comprado_por_unergy" class="ml-1 inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded" style="background: rgba(240,192,64,0.22); color: #9a6700;" v-tooltip="'Compra en bolsa'"><i class="pi pi-shopping-cart" style="font-size: 9px;" />Compra bolsa</span>
                     <span v-else-if="p.comprado_por_unergy" class="ml-1 text-[10px] font-semibold px-1.5 py-0.5 rounded" style="background: rgba(240,192,64,0.25); color: #9a6700;">Compra</span>
                   </td>
                   <td class="py-2 px-2 text-right font-mono text-xs" style="color: #7a6e8a;">{{ (p.pct_despacho * 100).toFixed(0) }}%</td>
@@ -1895,9 +1895,11 @@ const simResults = computed(() => {
       if (p.month_mwh == null) continue
       const mwh = p.month_mwh * p.pct_despacho
       // Todo el suministro cuenta para el cumplimiento (real o compra en bolsa);
-      // genDup es el subconjunto cuyo origen es bolsa (informativo).
+      // genDup es el subconjunto cuyo origen es bolsa (informativo). Una planta
+      // comprada por Unergy (comprado_por_unergy) NO es bolsa: su origen es el
+      // contrato de compra, así que se excluye de genDup aunque sea duplicado.
       genReal += mwh
-      if (p.es_duplicado) genDup += mwh
+      if (p.es_duplicado && !p.comprado_por_unergy) genDup += mwh
       if (esActual && p.month_mwh_proyectado != null) {
         genProy += p.month_mwh_proyectado * p.pct_despacho
       }
@@ -2324,7 +2326,7 @@ function _renderCapaCanvas(c) {
     ctx.fillText(nombre, padX, yMid)
     // Tag duplicado / compra
     const nx = padX + ctx.measureText(nombre).width + 8
-    if (p.es_duplicado) {
+    if (p.es_duplicado && !p.comprado_por_unergy) {
       _dibujarPill(ctx, nx, yMid - 9, 'Compra bolsa', 'rgba(240,192,64,0.22)', GOLD, 'bold 10px Inter, Arial, sans-serif')
     } else if (p.comprado_por_unergy) {
       _dibujarPill(ctx, nx, yMid - 9, 'Compra', 'rgba(240,192,64,0.25)', GOLD, 'bold 10px Inter, Arial, sans-serif')
