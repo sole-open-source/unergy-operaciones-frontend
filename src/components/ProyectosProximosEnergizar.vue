@@ -211,6 +211,12 @@
               <b>{{ sug.candidato_nombre }}</b> (ID {{ sug.candidato_id }})
               <span v-if="sug.candidato_municipio" class="text-gray-400"> · {{ sug.candidato_municipio }}</span>
             </div>
+            <div v-if="sug.candidato_sunfactory_id_previo != null" class="mt-1 text-xs" style="color:#b45309;">
+              <i class="pi pi-exclamation-triangle" style="font-size:0.7rem;" />
+              Ya está vinculado al ID {{ sug.candidato_sunfactory_id_previo }} de Sun Factory —
+              vincular reemplazaría ese vínculo por este ({{ sug.sunfactory_project_id }}).
+              Puede ser que Sun Factory tenga el mismo proyecto duplicado con dos IDs.
+            </div>
           </div>
           <div class="flex gap-2 flex-shrink-0">
             <Button label="No es el mismo" text severity="secondary" size="small"
@@ -279,6 +285,13 @@ async function onSync(force) {
 }
 
 async function vincular(sug) {
+  if (sug.candidato_sunfactory_id_previo != null) {
+    const ok = window.confirm(
+      `"${sug.candidato_nombre}" ya está vinculado al ID ${sug.candidato_sunfactory_id_previo} de Sun Factory. ` +
+      `¿Reemplazarlo por el ID ${sug.sunfactory_project_id}?`
+    )
+    if (!ok) return
+  }
   vinculandoId.value = sug.candidato_id
   try {
     await api.post(`/proyectos/${sug.candidato_id}/vincular-sunfactory/${sug.sunfactory_project_id}`)
