@@ -86,7 +86,7 @@
                   <th class="text-right px-4 py-2.5 font-medium text-gray-500 text-xs uppercase tracking-wide
                               whitespace-nowrap">kWp</th>
                   <th class="text-right px-4 py-2.5 font-medium text-gray-500 text-xs uppercase tracking-wide
-                              whitespace-nowrap">Potencia (kW)</th>
+                              whitespace-nowrap">Potencia AC (kW)</th>
                   <th class="text-left px-4 py-2.5 font-medium text-gray-500 text-xs uppercase tracking-wide
                               whitespace-nowrap" style="min-width:140px">Servicios</th>
                   <th class="text-left px-4 py-2.5 font-medium text-gray-500 text-xs uppercase tracking-wide
@@ -131,14 +131,9 @@
                     {{ row.potencia_instalada_kwp ?? '—' }}
                   </td>
 
-                  <!-- Potencia fleet -->
-                  <td class="px-4 py-2 text-right">
-                    <span v-if="fleetMap[row.nombre_comercial] != null"
-                          class="font-mono text-sm font-semibold"
-                          :style="{ color: fleetMap[row.nombre_comercial] > 0 ? '#10B981' : '#9CA3AF' }">
-                      {{ fleetMap[row.nombre_comercial].toFixed(1) }}
-                    </span>
-                    <span v-else class="text-gray-300 text-xs">—</span>
+                  <!-- Potencia AC (pestaña Técnico) -->
+                  <td class="px-4 py-2 text-right font-mono text-xs text-gray-500">
+                    {{ row.info_tecnica?.potencia_ac_kw ?? '—' }}
                   </td>
 
                   <!-- Servicios -->
@@ -428,13 +423,6 @@ const forzando = ref(false)
 const openSections = ref(new Set())    // reactive Set via full replacement
 
 const filters  = reactive({ q: '', estado: null, tipo_proyecto: null })
-const fleetData = ref([])
-
-const fleetMap = computed(() => {
-  const map = {}
-  for (const p of fleetData.value) map[p.name] = p.power_kw || 0
-  return map
-})
 
 // ── Filtrado + agrupación ──────────────────────────────────────────────────────
 const filteredItems = computed(() => {
@@ -488,9 +476,6 @@ async function load() {
 
 onMounted(() => {
   load()
-  api.get('/generacion-solar/fleet').then(r => {
-    if (r.data?.projects) fleetData.value = r.data.projects
-  }).catch(() => {})
 })
 
 function goDetail(row) { router.push(`/proyectos/${row.id}`) }
