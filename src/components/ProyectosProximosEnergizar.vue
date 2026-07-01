@@ -194,8 +194,8 @@
     <Dialog v-model:visible="sugerenciasVisible" header="Posibles vínculos con Sun Factory" modal class="w-full max-w-2xl">
       <p class="text-sm text-gray-600 mb-3">
         El sync no encontró un match exacto para estos proyectos de Sun Factory, pero encontró un
-        proyecto existente con un nombre parecido. Confirma si es el mismo (se vincula permanentemente
-        y el sync ya no lo vuelve a duplicar) o descártalo si es un proyecto distinto.
+        proyecto existente con un nombre parecido. Para cada uno, responde: <b>¿es el mismo proyecto?</b>
+        Si confirmas que sí, queda vinculado permanentemente y el sync ya no lo vuelve a duplicar.
       </p>
       <div v-if="!sugerencias.length" class="text-sm text-gray-400 py-6 text-center">
         No quedan sugerencias pendientes.
@@ -213,15 +213,15 @@
             </div>
             <div v-if="sug.candidato_sunfactory_id_previo != null" class="mt-1 text-xs" style="color:#b45309;">
               <i class="pi pi-exclamation-triangle" style="font-size:0.7rem;" />
-              Ya está vinculado al ID {{ sug.candidato_sunfactory_id_previo }} de Sun Factory —
-              vincular reemplazaría ese vínculo por este ({{ sug.sunfactory_project_id }}).
-              Puede ser que Sun Factory tenga el mismo proyecto duplicado con dos IDs.
+              Este proyecto ya había quedado confirmado antes como el ID {{ sug.candidato_sunfactory_id_previo }}
+              de Sun Factory. Si confirmas que también es el {{ sug.sunfactory_project_id }}, ese ID anterior
+              se reemplaza por este — puede ser que Sun Factory tenga el mismo proyecto duplicado con dos IDs.
             </div>
           </div>
           <div class="flex gap-2 flex-shrink-0">
             <Button label="No es el mismo" text severity="secondary" size="small"
               :disabled="vinculandoId === sug.candidato_id" @click="descartarSugerencia(sug)" />
-            <Button label="Vincular" size="small" :loading="vinculandoId === sug.candidato_id"
+            <Button label="Sí, es el mismo" size="small" :loading="vinculandoId === sug.candidato_id"
               @click="vincular(sug)" />
           </div>
         </div>
@@ -287,8 +287,8 @@ async function onSync(force) {
 async function vincular(sug) {
   if (sug.candidato_sunfactory_id_previo != null) {
     const ok = window.confirm(
-      `"${sug.candidato_nombre}" ya está vinculado al ID ${sug.candidato_sunfactory_id_previo} de Sun Factory. ` +
-      `¿Reemplazarlo por el ID ${sug.sunfactory_project_id}?`
+      `"${sug.candidato_nombre}" ya había quedado confirmado antes como el ID ${sug.candidato_sunfactory_id_previo} de Sun Factory. ` +
+      `¿Confirmas que también es el ID ${sug.sunfactory_project_id} (se reemplaza el anterior)?`
     )
     if (!ok) return
   }
