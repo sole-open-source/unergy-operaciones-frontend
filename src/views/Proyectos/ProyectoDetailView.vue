@@ -30,7 +30,7 @@
           <template v-if="!isEditMode">
             <InfoField label="Tipo" :value="proyecto.tipo_proyecto" />
             <InfoField label="Tecnología" :value="proyecto.tipo_tecnologia" />
-            <InfoField label="Potencia (kWp)" :value="proyecto.potencia_instalada_kwp" />
+            <InfoField label="Capacidad instalada (kWp)" :value="proyecto.info_tecnica?.capacidad_instalada_kwp" />
             <InfoField label="Departamento" :value="proyecto.departamento" />
             <InfoField label="Municipio" :value="proyecto.municipio" />
             <InfoField label="Operador de red" :value="proyecto.operador_red" />
@@ -51,8 +51,8 @@
               <Select v-model="editForm.tipo_tecnologia" :options="TIPOS_TECNOLOGIA" class="w-full" placeholder="Seleccionar" showClear />
             </div>
             <div class="flex flex-col gap-1">
-              <label class="field-label">Potencia (kWp)</label>
-              <InputNumber v-model="editForm.potencia_instalada_kwp" :maxFractionDigits="2" class="w-full" />
+              <label class="field-label">Capacidad instalada (kWp)</label>
+              <InputNumber v-model="editInfoTecnica.capacidad_instalada_kwp" :maxFractionDigits="3" class="w-full" />
             </div>
             <div class="flex flex-col gap-1">
               <label class="field-label">Departamento</label>
@@ -124,7 +124,6 @@
             <div>
               <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">General</p>
               <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <InfoField label="Potencia instalada (kWp)" :value="proyecto.potencia_instalada_kwp" />
                 <InfoField label="Potencia AC (kW)" :value="proyecto.info_tecnica?.potencia_ac_kw" />
                 <InfoField label="Capacidad instalada (kWp)" :value="proyecto.info_tecnica?.capacidad_instalada_kwp" />
                 <InfoField label="Voltaje red" :value="proyecto.info_tecnica?.voltaje_red" />
@@ -210,10 +209,6 @@
             <div>
               <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">General</p>
               <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
-                <div class="flex flex-col gap-1">
-                  <label class="field-label">Potencia instalada (kWp)</label>
-                  <InputNumber v-model="editForm.potencia_instalada_kwp" :maxFractionDigits="3" class="w-full" />
-                </div>
                 <div class="flex flex-col gap-1">
                   <label class="field-label">Potencia AC (kW)</label>
                   <InputNumber v-model="editInfoTecnica.potencia_ac_kw" :maxFractionDigits="3" class="w-full" />

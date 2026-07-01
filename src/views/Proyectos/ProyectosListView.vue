@@ -84,7 +84,7 @@
                   <th class="text-left px-4 py-2.5 font-medium text-gray-500 text-xs uppercase tracking-wide
                               whitespace-nowrap">Tipo</th>
                   <th class="text-right px-4 py-2.5 font-medium text-gray-500 text-xs uppercase tracking-wide
-                              whitespace-nowrap">kWp</th>
+                              whitespace-nowrap">Capacidad instalada (kWp)</th>
                   <th class="text-right px-4 py-2.5 font-medium text-gray-500 text-xs uppercase tracking-wide
                               whitespace-nowrap">Potencia AC (kW)</th>
                   <th class="text-left px-4 py-2.5 font-medium text-gray-500 text-xs uppercase tracking-wide
@@ -126,9 +126,9 @@
                     </span>
                   </td>
 
-                  <!-- kWp -->
+                  <!-- Capacidad instalada (pestaña Técnico) -->
                   <td class="px-4 py-2 text-right font-mono text-xs text-gray-500">
-                    {{ row.potencia_instalada_kwp ?? '—' }}
+                    {{ row.info_tecnica?.capacidad_instalada_kwp ?? '—' }}
                   </td>
 
                   <!-- Potencia AC (pestaña Técnico) -->
