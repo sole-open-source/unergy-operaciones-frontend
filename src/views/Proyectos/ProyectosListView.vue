@@ -3,6 +3,9 @@
     <!-- Header -->
     <PageHeader title="Proyectos" subtitle="Portafolio de plantas y servicios">
       <template #actions>
+        <Button label="Inversores minigranja" icon="pi pi-bolt" size="small" severity="secondary" outlined
+                :loading="invBackfillLoading" @click="previewInversoresBackfill"
+                v-tooltip.bottom="'Crear los 5 inversores típicos (3×300 + 50 + 40 kW) en minigranjas que aún no los tienen'" />
         <Button label="Nuevo proyecto" icon="pi pi-plus" size="small" @click="openNew" />
       </template>
     </PageHeader>
@@ -208,6 +211,47 @@
         <Button label="Eliminar" severity="danger" :loading="deleting" @click="doDelete" />
       </div>
     </Dialog>
+
+    <!-- Dialog: sembrar inversores típicos de minigranja -->
+    <Dialog v-model:visible="invBackfillVisible" header="Inversores típicos de minigranja" modal class="w-full max-w-2xl">
+      <div v-if="invBackfillReport" class="space-y-3 text-sm">
+        <p class="text-gray-700">
+          Se crearán los inversores típicos en cada proyecto que aún <b>no tiene ninguno</b>
+          (nunca duplica): <b>Inversor 1, 2, 3</b> de 300 kW, <b>Inversor 4</b> de 50 kW y
+          <b>Inversor 5</b> de 40 kW. Los números identifican cada inversor al reportar fallas.
+        </p>
+
+        <label class="flex items-center gap-2 text-gray-700 select-none cursor-pointer">
+          <input type="checkbox" v-model="invBackfillSoloMini" @change="previewInversoresBackfill" />
+          Solo proyectos con tipo <b>minigranja</b>
+          <span class="text-xs text-gray-400">(desmarca para incluir cualquier proyecto sin inversores)</span>
+        </label>
+
+        <div class="flex flex-wrap gap-4 p-3 rounded-lg" style="background:#F6F3FB;">
+          <span style="color:#16a34a;"><b>{{ invBackfillReport.a_sembrar }}</b> se sembrarán</span>
+          <span style="color:#7a6e8a;"><b>{{ invBackfillReport.ya_tienen_inversores }}</b> ya tienen inversores</span>
+          <span class="text-gray-400">{{ invBackfillReport.total_candidatos }} candidatos en total</span>
+        </div>
+
+        <div v-if="invBackfillReport.sembrados.length" class="max-h-60 overflow-y-auto border rounded-lg" style="border-color:#eee;">
+          <table class="w-full text-xs">
+            <tbody>
+              <tr v-for="r in invBackfillReport.sembrados" :key="r.id" class="border-t" style="border-color:#f0f0f0;">
+                <td class="px-3 py-1.5 text-gray-400">ID {{ r.id }}</td>
+                <td class="px-3 py-1.5">{{ r.nombre }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p v-else class="text-xs" style="color:#7a6e8a;">No hay proyectos pendientes de sembrar.</p>
+      </div>
+
+      <template #footer>
+        <Button label="Cancelar" text @click="invBackfillVisible = false" :disabled="invBackfillExecuting" />
+        <Button label="Sembrar" icon="pi pi-check" :loading="invBackfillExecuting"
+                :disabled="!invBackfillReport || !invBackfillReport.a_sembrar" @click="applyInversoresBackfill" />
+      </template>
+    </Dialog>
   </div>
 </template>
 
@@ -226,6 +270,46 @@ import ProyectoForm from './ProyectoForm.vue'
 
 const router = useRouter()
 const toast  = useToast()
+
+// ── Backfill inversores típicos de minigranja ────────────────────────────────
+const invBackfillVisible   = ref(false)
+const invBackfillReport    = ref(null)
+const invBackfillLoading   = ref(false)
+const invBackfillExecuting = ref(false)
+const invBackfillSoloMini  = ref(true)
+
+async function previewInversoresBackfill() {
+  invBackfillLoading.value = true
+  try {
+    const { data } = await api.post('/proyectos/inversores/backfill-minigranja', null,
+      { params: { dry_run: true, solo_minigranja: invBackfillSoloMini.value } })
+    invBackfillReport.value = data
+    invBackfillVisible.value = true
+  } catch (e) {
+    toast.add({ severity: 'error', summary: 'No se pudo previsualizar',
+      detail: e.response?.data?.detail || e.message, life: 5000 })
+  } finally {
+    invBackfillLoading.value = false
+  }
+}
+
+async function applyInversoresBackfill() {
+  invBackfillExecuting.value = true
+  try {
+    const { data } = await api.post('/proyectos/inversores/backfill-minigranja', null,
+      { params: { dry_run: false, solo_minigranja: invBackfillSoloMini.value } })
+    toast.add({ severity: 'success', summary: 'Inversores sembrados',
+      detail: `${data.a_sembrar} proyectos ahora tienen sus 5 inversores`, life: 5000 })
+    invBackfillVisible.value = false
+    invBackfillReport.value = null
+    await load()
+  } catch (e) {
+    toast.add({ severity: 'error', summary: 'El backfill falló',
+      detail: e.response?.data?.detail || e.message, life: 6000 })
+  } finally {
+    invBackfillExecuting.value = false
+  }
+}
 
 // ── Catálogos ──────────────────────────────────────────────────────────────────
 const ESTADOS       = ['en_desarrollo', 'en_operacion', 'suspendido', 'cancelado']
