@@ -187,6 +187,7 @@ import Button from 'primevue/button'
 import ProgressSpinner from 'primevue/progressspinner'
 import api from '@/api/client'
 import { buildReportHtmlDoc } from '@/utils/rptStyles'
+import { tituloFalla } from '@/utils/fallaTitulo'
 
 const router = useRouter()
 
@@ -511,21 +512,32 @@ const fmtD = (iso) => {
 }
 const nextMes = (m) => MESES[m === 12 ? 0 : m]
 
+// Normaliza un nombre para cruzar entre sistemas: minúsculas, sin acentos ni
+// espacios extra (los nombres de proyecto difieren entre /fallas y getProjects).
+function normNombre(s) {
+  return String(s ?? '').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+}
+
 function getFaultsForRange(proyectoCfg, range) {
-  // El endpoint `getProjects` no devuelve `id`, así que cruzamos por `nombre_comercial`
-  // (presente tanto en /fallas como en /monitoreo/_legacy?action=getProjects).
-  const candidatos = [
+  // El endpoint `getProjects` no devuelve `id`, así que cruzamos por nombre.
+  // Se comparan TODOS los alias del proyecto (comercial, clientes, bitácora,
+  // display, sub_project) contra TODOS los alias que trae la falla, para no
+  // perder fallas cuando el nombre difiere entre sistemas.
+  const candidatos = new Set([
     proyectoCfg.nombre_comercial,
     proyectoCfg.nombre_clientes,
     proyectoCfg.nombre_display,
     proyectoCfg.nombre_bitacora,
-  ].filter(Boolean).map(n => String(n).trim().toLowerCase())
+    proyectoCfg.sub_project,
+  ].filter(Boolean).map(normNombre))
   return fallas.value.filter(f => {
     if (!f.fecha_identificacion) return false
     const fecha = f.fecha_identificacion.slice(0, 10)
     if (fecha < range.from || fecha > range.to) return false
-    const fname = (f.proyecto?.nombre_comercial || '').trim().toLowerCase()
-    return candidatos.includes(fname)
+    const p = f.proyecto || {}
+    const fNames = [p.nombre_comercial, p.nombre_clientes, p.nombre_bitacora, p.sub_project]
+      .filter(Boolean).map(normNombre)
+    return fNames.some(n => candidatos.has(n))
   })
 }
 
@@ -585,8 +597,18 @@ function buildWeeks(data, range, p90d) {
   })
 }
 
-function autoCause(code) {
-  const pre = String(code || '').charAt(0)
+// Causa raíz por CATEGORÍA estructurada (metodología actual de fallas), con
+// respaldo al código legacy numérico para fallas viejas sin clasificación.
+const CAUSA_POR_CATEGORIA = {
+  red: 'Ausencia o anomalía en el suministro eléctrico externo (operador de red)',
+  frontera: 'Falla en el sistema de medición / comunicación de la frontera comercial',
+  inversores: 'Falla o anomalía en inversor(es) del sistema fotovoltaico',
+  eventos_adversos: 'Evento adverso externo, no atribuible a la infraestructura del proyecto',
+}
+function autoCause(f) {
+  const cat = f?.clasificacion?.categoria
+  if (cat && CAUSA_POR_CATEGORIA[cat]) return CAUSA_POR_CATEGORIA[cat]
+  const pre = String(f?.tipo?.codigo || '').charAt(0)
   return ({
     '1': 'Falla en sistema de medición o comunicación de datos',
     '2': 'Falla eléctrica en componente del sistema fotovoltaico',
@@ -598,6 +620,15 @@ function autoCause(code) {
     '8': 'Incumplimiento administrativo o regulatorio',
     '9': 'Ausencia de suministro eléctrico externo (operador de red)',
   })[pre] || 'Causa identificada en campo — ver descripción del evento'
+}
+
+// Descripción del evento para el informe: el equipo/evento/detalle reportado
+// (clasificación estructurada) + la narrativa libre si aporta información extra.
+function eventoDesc(f) {
+  const t = tituloFalla(f)
+  const d = (f?.descripcion || '').trim()
+  if (d && normNombre(d) !== normNombre(t)) return `${t} — ${d}`
+  return t
 }
 function autoAction(f) {
   if (f.resolucion?.descripcion?.trim()) return f.resolucion.descripcion.trim()
@@ -935,11 +966,11 @@ function buildProjectPage(cfg, genRes, mf, range, pageNum, totalPages, fmoMeta) 
   let evHtml = ''
   if (mf.length) {
     mf.forEach(f => {
-      const desc = (f.descripcion?.trim() || f.tipo?.etiqueta || f.tipo?.codigo || '—').slice(0, 220)
+      const desc = eventoDesc(f).slice(0, 220)
       evHtml += `<tr><td style="white-space:nowrap;font-weight:700;color:#6B35C0">${esc(fmtD(f.fecha_identificacion))}</td>` +
         `<td style="text-align:center;white-space:nowrap">${esc(f.hora || '—')}</td>` +
         `<td>${esc(desc)}</td>` +
-        `<td>${esc(autoCause(f.tipo?.codigo))}</td>` +
+        `<td>${esc(autoCause(f))}</td>` +
         `<td>${esc(autoAction(f).slice(0, 220))}</td></tr>`
     })
   } else {
@@ -1001,7 +1032,7 @@ function buildProjectPage(cfg, genRes, mf, range, pageNum, totalPages, fmoMeta) 
     (avail.pct !== null ? `<div class="rpt-status-row">🔆 Disponibilidad: ${avail.pct.toFixed(1)}%</div>` : '') +
     `<div class="rpt-status-row">⚡ ${mf.length} evento(s) este período</div>` +
     (atypical.length ? `<div class="rpt-status-row" style="color:#F97316">⚠️ ${atypical.length} día(s) atípico(s)</div>` : '') +
-    (activos.length ? `<div class="rpt-status-row" style="color:#F97316">En proceso: ${esc(activos.map(f => f.tipo?.codigo || '?').slice(0, 3).join(', '))}</div>` : '') +
+    (activos.length ? `<div class="rpt-status-row" style="color:#F97316">En proceso: ${esc(activos.map(f => tituloFalla(f)).slice(0, 3).join(', '))}</div>` : '') +
     `<div class="rpt-status-row" style="margin-top:8px;padding-top:8px;border-top:1px solid #EDE8F5">Resp: ${esc(resp)}</div>` +
     '<div class="rpt-status-row">Contacto: operaciones@unergy.io</div>' +
     `<div class="rpt-status-row">Prox. reporte: ${esc(nextMes(range.month))} ${range.year}</div>` +
@@ -1098,10 +1129,18 @@ function calcSLA(f) {
   const fecha = f.fecha_identificacion?.slice(0, 10)
   if (!fecha) return { dias: 0, slaRevision: 2, slaLabel: 'Crítico (≥90%)', cumple: true }
   const dias = Math.max(0, Math.floor((Date.now() - new Date(fecha + 'T00:00:00')) / 86400000))
-  const pre = String(f.tipo?.codigo || '').charAt(0)
   let slaRevision = 2, slaLabel = 'Crítico (≥90%)'
-  if (pre === '1') { slaRevision = 3; slaLabel = 'Grave (66-90%)' }
-  else if (pre === '4' || pre === '5') { slaRevision = 4; slaLabel = 'Medio (<66%)' }
+  const cat = f?.clasificacion?.categoria
+  if (cat) {
+    // red = desconexión de suministro → crítico; frontera/inversores → grave;
+    // eventos adversos externos → medio.
+    if (cat === 'frontera' || cat === 'inversores') { slaRevision = 3; slaLabel = 'Grave (66-90%)' }
+    else if (cat === 'eventos_adversos') { slaRevision = 4; slaLabel = 'Medio (<66%)' }
+  } else {
+    const pre = String(f.tipo?.codigo || '').charAt(0)
+    if (pre === '1') { slaRevision = 3; slaLabel = 'Grave (66-90%)' }
+    else if (pre === '4' || pre === '5') { slaRevision = 4; slaLabel = 'Medio (<66%)' }
+  }
   const cumple = f.estado?.codigo === 'cerrada' ? true : dias <= slaRevision
   return { dias, slaRevision, slaLabel, cumple }
 }
@@ -1216,7 +1255,7 @@ function buildFMOPage(cfg, genRes, mf, range, fmoData) {
     fallasSla.forEach(x => {
       const f = x.f
       const sla = x.sla
-      const desc = (f.descripcion?.trim() || f.tipo?.etiqueta || f.tipo?.codigo || '—').slice(0, 110)
+      const desc = eventoDesc(f).slice(0, 110)
       slaHtml += '<tr>' +
         `<td style="font-weight:700;color:#6B35C0;font-size:10px">${esc(fmtD(f.fecha_identificacion))}</td>` +
         `<td>${esc(desc)}</td>` +
