@@ -52,6 +52,20 @@
             @change="loadAnnualData"
           />
         </div>
+        <div class="flex gap-2 ml-auto">
+          <Button label="Exportar (Excel)" icon="pi pi-file-excel" size="small" outlined
+            :disabled="!anualData || chartLoading || exportingExcel || exportingPdf"
+            :loading="exportingExcel"
+            @click="exportarAnualExcel"
+            v-tooltip.bottom="selectedContratoId === CONSOLIDADO_ID ? 'Una hoja por contrato + resumen consolidado, con plantas participantes' : 'Detalle mensual del contrato con plantas participantes'"
+            style="color:#915BD8; border-color:#915BD8;" />
+          <Button label="Descargar PDF" icon="pi pi-file-pdf" size="small" outlined
+            :disabled="!anualData || chartLoading || exportingExcel || exportingPdf"
+            :loading="exportingPdf"
+            @click="exportarAnualPdf"
+            v-tooltip.bottom="'PDF presentable para compartir con el inversionista'"
+            style="color:#2C2039; border-color:#2C2039;" />
+        </div>
       </div>
 
       <!-- Chart loading -->
@@ -2623,6 +2637,243 @@ function onYearChange() { loadAnnualData(); loadTableData() }
 function selectContrato(id) {
   selectedContratoId.value = id
   loadAnnualData()
+}
+
+// ── Exportar matriz anual (Excel / PDF) ────────────────────────────────────────
+// Respeta el filtro activo de la pestaña Cumplimiento: un contrato puntual, o
+// CONSOLIDADO_ID (todos). Reutiliza cachedGet, así que en modo consolidado el
+// detalle por contrato normalmente ya está en caché (loadConsolidado lo trajo).
+const exportingExcel = ref(false)
+const exportingPdf   = ref(false)
+
+async function fetchContratoAnualCached(id, year) {
+  return cachedGet(`/cumplimiento/ppa/${id}/anual`, { year })
+}
+
+function styleAnualSheet(XLSX, ws, built) {
+  const C = { morado: '915BD8', oscuro: '2C2039', blanco: 'FFFFFF' }
+  const setStyle = (r, c, s) => {
+    const ref = XLSX.utils.encode_cell({ r, c })
+    if (!ws[ref]) ws[ref] = { t: 's', v: '' }
+    ws[ref].s = s
+  }
+  setStyle(0, 0, { font: { bold: true, sz: 13, color: { rgb: C.oscuro } } })
+  setStyle(1, 0, { font: { bold: true, sz: 12, color: { rgb: C.morado } } })
+  setStyle(2, 0, { font: { italic: true, color: { rgb: '7A6E8A' } } })
+
+  for (let c = 0; c < built.nCols; c++) {
+    setStyle(built.headerRow, c, { font: { bold: true, color: { rgb: C.blanco } }, fill: { fgColor: { rgb: C.morado } }, alignment: { horizontal: 'center' } })
+    setStyle(built.totalRow, c, { font: { bold: true, color: { rgb: C.oscuro } } })
+  }
+  setStyle(built.plantHeaderRow - 1, 0, { font: { bold: true, sz: 11, color: { rgb: C.morado } } })
+  for (let c = 0; c < built.plantCols; c++) {
+    setStyle(built.plantHeaderRow, c, { font: { bold: true, color: { rgb: C.blanco } }, fill: { fgColor: { rgb: C.oscuro } }, alignment: { horizontal: 'center' } })
+    setStyle(built.plantTotalRow, c, { font: { bold: true, color: { rgb: C.oscuro } } })
+  }
+  ws['!merges'] = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: built.nCols - 1 } },
+    { s: { r: built.plantHeaderRow - 1, c: 0 }, e: { r: built.plantHeaderRow - 1, c: built.plantCols - 1 } },
+  ]
+  ws['!cols'] = [{ wch: 30 }, { wch: 18 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 18 }, { wch: 16 }]
+}
+
+async function exportarAnualExcel() {
+  if (!anualData.value) return
+  exportingExcel.value = true
+  try {
+    const XLSX = await import('xlsx-js-style')
+    const { construirContratoAnualAOA, sheetNameSafe, slugify } = await import('./cumplimientoAnualExport.js')
+    const year = selectedYear.value
+    const consolidado = selectedContratoId.value === CONSOLIDADO_ID
+    const wb = XLSX.utils.book_new()
+    const usedNames = new Set()
+
+    function addSheet(built, label) {
+      const ws = XLSX.utils.aoa_to_sheet(built.aoa)
+      styleAnualSheet(XLSX, ws, built)
+      let name = sheetNameSafe(label)
+      let i = 2
+      while (usedNames.has(name)) { name = sheetNameSafe(`${label} ${i}`); i++ }
+      usedNames.add(name)
+      XLSX.utils.book_append_sheet(wb, ws, name)
+    }
+
+    if (consolidado) {
+      const realContratos = contratos.value.filter(c => c.id !== CONSOLIDADO_ID)
+      const builtConsolidado = construirContratoAnualAOA({
+        contrato: {
+          nombre_interno: 'Consolidado',
+          numero_codigo_contrato: `${realContratos.length} contratos`,
+          comprador_nombre: 'Todos los compradores',
+        },
+        year,
+        meses: anualData.value.meses,
+        consolidado: true,
+      })
+      addSheet(builtConsolidado, 'Consolidado')
+
+      const resultados = await Promise.allSettled(realContratos.map(c => fetchContratoAnualCached(c.id, year)))
+      resultados.forEach((r, i) => {
+        if (r.status !== 'fulfilled') return
+        const data = r.value
+        const built = construirContratoAnualAOA({ contrato: data.contrato, year, meses: data.meses, consolidado: false })
+        addSheet(built, data.contrato.nombre_interno || data.contrato.numero_codigo_contrato || `Contrato ${realContratos[i].id}`)
+      })
+    } else {
+      const built = construirContratoAnualAOA({ contrato: anualData.value.contrato, year, meses: anualData.value.meses, consolidado: false })
+      addSheet(built, anualData.value.contrato.nombre_interno || anualData.value.contrato.numero_codigo_contrato || 'Contrato')
+    }
+
+    const slug = consolidado ? 'consolidado' : slugify(anualData.value.contrato.nombre_interno || anualData.value.contrato.numero_codigo_contrato || 'contrato')
+    XLSX.writeFile(wb, `matriz_anual_cumplimiento_${year}_${slug}.xlsx`)
+  } catch (e) {
+    console.error('Error exportando matriz anual a Excel', e)
+    chartError.value = 'No se pudo generar el Excel de la matriz anual.'
+  } finally {
+    exportingExcel.value = false
+  }
+}
+
+// Rasteriza el SVG del gráfico (100% atributos inline, sin CSS externo) a PNG
+// vía canvas, para poder incrustarlo en el PDF con jsPDF.addImage.
+function svgElementToPngDataUrl(svgEl, w, h, scale = 2) {
+  return new Promise((resolve, reject) => {
+    const clone = svgEl.cloneNode(true)
+    clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
+    clone.setAttribute('width', w)
+    clone.setAttribute('height', h)
+    const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect')
+    bg.setAttribute('x', '0'); bg.setAttribute('y', '0')
+    bg.setAttribute('width', String(w)); bg.setAttribute('height', String(h))
+    bg.setAttribute('fill', '#FFFFFF')
+    clone.insertBefore(bg, clone.firstChild)
+
+    const xml = new XMLSerializer().serializeToString(clone)
+    const svg64 = btoa(unescape(encodeURIComponent(xml)))
+    const img = new Image()
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = w * scale
+      canvas.height = h * scale
+      const ctx = canvas.getContext('2d')
+      ctx.scale(scale, scale)
+      ctx.drawImage(img, 0, 0, w, h)
+      resolve(canvas.toDataURL('image/png'))
+    }
+    img.onerror = reject
+    img.src = 'data:image/svg+xml;base64,' + svg64
+  })
+}
+
+async function exportarAnualPdf() {
+  if (!anualData.value) return
+  exportingPdf.value = true
+  try {
+    const { jsPDF } = await import('jspdf')
+    const { default: autoTable } = await import('jspdf-autotable')
+    const { prepararFilasMensuales, totalizarFilasMensuales, agregarPlantasAnuales, fmtNumExport, slugify } = await import('./cumplimientoAnualExport.js')
+
+    const svgEl = chartBox.value?.querySelector('svg')
+    const chartImg = svgEl ? await svgElementToPngDataUrl(svgEl, SVG_W, SVG_H, 2).catch(() => null) : null
+
+    const year = selectedYear.value
+    const consolidado = selectedContratoId.value === CONSOLIDADO_ID
+    const contrato = anualData.value.contrato
+    const filas = prepararFilasMensuales(anualData.value.meses)
+    const totales = totalizarFilasMensuales(filas)
+    const plantas = agregarPlantasAnuales(anualData.value.meses, { incluirContrato: consolidado })
+
+    const doc = new jsPDF({ unit: 'pt', format: 'a4' })
+    const pageW = doc.internal.pageSize.getWidth()
+    const pageH = doc.internal.pageSize.getHeight()
+    const marginX = 40
+
+    doc.setFillColor(44, 32, 57) // #2C2039
+    doc.rect(0, 0, pageW, 64, 'F')
+    doc.setTextColor(255, 255, 255)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(18)
+    doc.text('UNERGY', marginX, 30)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(10)
+    doc.text('Cumplimiento PPA · Matriz anual de cumplimiento', marginX, 47)
+
+    let y = 90
+    doc.setTextColor(44, 32, 57)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(14)
+    doc.text(contrato.nombre_interno || contrato.numero_codigo_contrato || 'Contrato', marginX, y)
+    y += 18
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(10)
+    doc.setTextColor(122, 110, 138)
+    const infoLine = consolidado
+      ? `Consolidado · ${contrato.numero_codigo_contrato || ''} · Año ${year}`
+      : `Contrato ${contrato.numero_codigo_contrato || '—'} · ${contrato.comprador_nombre || '—'} · Año ${year}`
+    doc.text(infoLine, marginX, y)
+    y += 20
+
+    if (chartImg) {
+      const renderW = pageW - marginX * 2
+      const renderH = renderW * (SVG_H / SVG_W)
+      doc.addImage(chartImg, 'PNG', marginX, y, renderW, renderH)
+      y += renderH + 20
+    }
+
+    autoTable(doc, {
+      startY: y,
+      margin: { left: marginX, right: marginX },
+      head: [['Mes', 'Generación (MWh)', 'Mínimo (MWh)', 'Máximo (MWh)', 'Estado', 'Compras bolsa (MWh)', 'Excedentes (MWh)']],
+      body: filas.map(f => [f.mes, fmtNumExport(f.genMwh), fmtNumExport(f.minMwh), fmtNumExport(f.maxMwh), f.estadoLabel, fmtNumExport(f.comprasBolsaMwh), fmtNumExport(f.excedentesMwh)]),
+      foot: [['TOTAL', fmtNumExport(totales.genMwh), fmtNumExport(totales.minMwh), fmtNumExport(totales.maxMwh), '', fmtNumExport(totales.comprasBolsaMwh), fmtNumExport(totales.excedentesMwh)]],
+      headStyles: { fillColor: [145, 91, 216], textColor: 255, fontStyle: 'bold' },
+      footStyles: { fillColor: [246, 255, 114], textColor: [44, 32, 57], fontStyle: 'bold' },
+      styles: { fontSize: 9, cellPadding: 4 },
+      theme: 'grid',
+    })
+
+    let y2 = doc.lastAutoTable.finalY + 24
+    if (y2 > pageH - 140) { doc.addPage(); y2 = 40 }
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(12)
+    doc.setTextColor(44, 32, 57)
+    doc.text(`Plantas participantes (${plantas.length})`, marginX, y2)
+
+    const plantHead = consolidado
+      ? ['Planta', 'Contrato', '% Despacho', 'Generación aportada (MWh)']
+      : ['Planta', '% Despacho', 'Generación aportada (MWh)']
+    const plantBody = plantas.map(p => consolidado
+      ? [p.nombre, p.contrato, p.pctDespacho != null ? Math.round(p.pctDespacho * 100) + '%' : '—', fmtNumExport(p.genAportadaMwh)]
+      : [p.nombre, p.pctDespacho != null ? Math.round(p.pctDespacho * 100) + '%' : '—', fmtNumExport(p.genAportadaMwh)])
+
+    autoTable(doc, {
+      startY: y2 + 10,
+      margin: { left: marginX, right: marginX },
+      head: [plantHead],
+      body: plantBody,
+      headStyles: { fillColor: [44, 32, 57], textColor: 255, fontStyle: 'bold' },
+      styles: { fontSize: 9, cellPadding: 4 },
+      theme: 'grid',
+    })
+
+    const pageCount = doc.internal.getNumberOfPages()
+    const fechaGen = new Date().toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' })
+    for (let p = 1; p <= pageCount; p++) {
+      doc.setPage(p)
+      doc.setFontSize(8)
+      doc.setTextColor(150)
+      doc.text(`Generado el ${fechaGen} · Unergy`, marginX, pageH - 20)
+      doc.text(`Página ${p} de ${pageCount}`, pageW - marginX - 60, pageH - 20)
+    }
+
+    const slug = consolidado ? 'consolidado' : slugify(contrato.nombre_interno || contrato.numero_codigo_contrato || 'contrato')
+    doc.save(`matriz_anual_cumplimiento_${year}_${slug}.pdf`)
+  } catch (e) {
+    console.error('Error exportando matriz anual a PDF', e)
+    chartError.value = 'No se pudo generar el PDF de la matriz anual.'
+  } finally {
+    exportingPdf.value = false
+  }
 }
 
 async function loadSimulator(retry = true) {
