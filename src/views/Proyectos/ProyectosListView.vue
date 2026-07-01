@@ -252,6 +252,20 @@
                 :disabled="!invBackfillReport || !invBackfillReport.a_sembrar" @click="applyInversoresBackfill" />
       </template>
     </Dialog>
+
+    <!-- Dialog: Nombre parecido a uno existente -->
+    <Dialog v-model:visible="duplicadoVisible" header="Proyecto parecido ya existe" modal class="w-full max-w-sm">
+      <p class="text-sm text-gray-700 mb-4">
+        Ya existe un proyecto con un nombre muy parecido:
+        <strong>{{ duplicadoInfo?.candidato_nombre }}</strong>
+        (ID {{ duplicadoInfo?.candidato_id }}).
+        Si de verdad es un proyecto distinto, puedes crearlo igual.
+      </p>
+      <div class="flex justify-end gap-2">
+        <Button label="Cancelar" severity="secondary" @click="duplicadoVisible = false" />
+        <Button label="Crear de todos modos" :loading="forzando" @click="crearForzado" />
+      </div>
+    </Dialog>
   </div>
 </template>
 
@@ -407,6 +421,10 @@ const dialogVisible = ref(false)
 const deleteVisible = ref(false)
 const deleteProyecto = ref(null)
 const deleting    = ref(false)
+const duplicadoVisible = ref(false)
+const duplicadoInfo = ref(null)   // { mensaje, candidato_id, candidato_nombre }
+const pendingPayload = ref(null)  // payload a reintentar con forzar=true
+const forzando = ref(false)
 const openSections = ref(new Set())    // reactive Set via full replacement
 
 const filters  = reactive({ q: '', estado: null, tipo_proyecto: null })
@@ -491,7 +509,32 @@ async function onCreate(payload) {
     dialogVisible.value = false
     load()
   } catch (e) {
-    toast.add({ severity: 'error', summary: 'Error', detail: e.response?.data?.detail, life: 4000 })
+    const detail = e.response?.data?.detail
+    // Aviso de nombre parecido (409 estructurado): se puede confirmar y crear
+    // igual. Distinto de un choque real de columna única (detail es un string).
+    if (e.response?.status === 409 && detail?.duplicado_nombre) {
+      duplicadoInfo.value = detail
+      pendingPayload.value = payload
+      duplicadoVisible.value = true
+      return
+    }
+    toast.add({ severity: 'error', summary: 'Error', detail: typeof detail === 'string' ? detail : 'Error al guardar', life: 4000 })
+  }
+}
+
+async function crearForzado() {
+  forzando.value = true
+  try {
+    await api.post('/proyectos', pendingPayload.value, { params: { forzar: true } })
+    toast.add({ severity: 'success', summary: 'Proyecto creado', life: 3000 })
+    duplicadoVisible.value = false
+    dialogVisible.value = false
+    load()
+  } catch (e) {
+    const detail = e.response?.data?.detail
+    toast.add({ severity: 'error', summary: 'Error', detail: typeof detail === 'string' ? detail : 'Error al guardar', life: 4000 })
+  } finally {
+    forzando.value = false
   }
 }
 
