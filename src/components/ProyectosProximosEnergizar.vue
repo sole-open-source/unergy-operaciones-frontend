@@ -42,6 +42,17 @@
       <span>{{ warning }}</span>
     </div>
 
+    <!-- Sugerencias de vínculo pendientes (el sync no encontró match exacto, pero
+         un proyecto existente se parece — necesitan confirmación humana) -->
+    <div v-if="sugerencias.length" class="mx-3 mt-3 flex items-start gap-2 px-3 py-2 rounded-lg text-xs"
+      style="background: rgba(145,91,216,0.10); border: 1px solid rgba(145,91,216,0.30); color: #6b3fa0;">
+      <i class="pi pi-info-circle mt-0.5" />
+      <span>
+        {{ sugerencias.length }} posible{{ sugerencias.length !== 1 ? 's' : '' }} vínculo{{ sugerencias.length !== 1 ? 's' : '' }} con Sun Factory por confirmar.
+        <button type="button" class="underline font-semibold" @click="sugerenciasVisible = true">Revisar</button>
+      </span>
+    </div>
+
     <!-- Table -->
     <div class="p-3 overflow-x-auto">
       <DataTable
@@ -178,24 +189,64 @@
         </Column>
       </DataTable>
     </div>
+
+    <!-- Dialog: sugerencias de vínculo con Sun Factory -->
+    <Dialog v-model:visible="sugerenciasVisible" header="Posibles vínculos con Sun Factory" modal class="w-full max-w-2xl">
+      <p class="text-sm text-gray-600 mb-3">
+        El sync no encontró un match exacto para estos proyectos de Sun Factory, pero encontró un
+        proyecto existente con un nombre parecido. Confirma si es el mismo (se vincula permanentemente
+        y el sync ya no lo vuelve a duplicar) o descártalo si es un proyecto distinto.
+      </p>
+      <div v-if="!sugerencias.length" class="text-sm text-gray-400 py-6 text-center">
+        No quedan sugerencias pendientes.
+      </div>
+      <div v-else class="space-y-3">
+        <div v-for="sug in sugerencias" :key="sug.sunfactory_project_id + '-' + sug.candidato_id"
+          class="flex items-center justify-between gap-3 p-3 rounded-lg border" style="border-color:#ECE7F2;">
+          <div class="text-sm">
+            <div><span class="text-gray-400">Sun Factory:</span> <b>{{ sug.sunfactory_nombre }}</b>
+              <span v-if="sug.sunfactory_municipio" class="text-gray-400"> · {{ sug.sunfactory_municipio }}</span>
+            </div>
+            <div class="mt-0.5"><span class="text-gray-400">Proyecto existente:</span>
+              <b>{{ sug.candidato_nombre }}</b> (ID {{ sug.candidato_id }})
+              <span v-if="sug.candidato_municipio" class="text-gray-400"> · {{ sug.candidato_municipio }}</span>
+            </div>
+          </div>
+          <div class="flex gap-2 flex-shrink-0">
+            <Button label="No es el mismo" text severity="secondary" size="small"
+              :disabled="vinculandoId === sug.candidato_id" @click="descartarSugerencia(sug)" />
+            <Button label="Vincular" size="small" :loading="vinculandoId === sug.candidato_id"
+              @click="vincular(sug)" />
+          </div>
+        </div>
+      </div>
+    </Dialog>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Button from 'primevue/button'
+import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import DatePicker from 'primevue/datepicker'
 import Select from 'primevue/select'
+import { useToast } from 'primevue/usetoast'
+import api from '@/api/client'
 import { useEnergizationProjects } from '@/composables/useEnergizationProjects'
 
 const {
   projects, loading, warning, syncing, lastSync,
   loadProjects, persistField, removeProject, syncNow,
 } = useEnergizationProjects()
+
+const toast = useToast()
+const sugerencias = ref([])
+const sugerenciasVisible = ref(false)
+const vinculandoId = ref(null)
 
 const STATUS_OPTIONS = ['En construcción', 'Pruebas', 'Próximo a energizar', 'Energizado']
 const MESES_CORTOS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
@@ -219,7 +270,32 @@ async function onSync(force) {
       msg += `\n\nAvisos:\n- ${r.warnings.join('\n- ')}`
     }
     window.alert(msg)
+
+    if (Array.isArray(r.sugerencias_vinculo) && r.sugerencias_vinculo.length) {
+      sugerencias.value = r.sugerencias_vinculo
+      sugerenciasVisible.value = true
+    }
   }
+}
+
+async function vincular(sug) {
+  vinculandoId.value = sug.candidato_id
+  try {
+    await api.post(`/proyectos/${sug.candidato_id}/vincular-sunfactory/${sug.sunfactory_project_id}`)
+    sugerencias.value = sugerencias.value.filter(s => s !== sug)
+    toast.add({ severity: 'success', summary: 'Vinculado', detail: `${sug.candidato_nombre} vinculado a Sun Factory`, life: 3000 })
+  } catch (e) {
+    toast.add({ severity: 'error', summary: 'No se pudo vincular', detail: e.response?.data?.detail || e.message, life: 5000 })
+  } finally {
+    vinculandoId.value = null
+  }
+}
+
+function descartarSugerencia(sug) {
+  // Solo la quita de esta lista local (no persiste "descartado"): si de verdad
+  // es un proyecto distinto, el sync la va a volver a sugerir la próxima vez
+  // que corra, hasta que alguien la vincule o cree el proyecto correcto a mano.
+  sugerencias.value = sugerencias.value.filter(s => s !== sug)
 }
 
 function confirmRemove(project) {
