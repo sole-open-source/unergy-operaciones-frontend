@@ -152,11 +152,11 @@
                 <template #body="{ data }">
                   <div class="flex items-start gap-2">
                     <span class="cat-dot mt-1.5 flex-shrink-0"
-                      :style="{ background: data.tipo?.categoria?.color_hex || '#915BD8' }"
-                      v-tooltip.top="data.tipo?.categoria?.etiqueta || ''" />
+                      :style="{ background: categoriaFalla(data).color }"
+                      v-tooltip.top="categoriaFalla(data).etiqueta" />
                     <div class="min-w-0 flex-1">
                       <div class="text-xs font-medium text-gray-700 flex items-center gap-1.5 flex-wrap">
-                        <span class="truncate">{{ data.tipo?.etiqueta || data.tipo_libre || 'Sin tipo' }}</span>
+                        <span class="truncate">{{ tituloFalla(data) }}</span>
                         <span v-if="recurrencias(data) > 1"
                           class="inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0"
                           style="background: rgba(234,88,12,0.12); color: #ea580c;"
@@ -267,6 +267,7 @@
 
               <!-- ── HERO ─────────────────────────────────────────────── -->
               <section class="gf-hero">
+                <p class="gf-hero-title text-sm font-semibold text-gray-800 mb-1">{{ tituloFalla(drawerFalla) }}</p>
                 <p class="gf-hero-desc">{{ drawerFalla.descripcion }}</p>
 
                 <div class="flex flex-wrap gap-1.5">
@@ -274,8 +275,8 @@
                   <span class="prio-pill" :style="prioPillStyle(drawerFalla.prioridad?.codigo)">
                     {{ drawerFalla.prioridad?.etiqueta }}
                   </span>
-                  <Tag v-if="drawerFalla.tipo?.categoria" :value="drawerFalla.tipo.categoria.etiqueta"
-                    :style="catTagStyle(drawerFalla.tipo.categoria.color_hex)" />
+                  <Tag v-if="categoriaFalla(drawerFalla).etiqueta" :value="categoriaFalla(drawerFalla).etiqueta"
+                    :style="catTagStyle(categoriaFalla(drawerFalla).color)" />
                 </div>
 
                 <dl class="gf-facts">
@@ -551,6 +552,7 @@ import {
 } from 'chart.js'
 ChartJS.register(Tooltip, Legend, CategoryScale, LinearScale, BarElement, PointElement, LineElement, Title, Filler)
 import api from '@/api/client'
+import { tituloFalla, categoriaFalla } from '@/utils/fallaTitulo'
 
 const router         = useRouter()
 const toast          = useToast()
@@ -739,8 +741,8 @@ const filtradas = computed(() => {
       (f.codigo_interno || '').toLowerCase().includes(q) ||
       (f.descripcion || '').toLowerCase().includes(q) ||
       (f.proyecto?.nombre_comercial || '').toLowerCase().includes(q) ||
-      (f.tipo?.etiqueta || f.tipo_libre || '').toLowerCase().includes(q) ||
-      (f.tipo?.categoria?.etiqueta || '').toLowerCase().includes(q)
+      tituloFalla(f).toLowerCase().includes(q) ||
+      categoriaFalla(f).etiqueta.toLowerCase().includes(q)
     )
   }
   if (filtroProyecto.value)  arr = arr.filter(f => f.proyecto?.id === filtroProyecto.value)
