@@ -276,7 +276,13 @@ const ALL_GROUPS = [
       { to: '/fallas', label: 'Gestión de Fallas', icon: 'pi pi-wrench', roles: ['admin', 'operaciones', 'monitoreo'] },
       { to: '/alertas/monitoreo', label: 'Alarmas MGS', icon: 'pi pi-bell', roles: ['admin', 'operaciones', 'monitoreo'] },
       { to: '/operaciones/costos-variables', label: 'Costos Variables', icon: 'pi pi-receipt', roles: ['admin', 'operaciones'] },
-      { to: '/mem/fronteras',   label: 'Fronteras',        icon: 'pi pi-globe', roles: ['admin', 'operaciones', 'monitoreo'] },
+    ],
+  },
+  {
+    label: 'Fronteras Comerciales',
+    items: [
+      { to: '/mem/fronteras',         label: 'General',            icon: 'pi pi-globe',      roles: ['admin', 'operaciones', 'monitoreo'] },
+      { to: '/mem/reporte-energia',   label: 'Reporte de Energía', icon: 'pi pi-file-edit',  roles: ['admin', 'operaciones', 'monitoreo'] },
     ],
   },
   {

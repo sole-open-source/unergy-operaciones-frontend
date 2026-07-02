@@ -62,6 +62,7 @@ const routes = [
   // ── MEM ──────────────────────────────────────────────────────────
   { path: '/mem/gescon',       name: 'MemGescon',       component: () => import('@/views/MEM/GesconView.vue'),        meta: { roles: ['admin', 'operaciones'] } },
   { path: '/mem/fronteras',    name: 'MemFronteras',    component: () => import('@/views/MEM/FronterasView.vue'),     meta: { roles: ['admin', 'operaciones'] } },
+  { path: '/mem/reporte-energia', name: 'MemReporteEnergia', component: () => import('@/views/MEM/ReporteEnergiaView.vue'), meta: { roles: ['admin', 'operaciones'] } },
   { path: '/mem/precio-bolsa', name: 'MemPrecioBolsa',  component: () => import('@/views/MEM/PrecioBolsaView.vue') },
   { path: '/mem/balance',      name: 'MemBalance',      component: () => import('@/views/MEM/BalanceView.vue') },
   { path: '/mem/clima',        name: 'MemClima',        component: () => import('@/views/MEM/ClimaView.vue') },
