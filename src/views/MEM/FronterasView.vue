@@ -9,6 +9,10 @@
         </span>
         <Dropdown v-model="estadoFilter" :options="estadoOptions" optionLabel="label" optionValue="value"
                   placeholder="Estado" class="w-40" showClear />
+        <Dropdown v-model="proyectoFilter" :options="proyectoOptions" optionLabel="label" optionValue="value"
+                  placeholder="Proyecto" class="w-48" showClear filter />
+        <Dropdown v-model="operadorFilter" :options="operadorOptions" optionLabel="label" optionValue="value"
+                  placeholder="Operador" class="w-40" showClear />
         <Button icon="pi pi-chart-scatter" label="Diagrama Fasorial" size="small"
                 @click="showFasorial = true"
                 style="background: #915BD8; border-color: #915BD8;"
@@ -260,6 +264,8 @@ const loading = ref(true)
 const saving = ref(false)
 const search = ref('')
 const estadoFilter = ref(null)
+const proyectoFilter = ref(null)
+const operadorFilter = ref(null)
 const showEdit = ref(false)
 const editingFrontera = ref(null)
 const editForm = ref(null)
@@ -278,9 +284,32 @@ const opOptions = [
   { label: 'Fuera de servicio', value: 'fuera_servicio' },
 ]
 
+const proyectoOptions = computed(() => {
+  const seen = new Map()
+  for (const f of fronteras.value) {
+    if (f.proyecto_id != null && !seen.has(f.proyecto_id)) {
+      seen.set(f.proyecto_id, f.proyecto_nombre || `#${f.proyecto_id}`)
+    }
+  }
+  return [...seen.entries()]
+    .map(([value, label]) => ({ label, value }))
+    .sort((a, b) => a.label.localeCompare(b.label))
+})
+
+const operadorOptions = computed(() => {
+  const seen = new Set()
+  for (const f of fronteras.value) {
+    const nombre = f.operador_comercial || f.operador_red
+    if (nombre) seen.add(nombre)
+  }
+  return [...seen].sort().map(v => ({ label: v, value: v }))
+})
+
 const filteredFronteras = computed(() => {
   let list = fronteras.value
   if (estadoFilter.value) list = list.filter(f => f.estado === estadoFilter.value)
+  if (proyectoFilter.value) list = list.filter(f => f.proyecto_id === proyectoFilter.value)
+  if (operadorFilter.value) list = list.filter(f => (f.operador_comercial || f.operador_red) === operadorFilter.value)
   if (search.value) {
     const s = search.value.toLowerCase()
     list = list.filter(f =>
