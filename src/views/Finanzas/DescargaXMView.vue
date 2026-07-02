@@ -227,13 +227,24 @@ function detenerPolling() {
 }
 
 async function onDescargarArchivo(formato) {
-  const blob = await descargarArchivoXM(jobId.value, formato)
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = formato === 'xlsx' ? `${form.value.tipo}.xlsx` : `${form.value.tipo}.${form.value.extension}`
-  a.click()
-  URL.revokeObjectURL(url)
+  try {
+    const blob = await descargarArchivoXM(jobId.value, formato)
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = formato === 'xlsx' ? `${form.value.tipo}.xlsx` : `${form.value.tipo}.${form.value.extension}`
+    // El link debe estar en el DOM para que el click dispare la descarga
+    // en todos los navegadores (en algunos, un <a> fuera del documento
+    // no descarga nada aunque el .click() no lance error).
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    // Revocar la URL después de un tick, no antes: revocarla de
+    // inmediato puede cortar la descarga justo cuando arranca.
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  } catch (e) {
+    estado.value = { ...estado.value, estado: 'error', error_message: mensajeError(e, 'No se pudo descargar el archivo.') }
+  }
 }
 
 onBeforeUnmount(detenerPolling)
