@@ -1,5 +1,8 @@
 <template>
   <div class="space-y-5">
+    <TabView>
+      <TabPanel header="General">
+    <div class="space-y-5">
     <!-- Header -->
     <PageHeader title="Fronteras Comerciales" :subtitle="`${filteredFronteras.length} fronteras registradas`">
       <template #actions>
@@ -187,6 +190,14 @@
         <Button label="Guardar" :loading="saving" @click="saveFrontera" />
       </template>
     </Dialog>
+    </div>
+      </TabPanel>
+      <TabPanel header="Reporte de Energía">
+        <div class="p-8 text-center text-sm" style="color: #9b89b5;">
+          Próximamente.
+        </div>
+      </TabPanel>
+    </TabView>
   </div>
 </template>
 
@@ -197,6 +208,8 @@ import { useConfirm } from 'primevue/useconfirm'
 import api from '@/api/client'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
+import TabView from 'primevue/tabview'
+import TabPanel from 'primevue/tabpanel'
 import InputText from 'primevue/inputtext'
 import Dropdown from 'primevue/dropdown'
 import Tag from 'primevue/tag'
