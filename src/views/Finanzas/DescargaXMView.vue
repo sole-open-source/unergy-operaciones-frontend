@@ -205,16 +205,27 @@ function mensajeError(e, generico) {
   return e.response?.data?.detail || generico
 }
 
+const MAX_FALLOS_CONSECUTIVOS = 5 // ~10s de sondeos fallidos seguidos antes de darla por perdida
+let fallosConsecutivos = 0
+
 function iniciarPolling() {
   detenerPolling()
+  fallosConsecutivos = 0
   polling = setInterval(async () => {
     try {
       const data = await consultarEstadoXM(jobId.value)
+      fallosConsecutivos = 0
       estado.value = data
       if (data.estado === 'listo' || data.estado === 'error') detenerPolling()
     } catch (e) {
-      estado.value = { estado: 'error', error_message: mensajeError(e, 'Se perdió la conexión con el agente local.') }
-      detenerPolling()
+      // Un solo sondeo fallido no significa que la descarga se haya perdido —
+      // el agente puede tardar un momento en responder mientras procesa un
+      // archivo grande. Solo se da por perdida tras varios fallos seguidos.
+      fallosConsecutivos += 1
+      if (fallosConsecutivos >= MAX_FALLOS_CONSECUTIVOS) {
+        estado.value = { estado: 'error', error_message: mensajeError(e, 'Se perdió la conexión con el agente local.') }
+        detenerPolling()
+      }
     }
   }, 2000)
 }
