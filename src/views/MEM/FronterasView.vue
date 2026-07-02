@@ -76,7 +76,11 @@
             <span v-else class="text-xs" style="color: #c4b8d4;">—</span>
           </template>
         </Column>
-        <Column field="operador_red" header="Operador" sortable style="min-width: 120px" />
+        <Column field="operador_comercial" header="Operador" sortable style="min-width: 120px">
+          <template #body="{ data }">
+            {{ data.operador_comercial || data.operador_red || '—' }}
+          </template>
+        </Column>
         <Column field="capacidad_efectiva_mw" header="Cap. MW" sortable style="min-width: 100px">
           <template #body="{ data }">
             {{ data.capacidad_efectiva_mw ? Number(data.capacidad_efectiva_mw).toFixed(3) : '—' }}
@@ -284,6 +288,7 @@ const filteredFronteras = computed(() => {
       (f.nombre_frontera || '').toLowerCase().includes(s) ||
       (f.proyecto_nombre || '').toLowerCase().includes(s) ||
       (f.operador_red || '').toLowerCase().includes(s) ||
+      (f.operador_comercial || '').toLowerCase().includes(s) ||
       (f.municipio || '').toLowerCase().includes(s) ||
       (f.quoia_meter_id || '').toLowerCase().includes(s)
     )

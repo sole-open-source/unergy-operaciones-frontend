@@ -33,7 +33,7 @@
             <InfoField label="Capacidad instalada (kWp)" :value="proyecto.info_tecnica?.capacidad_instalada_kwp" />
             <InfoField label="Departamento" :value="proyecto.departamento" />
             <InfoField label="Municipio" :value="proyecto.municipio" />
-            <InfoField label="Operador de red" :value="proyecto.operador_red" />
+            <InfoField label="Operador de red" :value="proyecto.operador_red_legal || proyecto.operador_red" />
             <InfoField label="Clasificación" :value="proyecto.clasificacion_regulatoria" />
             <InfoField label="Carpeta Drive" :value="proyecto.carpeta_drive_codigo" />
             <InfoField label="API ID Unergy" :value="proyecto.sub_project" />
