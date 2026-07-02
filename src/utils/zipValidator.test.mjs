@@ -139,6 +139,59 @@ async function run() {
     assert(await codeOf(soloCarpetas) === 'EMPTY_ZIP', 'ZIP solo con carpetas: EMPTY_ZIP')
   }
 
+  // 8) REGRESIÓN: un ZIP de Arriendos zippeado a mano en Windows arrastra
+  //    Thumbs.db/desktop.ini junto a los PDF/JPG legítimos. NO debe rechazarse
+  //    el ZIP completo: los artefactos del SO se ignoran y los archivos de
+  //    negocio pasan. (Antes fallaba con DISALLOWED_FILE_TYPE por '.db'.)
+  {
+    const blob = await makeZipBlob({
+      'pago_1/COLXXP1_cuenta_cobro.pdf': 'x',
+      'pago_1/factura_electronica.jpg': 'img',
+      'pago_1/Thumbs.db': 'thumbcache',
+      'desktop.ini': '[.ShellClassInfo]',
+    })
+    const res = await validateZipFile(blob, { allowedExtensions: ALLOWED_EXTENSIONS_ARRIENDOS })
+    assert(res.entries.length === 2,
+      `ZIP con Thumbs.db/desktop.ini: pasa e ignora los artefactos (2 entradas, obtuvo ${res.entries.length})`)
+    assert(!res.entries.some(p => /thumbs\.db|desktop\.ini/i.test(p)),
+      'ZIP con basura del SO: los artefactos NO entran a entries')
+  }
+
+  // 8b) Artefactos de macOS (.DS_Store, __MACOSX/, ._*) también se ignoran.
+  {
+    const blob = await makeZipBlob({
+      'pago_1/cuenta.pdf': 'x',
+      '.DS_Store': 'macjunk',
+      '__MACOSX/pago_1/._cuenta.pdf': 'forkjunk',
+    })
+    const res = await validateZipFile(blob, { allowedExtensions: ALLOWED_EXTENSIONS_ARRIENDOS })
+    assert(res.entries.length === 1,
+      `ZIP con artefactos macOS: solo 1 entrada real (obtuvo ${res.entries.length})`)
+  }
+
+  // 8c) Un ejecutable NO puede colarse escondido en una ruta __MACOSX/ — la
+  //     blocklist se evalúa antes que el ignore de artefactos.
+  {
+    const blob = await makeZipBlob({ 'pago_1/cuenta.pdf': 'x', '__MACOSX/malware.exe': 'MZ' })
+    assert(await codeOf(blob, { allowedExtensions: ALLOWED_EXTENSIONS_ARRIENDOS }) === 'DANGEROUS_FILE_FOUND',
+      'Ejecutable dentro de __MACOSX/: DANGEROUS_FILE_FOUND (blocklist gana al ignore)')
+  }
+
+  // 8d) Un ZIP que SOLO trae basura del SO no tiene archivos procesables → EMPTY_ZIP.
+  {
+    const blob = await makeZipBlob({ 'Thumbs.db': 'x', 'desktop.ini': 'y' })
+    assert(await codeOf(blob, { allowedExtensions: ALLOWED_EXTENSIONS_ARRIENDOS }) === 'EMPTY_ZIP',
+      'ZIP solo con artefactos del SO: EMPTY_ZIP (nada procesable)')
+  }
+
+  // 8e) La allowlist SIGUE siendo estricta para archivos inesperados que NO son
+  //     basura del SO (un .txt cualquiera) → DISALLOWED_FILE_TYPE (sin regresión).
+  {
+    const blob = await makeZipBlob({ 'pago_1/cuenta.pdf': 'x', 'notas.txt': 'hola' })
+    assert(await codeOf(blob, { allowedExtensions: ALLOWED_EXTENSIONS_ARRIENDOS }) === 'DISALLOWED_FILE_TYPE',
+      'ZIP con .txt inesperado: DISALLOWED_FILE_TYPE (allowlist sigue estricta)')
+  }
+
   console.log(ok ? '\n✅ Todos los tests pasaron' : '\n❌ Hay tests fallidos')
   process.exit(ok ? 0 : 1)
 }

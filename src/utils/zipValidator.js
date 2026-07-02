@@ -63,6 +63,24 @@ function isPathTraversal(path) {
   return path.split(/[/\\]/).some(seg => seg === '..')
 }
 
+// Artefactos que el sistema operativo inyecta automáticamente al comprimir una
+// carpeta, NO archivos de negocio: Windows (Thumbs.db, desktop.ini) y macOS
+// (.DS_Store y los "resource forks" __MACOSX/ y ._*). No son peligrosos y el
+// usuario no los puso a propósito, así que se IGNORAN (no entran a `entries`) en
+// vez de rechazar el ZIP completo. Sin esto, una carpeta de Arriendos con JPGs
+// zippeada a mano en Windows arrastra Thumbs.db y el ZIP legítimo (formato D con
+// factura .jpg) se rechazaría por 'tipo no permitido (.db)' — regresión sobre un
+// flujo que antes funcionaba. La blocklist de ejecutables se evalúa ANTES que
+// esto, así que un artefacto no puede usarse para colar código.
+const OS_ARTIFACT_NAMES = new Set(['thumbs.db', 'desktop.ini', '.ds_store'])
+function isBenignOsArtifact(path) {
+  const segments = path.split(/[/\\]/)
+  const base = (segments.pop() || '').toLowerCase()
+  if (OS_ARTIFACT_NAMES.has(base)) return true
+  if (base.startsWith('._')) return true                   // AppleDouble resource fork
+  return segments.includes('__MACOSX')
+}
+
 
 /**
  * Valida un archivo ZIP de forma estricta.
@@ -94,7 +112,7 @@ export async function validateZipFile(file, opts = {}) {
   if (!ZIP_MAGIC.every((b, i) => magic[i] === b)) {
     throw new ZipValidationError(
       'INVALID_MAGIC_NUMBER',
-      'El archivo no es un ZIP válido (firma de formato incorrecta).',
+      'El archivo no es un ZIP válido o está dañado.',
     )
   }
 
@@ -119,7 +137,7 @@ export async function validateZipFile(file, opts = {}) {
     if (isPathTraversal(path)) {
       throw new ZipValidationError(
         'ZIP_SLIP_DETECTED',
-        `El ZIP contiene una ruta no permitida (posible ataque de path traversal): ${path}`,
+        'El ZIP contiene rutas de archivo no válidas y fue rechazado por seguridad.',
         path,
       )
     }
@@ -136,6 +154,11 @@ export async function validateZipFile(file, opts = {}) {
         path,
       )
     }
+
+    // Basura del SO (Thumbs.db, desktop.ini, .DS_Store, __MACOSX/, ._*): se
+    // ignora sin tumbar el ZIP. Va DESPUÉS de la blocklist para que un ejecutable
+    // no pueda esconderse detrás de una ruta __MACOSX/.
+    if (isBenignOsArtifact(path)) continue
 
     if (allow && ext && !allow.has(ext)) {
       throw new ZipValidationError(
