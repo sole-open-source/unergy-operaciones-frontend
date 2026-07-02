@@ -1,6 +1,12 @@
 // ──────────────────────────────────────────────────────────────────────────
 // Helpers compartidos del módulo de Liquidaciones (formato + cálculo del neto).
 // Fuente única de verdad — antes estaban duplicados en 4 vistas.
+//
+// @deprecated para lógica de negocio nueva: usa `useLiquidationsStore`
+// (src/stores/useLiquidationsStore.js), que centraliza y prueba el cálculo del
+// estado de resultados. Este archivo permanece como el MOTOR PURO y fuente de
+// verdad (el store lo importa) y sigue siendo el import directo de los muchos
+// componentes que sólo usan sus formateadores; por eso NO debe vaciarse.
 // ──────────────────────────────────────────────────────────────────────────
 import {
   ESTADO_SEVERITY, ESTADO_LABEL, ETIQUETAS, LABEL_SERVICIO,

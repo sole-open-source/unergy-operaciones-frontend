@@ -15,12 +15,13 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import * as XLSX from 'xlsx'
-import {
-  parseAsientos, extractMandate, suggestTag, reconciliar, fmt, norm as normNombre,
-  parseIngresos, matchIngresoContab,
-} from '@/utils/conciliacionMandatos.js'
+import { useMandatesStore } from '@/stores/useMandatesStore'
 
 const root = ref(null)
+
+// Store de dominio: centraliza el soporte contable cargado, el mapa recordado
+// planta→etiqueta y las operaciones de conciliación (envuelve el motor puro).
+const mandates = useMandatesStore()
 
 // IDs de las funciones globales que el markup invoca vía onclick — se limpian al desmontar
 const GLOBAL_FNS = [
@@ -224,19 +225,13 @@ function initValidador(el) {
   const $ = (id) => el.querySelector('#' + id)
 
   // ====== ESTADO GLOBAL ======
+  // El soporte contable cargado (contabilidadData / asientosDetalle /
+  // tagsAnaliticos) y el mapa recordado planta→etiqueta viven ahora en
+  // `useMandatesStore`; aquí sólo quedan los resultados de cruce que se pintan.
   let currentMode     = 'ingresos'
   let currentConcMode = 'ingresos'
-  let contabilidadData = []   // [{asociado, planta, valor_contabilidad}]  cargado desde xlsx (modo total)
   let concResults      = []   // resultados del cruce (modos ingresos/autoconsumo)
-
-  // --- Modo COSTOS: conciliación detallada por concepto ---
-  let asientosDetalle = []    // detalle línea-a-línea del xlsx (parseAsientos)
-  let tagsAnaliticos  = []    // etiquetas analíticas (proyectos) del xlsx
   let costosResults   = []    // [{mandato, tag, status, flags, sums, candidates, fileName}]
-  const TAGMAP_KEY = 'conc_costos_tagmap'
-  const loadTagMap = () => { try { return JSON.parse(localStorage.getItem(TAGMAP_KEY) || '{}') } catch { return {} } }
-  const saveTagMap = (m) => { try { localStorage.setItem(TAGMAP_KEY, JSON.stringify(m)) } catch { /* noop */ } }
-  let savedTagMap = loadTagMap()
 
   // ====== TABS ======
   function switchTab(tab) {
@@ -275,20 +270,17 @@ function initValidador(el) {
         //    el neto de 28150505 (mismo enfoque robusto de detección de columnas).
         //  - COSTOS: parseAsientos arma el detalle línea-a-línea (motor existente).
         const matriz = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
-        contabilidadData = parseIngresos(matriz)
-        try {
-          const pa = parseAsientos(matriz)
-          asientosDetalle = pa.details
-          tagsAnaliticos  = pa.tags
-        } catch (e2) { asientosDetalle = []; tagsAnaliticos = [] }
+        // El store procesa la matriz (parseIngresos + parseAsientos) y guarda el
+        // estado del soporte contable; devuelve los conteos para el rótulo.
+        const { grupos, lineas, tags } = mandates.loadContabilidad(matriz)
         const label = $('xlsxLabel')
         const esCostos = currentConcMode === 'costos'
-        const cuenta = esCostos ? asientosDetalle.length : contabilidadData.length
+        const cuenta = esCostos ? lineas : grupos
         label.innerHTML = `<b style="color:var(--ok)">✅ ${file.name}</b> — <span style="color:#64748b">${cuenta} ${esCostos ? 'líneas de detalle' : 'grupos inversionista+planta'} cargados</span>`
         $('dzExcel').classList.add('loaded')
         $('xlsxStatus').textContent = esCostos
-          ? `Periodo: ${detectPeriodo(rows)} · ${asientosDetalle.length} líneas · ${tagsAnaliticos.length} proyectos (etiquetas analíticas)`
-          : `Periodo: ${detectPeriodo(rows)} · Cuenta 28150505 (neto inversionista) · ${contabilidadData.length} grupos (inversionista + planta)`
+          ? `Periodo: ${detectPeriodo(rows)} · ${lineas} líneas · ${tags} proyectos (etiquetas analíticas)`
+          : `Periodo: ${detectPeriodo(rows)} · Cuenta 28150505 (neto inversionista) · ${grupos} grupos (inversionista + planta)`
         updateConcBtn()
       } catch(err) {
         $('xlsxLabel').innerHTML = `<span style="color:var(--err)">❌ Error leyendo el archivo: ${err.message}</span>`
@@ -335,8 +327,8 @@ function initValidador(el) {
   function updateConcBtn() {
     const hasPdfs  = $('concFileInput').files.length > 0
     const hasXlsx  = currentConcMode === 'costos'
-      ? asientosDetalle.length > 0
-      : contabilidadData.length > 0
+      ? mandates.asientosDetalle.length > 0
+      : mandates.contabilidadData.length > 0
     $('btnConc').disabled = !(hasPdfs && hasXlsx)
   }
 
@@ -401,7 +393,7 @@ function initValidador(el) {
 
       // Mandante + proyecto leídos del CUERPO del PDF (extractMandate, motor de
       // costos) — más robustos que inversionista/planta para EMPAREJAR por tokens.
-      const mand = extractMandate(fullText, file.name)
+      const mand = mandates.extractMandate(fullText, file.name)
 
       return {
         cmu, fileName: file.name, valorPagar,
@@ -458,13 +450,13 @@ function initValidador(el) {
       let mandato
       try {
         const text = await extractPdfLines(file)
-        mandato = extractMandate(text, file.name)
+        mandato = mandates.extractMandate(text, file.name)
       } catch (e) {
         mandato = { cmu: '', projName: '', mandante: '', nit: '', vals: {}, total: null }
       }
-      const sug = suggestTag(mandato.projName, tagsAnaliticos, savedTagMap)
-      const rec = reconciliar(mandato, asientosDetalle, sug.tag)
-      costosResults.push({ mandato, fileName: file.name, tag: sug.tag, sugStatus: sug.status, candidates: sug.candidates, ...rec })
+      // El store sugiere la etiqueta (contra el soporte cargado + mapa recordado)
+      // y concilia en un solo paso.
+      costosResults.push({ fileName: file.name, ...mandates.reconcileCosto(mandato) })
     }
 
     recalcCostosStats()
@@ -492,7 +484,7 @@ function initValidador(el) {
         tagControl = `<span style="color:#64748b;font-size:12px">Etiqueta analítica: <b>${r.tag}</b> <small>(${r.sugStatus})</small></span>`
       } else {
         const opts = ['<option value="">— elegir etiqueta —</option>']
-          .concat(tagsAnaliticos.map(t => `<option value="${t}" ${t === r.tag ? 'selected' : ''}>${t}</option>`)).join('')
+          .concat(mandates.tagsAnaliticos.map(t => `<option value="${t}" ${t === r.tag ? 'selected' : ''}>${t}</option>`)).join('')
         tagControl = `<span style="color:#64748b;font-size:12px">Etiqueta analítica: </span><select class="tol-input" style="width:auto;min-width:220px" onchange="setCostoTag(${idx}, this.value)">${opts}</select>`
       }
       const flagsHtml = r.flags.map(f => `<li style="color:${lvlColor[f.lvl]};font-size:12px;margin:2px 0">${f.txt}</li>`).join('')
@@ -512,8 +504,8 @@ function initValidador(el) {
     const r = costosResults[idx]
     if (!r) return
     r.tag = tag
-    if (tag && r.mandato.projName) { savedTagMap[normNombre(r.mandato.projName)] = tag; saveTagMap(savedTagMap) }
-    Object.assign(r, reconciliar(r.mandato, asientosDetalle, tag))
+    mandates.rememberTag(r.mandato.projName, tag)
+    Object.assign(r, mandates.reconcile(r.mandato, tag))
     r.sugStatus = tag ? 'recordado' : r.sugStatus
     recalcCostosStats()
     renderConcCostos()
@@ -556,7 +548,7 @@ function initValidador(el) {
       // Match con el motor de tokens (mismo criterio que costos): asociado por
       // palabra completa + planta por tokens (incluye números). Ver matchIngresoContab.
       const rec = (d.mandante || d.projName)
-                ? matchIngresoContab({ mandante: d.mandante, projName: d.projName }, contabilidadData) : null
+                ? mandates.matchIngreso({ mandante: d.mandante, projName: d.projName }) : null
       const contVal   = rec ? Math.abs(rec.valor_contabilidad) : null
       const diferencia= contVal !== null ? Math.round(d.valorPagar - contVal) : null
       const tol       = parseInt($('toleranceInput').value) || 200
@@ -571,7 +563,7 @@ function initValidador(el) {
     }
 
     // Registros contables sin PDF
-    const sinPdf = contabilidadData.filter(r =>
+    const sinPdf = mandates.contabilidadData.filter(r =>
       !contMatched.has(r.asociado+'|||'+r.planta) && r.valor_contabilidad < 0
     )
 
@@ -627,7 +619,7 @@ function initValidador(el) {
           const dAbs = Math.abs(r.diferencia)
           // Buscar en contabilidadData si hay entradas relacionadas con misma planta
           const np = norm(r.planta || '')
-          const relRows = contabilidadData.filter(cr => {
+          const relRows = mandates.contabilidadData.filter(cr => {
             const rp = norm(cr.planta)
             return (rp.includes(np) || np.includes(rp)) && Math.abs(cr.valor_contabilidad) > 1
           })
@@ -659,7 +651,7 @@ function initValidador(el) {
     }
 
     // Sin PDF
-    const sinPdf = sinPdfOverride || contabilidadData.filter(r =>
+    const sinPdf = sinPdfOverride || mandates.contabilidadData.filter(r =>
       !concResults.find(cr => cr.recKey === r.asociado+'|||'+r.planta) && r.valor_contabilidad < 0
     )
     const sinPdfSection = $('sinPdfSection')
@@ -698,7 +690,7 @@ function initValidador(el) {
       ].join(',') + '\n'
     }
     // Registros sin PDF
-    const sinPdf = contabilidadData.filter(r =>
+    const sinPdf = mandates.contabilidadData.filter(r =>
       !concResults.find(cr => cr.recKey === r.asociado+'|||'+r.planta) && r.valor_contabilidad < 0)
     for (const r of sinPdf) {
       csv += ['',`"${r.asociado}"`,`"${r.planta}"`, '', Math.round(Math.abs(r.valor_contabilidad)), '', 'SIN_PDF', ''].join(',') + '\n'

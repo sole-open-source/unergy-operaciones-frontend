@@ -1,6 +1,12 @@
 /**
  * conciliacionMandatos.js
  * ---------------------------------------------------------------------------
+ * @deprecated para consumo directo desde vistas: usa `useMandatesStore`
+ * (src/stores/useMandatesStore.js), que centraliza el estado del soporte
+ * contable y envuelve estas funciones. Este archivo permanece como el MOTOR
+ * PURO y fuente de verdad de las reglas (el store lo importa; no lo reimplementa),
+ * por lo que NO debe vaciarse.
+ * ---------------------------------------------------------------------------
  * Motor PURO (sin DOM ni framework) de conciliación "Mandato (PDF) vs. Asiento
  * contable (Odoo .xlsx)" para Finanzas → Validador de Mandatos → Conciliación
  * Contable → COSTOS.
