@@ -1,10 +1,18 @@
 import * as XLSX from 'xlsx'
 import XLSXStyle from 'xlsx-js-style'
+import { sanitizeCell } from '@/utils/excelSanitizer'
 
 const FONT = 'Arial'
 const PURPLE = '7030A0'
 const GREEN = 'C6EFCE'
 const MONEY = '$#,##0.00'
+
+// Sanea todos los valores string de un objeto-fila antes de volcarlo a la hoja.
+function sanitizeRow(row) {
+  const out = {}
+  for (const k in row) out[k] = sanitizeCell(row[k])
+  return out
+}
 
 function thinBorder() {
   const s = { style: 'thin', color: { rgb: '000000' } }
@@ -45,7 +53,7 @@ export function exportHojaMadreExcel(data, filename = 'garantias_hoja_madre.xlsx
     set(r, 0, 'AGENTE')
     const headerRow = r; r++
     const startData = r
-    for (const row of rows) { set(r, 1, row.label); set(r, 2, Number(row.valor) || 0); r++ }
+    for (const row of rows) { set(r, 1, sanitizeCell(row.label)); set(r, 2, Number(row.valor) || 0); r++ }
     const endData = r - 1
     const total = rows.reduce((s, x) => s + (Number(x.valor) || 0), 0)
     set(r, 1, 'TOTAL A PAGAR'); set(r, 2, total)
@@ -134,7 +142,7 @@ export function exportHojaMadreExcel(data, filename = 'garantias_hoja_madre.xlsx
 
 export function exportTablaExcel(rows, filename = 'tabla.xlsx') {
   if (!rows || !rows.length) return
-  const ws = XLSX.utils.json_to_sheet(rows)
+  const ws = XLSX.utils.json_to_sheet(rows.map(sanitizeRow))
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, 'Datos')
   XLSX.writeFile(wb, filename)
@@ -154,7 +162,7 @@ export function exportHistorialExcel(historial, filename = 'historial_garantias.
     Saldo: r.saldo,
     'Ajuste TXR': r.totalAjusteTXR,
   }))
-  const ws = XLSX.utils.json_to_sheet(rows)
+  const ws = XLSX.utils.json_to_sheet(rows.map(sanitizeRow))
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, 'Historial')
   XLSX.writeFile(wb, filename)
