@@ -725,10 +725,21 @@
                 <span class="font-bold text-sm" style="color: #2C2039;">{{ c.nombre }}</span>
                 <span class="ml-2 text-xs" style="color: #7a6e8a;">{{ c.comprador_nombre }}</span>
               </div>
-              <span class="text-xs font-mono px-2 py-0.5 rounded"
-                style="background: rgba(145,91,216,0.10); color: #915BD8;">
-                {{ c.plantas.length }} plantas
-              </span>
+              <div class="flex items-center gap-2 flex-shrink-0">
+                <span class="text-xs font-mono px-2 py-0.5 rounded"
+                  style="background: rgba(145,91,216,0.10); color: #915BD8;">
+                  {{ c.plantas.length }} plantas
+                </span>
+                <button
+                  @click="copiarImagenVenta(c)"
+                  class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors"
+                  :style="copiadoVentaId === c.id ? 'background: rgba(46,125,50,0.12); color: #2e7d32;' : 'background: #915BD8; color: white;'"
+                  v-tooltip.left="'Copia la imagen al portapapeles (o la descarga si el navegador no lo permite)'"
+                >
+                  <i class="pi text-xs" :class="copiadoVentaId === c.id ? 'pi-check' : 'pi-image'" />
+                  {{ copiadoVentaId === c.id ? '¡Copiado!' : 'Copiar imagen' }}
+                </button>
+              </div>
             </div>
             <div v-if="c.plantas.length" class="divide-y" style="border-color: rgba(44,32,57,0.05);">
               <div v-for="p in c.plantas" :key="p.id" class="px-4 py-2.5 flex items-center justify-between text-sm"
@@ -2472,6 +2483,156 @@ async function copiarImagenCapa(c) {
       const a = document.createElement('a')
       a.href = url
       a.download = `capa-${(c.nombre || 'contrato').replace(/[^\w-]+/g, '_')}.png`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    }
+  }, 'image/png')
+}
+
+// ── Copiar imagen de un contrato de venta (tab Proyectos → modo Venta) ────────
+// Mismo mecanismo que copiarImagenCapa: Canvas → PNG → portapapeles, con
+// fallback a descarga si el navegador no permite escribir imágenes.
+const copiadoVentaId = ref(null)
+
+function _renderVentaCanvas(c) {
+  const plantas = c.plantas || []
+  const DARK = '#2C2039', GREY = '#7a6e8a', PURPLE = '#915BD8', GOLD = '#9a6700'
+  const scale = 2
+  const W = 760, padX = 36
+  const headerH = 96, tableHeadH = 30, rowH = 34, footerH = 46
+  const bodyTop = headerH + tableHeadH
+  const H = bodyTop + Math.max(plantas.length, 1) * rowH + footerH
+
+  const canvas = document.createElement('canvas')
+  canvas.width = W * scale
+  canvas.height = H * scale
+  const ctx = canvas.getContext('2d')
+  ctx.scale(scale, scale)
+  ctx.textBaseline = 'alphabetic'
+
+  // Fondo + barra de acento
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(0, 0, W, H)
+  ctx.fillStyle = PURPLE
+  ctx.fillRect(0, 0, W, 6)
+
+  // ── Header: nombre + comprador ──
+  ctx.fillStyle = DARK
+  ctx.font = 'bold 21px Inter, Arial, sans-serif'
+  ctx.fillText(_truncarTexto(ctx, c.nombre || 'Contrato', W - padX * 2 - 130), padX, 42)
+  ctx.fillStyle = GREY
+  ctx.font = '13px Inter, Arial, sans-serif'
+  ctx.fillText(_truncarTexto(ctx, c.comprador_nombre || '', W - padX * 2 - 130), padX, 62)
+  ctx.fillStyle = PURPLE
+  ctx.font = 'bold 11px Inter, Arial, sans-serif'
+  ctx.fillText(`Período de consulta: ${MESES[pcMonth.value - 1]} ${pcYear.value}`, padX, 80)
+
+  // Pill "N plantas" arriba a la derecha
+  ctx.textBaseline = 'middle'
+  const pillTxt = `${plantas.length} planta${plantas.length === 1 ? '' : 's'}`
+  const f = 'bold 12px Inter, Arial, sans-serif'
+  ctx.font = f
+  const pillW = ctx.measureText(pillTxt).width + 18
+  _dibujarPill(ctx, W - padX - pillW, 30, pillTxt, 'rgba(145,91,216,0.12)', PURPLE, f)
+  ctx.textBaseline = 'alphabetic'
+
+  // ── Cabecera de tabla ──
+  const colVigR = W - padX
+  const colPctR = W - padX - 150
+  const colSicR = W - padX - 260
+  const yHead = headerH + 20
+  ctx.fillStyle = GREY
+  ctx.font = 'bold 10px Inter, Arial, sans-serif'
+  ctx.fillText('PROYECTO', padX, yHead)
+  ctx.textAlign = 'right'
+  ctx.fillText('CÓDIGO SIC', colSicR, yHead)
+  ctx.fillText('% DESPACHO', colPctR, yHead)
+  ctx.fillText('VIGENCIA', colVigR, yHead)
+  ctx.textAlign = 'left'
+
+  // ── Filas de plantas ──
+  if (!plantas.length) {
+    ctx.fillStyle = 'rgba(44,32,57,0.35)'
+    ctx.font = 'italic 13px Inter, Arial, sans-serif'
+    ctx.fillText(`Sin plantas asignadas en GESCON para ${MESES[pcMonth.value - 1]} ${pcYear.value}`, padX, bodyTop + 24)
+  }
+  plantas.forEach((p, i) => {
+    const yTop = bodyTop + i * rowH
+    const yMid = yTop + rowH / 2
+    if (i % 2 === 1) {
+      ctx.fillStyle = 'rgba(145,91,216,0.04)'
+      ctx.fillRect(padX - 8, yTop, W - padX * 2 + 16, rowH)
+    }
+    ctx.textBaseline = 'middle'
+    // Nombre + tag duplicado
+    ctx.fillStyle = p.es_duplicado ? GOLD : DARK
+    ctx.font = '600 13px Inter, Arial, sans-serif'
+    const nameMaxW = colSicR - padX - (p.es_duplicado ? 190 : 100)
+    const nombre = _truncarTexto(ctx, p.nombre || `Proyecto ${p.id}`, nameMaxW)
+    ctx.fillText(nombre, padX, yMid)
+    if (p.es_duplicado) {
+      const nx = padX + ctx.measureText(nombre).width + 8
+      _dibujarPill(ctx, nx, yMid - 9, 'Compra bolsa', 'rgba(240,192,64,0.22)', GOLD, 'bold 10px Inter, Arial, sans-serif')
+    }
+    // Código SIC
+    ctx.textAlign = 'right'
+    ctx.fillStyle = GREY
+    ctx.font = '12px Inter, Arial, sans-serif'
+    ctx.fillText(p.codigo_sic || '—', colSicR, yMid)
+    // % despacho
+    ctx.fillStyle = PURPLE
+    ctx.font = 'bold 12px Inter, Arial, sans-serif'
+    ctx.fillText(p.pct_despacho != null ? (p.pct_despacho * 100).toFixed(0) + '%' : '—', colPctR, yMid)
+    // Vigencia (rojo si vence pronto)
+    const vigencia = (p.fecha_inicio || p.fecha_fin) ? `${p.fecha_inicio || '—'} → ${p.fecha_fin || '—'}` : '—'
+    const vence = p.fecha_fin && isExpiringSoon(p.fecha_fin)
+    ctx.fillStyle = vence ? '#D64455' : GREY
+    ctx.font = (vence ? 'bold ' : '') + '12px Inter, Arial, sans-serif'
+    ctx.fillText(vigencia, colVigR, yMid)
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'alphabetic'
+  })
+
+  // ── Footer ──
+  ctx.fillStyle = '#faf8fc'
+  ctx.fillRect(0, H - footerH, W, footerH)
+  ctx.fillStyle = PURPLE
+  ctx.font = 'bold 12px Inter, Arial, sans-serif'
+  ctx.fillText('Unergy', padX, H - footerH / 2 + 1)
+  ctx.fillStyle = GREY
+  ctx.font = '11px Inter, Arial, sans-serif'
+  ctx.textBaseline = 'middle'
+  ctx.fillText('Plantas y contratos · Venta', padX + 58, H - footerH / 2 + 1)
+  ctx.textAlign = 'right'
+  ctx.fillText(`${MESES[pcMonth.value - 1]} ${pcYear.value}`, W - padX, H - footerH / 2 + 1)
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'alphabetic'
+
+  return canvas
+}
+
+async function copiarImagenVenta(c) {
+  let canvas
+  try {
+    canvas = _renderVentaCanvas(c)
+  } catch (e) {
+    console.error('No se pudo renderizar la imagen del contrato', e)
+    return
+  }
+  canvas.toBlob(async (blob) => {
+    if (!blob) return
+    try {
+      await navigator.clipboard.write([new window.ClipboardItem({ 'image/png': blob })])
+      copiadoVentaId.value = c.id
+      setTimeout(() => { if (copiadoVentaId.value === c.id) copiadoVentaId.value = null }, 2200)
+    } catch (e) {
+      // Fallback: el navegador no permite escribir imágenes al portapapeles → descargar
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `venta-${(c.nombre || 'contrato').replace(/[^\w-]+/g, '_')}.png`
       document.body.appendChild(a)
       a.click()
       a.remove()
