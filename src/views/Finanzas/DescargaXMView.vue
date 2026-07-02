@@ -6,6 +6,15 @@
     </div>
 
     <div class="max-w-3xl mx-auto mt-4 space-y-4">
+      <div class="rounded-xl border p-3 flex items-start gap-2" style="background:#F1EAF9;border-color:#E0D3F5">
+        <i class="pi pi-info-circle text-sm flex-shrink-0 mt-0.5" style="color:#6D28D9" />
+        <p class="text-xs" style="color:#4C1D95">
+          Esta pestaña necesita el <strong>agente local</strong> corriendo en tu computador (el FTP de XM
+          solo acepta conexiones desde tu máquina, no desde la plataforma). Abre
+          <code class="font-mono">iniciar_descarga_xm.bat</code> y déjalo abierto antes de descargar.
+        </p>
+      </div>
+
       <div class="rounded-xl border bg-white p-5" style="border-color:#ECE7F2">
         <div class="grid grid-cols-2 gap-4">
           <div class="flex flex-col gap-1">
@@ -101,7 +110,7 @@ import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import Select from 'primevue/select'
 import Checkbox from 'primevue/checkbox'
 import Button from 'primevue/button'
-import { iniciarDescargaXM, consultarEstadoXM, descargarArchivoXM } from '@/api/xm'
+import { iniciarDescargaXM, consultarEstadoXM, descargarArchivoXM, agenteLocalNoDisponible } from '@/api/xm'
 
 const TIPOS = ['dspcttos', 'aenc', 'BalCttos', 'grip', 'arrpas', 'tgrl', 'trsd', 'cxcsb']
 const EXTENSIONES = ['txf', 'txr', 'tx1', 'tx2', 'tx3', 'tx4', 'tx5', 'tx6', 'tx7', 'tx8']
@@ -185,8 +194,15 @@ async function onDescargar() {
     estado.value = { estado: 'descargando', archivos_procesados: 0, archivos_totales: 0 }
     iniciarPolling()
   } catch (e) {
-    estado.value = { estado: 'error', error_message: e.response?.data?.detail || 'No se pudo iniciar la descarga.' }
+    estado.value = { estado: 'error', error_message: mensajeError(e, 'No se pudo iniciar la descarga.') }
   }
+}
+
+function mensajeError(e, generico) {
+  if (agenteLocalNoDisponible(e)) {
+    return 'No se pudo conectar con el agente local. Abre "iniciar_descarga_xm.bat" en tu computador y déjalo abierto, luego intenta de nuevo.'
+  }
+  return e.response?.data?.detail || generico
 }
 
 function iniciarPolling() {
@@ -196,7 +212,8 @@ function iniciarPolling() {
       const data = await consultarEstadoXM(jobId.value)
       estado.value = data
       if (data.estado === 'listo' || data.estado === 'error') detenerPolling()
-    } catch {
+    } catch (e) {
+      estado.value = { estado: 'error', error_message: mensajeError(e, 'Se perdió la conexión con el agente local.') }
       detenerPolling()
     }
   }, 2000)
