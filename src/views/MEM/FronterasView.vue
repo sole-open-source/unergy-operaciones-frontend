@@ -74,13 +74,13 @@
             <span v-else class="text-xs" style="color: #9b89b5;">—</span>
           </template>
         </Column>
-        <Column field="nro_serie_med_ppal" header="Serial Ppal" style="min-width: 110px">
+        <Column field="nro_serie_med_ppal" header="Serial Medidor Principal" style="min-width: 170px">
           <template #body="{ data }">
             <span v-if="data.nro_serie_med_ppal" class="font-mono text-xs" style="color: #6b5a8a;">{{ data.nro_serie_med_ppal }}</span>
             <span v-else class="text-xs" style="color: #c4b8d4;">—</span>
           </template>
         </Column>
-        <Column field="nro_serie_med_resp" header="Serial Resp" style="min-width: 110px">
+        <Column field="nro_serie_med_resp" header="Serial Medidor Respaldo" style="min-width: 170px">
           <template #body="{ data }">
             <span v-if="data.nro_serie_med_resp" class="font-mono text-xs" style="color: #6b5a8a;">{{ data.nro_serie_med_resp }}</span>
             <span v-else class="text-xs" style="color: #c4b8d4;">—</span>
