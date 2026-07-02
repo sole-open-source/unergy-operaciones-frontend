@@ -19,6 +19,10 @@ import {
   parseAsientos, extractMandate, suggestTag, reconciliar, fmt, norm as normNombre,
   parseIngresos, matchIngresoContab,
 } from '@/utils/conciliacionMandatos.js'
+// Contenido no confiable (texto de PDFs/Excel del usuario, nombres de archivo…)
+// se sanea antes de inyectarlo con innerHTML para evitar XSS. La interpolación
+// {{ }} de Vue ya es segura; esto es solo para el HTML construido a mano.
+import { sanitizeText, sanitizeAttr } from '@/utils/sanitization.js'
 
 const root = ref(null)
 
@@ -284,14 +288,14 @@ function initValidador(el) {
         const label = $('xlsxLabel')
         const esCostos = currentConcMode === 'costos'
         const cuenta = esCostos ? asientosDetalle.length : contabilidadData.length
-        label.innerHTML = `<b style="color:var(--ok)">✅ ${file.name}</b> — <span style="color:#64748b">${cuenta} ${esCostos ? 'líneas de detalle' : 'grupos inversionista+planta'} cargados</span>`
+        label.innerHTML = `<b style="color:var(--ok)">✅ ${sanitizeText(file.name)}</b> — <span style="color:#64748b">${cuenta} ${esCostos ? 'líneas de detalle' : 'grupos inversionista+planta'} cargados</span>`
         $('dzExcel').classList.add('loaded')
         $('xlsxStatus').textContent = esCostos
           ? `Periodo: ${detectPeriodo(rows)} · ${asientosDetalle.length} líneas · ${tagsAnaliticos.length} proyectos (etiquetas analíticas)`
           : `Periodo: ${detectPeriodo(rows)} · Cuenta 28150505 (neto inversionista) · ${contabilidadData.length} grupos (inversionista + planta)`
         updateConcBtn()
       } catch(err) {
-        $('xlsxLabel').innerHTML = `<span style="color:var(--err)">❌ Error leyendo el archivo: ${err.message}</span>`
+        $('xlsxLabel').innerHTML = `<span style="color:var(--err)">❌ Error leyendo el archivo: ${sanitizeText(err.message)}</span>`
       }
     }
     reader.readAsArrayBuffer(file)
@@ -489,17 +493,17 @@ function initValidador(el) {
       const idx = costosResults.indexOf(r)
       let tagControl
       if (r.tag && (r.sugStatus === 'recordado' || r.sugStatus === 'auto')) {
-        tagControl = `<span style="color:#64748b;font-size:12px">Etiqueta analítica: <b>${r.tag}</b> <small>(${r.sugStatus})</small></span>`
+        tagControl = `<span style="color:#64748b;font-size:12px">Etiqueta analítica: <b>${sanitizeText(r.tag)}</b> <small>(${r.sugStatus})</small></span>`
       } else {
         const opts = ['<option value="">— elegir etiqueta —</option>']
-          .concat(tagsAnaliticos.map(t => `<option value="${t}" ${t === r.tag ? 'selected' : ''}>${t}</option>`)).join('')
+          .concat(tagsAnaliticos.map(t => `<option value="${sanitizeAttr(t)}" ${t === r.tag ? 'selected' : ''}>${sanitizeText(t)}</option>`)).join('')
         tagControl = `<span style="color:#64748b;font-size:12px">Etiqueta analítica: </span><select class="tol-input" style="width:auto;min-width:220px" onchange="setCostoTag(${idx}, this.value)">${opts}</select>`
       }
       const flagsHtml = r.flags.map(f => `<li style="color:${lvlColor[f.lvl]};font-size:12px;margin:2px 0">${f.txt}</li>`).join('')
       return `<div style="border:1px solid #e2e8f0;border-radius:10px;padding:12px;margin-bottom:10px">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:6px">
           <div><b style="color:var(--accent)">${r.mandato.cmu || '-'}</b>
-            <span style="font-size:12px;margin-left:8px">${r.mandato.mandante || '<span style="color:var(--warn)">mandante no detectado</span>'}</span></div>
+            <span style="font-size:12px;margin-left:8px">${sanitizeText(r.mandato.mandante) || '<span style="color:var(--warn)">mandante no detectado</span>'}</span></div>
           ${stBadge(r.status)}
         </div>
         <div style="margin-bottom:6px">${tagControl}</div>
@@ -633,7 +637,7 @@ function initValidador(el) {
           })
           if (relRows.length > 1) {
             detalle = relRows.map(cr =>
-              `<div style="white-space:nowrap;font-size:10px;color:#475569">${cr.planta.replace(/^(MINIGRANJA SOLAR |GD )/,'')}: <b>$${Math.round(Math.abs(cr.valor_contabilidad)).toLocaleString('es-CO')}</b></div>`
+              `<div style="white-space:nowrap;font-size:10px;color:#475569">${sanitizeText(cr.planta.replace(/^(MINIGRANJA SOLAR |GD )/,''))}: <b>$${Math.round(Math.abs(cr.valor_contabilidad)).toLocaleString('es-CO')}</b></div>`
             ).join('')
           } else {
             // Intentar identificar si es diferencia de redondeo, comercialización, etc.
@@ -642,13 +646,13 @@ function initValidador(el) {
             else detalle = `<span style="font-size:10px;color:var(--err)">Dif: $${dAbs.toLocaleString('es-CO')}</span>`
           }
         } else if (r.estado === 'SIN_CONTAB') {
-          detalle = `<span style="font-size:10px;color:var(--warn)">Planta: "${r.planta||'?'}"</span>`
+          detalle = `<span style="font-size:10px;color:var(--warn)">Planta: "${sanitizeText(r.planta) || '?'}"</span>`
         }
 
         tbody.innerHTML += `<tr>
           <td class="mono" style="color:var(--accent);font-weight:600">${r.cmu||'-'}</td>
-          <td style="font-size:12px;max-width:180px;word-break:break-word">${r.inversionista||'<span style="color:var(--warn)">No detectado</span>'}</td>
-          <td style="font-size:12px;max-width:160px;word-break:break-word">${r.planta||'<span style="color:var(--warn)">No detectado</span>'}</td>
+          <td style="font-size:12px;max-width:180px;word-break:break-word">${sanitizeText(r.inversionista) || '<span style="color:var(--warn)">No detectado</span>'}</td>
+          <td style="font-size:12px;max-width:160px;word-break:break-word">${sanitizeText(r.planta) || '<span style="color:var(--warn)">No detectado</span>'}</td>
           <td class="mono" style="text-align:right">$${Math.round(r.valorPagar).toLocaleString('es-CO')}</td>
           <td class="mono" style="text-align:right">${r.contVal!==null?'$'+Math.round(r.contVal).toLocaleString('es-CO'):'<span style="color:var(--warn)">—</span>'}</td>
           <td class="mono" style="text-align:right">${difStr}</td>
@@ -668,8 +672,8 @@ function initValidador(el) {
     if (sinPdf.length && !onlyDiff) {
       sinPdfSection.style.display = 'block'
       sinPdfBody.innerHTML = sinPdf.map(r => `<tr>
-        <td style="font-size:12px">${r.asociado}</td>
-        <td style="font-size:12px">${r.planta}</td>
+        <td style="font-size:12px">${sanitizeText(r.asociado)}</td>
+        <td style="font-size:12px">${sanitizeText(r.planta)}</td>
         <td class="mono" style="text-align:right;color:var(--warn)">$${Math.round(Math.abs(r.valor_contabilidad)).toLocaleString('es-CO')}</td>
       </tr>`).join('')
     } else {
@@ -726,7 +730,7 @@ function initValidador(el) {
     for (const file of files) {
       const card = document.createElement('div')
       card.className = 'card'
-      card.innerHTML = `<b style="font-size:12px">${file.name}</b><div class="spinner" style="margin-top:8px"></div>`
+      card.innerHTML = `<b style="font-size:12px">${sanitizeText(file.name)}</b><div class="spinner" style="margin-top:8px"></div>`
       container.appendChild(card)
 
       const res = await processPdf(file)
@@ -744,17 +748,17 @@ function initValidador(el) {
         err++
         reportContainer.style.display = 'block'
         reportBody.innerHTML += `<tr>
-          <td>${cmuInName||'S/N'}<br><small style="color:#94a3b8;font-size:10px">${file.name}</small></td>
+          <td>${cmuInName||'S/N'}<br><small style="color:#94a3b8;font-size:10px">${sanitizeText(file.name)}</small></td>
           <td class="mono">$${res.reported.toLocaleString()}</td>
           <td class="mono">$${res.expected.toLocaleString()}</td>
-          <td class="txt-err">${res.msg}</td>
+          <td class="txt-err">${sanitizeText(res.msg)}</td>
         </tr>`
       }
 
       card.innerHTML = `
         <span class="pill ${res.approved?'pill-ok':'pill-err'}">${res.approved?'CUMPLE':'RECHAZADO'}</span>
         <b style="font-size:12px;display:block;margin-right:65px;color:var(--accent)">${cmuInName||'Sin CMU'}</b>
-        <div style="font-size:11px;color:#64748b;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${file.name}</div>
+        <div style="font-size:11px;color:#64748b;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${sanitizeText(file.name)}</div>
         <div style="font-size:12px;margin-top:10px;display:grid;grid-template-columns:1fr 1fr;border-top:1px solid #f1f5f9;padding-top:8px">
           <div>Matemática: ${res.mathOk?'✅':'❌'}</div>
           ${(currentMode==='ingresos'||currentMode==='autoconsumo')?`<div>Marca (**): ${res.starOk?'✅':'❌'}</div>`:'<div></div>'}
