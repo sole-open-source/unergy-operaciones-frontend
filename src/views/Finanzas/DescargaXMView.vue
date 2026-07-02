@@ -1,0 +1,237 @@
+<template>
+  <div class="gf-page">
+    <div class="mon-tab-bar">
+      <i class="pi pi-cloud-download text-sm" style="color:#915BD8" />
+      <span class="text-base font-bold text-gray-800 whitespace-nowrap mr-2">Descarga de XM</span>
+    </div>
+
+    <div class="max-w-3xl mx-auto mt-4 space-y-4">
+      <div class="rounded-xl border bg-white p-5" style="border-color:#ECE7F2">
+        <div class="grid grid-cols-2 gap-4">
+          <div class="flex flex-col gap-1">
+            <label class="text-xs font-medium text-gray-500">Usuario FTP</label>
+            <input v-model="form.ftpUsuario" type="text" class="xm-input" autocomplete="off" />
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-xs font-medium text-gray-500">Clave FTP</label>
+            <input v-model="form.ftpClave" type="password" class="xm-input" autocomplete="off" />
+          </div>
+
+          <div class="col-span-2 flex items-center gap-2">
+            <Checkbox v-model="recordarCredenciales" binary inputId="xm-recordar" />
+            <label for="xm-recordar" class="text-xs text-gray-500">
+              Recordar en esta sesión del navegador
+            </label>
+          </div>
+
+          <div class="flex flex-col gap-1">
+            <label class="text-xs font-medium text-gray-500">Tipo de archivo</label>
+            <Select v-model="form.tipo" :options="TIPOS" placeholder="Selecciona…" />
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-xs font-medium text-gray-500">Extensión</label>
+            <Select v-model="form.extension" :options="EXTENSIONES" placeholder="Selecciona…" />
+          </div>
+
+          <div class="flex flex-col gap-1">
+            <label class="text-xs font-medium text-gray-500">Fecha inicio</label>
+            <input v-model="form.fechaInicio" type="date" class="xm-input" />
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-xs font-medium text-gray-500">Fecha fin</label>
+            <input v-model="form.fechaFin" type="date" class="xm-input" />
+          </div>
+
+          <div class="col-span-2 flex items-center gap-2" v-if="tipoEsEnriquecible">
+            <Checkbox v-model="form.enriquecer" binary inputId="xm-enriquecer" />
+            <label for="xm-enriquecer" class="text-xs text-gray-500">
+              Enriquecer con datos de planta Unergy (nombre + MW)
+            </label>
+          </div>
+        </div>
+
+        <div class="mt-4">
+          <Button
+            label="Descargar y unificar"
+            icon="pi pi-download"
+            :loading="enProceso"
+            :disabled="!formularioValido || enProceso"
+            @click="onDescargar"
+            style="background:#915BD8;border-color:#915BD8"
+          />
+        </div>
+      </div>
+
+      <div v-if="estado" class="rounded-xl border p-4" style="border-color:#ECE7F2">
+        <div v-if="estado.estado === 'descargando'" class="text-sm text-gray-600">
+          <i class="pi pi-spin pi-spinner mr-2" style="color:#915BD8" />
+          Descargando archivos… {{ estado.archivos_procesados }}/{{ estado.archivos_totales }}
+        </div>
+
+        <div v-else-if="estado.estado === 'unificando'" class="text-sm text-gray-600">
+          <i class="pi pi-spin pi-spinner mr-2" style="color:#915BD8" />
+          Unificando archivos…
+        </div>
+
+        <div v-else-if="estado.estado === 'listo'" class="space-y-2">
+          <div class="text-sm font-semibold" style="color:#2C2039">Listo</div>
+          <div v-if="estado.archivos_faltantes?.length" class="text-xs text-amber-600">
+            {{ estado.archivos_faltantes.length }} archivo(s) no encontrados en el FTP para el rango.
+          </div>
+          <div v-if="estado.codigos_sin_match?.length" class="text-xs text-amber-600">
+            Códigos sin match en fronteras: {{ estado.codigos_sin_match.join(', ') }}
+          </div>
+          <div class="flex gap-2">
+            <Button label="Descargar Excel" icon="pi pi-file-excel" size="small" @click="onDescargarArchivo('xlsx')" />
+            <Button label="Descargar TXT" icon="pi pi-file" size="small" outlined @click="onDescargarArchivo('txt')" />
+          </div>
+        </div>
+
+        <div v-else-if="estado.estado === 'error'" class="text-sm text-red-600">
+          <i class="pi pi-exclamation-circle mr-2" />
+          {{ estado.error_message || 'Ocurrió un error al procesar la descarga.' }}
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, computed, watch, onBeforeUnmount } from 'vue'
+import Select from 'primevue/select'
+import Checkbox from 'primevue/checkbox'
+import Button from 'primevue/button'
+import { iniciarDescargaXM, consultarEstadoXM, descargarArchivoXM } from '@/api/xm'
+
+const TIPOS = ['dspcttos', 'aenc', 'BalCttos', 'grip', 'arrpas', 'tgrl', 'trsd', 'cxcsb']
+const EXTENSIONES = ['txf', 'txr', 'tx1', 'tx2', 'tx3', 'tx4', 'tx5', 'tx6', 'tx7', 'tx8']
+const TIPOS_ENRIQUECIBLES = ['grip', 'arrpas', 'tgrl', 'cxcsb']
+const STORAGE_KEY = 'xm_credenciales_sesion'
+
+const form = ref({
+  ftpUsuario: '',
+  ftpClave: '',
+  tipo: null,
+  extension: null,
+  fechaInicio: '',
+  fechaFin: '',
+  enriquecer: false,
+})
+const recordarCredenciales = ref(false)
+
+const guardadas = sessionStorage.getItem(STORAGE_KEY)
+if (guardadas) {
+  try {
+    const { usuario, clave } = JSON.parse(guardadas)
+    form.value.ftpUsuario = usuario || ''
+    form.value.ftpClave = clave || ''
+    recordarCredenciales.value = true
+  } catch {
+    // ignorar sesión corrupta
+  }
+}
+
+watch(
+  [recordarCredenciales, () => form.value.ftpUsuario, () => form.value.ftpClave],
+  () => {
+    if (recordarCredenciales.value) {
+      sessionStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ usuario: form.value.ftpUsuario, clave: form.value.ftpClave })
+      )
+    } else {
+      sessionStorage.removeItem(STORAGE_KEY)
+    }
+  }
+)
+
+const tipoEsEnriquecible = computed(() => TIPOS_ENRIQUECIBLES.includes(form.value.tipo))
+watch(
+  () => form.value.tipo,
+  () => {
+    if (!tipoEsEnriquecible.value) form.value.enriquecer = false
+  }
+)
+
+const formularioValido = computed(
+  () =>
+    form.value.ftpUsuario &&
+    form.value.ftpClave &&
+    form.value.tipo &&
+    form.value.extension &&
+    form.value.fechaInicio &&
+    form.value.fechaFin
+)
+
+const jobId = ref(null)
+const estado = ref(null)
+const enProceso = computed(() => estado.value && ['descargando', 'unificando'].includes(estado.value.estado))
+let polling = null
+
+async function onDescargar() {
+  estado.value = null
+  const payload = {
+    ftp_usuario: form.value.ftpUsuario,
+    ftp_clave: form.value.ftpClave,
+    tipo: form.value.tipo,
+    extension: form.value.extension,
+    fecha_inicio: form.value.fechaInicio,
+    fecha_fin: form.value.fechaFin,
+    enriquecer: form.value.enriquecer,
+  }
+  try {
+    const { job_id: id } = await iniciarDescargaXM(payload)
+    jobId.value = id
+    estado.value = { estado: 'descargando', archivos_procesados: 0, archivos_totales: 0 }
+    iniciarPolling()
+  } catch (e) {
+    estado.value = { estado: 'error', error_message: e.response?.data?.detail || 'No se pudo iniciar la descarga.' }
+  }
+}
+
+function iniciarPolling() {
+  detenerPolling()
+  polling = setInterval(async () => {
+    try {
+      const data = await consultarEstadoXM(jobId.value)
+      estado.value = data
+      if (data.estado === 'listo' || data.estado === 'error') detenerPolling()
+    } catch {
+      detenerPolling()
+    }
+  }, 2000)
+}
+
+function detenerPolling() {
+  if (polling) {
+    clearInterval(polling)
+    polling = null
+  }
+}
+
+async function onDescargarArchivo(formato) {
+  const blob = await descargarArchivoXM(jobId.value, formato)
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = formato === 'xlsx' ? `${form.value.tipo}.xlsx` : `${form.value.tipo}.${form.value.extension}`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+onBeforeUnmount(detenerPolling)
+</script>
+
+<style scoped>
+.xm-input {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 13px;
+}
+.xm-input:focus {
+  outline: none;
+  border-color: #915bd8;
+  box-shadow: 0 0 0 2px rgba(145, 91, 216, 0.15);
+}
+</style>
