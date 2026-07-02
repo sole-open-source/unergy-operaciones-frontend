@@ -158,6 +158,7 @@ import { ref, computed, onMounted } from 'vue'
 import Select from 'primevue/select'
 import api from '@/api/client'
 import { useToast } from 'primevue/usetoast'
+import { validateZipFile, ZipValidationError, ALLOWED_EXTENSIONS_MANDATOS } from '@/utils/zipValidator'
 
 const toast = useToast()
 
@@ -186,13 +187,31 @@ const periodoZip = ref(periodo.value)          // "YYYY-MM"
 const subiendoZip = ref(false)
 const resumenZip = ref(null)                    // null | objeto de resumen
 
-function abrirDialogoZip(e) {
+async function abrirDialogoZip(e) {
   const f = e.target.files?.[0]
+  e.target.value = ''                      // permite reintentar el mismo archivo tras un error
   if (!f) return
+
+  // Validación estricta antes de abrir el diálogo o tocar el backend:
+  // firma binaria, path traversal, ejecutables y allowlist de tipos.
+  subiendoZip.value = true
+  try {
+    await validateZipFile(f, { allowedExtensions: ALLOWED_EXTENSIONS_MANDATOS })
+  } catch (err) {
+    console.error(err)
+    if (err instanceof ZipValidationError) {
+      toast.add({ severity: 'error', summary: 'ZIP rechazado por seguridad', detail: err.message, life: 6000 })
+    } else {
+      toast.add({ severity: 'error', summary: 'No se pudo leer el ZIP', detail: err.message || '', life: 5000 })
+    }
+    return
+  } finally {
+    subiendoZip.value = false
+  }
+
   archivoZip.value = f
   periodoZip.value = periodo.value
   mostrarDialogoZip.value = true
-  e.target.value = ''
 }
 
 async function confirmarCargaZip() {

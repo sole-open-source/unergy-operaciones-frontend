@@ -208,7 +208,7 @@ import { ref, computed } from 'vue'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import { useToast } from 'primevue/usetoast'
-import JSZip from 'jszip'
+import { validateZipFile, ZipValidationError, ALLOWED_EXTENSIONS_ARRIENDOS } from '@/utils/zipValidator'
 import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist'
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import { uploadCuentaCobro, fetchDocsPeriodo } from '@/composables/useArriendosDocs'
@@ -450,7 +450,9 @@ async function onZipSelected(e) {
   periodoZip.value    = extraerPeriodoDeZip(file.name)
 
   try {
-    const zip = await JSZip.loadAsync(file)
+    // Validación estricta antes de procesar: firma binaria, path traversal,
+    // ejecutables y allowlist de tipos. Reutilizamos el ZIP ya cargado.
+    const { zip } = await validateZipFile(file, { allowedExtensions: ALLOWED_EXTENSIONS_ARRIENDOS })
     const carpetas = new Set()
     zip.forEach((path) => {
       const top = path.split('/')[0]
@@ -575,7 +577,11 @@ async function onZipSelected(e) {
     showDialog.value = true
   } catch (err) {
     console.error(err)
-    toast.add({ severity: 'error', summary: 'Error al procesar el ZIP', detail: err.message, life: 5000 })
+    if (err instanceof ZipValidationError) {
+      toast.add({ severity: 'error', summary: 'ZIP rechazado por seguridad', detail: err.message, life: 6000 })
+    } else {
+      toast.add({ severity: 'error', summary: 'Error al procesar el ZIP', detail: err.message, life: 5000 })
+    }
   } finally {
     procesando.value = false
   }
