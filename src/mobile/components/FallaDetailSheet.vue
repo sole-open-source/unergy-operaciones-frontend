@@ -9,7 +9,7 @@
           <div class="fd-header">
             <div class="fd-head-text">
               <code class="fd-code">{{ fa.codigo_interno }}</code>
-              <span class="fd-type">{{ fa.tipo?.etiqueta || fa.tipo_libre || 'Falla' }}</span>
+              <span class="fd-type">{{ titulo }}</span>
             </div>
             <span v-if="saving" class="fd-saving"><i class="pi pi-spin pi-spinner" /></span>
             <button class="fd-close" @click="close"><i class="pi pi-times" /></button>
@@ -17,6 +17,43 @@
 
           <div class="fd-body">
             <p class="fd-desc">{{ fa.descripcion }}</p>
+
+            <!-- Clasificación (metodología estructurada) -->
+            <div v-if="clasif" class="fd-clasif">
+              <div class="fd-clasif-head">
+                <span class="fd-clasif-cat" :style="{ background: clasif.categoriaColor + '1a', color: clasif.categoriaColor }">
+                  <i :class="clasif.icono" /> {{ clasif.categoriaEtiqueta }}
+                </span>
+                <span v-if="clasif.subtitulo" class="fd-clasif-sub">{{ clasif.subtitulo }}</span>
+                <span v-if="clasif.pendienteReclasificar" class="fd-clasif-pend">Pendiente reclasificar</span>
+              </div>
+
+              <p v-if="clasif.detalle" class="fd-clasif-detalle">{{ clasif.detalle }}</p>
+
+              <!-- Frontera -->
+              <div v-if="clasif.frontera" class="fd-clasif-flags">
+                <span :class="['fd-flag', clasif.frontera.afectaMedicion ? 'fd-flag--bad' : 'fd-flag--ok']">
+                  {{ clasif.frontera.afectaMedicion ? 'Afecta medición' : 'No afecta medición' }}
+                </span>
+                <span :class="['fd-flag', clasif.frontera.perdidaComunicacion ? 'fd-flag--warn' : 'fd-flag--ok']">
+                  {{ clasif.frontera.perdidaComunicacion ? 'Pérdida de comunicación' : 'Comunicación OK' }}
+                </span>
+              </div>
+
+              <!-- Inversores afectados -->
+              <div v-if="clasif.inversores.length" class="fd-inv-list">
+                <div v-for="(inv, idx) in clasif.inversores" :key="idx" class="fd-inv">
+                  <div class="fd-inv-top">
+                    <i class="pi pi-server" />
+                    <b>{{ inv.nombre }}</b>
+                    <span v-if="inv.potenciaKw != null" class="fd-inv-pot">{{ inv.potenciaKw }} kW</span>
+                  </div>
+                  <div v-if="inv.tipos.length" class="fd-inv-tipos">
+                    <span v-for="(t, ti) in inv.tipos" :key="ti" class="fd-inv-tag">{{ t }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
 
             <!-- Estado -->
             <div class="fd-field">
@@ -103,7 +140,8 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
+import { tituloFalla, clasificacionDetalle } from '@/utils/fallaTitulo'
 import api from '@/api/client'
 
 const props = defineProps({
@@ -119,6 +157,11 @@ const saving = ref(false)
 const addingSeg = ref(false)
 const nota = ref('')
 const notaEstadoId = ref(null)
+
+// Título y clasificación derivados de lo realmente reportado (metodología nueva),
+// con respaldo al tipo legacy para fallas viejas.
+const titulo = computed(() => tituloFalla(fa.value))
+const clasif = computed(() => clasificacionDetalle(fa.value))
 
 watch(() => props.open, (o) => {
   if (o && props.falla) {
@@ -224,6 +267,27 @@ async function reabrir() {
 
 .fd-body { overflow-y: auto; flex: 1; }
 .fd-desc { font-size: 15px; color: #2C2039; line-height: 1.45; margin: 0 0 16px; }
+
+/* Clasificación estructurada */
+.fd-clasif { border: 1px solid #f0eaf8; border-radius: 14px; padding: 12px 14px; margin-bottom: 16px; background: #fcfaff; }
+.fd-clasif-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.fd-clasif-cat { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 8px; }
+.fd-clasif-sub { font-size: 14px; font-weight: 700; color: #2C2039; }
+.fd-clasif-pend { font-size: 10.5px; font-weight: 800; color: #b45309; background: #fef3c7; padding: 3px 8px; border-radius: 7px; text-transform: uppercase; letter-spacing: .3px; }
+.fd-clasif-detalle { font-size: 14px; color: #4b5563; line-height: 1.45; margin: 10px 0 0; }
+.fd-clasif-flags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.fd-flag { font-size: 11.5px; font-weight: 700; padding: 4px 10px; border-radius: 8px; }
+.fd-flag--ok { background: #f3f4f6; color: #6b7280; }
+.fd-flag--bad { background: #fee2e2; color: #b91c1c; }
+.fd-flag--warn { background: #fef3c7; color: #b45309; }
+.fd-inv-list { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+.fd-inv { border: 1px solid #eee6fa; border-radius: 11px; padding: 10px 12px; background: #fff; }
+.fd-inv-top { display: flex; align-items: center; gap: 7px; font-size: 14px; color: #2C2039; }
+.fd-inv-top .pi { color: #915BD8; font-size: 12px; }
+.fd-inv-pot { color: #9b8db5; font-size: 12.5px; font-weight: 600; }
+.fd-inv-tipos { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.fd-inv-tag { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 7px; background: #915BD81a; color: #6E3FB8; }
+
 .fd-field { margin-bottom: 16px; }
 .fd-label { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; color: #9b8db5; }
 .fd-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }

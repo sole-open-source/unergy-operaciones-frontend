@@ -10,6 +10,14 @@ const COLOR_CAT = {
   eventos_adversos: '#EF4444',
 }
 
+// Ícono por sistema (coincide con ESTRUCTURA_FALLAS del backend).
+const ICONO_CAT = {
+  red: 'pi pi-bolt',
+  frontera: 'pi pi-gauge',
+  inversores: 'pi pi-server',
+  eventos_adversos: 'pi pi-exclamation-triangle',
+}
+
 // Título específico: el equipo/evento/detalle reportado.
 export function tituloFalla(f) {
   if (!f) return 'Sin tipo'
@@ -45,5 +53,37 @@ export function categoriaFalla(f) {
   return {
     etiqueta: f?.tipo?.categoria?.etiqueta || '',
     color: f?.tipo?.categoria?.color_hex || '#915BD8',
+  }
+}
+
+// Modelo de presentación de la clasificación estructurada, agnóstico al estilo:
+// lo consumen la vista de detalle web y el sheet móvil. Devuelve null para fallas
+// legacy sin clasificación (esas caen al tipo/tipo_libre en el encabezado).
+export function clasificacionDetalle(f) {
+  const c = f?.clasificacion
+  if (!c || typeof c !== 'object' || !c.categoria) return null
+  const cat = c.categoria
+  const inversores = Array.isArray(c.inversores)
+    ? c.inversores.map((i) => ({
+        nombre: i.nombre || (i.proyecto_inversor_id ? `Inversor ${i.proyecto_inversor_id}` : 'Inversor'),
+        potenciaKw: i.potencia_kw ?? null,
+        // Preferir etiquetas resueltas; respaldo a códigos crudos.
+        tipos: (Array.isArray(i.tipos_etiquetas) && i.tipos_etiquetas.length)
+          ? i.tipos_etiquetas
+          : (Array.isArray(i.tipos) ? i.tipos : []),
+      }))
+    : []
+  return {
+    categoria: cat,
+    categoriaEtiqueta: c.categoria_etiqueta || cat,
+    categoriaColor: COLOR_CAT[cat] || f?.tipo?.categoria?.color_hex || '#915BD8',
+    icono: ICONO_CAT[cat] || 'pi pi-tag',
+    subtitulo: c.subtipo_etiqueta || '',
+    detalle: c.detalle || null,
+    pendienteReclasificar: !!f?.pendiente_reclasificar,
+    frontera: cat === 'frontera'
+      ? { afectaMedicion: !!c.afecta_medicion, perdidaComunicacion: !!c.perdida_comunicacion }
+      : null,
+    inversores,
   }
 }
