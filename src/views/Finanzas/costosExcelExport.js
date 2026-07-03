@@ -10,6 +10,7 @@
  * Cada proyecto genera 7 filas (una por payment_type). Genera y descarga el .xlsx.
  */
 import * as XLSX from 'xlsx'
+import { sanitizeRow } from '@/utils/excelSanitizer'
 import api from '@/api/client'
 
 const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -163,7 +164,7 @@ export async function generarExcelCostos(periodo) {
   }
 
   // Hoja .xlsx plana
-  const ws = XLSX.utils.json_to_sheet(rows, {
+  const ws = XLSX.utils.json_to_sheet(rows.map(sanitizeRow), {
     header: ['project_pk', 'payment_type', 'value', 'from_date', 'to_date', 'payment_frecuency'],
   })
   const wb = XLSX.utils.book_new()

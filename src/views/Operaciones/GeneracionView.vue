@@ -385,6 +385,7 @@ import Column from 'primevue/column'
 import Tag from 'primevue/tag'
 import ProgressSpinner from 'primevue/progressspinner'
 import * as XLSX from 'xlsx'
+import { sanitizeAoa } from '@/utils/excelSanitizer'
 import { useRouter } from 'vue-router'
 import api from '@/api/client'
 
@@ -994,7 +995,7 @@ function exportarExcel() {
         Number((d.total / Math.max(1, d.points.length)).toFixed(2)),
       ]),
     ]
-    const ws1 = XLSX.utils.aoa_to_sheet(resumen)
+    const ws1 = XLSX.utils.aoa_to_sheet(sanitizeAoa(resumen))
     ws1['!cols'] = [{ wch: 30 }, { wch: 18 }, { wch: 18 }]
     XLSX.utils.book_append_sheet(wb, ws1, 'Resumen')
 
@@ -1006,7 +1007,7 @@ function exportarExcel() {
       arr.push(Number(r.total.toFixed(2)))
       return arr
     })
-    const ws2 = XLSX.utils.aoa_to_sheet([headers, ...rows])
+    const ws2 = XLSX.utils.aoa_to_sheet(sanitizeAoa([headers, ...rows]))
     ws2['!cols'] = [{ wch: 14 }, ...datasets.value.map(() => ({ wch: 18 })), { wch: 18 }]
     XLSX.utils.book_append_sheet(wb, ws2, 'Detalle')
 

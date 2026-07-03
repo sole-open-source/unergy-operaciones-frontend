@@ -415,6 +415,7 @@
 <script setup>
 import { ref, watch, computed, onMounted } from 'vue'
 import api from '@/api/client.js'
+import { sanitizeAoa } from '@/utils/excelSanitizer'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Button from 'primevue/button'
@@ -554,7 +555,7 @@ async function descargarGesconExcel() {
       })),
     ]
 
-    const ws = XLSX.utils.aoa_to_sheet(aoa)
+    const ws = XLSX.utils.aoa_to_sheet(sanitizeAoa(aoa))
     const enc = (r, c) => XLSX.utils.encode_cell({ r, c })
     const setStyle = (r, c, s) => { const ref = enc(r, c); if (!ws[ref]) ws[ref] = { t: 's', v: '' }; ws[ref].s = s }
 

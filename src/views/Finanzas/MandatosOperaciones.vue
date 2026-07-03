@@ -158,6 +158,7 @@ import { ref, computed, onMounted } from 'vue'
 import Select from 'primevue/select'
 import api from '@/api/client'
 import { useToast } from 'primevue/usetoast'
+import { sanitizeCell } from '@/utils/excelSanitizer'
 
 const toast = useToast()
 
@@ -270,8 +271,15 @@ async function onSubirFirmado(e) {
 function exportarCsv() {
   const filas = mandatosFiltrados.value
   const cabecera = ['CMU', 'Tercero', 'Proyecto', 'Periodo', 'Estado', 'Observacion', 'Enviado inversionista']
-  const lineas = filas.map(m => [m.cmu, m.tercero || '', m.proyecto || '', m.periodo, m.estado,
-    (m.observacion || '').replace(/[\r\n;]/g, ' '), m.fecha_envio_inversionista || ''].join(';'))
+  const lineas = filas.map(m => [
+    sanitizeCell(m.cmu),
+    sanitizeCell(m.tercero || ''),
+    sanitizeCell(m.proyecto || ''),
+    sanitizeCell(m.periodo),
+    sanitizeCell(m.estado),
+    sanitizeCell((m.observacion || '').replace(/[\r\n;]/g, ' ')),
+    sanitizeCell(m.fecha_envio_inversionista || ''),
+  ].join(';'))
   const csv = [cabecera.join(';'), ...lineas].join('\n')
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)

@@ -382,6 +382,7 @@ import Textarea from 'primevue/textarea'
 import NuevoClienteDialog from '@/components/NuevoClienteDialog.vue'
 import api from '@/api/client'
 import * as XLSX from 'xlsx'
+import { sanitizeAoa } from '@/utils/excelSanitizer'
 
 const props = defineProps({
   visible: Boolean,
@@ -609,7 +610,7 @@ function descargarPlantillaEnergia() {
     ? energiaRows.value.map(r => [r.año, r.mes, r.energia_minima, r.energia_maxima, r.cantidad_proyectos])
     : [[new Date().getFullYear(), 1, '', '', '']]
   const aoa = [header, ...filas]
-  const ws = XLSX.utils.aoa_to_sheet(aoa)
+  const ws = XLSX.utils.aoa_to_sheet(sanitizeAoa(aoa))
   ws['!cols'] = [{ wch: 8 }, { wch: 6 }, { wch: 12 }, { wch: 12 }, { wch: 18 }]
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, 'Compromisos')

@@ -15,6 +15,7 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import * as XLSX from 'xlsx'
+import { sanitizeCell } from '@/utils/excelSanitizer'
 import {
   parseAsientos, extractMandate, suggestTag, reconciliar, fmt, norm as normNombre,
   parseIngresos, matchIngresoContab,
@@ -523,11 +524,16 @@ function initValidador(el) {
     if (!costosResults.length) return
     let csv = '﻿CMU,Mandante,Etiqueta,Estado,Nivel,Codigo,Detalle,Archivo\n'
     for (const r of costosResults) {
-      const base = [r.mandato.cmu || '', `"${(r.mandato.mandante || '').replace(/"/g, '""')}"`, `"${r.tag || ''}"`, r.status]
+      const base = [
+        sanitizeCell(r.mandato.cmu || ''),
+        `"${sanitizeCell(r.mandato.mandante || '').replace(/"/g, '""')}"`,
+        `"${sanitizeCell(r.tag || '')}"`,
+        sanitizeCell(r.status),
+      ]
       if (r.flags.length) {
-        for (const f of r.flags) csv += base.concat([f.lvl, f.code, `"${f.txt.replace(/"/g, '""')}"`, `"${r.fileName}"`]).join(',') + '\n'
+        for (const f of r.flags) csv += base.concat([sanitizeCell(f.lvl), sanitizeCell(f.code), `"${sanitizeCell((f.txt || '')).replace(/"/g, '""')}"`, `"${sanitizeCell(r.fileName || '')}"`]).join(',') + '\n'
       } else {
-        csv += base.concat(['', '', '', `"${r.fileName}"`]).join(',') + '\n'
+        csv += base.concat(['', '', '', `"${sanitizeCell(r.fileName || '')}"`]).join(',') + '\n'
       }
     }
     const a = Object.assign(document.createElement('a'), {
@@ -687,21 +693,21 @@ function initValidador(el) {
       const estado = r.contVal!==null
         ? (Math.abs(r.diferencia)<=tol ? 'OK' : 'DIFERENCIA') : r.estado
       csv += [
-        r.cmu,
-        `"${r.inversionista}"`,
-        `"${r.planta}"`,
+        sanitizeCell(r.cmu),
+        `"${sanitizeCell(r.inversionista ?? '')}"`,
+        `"${sanitizeCell(r.planta ?? '')}"`,
         Math.round(r.valorPagar),
         r.contVal!==null ? Math.round(r.contVal) : '',
         r.diferencia!==null ? r.diferencia : '',
-        estado,
-        `"${r.fileName}"`
+        sanitizeCell(estado),
+        `"${sanitizeCell(r.fileName ?? '')}"`
       ].join(',') + '\n'
     }
     // Registros sin PDF
     const sinPdf = contabilidadData.filter(r =>
       !concResults.find(cr => cr.recKey === r.asociado+'|||'+r.planta) && r.valor_contabilidad < 0)
     for (const r of sinPdf) {
-      csv += ['',`"${r.asociado}"`,`"${r.planta}"`, '', Math.round(Math.abs(r.valor_contabilidad)), '', 'SIN_PDF', ''].join(',') + '\n'
+      csv += ['',`"${sanitizeCell(r.asociado ?? '')}"`,`"${sanitizeCell(r.planta ?? '')}"`, '', Math.round(Math.abs(r.valor_contabilidad)), '', 'SIN_PDF', ''].join(',') + '\n'
     }
     const a = Object.assign(document.createElement('a'), {
       href: URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8'})),

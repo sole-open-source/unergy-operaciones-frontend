@@ -52,6 +52,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { sanitizeAoa } from '@/utils/excelSanitizer'
 import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import Select from 'primevue/select'
@@ -583,7 +584,7 @@ function sheetForEr(XLSX, col) {
   const netoRow = rows.length
   rows.push(['Valor a pagar (neto)', null, ''])
 
-  const ws = XLSX.utils.aoa_to_sheet(rows)
+  const ws = XLSX.utils.aoa_to_sheet(sanitizeAoa(rows))
   const enc = (r, c) => XLSX.utils.encode_cell({ r, c })
   const setCell = (r, c, patch) => { const ref = enc(r, c); ws[ref] = { ...(ws[ref] || { t: 's', v: '' }), ...patch } }
   const setStyle = (r, c, s) => { const ref = enc(r, c); if (!ws[ref]) ws[ref] = { t: 's', v: '' }; ws[ref].s = s }

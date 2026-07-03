@@ -748,6 +748,7 @@ import Divider from 'primevue/divider'
 import Dialog from 'primevue/dialog'
 import { useToast } from 'primevue/usetoast'
 import * as XLSX from 'xlsx'
+import { sanitizeAoa } from '@/utils/excelSanitizer'
 import api from '@/api/client'
 import ContratoServicioWizard from '@/views/Contratos/ContratoServicioWizard.vue'
 
@@ -929,7 +930,7 @@ function descargarSimulacionExcel() {
       header,
       ...rows,
     ]
-    const ws = XLSX.utils.aoa_to_sheet(aoa)
+    const ws = XLSX.utils.aoa_to_sheet(sanitizeAoa(aoa))
     ws['!cols'] = [{ wch: 14 }, ...MESES.map(() => ({ wch: 10 })), { wch: 18 }]
     if (!ws['!merges']) ws['!merges'] = []
     ws['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: header.length - 1 } })

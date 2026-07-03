@@ -554,6 +554,7 @@
 
 <script setup>
 import { ref, reactive, computed, watch, onMounted } from 'vue'
+import { sanitizeCell } from '@/utils/excelSanitizer'
 import MultiSelect from 'primevue/multiselect'
 import Checkbox   from 'primevue/checkbox'
 import Button     from 'primevue/button'
@@ -1011,7 +1012,7 @@ function exportCSV() {
   const hdr  = cols.join(',')
   const body = rows.map(r =>
     cols.map(c => {
-      const v = r[c] ?? ''
+      const v = sanitizeCell(r[c] ?? '')
       return typeof v === 'string' && v.includes(',') ? `"${v}"` : v
     }).join(',')
   ).join('\n')

@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx'
 import XLSXStyle from 'xlsx-js-style'
+import { sanitizeRow, sanitizeAoa } from '@/utils/excelSanitizer'
 
 const FONT = 'Arial'
 const PURPLE = '7030A0'
@@ -77,7 +78,7 @@ export function exportHojaMadreExcel(data, filename = 'garantias_hoja_madre.xlsx
   panel.forEach(([lbl, val], i) => { set(panelStart + i, 4, lbl); set(panelStart + i, 5, val) })
   const panelEnd = panelStart + panel.length - 1
 
-  const ws = XLSXStyle.utils.aoa_to_sheet(aoa)
+  const ws = XLSXStyle.utils.aoa_to_sheet(sanitizeAoa(aoa))
   ws['!merges'] = merges
   ws['!cols'] = [{ wpx: 80 }, { wpx: 210 }, { wpx: 120 }, { wpx: 18 }, { wpx: 210 }, { wpx: 120 }]
 
@@ -134,7 +135,7 @@ export function exportHojaMadreExcel(data, filename = 'garantias_hoja_madre.xlsx
 
 export function exportTablaExcel(rows, filename = 'tabla.xlsx') {
   if (!rows || !rows.length) return
-  const ws = XLSX.utils.json_to_sheet(rows)
+  const ws = XLSX.utils.json_to_sheet(rows.map(sanitizeRow))
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, 'Datos')
   XLSX.writeFile(wb, filename)
@@ -154,7 +155,7 @@ export function exportHistorialExcel(historial, filename = 'historial_garantias.
     Saldo: r.saldo,
     'Ajuste TXR': r.totalAjusteTXR,
   }))
-  const ws = XLSX.utils.json_to_sheet(rows)
+  const ws = XLSX.utils.json_to_sheet(rows.map(sanitizeRow))
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, 'Historial')
   XLSX.writeFile(wb, filename)

@@ -1228,6 +1228,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+import { sanitizeAoa } from '@/utils/excelSanitizer'
 import { proyectoActivoEnMes } from '@/utils/proyectoActivo'
 import Select from 'primevue/select'
 import MultiSelect from 'primevue/multiselect'
@@ -1473,7 +1474,7 @@ async function exportarResumenPlantasContratos() {
   for (const p of pcBolsaLibre.value)
     aoa.push(['Sin contrato', '', '', p.nombre, '', '', '', '', 'Sin SIC vigente'])
 
-  const ws = XLSX.utils.aoa_to_sheet(aoa)
+  const ws = XLSX.utils.aoa_to_sheet(sanitizeAoa(aoa))
   const C = { morado: '915BD8', oscuro: '2C2039', blanco: 'FFFFFF' }
   for (let c = 0; c < header.length; c++) {
     const ref = XLSX.utils.encode_cell({ r: headerRow, c })
@@ -1689,7 +1690,7 @@ async function exportarMatrizExcel() {
   const { aoa, rowLevels, formulaCells, totalRow, headerRow } =
     construirMatrizAOA(anualMatrizData.value, anualMatrizYear.value)
 
-  const ws = XLSX.utils.aoa_to_sheet(aoa)
+  const ws = XLSX.utils.aoa_to_sheet(sanitizeAoa(aoa))
 
   // Fórmulas
   for (const fc of formulaCells) {
@@ -2850,7 +2851,7 @@ async function exportarAnualExcel() {
     const usedNames = new Set()
 
     function addSheet(built, label) {
-      const ws = XLSX.utils.aoa_to_sheet(built.aoa)
+      const ws = XLSX.utils.aoa_to_sheet(sanitizeAoa(built.aoa))
       styleAnualSheet(XLSX, ws, built)
       let name = sheetNameSafe(label)
       let i = 2
