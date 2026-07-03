@@ -326,8 +326,18 @@
                   </div>
                 </template>
 
-                <!-- Falla legacy sin clasificación estructurada -->
-                <p v-else class="gf-body-text">{{ drawerFalla.tipo?.etiqueta || drawerFalla.tipo_libre || 'Sin clasificación registrada' }}</p>
+                <!-- Falla sin clasificación estructurada (catálogo anterior) -->
+                <template v-else>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <Tag v-if="categoriaFalla(drawerFalla).etiqueta" :value="categoriaFalla(drawerFalla).etiqueta"
+                      :style="catTagStyle(categoriaFalla(drawerFalla).color)" />
+                    <span class="gf-clasif-sub">{{ drawerFalla.tipo?.etiqueta || drawerFalla.tipo_libre || 'Sin clasificación' }}</span>
+                  </div>
+                  <p class="gf-legacy-note">
+                    <i class="pi pi-info-circle" />
+                    Registrada sin desglose específico por equipo/inversor. Las fallas nuevas capturan el detalle (p. ej. inversor afectado y tipo de falla).
+                  </p>
+                </template>
               </section>
 
               <!-- ── FECHAS Y TIEMPOS ──────────────────────────────────── -->
@@ -2254,6 +2264,11 @@ watch(bucket, (newBucket) => {
 .gf-inv-tipos { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
 .gf-inv-tag { font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 6px; background: #915BD81a; color: #6E3FB8; }
 .gf-inv-empty { font-size: 12px; color: #9ca3af; margin: 6px 0 0; }
+.gf-legacy-note {
+  display: flex; align-items: flex-start; gap: 6px;
+  font-size: 12px; color: #9ca3af; margin: 8px 0 0; line-height: 1.4;
+}
+.gf-legacy-note i { font-size: 11px; margin-top: 2px; flex-shrink: 0; }
 .gf-facts {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
