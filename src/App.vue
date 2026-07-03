@@ -35,10 +35,16 @@ import Toast from 'primevue/toast'
 import ConfirmDialog from 'primevue/confirmdialog'
 import AppSidebar from '@/components/AppSidebar.vue'
 import { useSidebar } from '@/composables/useSidebar'
+import { usePermissionStore } from '@/stores/permissionStore'
 
 const route = useRoute()
 const toast = useToast()
 const { mobileOpen, toggle, collapsed, toggleCollapsed } = useSidebar()
+
+// Inicializa el store de permisos en el arranque. La identidad se reconstruye
+// desde el JWT en `useAuthStore`; los permisos se derivan de forma reactiva del
+// rol, de modo que están disponibles antes del primer render.
+usePermissionStore()
 const routeReady = computed(() => !!route.name)
 const isLoginPage = computed(() => ['Login', 'ForgotPassword', 'ResetPassword'].includes(route.name))
 const isMobileApp = computed(() => !!route.meta.mobile)

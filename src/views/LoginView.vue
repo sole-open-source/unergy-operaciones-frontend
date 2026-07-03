@@ -85,9 +85,11 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { usePermissionStore } from '@/stores/permissionStore'
 
 const router = useRouter()
 const auth = useAuthStore()
+const permissions = usePermissionStore()
 
 const email    = ref('')
 const password = ref('')
@@ -99,6 +101,10 @@ async function submit() {
   error.value = ''
   try {
     await auth.login(email.value, password.value)
+    // Sincroniza el store de permisos con el usuario recién autenticado. Los
+    // permisos se derivan del rol del JWT; si el backend enviara una lista
+    // explícita, se pasaría aquí como `permissions`.
+    permissions.setUser({ user: auth.user })
     router.push('/dashboard')
   } catch (e) {
     error.value = e.response?.data?.detail || e.message || 'Error de conexión'

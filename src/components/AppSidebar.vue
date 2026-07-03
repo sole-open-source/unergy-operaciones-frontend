@@ -153,10 +153,12 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { usePermissionStore } from '@/stores/permissionStore'
 import { useSidebar } from '@/composables/useSidebar'
 import api from '@/api/client'
 
 const auth = useAuthStore()
+const permissions = usePermissionStore()
 const router = useRouter()
 const { mobileOpen, collapsed, toggleCollapsed, isGroupCollapsed, toggleGroup } = useSidebar()
 
@@ -345,6 +347,7 @@ const navGroups = computed(() =>
     ...g,
     items: g.items.filter(i =>
       (!i.roles || auth.can(...i.roles)) &&
+      (!i.permissions || permissions.hasPermission(i.permissions)) &&
       (!i.requireEmail || auth.user?.email === i.requireEmail)
     ),
   })).filter(g => g.items.length > 0)

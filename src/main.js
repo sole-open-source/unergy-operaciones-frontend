@@ -31,6 +31,7 @@ import App from './App.vue'
 import router from './router'
 import InfoField from './components/InfoField.vue'
 import PageHeader from './components/PageHeader.vue'
+import { hasPermission } from './directives/hasPermission'
 
 const app = createApp(App)
 
@@ -45,6 +46,7 @@ app.use(PrimeVue, {
 app.use(ToastService)
 app.use(ConfirmationService)
 app.directive('tooltip', Tooltip)
+app.directive('has-permission', hasPermission)
 app.component('InfoField', InfoField)
 app.component('PageHeader', PageHeader)
 

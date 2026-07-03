@@ -43,7 +43,8 @@
           :periodo="periodoActual"
           :periodo-label="periodoLabel"
           @docs-actualizados="() => loadDocs(periodoActual.value)" />
-        <Button label="Guardar selección" icon="pi pi-save" size="small"
+        <Button v-has-permission:disabled="PERMISSIONS.FINANZAS_EDIT"
+          label="Guardar selección" icon="pi pi-save" size="small"
           :loading="guardando"
           style="background:#915BD8;border-color:#915BD8"
           @click="guardarSeleccion" />
@@ -226,7 +227,8 @@
               <InputText v-model="ipcForm.fuente" class="w-full" placeholder="DANE" />
             </div>
           </div>
-          <Button label="Guardar tasa" icon="pi pi-check" size="small"
+          <Button v-has-permission:disabled="PERMISSIONS.FINANZAS_EDIT"
+            label="Guardar tasa" icon="pi pi-check" size="small"
             @click="guardarIPC"
             style="background:#915BD8;border-color:#915BD8" />
         </div>
@@ -258,6 +260,7 @@ import ArriendosZipUpload from './ArriendosZipUpload.vue'
 import CalculoIpcPopover from '@/components/CalculoIpcPopover.vue'
 import { docsPorProyecto, loadDocs, downloadDoc } from '@/composables/useArriendosDocs'
 import DocumentoIcon from '@/components/DocumentoIcon.vue'
+import { PERMISSIONS } from '@/utils/permissionDefinitions'
 
 const toast = useToast()
 

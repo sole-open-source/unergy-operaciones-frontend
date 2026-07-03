@@ -1,5 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { usePermissionStore } from '@/stores/permissionStore'
+import { PERMISSIONS } from '@/utils/permissionDefinitions'
 
 const routes = [
   // ── Públicas ─────────────────────────────────────────────────────
@@ -50,10 +52,10 @@ const routes = [
   { path: '/liquidaciones',                  name: 'Liquidaciones',                  component: () => import('@/views/Liquidaciones/LiquidacionesView.vue'),                     meta: { roles: ['admin', 'liquidaciones'] } },
   { path: '/liquidaciones/inversionista',    redirect: '/liquidaciones?tab=inversionistas' },
   { path: '/liquidaciones/cargar-excel',     redirect: '/liquidaciones?tab=cargar' },
-  { path: '/finanzas/costos',             name: 'Costos',                     component: () => import('@/views/Finanzas/CostosView.vue'),                                meta: { roles: ['admin', 'liquidaciones'] } },
+  { path: '/finanzas/costos',             name: 'Costos',                     component: () => import('@/views/Finanzas/CostosView.vue'),                                meta: { roles: ['admin', 'liquidaciones'], permissions: [PERMISSIONS.FINANZAS_VIEW] } },
   { path: '/validador-mandatos',          name: 'ValidadorMandatos',          component: () => import('@/views/Finanzas/ValidadorMandatosView.vue'),                     meta: { roles: ['admin', 'liquidaciones'] } },
   { path: '/finanzas/descarga-xm',     name: 'DescargaXM',     component: () => import('@/views/Finanzas/DescargaXMView.vue'),        meta: { roles: ['admin', 'liquidaciones'] } },
-  { path: '/panel-contable',              name: 'PanelContable',              component: () => import('@/views/PanelContable/PanelContableView.vue'),                    meta: { roles: ['admin', 'liquidaciones'] } },
+  { path: '/panel-contable',              name: 'PanelContable',              component: () => import('@/views/PanelContable/PanelContableView.vue'),                    meta: { roles: ['admin', 'liquidaciones'], permissions: [PERMISSIONS.FINANZAS_VIEW] } },
   { path: '/liquidaciones/minigranjas',   redirect: '/liquidaciones' },
   { path: '/liquidaciones/:id',           name: 'LiquidacionDetalle',         component: () => import('@/views/Liquidaciones/LiquidacionDetailView.vue'),           meta: { roles: ['admin', 'liquidaciones'] } },
   { path: '/liquidaciones/:id/pdf',       name: 'LiquidacionPdf',             component: () => import('@/views/Liquidaciones/LiquidacionPdfView.vue'),              meta: { roles: ['admin', 'liquidaciones'] } },
@@ -119,6 +121,14 @@ router.beforeEach((to) => {
 
   // Verificación de rol (rutas web)
   if (to.meta.roles && to.meta.mobile !== true && !auth.can(...to.meta.roles)) return '/dashboard'
+
+  // Verificación de permisos de grano fino (rutas web). Complementa a `roles`:
+  // una ruta puede declarar `permissions: [...]` en su meta y el guard exige que
+  // el usuario tenga al menos uno de esos permisos.
+  if (to.meta.permissions && to.meta.mobile !== true) {
+    const perms = usePermissionStore()
+    if (!perms.hasPermission(to.meta.permissions)) return '/dashboard'
+  }
 
   // Verificación de email específico (rutas admin restringidas)
   if (to.meta.requireEmail && auth.user?.email !== to.meta.requireEmail) return '/dashboard'

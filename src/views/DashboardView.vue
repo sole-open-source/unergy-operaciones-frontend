@@ -222,7 +222,7 @@
 
     <!-- Quick links -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-      <RouterLink v-for="link in quickLinks" :key="link.to" :to="link.to"
+      <RouterLink v-for="link in visibleQuickLinks" :key="link.to" :to="link.to"
                   class="bg-white rounded-xl shadow-sm p-4 flex items-center gap-3 transition-all duration-150 hover:shadow-md"
                   style="border: 1px solid #e8e0f0;">
         <div class="w-10 h-10 rounded-lg flex items-center justify-center" :style="{ backgroundColor: link.bg }">
@@ -237,6 +237,10 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import api from '@/api/client'
+import { usePermissions } from '@/composables/usePermissions'
+import { PERMISSIONS } from '@/utils/permissionDefinitions'
+
+const { checkPermission } = usePermissions()
 
 const data = ref({})
 const pipeline = ref({})
@@ -422,10 +426,16 @@ const quickLinks = [
   { to: '/generacion-solar', label: 'Generación Solar', icon: 'pi pi-sun', bg: 'rgba(240,192,64,0.15)', color: '#D4A017' },
   { to: '/mem/cumplimiento', label: 'Cumplimiento PPA', icon: 'pi pi-shield', bg: 'rgba(16,185,129,0.1)', color: '#10B981' },
   { to: '/mem/descubrimientos', label: 'Descubrimientos', icon: 'pi pi-bolt', bg: 'rgba(240,192,64,0.1)', color: '#F0C040' },
-  { to: '/liquidaciones', label: 'Liquidaciones', icon: 'pi pi-file-edit', bg: 'rgba(145,91,216,0.08)', color: '#915BD8' },
-  { to: '/garantias', label: 'Garantías', icon: 'pi pi-wallet', bg: 'rgba(145,91,216,0.1)', color: '#915BD8' },
+  { to: '/liquidaciones', label: 'Liquidaciones', icon: 'pi pi-file-edit', bg: 'rgba(145,91,216,0.08)', color: '#915BD8', permission: PERMISSIONS.FINANZAS_VIEW },
+  { to: '/garantias', label: 'Garantías', icon: 'pi pi-wallet', bg: 'rgba(145,91,216,0.1)', color: '#915BD8', permission: PERMISSIONS.FINANZAS_VIEW },
   { to: '/alertas', label: 'Centro de Alertas', icon: 'pi pi-exclamation-circle', bg: 'rgba(214,68,85,0.08)', color: '#D64455' },
 ]
+
+// Oculta los accesos rápidos a los que el usuario no tiene permiso, evitando
+// enlaces muertos (que el guard del router redirigiría).
+const visibleQuickLinks = computed(() =>
+  quickLinks.filter((l) => checkPermission(l.permission))
+)
 
 onMounted(async () => {
   try {

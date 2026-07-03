@@ -6,7 +6,7 @@
         <Button label="Inversores minigranja" icon="pi pi-bolt" size="small" severity="secondary" outlined
                 :loading="invBackfillLoading" @click="previewInversoresBackfill"
                 v-tooltip.bottom="'Crear los 5 inversores típicos (3×300 + 50 + 40 kW) en minigranjas que aún no los tienen'" />
-        <Button label="Nuevo proyecto" icon="pi pi-plus" size="small" @click="openNew" />
+        <Button v-has-permission="PERMISSIONS.PROJECTS_CREATE" label="Nuevo proyecto" icon="pi pi-plus" size="small" @click="openNew" />
       </template>
     </PageHeader>
 
@@ -175,9 +175,9 @@
                     <div class="flex gap-0.5 justify-end">
                       <Button icon="pi pi-eye" text size="small"
                               @click="goDetail(row)" v-tooltip="'Ver detalle'" />
-                      <Button icon="pi pi-pencil" text size="small" severity="info"
+                      <Button v-has-permission="PERMISSIONS.PROJECTS_EDIT" icon="pi pi-pencil" text size="small" severity="info"
                               @click="goEdit(row)" v-tooltip="'Editar'" />
-                      <Button icon="pi pi-trash" text size="small" severity="danger"
+                      <Button v-has-permission="PERMISSIONS.PROJECTS_DELETE" icon="pi pi-trash" text size="small" severity="danger"
                               @click="confirmDelete(row)" v-tooltip="'Eliminar'" />
                     </div>
                   </td>
@@ -276,6 +276,7 @@ import InputIcon from 'primevue/inputicon'
 import { useToast } from 'primevue/usetoast'
 import api from '@/api/client'
 import ProyectoForm from './ProyectoForm.vue'
+import { PERMISSIONS } from '@/utils/permissionDefinitions'
 
 const router = useRouter()
 const toast  = useToast()

@@ -6,7 +6,7 @@
           <InputIcon class="pi pi-search" />
           <InputText v-model="q" placeholder="Buscar..." class="w-full sm:w-64" @input="onSearch" />
         </IconField>
-        <Button label="Nuevo cliente" icon="pi pi-plus" size="small" @click="openNew" />
+        <Button v-has-permission="PERMISSIONS.CLIENTS_CREATE" label="Nuevo cliente" icon="pi pi-plus" size="small" @click="openNew" />
       </template>
     </PageHeader>
 
@@ -21,7 +21,7 @@
         <Column header="Acciones" style="width: 120px">
           <template #body="{ data }">
             <Button icon="pi pi-eye" text rounded size="small" v-tooltip.top="'Ver detalle'" @click="$router.push(`/clientes/${data.id}`)" />
-            <Button icon="pi pi-pencil" text rounded size="small" v-tooltip.top="'Editar'" @click="openEdit(data)" />
+            <Button v-has-permission="PERMISSIONS.CLIENTS_EDIT" icon="pi pi-pencil" text rounded size="small" v-tooltip.top="'Editar'" @click="openEdit(data)" />
           </template>
         </Column>
       </DataTable>
@@ -46,6 +46,7 @@ import InputIcon from 'primevue/inputicon'
 import { useToast } from 'primevue/usetoast'
 import api from '@/api/client'
 import ClienteForm from './ClienteForm.vue'
+import { PERMISSIONS } from '@/utils/permissionDefinitions'
 
 const toast = useToast()
 const items = ref([])
