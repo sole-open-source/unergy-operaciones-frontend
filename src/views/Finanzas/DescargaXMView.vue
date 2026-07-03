@@ -54,7 +54,7 @@
           <div class="col-span-2 flex items-center gap-2" v-if="tipoEsEnriquecible">
             <Checkbox v-model="form.enriquecer" binary inputId="xm-enriquecer" />
             <label for="xm-enriquecer" class="text-xs text-gray-500">
-              Enriquecer con datos de planta Unergy (nombre + MW)
+              Filtrar solo plantas Unergy y agregar nombre + MW
             </label>
           </div>
         </div>
