@@ -245,7 +245,7 @@
                 <div class="flex items-center gap-2 flex-wrap">
                   <code class="font-mono text-sm text-purple-700 bg-purple-50 px-2 py-0.5 rounded">{{ drawerFalla.codigo_interno }}</code>
                   <span class="text-xs text-gray-400">·</span>
-                  <span class="text-sm font-medium text-gray-700 truncate">{{ drawerFalla.tipo?.etiqueta || drawerFalla.tipo_libre }}</span>
+                  <span class="text-sm font-medium text-gray-700 truncate">{{ tituloFalla(drawerFalla) }}</span>
                   <span v-if="navIndex >= 0" class="text-[10px] text-gray-400 ml-auto whitespace-nowrap hidden sm:inline-block">
                     {{ navIndex + 1 }} / {{ filtradas.length }}
                   </span>
@@ -265,71 +265,156 @@
             <!-- Body drawer -->
             <div class="gf-drawer-body">
 
-              <!-- ── HERO ─────────────────────────────────────────────── -->
+              <!-- ── HERO: título + estado + descripción ──────────────── -->
               <section class="gf-hero">
-                <p class="gf-hero-title text-sm font-semibold text-gray-800 mb-1">{{ tituloFalla(drawerFalla) }}</p>
-                <p class="gf-hero-desc">{{ drawerFalla.descripcion }}</p>
-
-                <div class="flex flex-wrap gap-1.5">
-                  <Tag :value="drawerFalla.estado?.etiqueta" :style="estadoPillStyle(drawerFalla.estado?.color_hex)" />
-                  <span class="prio-pill" :style="prioPillStyle(drawerFalla.prioridad?.codigo)">
-                    {{ drawerFalla.prioridad?.etiqueta }}
-                  </span>
-                  <Tag v-if="categoriaFalla(drawerFalla).etiqueta" :value="categoriaFalla(drawerFalla).etiqueta"
-                    :style="catTagStyle(categoriaFalla(drawerFalla).color)" />
-                </div>
-
-                <dl class="gf-facts">
-                  <div class="gf-fact">
-                    <dt class="gf-fact-label"><i class="pi pi-building" /> Proyecto</dt>
-                    <dd class="gf-fact-value">{{ drawerFalla.proyecto?.nombre_comercial || '—' }}</dd>
+                <div>
+                  <p class="gf-hero-title">{{ tituloFalla(drawerFalla) }}</p>
+                  <div class="flex flex-wrap gap-1.5 mt-2">
+                    <Tag :value="drawerFalla.estado?.etiqueta" :style="estadoPillStyle(drawerFalla.estado?.color_hex)" />
+                    <span class="prio-pill" :style="prioPillStyle(drawerFalla.prioridad?.codigo)">
+                      {{ drawerFalla.prioridad?.etiqueta }}
+                    </span>
+                    <Tag v-if="categoriaFalla(drawerFalla).etiqueta" :value="categoriaFalla(drawerFalla).etiqueta"
+                      :style="catTagStyle(categoriaFalla(drawerFalla).color)" />
+                    <Tag v-if="drawerFalla.pendiente_reclasificar" value="Pendiente de reclasificar" severity="warn" />
                   </div>
+                </div>
+                <p v-if="drawerFalla.descripcion" class="gf-hero-desc">{{ drawerFalla.descripcion }}</p>
+              </section>
+
+              <!-- ── EQUIPO QUE FALLÓ / CLASIFICACIÓN ──────────────────── -->
+              <section class="gf-section">
+                <header class="gf-section-head">
+                  <i :class="clasifDrawer ? clasifDrawer.icono : 'pi pi-server'" class="gf-section-icon"
+                    :style="clasifDrawer ? { color: clasifDrawer.categoriaColor } : {}" />
+                  <h3 class="gf-section-title">Equipo / clasificación</h3>
+                </header>
+
+                <template v-if="clasifDrawer">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <Tag :value="clasifDrawer.categoriaEtiqueta" :style="catTagStyle(clasifDrawer.categoriaColor)" />
+                    <span v-if="clasifDrawer.subtitulo" class="gf-clasif-sub">{{ clasifDrawer.subtitulo }}</span>
+                  </div>
+                  <p v-if="clasifDrawer.detalle" class="gf-body-text mt-2">{{ clasifDrawer.detalle }}</p>
+
+                  <!-- Frontera: flags de medición / comunicación -->
+                  <div v-if="clasifDrawer.frontera" class="flex flex-wrap gap-2 mt-3">
+                    <span class="gf-flag" :class="clasifDrawer.frontera.afectaMedicion ? 'gf-flag--bad' : 'gf-flag--ok'">
+                      <i :class="clasifDrawer.frontera.afectaMedicion ? 'pi pi-times-circle' : 'pi pi-check-circle'" />
+                      {{ clasifDrawer.frontera.afectaMedicion ? 'Afecta la medición' : 'No afecta la medición' }}
+                    </span>
+                    <span class="gf-flag" :class="clasifDrawer.frontera.perdidaComunicacion ? 'gf-flag--warn' : 'gf-flag--ok'">
+                      <i :class="clasifDrawer.frontera.perdidaComunicacion ? 'pi pi-wifi' : 'pi pi-check-circle'" />
+                      {{ clasifDrawer.frontera.perdidaComunicacion ? 'Pérdida de comunicación' : 'Comunicación OK' }}
+                    </span>
+                  </div>
+
+                  <!-- Inversores afectados con sus tipos de falla -->
+                  <div v-if="clasifDrawer.inversores.length" class="gf-inv-list mt-3">
+                    <p class="gf-subhead">Inversores afectados ({{ clasifDrawer.inversores.length }})</p>
+                    <div v-for="(inv, idx) in clasifDrawer.inversores" :key="idx" class="gf-inv">
+                      <div class="gf-inv-top">
+                        <i class="pi pi-server" />
+                        <span class="gf-inv-name">{{ inv.nombre }}</span>
+                        <span v-if="inv.potenciaKw != null" class="gf-inv-pot">· {{ inv.potenciaKw }} kW</span>
+                      </div>
+                      <div v-if="inv.tipos.length" class="gf-inv-tipos">
+                        <span v-for="(t, ti) in inv.tipos" :key="ti" class="gf-inv-tag">{{ t }}</span>
+                      </div>
+                      <p v-else class="gf-inv-empty">Sin tipo de falla especificado</p>
+                    </div>
+                  </div>
+                </template>
+
+                <!-- Falla legacy sin clasificación estructurada -->
+                <p v-else class="gf-body-text">{{ drawerFalla.tipo?.etiqueta || drawerFalla.tipo_libre || 'Sin clasificación registrada' }}</p>
+              </section>
+
+              <!-- ── FECHAS Y TIEMPOS ──────────────────────────────────── -->
+              <section class="gf-section">
+                <header class="gf-section-head">
+                  <i class="pi pi-calendar gf-section-icon" />
+                  <h3 class="gf-section-title">Fechas y tiempos</h3>
+                </header>
+                <dl class="gf-facts gf-facts--flush">
                   <div class="gf-fact">
-                    <dt class="gf-fact-label"><i class="pi pi-calendar" /> Identificada</dt>
+                    <dt class="gf-fact-label"><i class="pi pi-calendar-plus" /> Identificada</dt>
                     <dd class="gf-fact-value">
-                      {{ fmtFecha(drawerFalla.fecha_identificacion) }}
+                      {{ fmtFecha(drawerFalla.fecha_identificacion) }}<span v-if="drawerFalla.hora_identificacion"> · {{ String(drawerFalla.hora_identificacion).slice(0,5) }}</span>
                       <span class="text-gray-500">· {{ relativeTime(drawerFalla.fecha_identificacion) }}</span>
                     </dd>
                   </div>
-                  <div class="gf-fact">
-                    <dt class="gf-fact-label"><i class="pi pi-user-edit" /> Registrado por</dt>
-                    <dd class="gf-fact-value">{{ drawerFalla.registrado_por?.nombre || '—' }}</dd>
+                  <div v-if="drawerFalla.fecha_ocurrencia" class="gf-fact">
+                    <dt class="gf-fact-label"><i class="pi pi-clock" /> Ocurrencia</dt>
+                    <dd class="gf-fact-value">{{ fmtFechaHora(drawerFalla.fecha_ocurrencia) }}</dd>
+                  </div>
+                  <div v-if="drawerFalla.fecha_programada" class="gf-fact">
+                    <dt class="gf-fact-label"><i class="pi pi-calendar" /> Programada</dt>
+                    <dd class="gf-fact-value">{{ fmtFecha(drawerFalla.fecha_programada) }}</dd>
                   </div>
                   <div v-if="drawerFalla.fecha_resolucion" class="gf-fact">
                     <dt class="gf-fact-label"><i class="pi pi-check-circle" /> Resuelta</dt>
-                    <dd class="gf-fact-value text-emerald-700 font-semibold">
-                      {{ fmtFecha(drawerFalla.fecha_resolucion?.slice?.(0,10) || drawerFalla.fecha_resolucion) }}
-                    </dd>
-                  </div>
-                  <div v-if="drawerFalla.tipo_solucion" class="gf-fact">
-                    <dt class="gf-fact-label"><i class="pi pi-wrench" /> Tipo de solución</dt>
-                    <dd class="gf-fact-value font-medium text-emerald-700">{{ drawerFalla.tipo_solucion }}</dd>
-                  </div>
-                  <div v-if="drawerFalla.energia_perdida_kwh != null" class="gf-fact">
-                    <dt class="gf-fact-label"><i class="pi pi-bolt" /> Energía perdida</dt>
-                    <dd class="gf-fact-value text-red-700 font-semibold">
-                      {{ Number(drawerFalla.energia_perdida_kwh).toLocaleString('es-CO') }} kWh
-                    </dd>
+                    <dd class="gf-fact-value text-emerald-700 font-semibold">{{ fmtFechaHora(drawerFalla.fecha_resolucion) }}</dd>
                   </div>
                   <div v-if="drawerFalla.dias_abierta != null" class="gf-fact">
-                    <dt class="gf-fact-label"><i class="pi pi-clock" /> Días abierta</dt>
+                    <dt class="gf-fact-label"><i class="pi pi-hourglass" /> Días abierta</dt>
                     <dd class="gf-fact-value">
                       <span class="dias-badge" :class="diasClass(drawerFalla)">{{ drawerFalla.dias_abierta }}d</span>
                     </dd>
+                  </div>
+                  <div v-if="drawerFalla.tiempo_afectacion_horas != null" class="gf-fact">
+                    <dt class="gf-fact-label"><i class="pi pi-stopwatch" /> Tiempo de afectación</dt>
+                    <dd class="gf-fact-value" style="color:#b45309;font-weight:600">{{ fmtHoras(drawerFalla.tiempo_afectacion_horas) }}</dd>
                   </div>
                   <div v-if="tiempoEnEstadoActual && !drawerFalla.estado?.es_estado_final" class="gf-fact">
                     <dt class="gf-fact-label"><i class="pi pi-stopwatch" /> En estado actual</dt>
                     <dd class="gf-fact-value">{{ tiempoEnEstadoActual }}</dd>
                   </div>
-                  <div v-if="drawerFalla.equipo_afectado" class="gf-fact">
-                    <dt class="gf-fact-label"><i class="pi pi-server" /> Equipo afectado</dt>
-                    <dd class="gf-fact-value font-medium">{{ drawerFalla.equipo_afectado }}</dd>
+                </dl>
+              </section>
+
+              <!-- ── GESTIÓN E IMPACTO ─────────────────────────────────── -->
+              <section class="gf-section">
+                <header class="gf-section-head">
+                  <i class="pi pi-briefcase gf-section-icon" />
+                  <h3 class="gf-section-title">Gestión e impacto</h3>
+                </header>
+                <dl class="gf-facts gf-facts--flush">
+                  <div class="gf-fact">
+                    <dt class="gf-fact-label"><i class="pi pi-building" /> Proyecto</dt>
+                    <dd class="gf-fact-value">{{ drawerFalla.proyecto?.nombre_comercial || '—' }}</dd>
+                  </div>
+                  <div class="gf-fact">
+                    <dt class="gf-fact-label"><i class="pi pi-user-edit" /> Registrado por</dt>
+                    <dd class="gf-fact-value">{{ drawerFalla.registrado_por?.nombre || '—' }}</dd>
+                  </div>
+                  <div class="gf-fact">
+                    <dt class="gf-fact-label"><i class="pi pi-user" /> Asignado a</dt>
+                    <dd class="gf-fact-value">{{ drawerFalla.asignado_a?.nombre || 'Sin asignar' }}</dd>
+                  </div>
+                  <div v-if="drawerFalla.resolucion" class="gf-fact">
+                    <dt class="gf-fact-label"><i class="pi pi-wrench" /> Resolución</dt>
+                    <dd class="gf-fact-value font-medium text-emerald-700">{{ drawerFalla.resolucion.etiqueta }}</dd>
+                  </div>
+                  <div v-if="drawerFalla.kwh_perdidos_estimado != null" class="gf-fact">
+                    <dt class="gf-fact-label"><i class="pi pi-bolt" /> Energía perdida</dt>
+                    <dd class="gf-fact-value text-red-700 font-semibold">
+                      {{ Number(drawerFalla.kwh_perdidos_estimado).toLocaleString('es-CO') }} kWh
+                    </dd>
+                  </div>
+                  <div v-if="drawerFalla.impacto_economico_cop != null" class="gf-fact">
+                    <dt class="gf-fact-label"><i class="pi pi-dollar" /> Impacto económico</dt>
+                    <dd class="gf-fact-value text-red-700 font-semibold">{{ fmtCOP(drawerFalla.impacto_economico_cop) }}</dd>
                   </div>
                   <div v-if="recurrencias(drawerFalla) > 1" class="gf-fact">
                     <dt class="gf-fact-label"><i class="pi pi-replay" style="color:#ea580c" /> Reincidencia</dt>
                     <dd class="gf-fact-value font-semibold" style="color:#ea580c">
                       {{ recurrencias(drawerFalla) }}× mismo tipo en este proyecto
                     </dd>
+                  </div>
+                  <div v-if="origenFalla" class="gf-fact">
+                    <dt class="gf-fact-label"><i class="pi pi-bell" /> Origen</dt>
+                    <dd class="gf-fact-value">{{ origenFalla }}</dd>
                   </div>
                 </dl>
               </section>
@@ -552,7 +637,7 @@ import {
 } from 'chart.js'
 ChartJS.register(Tooltip, Legend, CategoryScale, LinearScale, BarElement, PointElement, LineElement, Title, Filler)
 import api from '@/api/client'
-import { tituloFalla, categoriaFalla } from '@/utils/fallaTitulo'
+import { tituloFalla, categoriaFalla, clasificacionDetalle } from '@/utils/fallaTitulo'
 
 const router         = useRouter()
 const toast          = useToast()
@@ -789,6 +874,18 @@ const emptySubtitulo = computed(() => {
 const sortedSeguimientos = computed(() =>
   [...(drawerFalla.value?.seguimientos ?? [])].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
 )
+
+// ── Clasificación estructurada del drawer (equipo que falló) ──────────────
+const clasifDrawer = computed(() => clasificacionDetalle(drawerFalla.value))
+
+// Origen de la falla: alarma automática de monitoreo o centinela manual.
+const origenFalla = computed(() => {
+  const f = drawerFalla.value
+  if (!f) return null
+  if (f.alarma_monitoreo_id) return 'Alarma automática de monitoreo'
+  if (f.centinela) return f.centinela
+  return null
+})
 
 // ── Reincidencia: cuántas fallas del mismo tipo tiene el mismo proyecto ──
 const recurrenciaMap = computed(() => {
@@ -1426,6 +1523,31 @@ function fmtFecha(d) {
   if (!d) return '—'
   return new Date(d + 'T00:00:00').toLocaleDateString('es-CO',
     { day: '2-digit', month: 'short', year: 'numeric' })
+}
+
+// Fecha + hora para campos datetime (ocurrencia, resolución).
+function fmtFechaHora(dt) {
+  if (!dt) return '—'
+  const d = new Date(dt)
+  if (isNaN(d)) return fmtFecha(String(dt).slice(0, 10))
+  return d.toLocaleString('es-CO',
+    { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
+// Moneda COP sin decimales.
+function fmtCOP(v) {
+  if (v == null) return '—'
+  return Number(v).toLocaleString('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 })
+}
+
+// Duración legible a partir de horas (min / h / d h).
+function fmtHoras(h) {
+  if (h == null) return '—'
+  if (h < 1) return `${Math.round(h * 60)} min`
+  if (h < 24) return `${Math.round(h * 10) / 10} h`
+  const dias = Math.floor(h / 24)
+  const rest = Math.round(h % 24)
+  return rest ? `${dias} d ${rest} h` : `${dias} d`
 }
 
 function relativeTime(d, includeAbsolute = false) {
@@ -2097,6 +2219,13 @@ watch(bucket, (newBucket) => {
   flex-direction: column;
   gap: 12px;
 }
+.gf-hero-title {
+  font-size: 17px;
+  font-weight: 800;
+  color: #2C2039;
+  line-height: 1.3;
+  margin: 0;
+}
 .gf-hero-desc {
   font-size: 15px;
   line-height: 1.5;
@@ -2105,6 +2234,26 @@ watch(bucket, (newBucket) => {
   margin: 0;
   white-space: pre-line;
 }
+
+/* Clasificación / equipo que falló */
+.gf-clasif-sub { font-size: 14px; font-weight: 700; color: #2C2039; }
+.gf-flag {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 8px;
+}
+.gf-flag i { font-size: 11px; }
+.gf-flag--ok  { background: #f3f4f6; color: #6b7280; }
+.gf-flag--bad { background: #fee2e2; color: #b91c1c; }
+.gf-flag--warn{ background: #fef3c7; color: #b45309; }
+.gf-inv-list { display: flex; flex-direction: column; gap: 8px; }
+.gf-inv { border: 1px solid #eee6fa; border-radius: 9px; padding: 9px 11px; background: #faf9fc; }
+.gf-inv-top { display: flex; align-items: center; gap: 6px; }
+.gf-inv-top .pi { color: #915BD8; font-size: 12px; }
+.gf-inv-name { font-size: 13.5px; font-weight: 700; color: #2C2039; }
+.gf-inv-pot { font-size: 12.5px; color: #6b5a8a; }
+.gf-inv-tipos { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
+.gf-inv-tag { font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 6px; background: #915BD81a; color: #6E3FB8; }
+.gf-inv-empty { font-size: 12px; color: #9ca3af; margin: 6px 0 0; }
 .gf-facts {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2114,6 +2263,7 @@ watch(bucket, (newBucket) => {
   border-top: 1px solid #e9ddff;
 }
 @media (max-width: 480px) { .gf-facts { grid-template-columns: 1fr; } }
+.gf-facts--flush { border-top: none; padding-top: 0; }
 .gf-fact { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .gf-fact-label {
   font-size: 11.5px;
