@@ -82,6 +82,11 @@
           Unificando archivos…
         </div>
 
+        <div v-else-if="estado.estado === 'exportando'" class="text-sm text-gray-600">
+          <i class="pi pi-spin pi-spinner mr-2" style="color:#915BD8" />
+          Generando el archivo final… con rangos grandes puede tardar uno o dos minutos.
+        </div>
+
         <div v-else-if="estado.estado === 'listo'" class="space-y-2">
           <div class="text-sm font-semibold" style="color:#2C2039">Listo</div>
           <div v-if="estado.archivos_faltantes?.length" class="text-xs text-amber-600">
@@ -110,7 +115,7 @@ import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import Select from 'primevue/select'
 import Checkbox from 'primevue/checkbox'
 import Button from 'primevue/button'
-import { iniciarDescargaXM, consultarEstadoXM, descargarArchivoXM, agenteLocalNoDisponible } from '@/api/xm'
+import { iniciarDescargaXM, consultarEstadoXM, agenteLocalNoDisponible } from '@/api/xm'
 
 const TIPOS = ['dspcttos', 'aenc', 'BalCttos', 'grip', 'arrpas', 'tgrl', 'trsd', 'cxcsb']
 const EXTENSIONES = ['txf', 'txr', 'tx1', 'tx2', 'tx3', 'tx4', 'tx5', 'tx6', 'tx7', 'tx8']
@@ -174,7 +179,7 @@ const formularioValido = computed(
 
 const jobId = ref(null)
 const estado = ref(null)
-const enProceso = computed(() => estado.value && ['descargando', 'unificando'].includes(estado.value.estado))
+const enProceso = computed(() => estado.value && ['descargando', 'unificando', 'exportando'].includes(estado.value.estado))
 let polling = null
 
 async function onDescargar() {
@@ -237,25 +242,22 @@ function detenerPolling() {
   }
 }
 
-async function onDescargarArchivo(formato) {
-  try {
-    const blob = await descargarArchivoXM(jobId.value, formato)
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = formato === 'xlsx' ? `${form.value.tipo}.xlsx` : `${form.value.tipo}.${form.value.extension}`
-    // El link debe estar en el DOM para que el click dispare la descarga
-    // en todos los navegadores (en algunos, un <a> fuera del documento
-    // no descarga nada aunque el .click() no lance error).
-    document.body.appendChild(a)
-    a.click()
-    a.remove()
-    // Revocar la URL después de un tick, no antes: revocarla de
-    // inmediato puede cortar la descarga justo cuando arranca.
-    setTimeout(() => URL.revokeObjectURL(url), 1000)
-  } catch (e) {
-    estado.value = { ...estado.value, estado: 'error', error_message: mensajeError(e, 'No se pudo descargar el archivo.') }
-  }
+function onDescargarArchivo(formato) {
+  // Navegar directo a la URL del archivo (en vez de fetch + blob + click
+  // simulado) — así el navegador maneja la descarga nativamente, sin
+  // pasar por JavaScript. Esto es intencional y evita dos problemas
+  // reales: (1) un .click() disparado después de un `await` deja de
+  // contar como gesto directo del usuario en algunos navegadores, que
+  // entonces bloquean la descarga sin avisar; (2) evita cargar el
+  // archivo completo en memoria como Blob antes de guardarlo, lo cual
+  // pesa para archivos grandes (ej. ~25 MB de grip).
+  const url = `http://127.0.0.1:8420/descargas/${jobId.value}/archivo?formato=${formato}`
+  const a = document.createElement('a')
+  a.href = url
+  a.download = formato === 'xlsx' ? `${form.value.tipo}.xlsx` : `${form.value.tipo}.${form.value.extension}`
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
 }
 
 onBeforeUnmount(detenerPolling)

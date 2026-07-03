@@ -21,12 +21,6 @@ export function consultarEstadoXM(jobId) {
   return agenteLocal.get(`/descargas/${jobId}`).then((r) => r.data)
 }
 
-export function descargarArchivoXM(jobId, formato) {
-  return agenteLocal
-    .get(`/descargas/${jobId}/archivo`, { params: { formato }, responseType: 'blob' })
-    .then((r) => r.data)
-}
-
 export function agenteLocalNoDisponible(error) {
   return !error.response
 }
