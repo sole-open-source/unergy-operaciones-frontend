@@ -446,11 +446,15 @@ function getMedidorData(id) {
 const _todayStr = new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString().slice(0, 10)
 
 function getInversorAcum(id) {
-  // Fuente primaria: generación real del día desde Solenium
+  // Fuente primaria: total de hoy calculado por Solenium (endpoint /generation/,
+  // más preciso que integrar nosotros la curva de potencia por trapecios).
+  const genHoy = detailMap[id]?.generation_today_kwh
+  if (genHoy != null && genHoy > 0) return genHoy
+  // Fallback 1: generación real del día ya cerrado (histórico de 30 días)
   const gen30 = detailMap[id]?.generation_30d ?? []
   const hoy = gen30.find(d => d.date === _todayStr)
   if (hoy?.kwh > 0) return hoy.kwh
-  // Fallback: integración trapezoidal de la curva de potencia
+  // Fallback 2: integración trapezoidal de la curva de potencia
   const curve = detailMap[id]?.power_curve ?? []
   if (curve.length < 2) return null
   let kwh = 0
