@@ -166,14 +166,14 @@
         <div class="gen-kpi">
           <div class="gen-kpi-icon" style="background:rgba(212,160,23,0.12); color:#D4A017"><i class="pi pi-bolt" /></div>
           <div>
-            <div class="gen-kpi-val">{{ totalKwh.toLocaleString('es-CO', { maximumFractionDigits: 0 }) }}</div>
+            <div class="gen-kpi-val">{{ fmtNum(totalKwh) }}</div>
             <div class="gen-kpi-lbl">kWh totales</div>
           </div>
         </div>
         <div class="gen-kpi">
           <div class="gen-kpi-icon" style="background:rgba(145,91,216,0.12); color:#915BD8"><i class="pi pi-chart-bar" /></div>
           <div>
-            <div class="gen-kpi-val">{{ (totalKwh / Math.max(1, datasets.length) / Math.max(1, periodos.length)).toLocaleString('es-CO', { maximumFractionDigits: 1 }) }}</div>
+            <div class="gen-kpi-val">{{ fmtNum(totalKwh / Math.max(1, datasets.length) / Math.max(1, periodos.length), 1) }}</div>
             <div class="gen-kpi-lbl">Promedio kWh / {{ unidadPeriodo }}</div>
           </div>
         </div>
@@ -214,7 +214,7 @@
             @click="ds.hidden = !ds.hidden">
             <span class="gen-legend-dot" :style="{ background: ds.color }" />
             <span class="gen-legend-name">{{ ds.nombre }}</span>
-            <span class="gen-legend-total">{{ ds.total.toLocaleString('es-CO', { maximumFractionDigits: 0 }) }} kWh</span>
+            <span class="gen-legend-total">{{ fmtNum(ds.total) }} kWh</span>
           </button>
         </div>
 
@@ -287,15 +287,15 @@
             <div v-for="s in hoverSeries" :key="'t' + s.proyectoId" class="gen-tooltip-row">
               <span class="gen-tooltip-dot" :style="{ background: s.color }" />
               <span class="gen-tooltip-name">{{ s.nombre }}</span>
-              <span class="gen-tooltip-val">{{ s.kwh.toLocaleString('es-CO', { maximumFractionDigits: 1 }) }} kWh</span>
+              <span class="gen-tooltip-val">{{ fmtNum(s.kwh, 1) }} kWh</span>
             </div>
             <div v-if="hoverSeries.length > 1" class="gen-tooltip-row gen-tooltip-total">
               <span class="gen-tooltip-name">Total</span>
-              <span class="gen-tooltip-val">{{ hoverTotal.toLocaleString('es-CO', { maximumFractionDigits: 1 }) }} kWh</span>
+              <span class="gen-tooltip-val">{{ fmtNum(hoverTotal, 1) }} kWh</span>
             </div>
             <div v-if="hoverFalla" class="gen-tooltip-fault">
               <i class="pi pi-exclamation-triangle" />
-              {{ hoverFalla.count }} falla{{ hoverFalla.count !== 1 ? 's' : '' }} de generación · {{ hoverFalla.kwh.toLocaleString('es-CO', { maximumFractionDigits: 0 }) }} kWh perdidos
+              {{ hoverFalla.count }} falla{{ hoverFalla.count !== 1 ? 's' : '' }} de generación · {{ fmtNum(hoverFalla.kwh) }} kWh perdidos
             </div>
           </div>
         </div>
@@ -310,7 +310,7 @@
             <span class="gen-fchip">{{ fallasDelPeriodo.length }} en total</span>
             <span v-if="fallasGenCount" class="gen-fchip gen-fchip--red">{{ fallasGenCount }} afectan generación</span>
             <span v-if="kwhPerdidoTotal > 0" class="gen-fchip gen-fchip--red">
-              {{ kwhPerdidoTotal.toLocaleString('es-CO', { maximumFractionDigits: 0 }) }} kWh perdidos
+              {{ fmtNum(kwhPerdidoTotal) }} kWh perdidos
             </span>
           </div>
         </header>
@@ -360,7 +360,7 @@
             <Column header="Energía perdida" style="width:140px">
               <template #body="{ data }">
                 <span v-if="involucraGeneracion(data)" class="gen-energy-badge">
-                  <i class="pi pi-bolt" /> {{ energiaPerdida(data).toLocaleString('es-CO', { maximumFractionDigits: 0 }) }} kWh
+                  <i class="pi pi-bolt" /> {{ fmtNum(energiaPerdida(data)) }} kWh
                 </span>
                 <span v-else class="text-gray-300">—</span>
               </template>
@@ -835,6 +835,13 @@ function fmtYTick(v) {
   if (v >= 1_000_000) return (v / 1_000_000).toFixed(1) + 'M'
   if (v >= 1_000) return (v / 1_000).toFixed(1) + 'k'
   return v.toFixed(0)
+}
+
+// Separador de miles = espacio (evita confundirlo con la coma decimal), coma decimal.
+function fmtNum(v, maxDecimals = 0) {
+  return (v ?? 0)
+    .toLocaleString('es-CO', { maximumFractionDigits: maxDecimals })
+    .replace(/\./g, ' ')
 }
 
 // ── Hover (tooltip de valores X/Y) ───────────────────────────────────
