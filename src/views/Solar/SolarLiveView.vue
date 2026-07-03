@@ -26,6 +26,17 @@
         </p>
       </div>
       <div class="sl-header-right">
+        <!-- Filtro por proyecto -->
+        <div class="sl-filter-wrap">
+          <i class="pi pi-search sl-filter-icon" />
+          <input
+            v-model="filtro"
+            type="text"
+            class="sl-filter-input"
+            placeholder="Buscar proyecto..."
+          />
+          <i v-if="filtro" class="pi pi-times sl-filter-clear" @click="filtro = ''" />
+        </div>
         <!-- Toggle columnas -->
         <div class="sl-cols-toggle">
           <button v-for="c in [1,2,4]" :key="c"
@@ -71,6 +82,12 @@
       <p>Sin proyectos disponibles</p>
     </div>
 
+    <!-- ══ SIN COINCIDENCIAS ══ -->
+    <div v-else-if="sinCoincidencias" class="sl-empty">
+      <i class="pi pi-search" style="font-size:32px;color:#cbd5e1" />
+      <p>Ningún proyecto coincide con "{{ filtro }}"</p>
+    </div>
+
     <!-- ══ PROYECTOS (drag & drop) ══ -->
     <draggable
       v-else
@@ -79,10 +96,11 @@
       handle=".sl-drag-handle"
       class="sl-grid"
       :style="{ gridTemplateColumns: `repeat(${cols}, minmax(0,1fr))` }"
+      :disabled="!!filtro.trim()"
       @end="saveOrder"
     >
       <template #item="{ element: proy }">
-        <div class="sl-project-block">
+        <div v-show="matchesFiltro(proy)" class="sl-project-block">
 
           <!-- Nombre + estado -->
           <div class="sl-project-name">
@@ -241,6 +259,19 @@ const detailMap   = reactive({})
 const lastUpdated = ref('')
 const cols        = ref(1)
 let refreshTimer  = null
+
+// ── Filtro por proyecto ────────────────────────────────────────────────────
+const filtro = ref('')
+
+function matchesFiltro(proy) {
+  const q = filtro.value.trim().toLowerCase()
+  if (!q) return true
+  return (proy.nombre || '').toLowerCase().includes(q)
+}
+
+const sinCoincidencias = computed(() =>
+  !!filtro.value.trim() && !proyectos.value.some(matchesFiltro)
+)
 
 // ── Generación de hoy ──────────────────────────────────────────────────────
 const genHoyMap  = reactive({})   // proyecto_id → { kwh_real, fuente }
@@ -586,6 +617,19 @@ onUnmounted(() => {
 .sl-title { font-size: 20px; font-weight: 800; color: #2C2039; margin: 0; }
 .sl-subtitle { font-size: 12px; color: #6b5a8a; margin: 3px 0 0; }
 .sl-ts { color: #9ca3af; }
+
+/* ── Filtro por proyecto ── */
+.sl-filter-wrap { position: relative; display: flex; align-items: center; }
+.sl-filter-icon { position: absolute; left: 11px; font-size: 12px; color: #9ca3af; pointer-events: none; }
+.sl-filter-input {
+  width: 200px; padding: 7px 28px 7px 30px; border-radius: 8px; border: 1px solid #e5e7eb;
+  background: #fff; font-size: 13px; font-family: inherit; color: #2C2039; outline: none;
+  transition: border-color 0.15s;
+}
+.sl-filter-input:focus { border-color: #915BD8; }
+.sl-filter-input::placeholder { color: #9ca3af; }
+.sl-filter-clear { position: absolute; right: 10px; font-size: 11px; color: #9ca3af; cursor: pointer; }
+.sl-filter-clear:hover { color: #6b5a8a; }
 
 /* ── Column toggle ── */
 .sl-cols-toggle { display: flex; gap: 4px; background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 3px; }
