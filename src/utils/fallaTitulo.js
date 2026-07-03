@@ -73,6 +73,12 @@ export function clasificacionDetalle(f) {
           : (Array.isArray(i.tipos) ? i.tipos : []),
       }))
     : []
+  // Capa "tipo de falla": conjunto único de tipos across inversores, y si todos
+  // los inversores comparten el mismo set (para no repetir chips por inversor).
+  const inversorTipos = [...new Set(inversores.flatMap((i) => i.tipos))]
+  const _key = (arr) => [...arr].sort().join('|')
+  const tiposUniformes = inversores.length > 0 &&
+    inversores.every((i) => _key(i.tipos) === _key(inversores[0].tipos))
   return {
     categoria: cat,
     categoriaEtiqueta: c.categoria_etiqueta || cat,
@@ -85,5 +91,7 @@ export function clasificacionDetalle(f) {
       ? { afectaMedicion: !!c.afecta_medicion, perdidaComunicacion: !!c.perdida_comunicacion }
       : null,
     inversores,
+    inversorTipos,     // capa aparte: tipos de falla de inversor (conjunto único)
+    tiposUniformes,    // true si todos los inversores comparten los mismos tipos
   }
 }

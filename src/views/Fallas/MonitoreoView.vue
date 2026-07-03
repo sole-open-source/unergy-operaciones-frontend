@@ -309,7 +309,15 @@
                     </span>
                   </div>
 
-                  <!-- Inversores afectados con sus tipos de falla -->
+                  <!-- Capa aparte: TIPO(S) DE FALLA del inversor -->
+                  <div v-if="clasifDrawer.inversorTipos.length" class="gf-tipo-layer mt-3">
+                    <p class="gf-subhead">Tipo{{ clasifDrawer.inversorTipos.length > 1 ? 's' : '' }} de falla</p>
+                    <div class="gf-tipo-chips">
+                      <span v-for="(t, ti) in clasifDrawer.inversorTipos" :key="ti" class="gf-tipo-chip">{{ t }}</span>
+                    </div>
+                  </div>
+
+                  <!-- Capa: INVERSORES afectados -->
                   <div v-if="clasifDrawer.inversores.length" class="gf-inv-list mt-3">
                     <p class="gf-subhead">Inversores afectados ({{ clasifDrawer.inversores.length }})</p>
                     <div v-for="(inv, idx) in clasifDrawer.inversores" :key="idx" class="gf-inv">
@@ -318,10 +326,10 @@
                         <span class="gf-inv-name">{{ inv.nombre }}</span>
                         <span v-if="inv.potenciaKw != null" class="gf-inv-pot">· {{ inv.potenciaKw }} kW</span>
                       </div>
-                      <div v-if="inv.tipos.length" class="gf-inv-tipos">
+                      <!-- Chips por inversor solo si los tipos difieren entre inversores -->
+                      <div v-if="!clasifDrawer.tiposUniformes && inv.tipos.length" class="gf-inv-tipos">
                         <span v-for="(t, ti) in inv.tipos" :key="ti" class="gf-inv-tag">{{ t }}</span>
                       </div>
-                      <p v-else class="gf-inv-empty">Sin tipo de falla especificado</p>
                     </div>
                   </div>
                 </template>
@@ -2264,6 +2272,16 @@ watch(bucket, (newBucket) => {
 .gf-inv-tipos { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
 .gf-inv-tag { font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 6px; background: #915BD81a; color: #6E3FB8; }
 .gf-inv-empty { font-size: 12px; color: #9ca3af; margin: 6px 0 0; }
+/* Capa aparte para el tipo de falla del inversor */
+.gf-tipo-layer {
+  border: 1px solid #e9ddff; border-radius: 10px; padding: 10px 12px;
+  background: linear-gradient(180deg, #faf7ff 0%, #fff 100%);
+}
+.gf-tipo-chips { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 6px; }
+.gf-tipo-chip {
+  font-size: 12.5px; font-weight: 700; padding: 5px 11px; border-radius: 8px;
+  background: #915BD814; color: #6E3FB8; border: 1px solid #915BD833;
+}
 .gf-legacy-note {
   display: flex; align-items: flex-start; gap: 6px;
   font-size: 12px; color: #9ca3af; margin: 8px 0 0; line-height: 1.4;
