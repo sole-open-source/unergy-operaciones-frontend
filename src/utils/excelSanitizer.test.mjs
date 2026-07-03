@@ -1,6 +1,7 @@
 /**
  * Tests del saneador anti-inyección de fórmulas. Se ejecuta con el runner
- * nativo de Node (sin dependencias): `node --test src/utils/`.
+ * nativo de Node (sin dependencias): `npm test` (equivale a `node --test`, que
+ * descubre los `*.test.mjs`) o directo `node src/utils/excelSanitizer.test.mjs`.
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
