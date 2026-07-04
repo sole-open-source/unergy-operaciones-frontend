@@ -314,6 +314,37 @@
           </div>
         </div>
 
+        <!-- Aviso en tiempo real: solapamiento de fechas de la misma planta ─── -->
+        <div v-if="conflictosSolapamiento.length" class="rounded-lg px-3 py-2 text-xs"
+          :style="conflictoNoResuelto
+            ? 'background:#FEF2F2; border:1px solid #FECACA; color:#991B1B;'
+            : 'background:#FFF7ED; border:1px solid #FED7AA; color:#9A3412;'">
+          <div class="flex items-start gap-2">
+            <i class="pi pi-exclamation-triangle mt-0.5" />
+            <div class="flex-1">
+              <p class="font-medium">
+                Se detectó {{ conflictosSolapamiento.length }} contrato{{ conflictosSolapamiento.length > 1 ? 's' : '' }}
+                activo{{ conflictosSolapamiento.length > 1 ? 's' : '' }} de esta planta con fechas que se cruzan.
+              </p>
+              <ul class="mt-1 pl-4 list-disc">
+                <li v-for="c in conflictosSolapamiento" :key="c.id">
+                  {{ c.codigo_sic_contrato || c.contrato_interno || ('ID ' + c.id) }}
+                  · {{ fmt(c.fecha_inicio) }} → {{ fmt(c.fecha_fin) }}
+                </li>
+              </ul>
+              <p v-if="conflictoNoResuelto" class="mt-1.5">
+                Para no duplicar la generación en Cumplimiento: marca
+                <b>Reemplaza anterior</b> si sustituye al registro previo, o
+                <b>Compra en bolsa</b> si coexiste con origen bolsa.
+              </p>
+              <p v-else class="mt-1.5">
+                Resuelto —
+                {{ form.reemplaza_anterior ? 'reemplaza al registro anterior en este SIC.' : 'marcado como compra en bolsa.' }}
+              </p>
+            </div>
+          </div>
+        </div>
+
         <!-- Fila 6: Tipo mercado + Tipo asignación + % FNCER + % Despacho -->
         <div class="grid grid-cols-4 gap-4">
           <div class="flex flex-col gap-1">
@@ -365,6 +396,8 @@
         <div class="flex justify-end gap-2 pt-2">
           <Button label="Cancelar" severity="secondary" @click="dialogVisible = false" type="button" />
           <Button :label="editandoId ? 'Actualizar' : 'Guardar'" icon="pi pi-check" type="submit" :loading="guardando"
+            :disabled="conflictoNoResuelto"
+            v-tooltip.top="conflictoNoResuelto ? 'Resuelve el solapamiento de fechas antes de guardar' : ''"
             style="background:#915BD8; border-color:#915BD8;" />
         </div>
       </form>
@@ -415,6 +448,7 @@
 <script setup>
 import { ref, watch, computed, onMounted } from 'vue'
 import api from '@/api/client.js'
+import { conflictosAtribucion } from '@/utils/validacionContratos.js'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Button from 'primevue/button'
@@ -711,6 +745,26 @@ const form = ref(FORM_INICIAL())
 // cédulas de los agentes y el link del archivo. El resto de campos se ocultan.
 const esTerminacion = computed(() => form.value.tipo_solicitud === 'terminacion')
 
+// ── Validación de solapamiento (integridad de atribución de generación) ──
+// Contratos ACTIVOS de la MISMA planta cuya ventana de fechas se cruza con la que
+// se está capturando. Si existen y la planta no reemplaza a la anterior ni se marca
+// como compra en bolsa, su generación se contaría dos veces en Cumplimiento.
+const conflictosSolapamiento = computed(() => {
+  if (esTerminacion.value) return []
+  return conflictosAtribucion(
+    { id: editandoId.value, proyecto_id: form.value.proyecto_id,
+      fecha_inicio: form.value.fecha_inicio, fecha_fin: form.value.fecha_fin },
+    rows.value,
+  )
+})
+// El cruce queda resuelto si la planta reemplaza a la anterior o se marca como
+// compra en bolsa (es_duplicado). Si no, es un conflicto bloqueante.
+const conflictoNoResuelto = computed(() =>
+  conflictosSolapamiento.value.length > 0 &&
+  !form.value.reemplaza_anterior &&
+  !form.value.es_duplicado,
+)
+
 const opcionesEstadoForm = [
   { label: 'En proceso', value: 'en_proceso' },
   { label: 'Publicado', value: 'publicado' },
@@ -780,6 +834,18 @@ async function guardar() {
   if (esTerminacion.value) {
     if (!form.value.codigo_sic_contrato) { errores.value.codigo_sic_contrato = 'Requerido'; return }
     if (!form.value.fecha_fin) { errores.value.fecha_fin = 'Requerido'; return }
+  }
+
+  // Solapamiento de generación sin resolver: bloquea el guardado para no duplicar
+  // el aporte de la planta en Cumplimiento.
+  if (conflictoNoResuelto.value) {
+    toast.add({
+      severity: 'warn',
+      summary: 'Solapamiento sin resolver',
+      detail: 'Otra planta igual tiene fechas que se cruzan. Marca "Reemplaza anterior" si la sustituye, o "Compra en bolsa" si coexiste con origen bolsa.',
+      life: 6000,
+    })
+    return
   }
 
   guardando.value = true
