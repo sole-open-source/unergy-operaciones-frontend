@@ -165,6 +165,40 @@
         :disabled="!nuevoInv.cliente_id" @click="agregarInversionista" />
     </div>
 
+    <!-- Resumen de rendimiento (solo lectura, modo edición) -->
+    <div v-if="proyectoId" class="border border-gray-200 rounded-lg p-4 space-y-3">
+      <div class="flex items-center justify-between">
+        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Resumen de rendimiento</p>
+        <Button type="button" icon="pi pi-sync" label="Sincronizar" size="small" text
+                :loading="rendSyncing" @click="syncRendimiento" />
+      </div>
+
+      <div v-if="rendLoading" class="text-xs text-gray-400">Cargando rendimiento…</div>
+      <div v-else-if="rendKpis" class="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <div class="bg-gray-50 rounded-lg px-3 py-2">
+          <p class="text-[10px] uppercase font-semibold text-gray-500">Último mes con datos</p>
+          <p class="text-sm font-bold text-gray-800">
+            {{ rendKpis.ultimoMes?.label || '—' }}
+            <span class="font-normal text-gray-500">· {{ fmtMWh(rendKpis.ultimoMes?.real_mwh) }}</span>
+          </p>
+        </div>
+        <div class="bg-gray-50 rounded-lg px-3 py-2">
+          <p class="text-[10px] uppercase font-semibold text-gray-500">Acumulado anual (real)</p>
+          <p class="text-sm font-bold text-gray-800">{{ fmtMWh(rendKpis.realYtd) }}</p>
+        </div>
+        <div class="bg-gray-50 rounded-lg px-3 py-2">
+          <p class="text-[10px] uppercase font-semibold text-gray-500">Cumplimiento P50</p>
+          <div class="flex items-center gap-2">
+            <span class="inline-block w-2.5 h-2.5 rounded-full" :style="{ background: cumplColor(rendKpis.cumplimientoYtdPct) }" />
+            <p class="text-sm font-bold" :style="{ color: cumplColor(rendKpis.cumplimientoYtdPct) }">
+              {{ rendKpis.cumplimientoYtdPct != null ? rendKpis.cumplimientoYtdPct.toFixed(1) + '%' : '—' }}
+            </p>
+          </div>
+        </div>
+      </div>
+      <div v-else class="text-xs text-gray-400">Sin datos de rendimiento para este proyecto.</div>
+    </div>
+
     <div class="flex justify-end gap-2 pt-2">
       <Button type="button" label="Cancelar" severity="secondary" @click="$emit('cancel')" />
       <Button type="submit" :label="editMode ? 'Guardar cambios' : 'Crear proyecto'" />
@@ -186,6 +220,8 @@ import Divider from 'primevue/divider'
 import Tag from 'primevue/tag'
 import { useToast } from 'primevue/usetoast'
 import api from '@/api/client'
+import { getProjectPerformance, syncFronteras } from '@/services/rendimientoService'
+import { formatMWh } from '@/utils/financialCalculations'
 
 const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 
@@ -274,6 +310,56 @@ watch(() => props.proyectoId, async (id) => {
     inversionistas.value = data
   }
 }, { immediate: true })
+
+// ── Resumen de rendimiento (solo lectura) ─────────────────────────────────────
+const fmtMWh = formatMWh
+const rendUseMock = ref(true)
+const rendKpis = ref(null)
+const rendLoading = ref(false)
+const rendSyncing = ref(false)
+
+function cumplColor(pct) {
+  if (pct == null) return '#6b5a8a'
+  if (pct >= 95) return '#10B981'
+  if (pct >= 85) return '#CA8A04'
+  return '#D64455'
+}
+
+async function loadRendimiento() {
+  if (!props.proyectoId) { rendKpis.value = null; return }
+  rendLoading.value = true
+  try {
+    const p = props.proyecto || {}
+    const { kpis } = await getProjectPerformance(props.proyectoId, {
+      useMock: rendUseMock.value,
+      simulacion: { p50: p.p50_mensual_kwh, p90: p.p90_mensual_kwh, p99: p.p99_mensual_kwh },
+    })
+    rendKpis.value = kpis
+  } catch {
+    rendKpis.value = null
+  } finally {
+    rendLoading.value = false
+  }
+}
+
+async function syncRendimiento() {
+  if (!props.proyectoId) return
+  rendSyncing.value = true
+  try {
+    const { data } = await api.get('/fronteras', { params: { proyecto_id: props.proyectoId } })
+    const lista = Array.isArray(data) ? data : (data.items ?? [])
+    const ids = lista.filter(f => String(f.proyecto_id) === String(props.proyectoId)).map(f => f.id)
+    await syncFronteras(ids, { useMock: rendUseMock.value })
+    toast.add({ severity: 'success', summary: 'Fronteras sincronizadas', detail: `${ids.length} frontera(s).`, life: 2500 })
+    await loadRendimiento()
+  } catch (e) {
+    toast.add({ severity: 'error', summary: 'Error al sincronizar', detail: e.response?.data?.detail, life: 3500 })
+  } finally {
+    rendSyncing.value = false
+  }
+}
+
+watch(() => props.proyectoId, () => { loadRendimiento() }, { immediate: true })
 
 async function agregarInversionista() {
   if (!nuevoInv.cliente_id) return

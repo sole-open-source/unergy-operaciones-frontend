@@ -388,6 +388,94 @@
         </div>
       </TabPanel>
 
+      <!-- ══ RENDIMIENTO ══ -->
+      <TabPanel header="Rendimiento">
+        <div class="p-4 space-y-5">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 class="text-sm font-bold" style="color:#2C2039;">Rendimiento del proyecto</h3>
+              <p class="text-xs" style="color:#9b8fb0;">Generación real agregada de sus fronteras vs. simulaciones P50/P90/P99</p>
+            </div>
+            <div class="flex items-center gap-3">
+              <div class="flex items-center gap-2">
+                <ToggleSwitch v-model="rendUseMock" @change="loadRendimiento" />
+                <span class="text-xs" style="color:#6b5a8a;">{{ rendUseMock ? 'Datos demo' : 'Datos reales' }}</span>
+              </div>
+              <Button icon="pi pi-sync" label="Sincronizar fronteras" size="small" outlined
+                      :loading="rendSyncing" :disabled="!rendFronteras.length" @click="syncProyectoFronteras" />
+            </div>
+          </div>
+
+          <!-- KPIs -->
+          <div v-if="rendKpis && !rendLoading" class="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div class="bg-white rounded-xl shadow-sm p-3" style="border:1px solid #e8e0f0;">
+              <p class="text-[10px] uppercase font-semibold" style="color:#6b5a8a;">Real acumulado</p>
+              <p class="text-lg font-bold" style="color:#915BD8;">{{ formatMWh(rendKpis.realTotal) }}</p>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm p-3" style="border:1px solid #e8e0f0;">
+              <p class="text-[10px] uppercase font-semibold" style="color:#6b5a8a;">Proyectado P50</p>
+              <p class="text-lg font-bold" style="color:#2C2039;">{{ formatMWh(rendKpis.p50Total) }}</p>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm p-3" style="border:1px solid #e8e0f0;">
+              <p class="text-[10px] uppercase font-semibold" style="color:#6b5a8a;">Cumplimiento P50</p>
+              <div class="flex items-center gap-2">
+                <span class="inline-block w-2.5 h-2.5 rounded-full" :style="{ background: cumplColor(rendKpis.cumplimientoP50Pct) }" />
+                <p class="text-lg font-bold" :style="{ color: cumplColor(rendKpis.cumplimientoP50Pct) }">{{ fmtPct(rendKpis.cumplimientoP50Pct) }}</p>
+              </div>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm p-3" style="border:1px solid #e8e0f0;">
+              <p class="text-[10px] uppercase font-semibold" style="color:#6b5a8a;">Estado vs. P90</p>
+              <p class="text-lg font-bold" :style="{ color: rendKpis.belowP90 ? '#D64455' : '#10B981' }">
+                {{ rendKpis.belowP90 ? 'Bajo P90' : 'OK' }}
+              </p>
+            </div>
+          </div>
+          <div v-if="rendKpis && rendKpis.belowP90 && !rendLoading" class="rounded-lg px-3 py-2 text-xs"
+               style="background:rgba(214,68,85,0.08); color:#D64455; border:1px solid rgba(214,68,85,0.2);">
+            <i class="pi pi-exclamation-triangle mr-1" />
+            La generación real acumulada del proyecto está por debajo del escenario P90.
+          </div>
+
+          <div style="height:400px">
+            <ChartRendimiento :series="rendSeries" :loading="rendLoading" title="Rendimiento agregado" />
+          </div>
+
+          <!-- Detalle por frontera -->
+          <div>
+            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Fronteras del proyecto</p>
+            <div class="bg-white rounded-xl shadow-sm overflow-hidden" style="border:1px solid #e8e0f0;">
+              <DataTable :value="rendFronteras" :loading="rendFronterasLoading" responsiveLayout="scroll" stripedRows class="p-datatable-sm">
+                <Column header="Frontera" style="min-width:180px">
+                  <template #body="{ data }">
+                    <p class="text-sm font-semibold" style="color:#2C2039;">{{ data.nombre_frontera || '—' }}</p>
+                    <p class="font-mono text-[11px]" style="color:#915BD8;">{{ data.codigo_frontera || '—' }}</p>
+                  </template>
+                </Column>
+                <Column header="Estado operacional" style="min-width:150px">
+                  <template #body="{ data }">
+                    <span class="text-xs px-2 py-0.5 rounded-full font-semibold" :style="opStyle(data.estado_operacional || 'sin_datos')">
+                      {{ opLabel(data.estado_operacional || 'sin_datos') }}
+                    </span>
+                  </template>
+                </Column>
+                <Column header="Medidor Quoia" style="min-width:150px">
+                  <template #body="{ data }">
+                    <span v-if="data.quoia_meter_id" class="font-mono text-xs" style="color:#6b5a8a;">{{ data.quoia_meter_id }}</span>
+                    <span v-else class="text-xs font-semibold" style="color:#D64455;"><i class="pi pi-times-circle mr-1" />Sin medidor</span>
+                  </template>
+                </Column>
+                <Column field="capacidad_efectiva_mw" header="Cap. MW" style="min-width:90px">
+                  <template #body="{ data }">{{ data.capacidad_efectiva_mw ? Number(data.capacidad_efectiva_mw).toFixed(3) : '—' }}</template>
+                </Column>
+                <template #empty>
+                  <p class="text-center text-gray-400 py-4 text-xs">Sin fronteras registradas para este proyecto.</p>
+                </template>
+              </DataTable>
+            </div>
+          </div>
+        </div>
+      </TabPanel>
+
       <!-- ══ INVERSIONISTAS ══ -->
       <TabPanel header="Inversionistas">
         <div class="p-4 space-y-4">
@@ -750,6 +838,9 @@ import { useToast } from 'primevue/usetoast'
 import * as XLSX from 'xlsx'
 import api from '@/api/client'
 import ContratoServicioWizard from '@/views/Contratos/ContratoServicioWizard.vue'
+import ChartRendimiento from '@/components/ChartRendimiento.vue'
+import { getProjectPerformance, syncFronteras } from '@/services/rendimientoService'
+import { formatMWh } from '@/utils/financialCalculations'
 
 const route = useRoute()
 const router = useRouter()
@@ -1217,6 +1308,84 @@ const estadoSeverity = (e) => (
   { en_operacion: 'success', en_desarrollo: 'info', suspendido: 'warn', cancelado: 'secondary' }[e] || 'secondary'
 )
 
+// ── Rendimiento del proyecto (Real agregado vs. simulaciones P50/P90/P99) ──────
+const rendUseMock = ref(true)
+const rendSeries = ref([])
+const rendKpis = ref(null)
+const rendLoading = ref(false)
+const rendSyncing = ref(false)
+const rendFronteras = ref([])
+const rendFronterasLoading = ref(false)
+
+async function cargarFronterasProyecto() {
+  rendFronterasLoading.value = true
+  try {
+    const { data } = await api.get('/fronteras', { params: { proyecto_id: route.params.id } })
+    const lista = Array.isArray(data) ? data : (data.items ?? [])
+    // El backend puede no filtrar por proyecto: aseguramos el filtro en cliente.
+    rendFronteras.value = lista.filter(f => String(f.proyecto_id) === String(route.params.id))
+  } catch {
+    rendFronteras.value = []
+  } finally {
+    rendFronterasLoading.value = false
+  }
+}
+
+async function loadRendimiento() {
+  if (!proyecto.value) return
+  rendLoading.value = true
+  try {
+    const p = proyecto.value
+    const { series, kpis } = await getProjectPerformance(route.params.id, {
+      useMock: rendUseMock.value,
+      // Lado simulado con datos reales del proyecto (kWh → MWh lo hace el servicio).
+      simulacion: { p50: p.p50_mensual_kwh, p90: p.p90_mensual_kwh, p99: p.p99_mensual_kwh },
+    })
+    rendSeries.value = series
+    rendKpis.value = kpis
+  } catch (e) {
+    toast.add({ severity: 'error', summary: 'Error', detail: e.response?.data?.detail || 'No se pudo cargar el rendimiento', life: 4000 })
+    rendSeries.value = []
+    rendKpis.value = null
+  } finally {
+    rendLoading.value = false
+  }
+}
+
+async function syncProyectoFronteras() {
+  if (!rendFronteras.value.length) return
+  rendSyncing.value = true
+  try {
+    const ids = rendFronteras.value.map(f => f.id)
+    const res = await syncFronteras(ids, { useMock: rendUseMock.value })
+    toast.add({ severity: 'success', summary: 'Fronteras sincronizadas', detail: `${res.sincronizadas} fronteras del proyecto.`, life: 3000 })
+    await Promise.all([cargarFronterasProyecto(), loadRendimiento()])
+  } catch (e) {
+    toast.add({ severity: 'error', summary: 'Error', detail: e.response?.data?.detail || 'Error al sincronizar', life: 4000 })
+  } finally {
+    rendSyncing.value = false
+  }
+}
+
+function fmtPct(v) { return v != null ? `${v.toFixed(1)}%` : '—' }
+function cumplColor(pct) {
+  if (pct == null) return '#6b5a8a'
+  if (pct >= 95) return '#10B981'
+  if (pct >= 85) return '#CA8A04'
+  return '#D64455'
+}
+function opLabel(v) {
+  return { normal: 'Normal', degradada: 'Degradada', sin_datos: 'Sin datos', fuera_servicio: 'Fuera de servicio' }[v] || v
+}
+function opStyle(v) {
+  return {
+    normal: 'background: rgba(16,185,129,0.12); color: #10B981;',
+    degradada: 'background: rgba(240,192,64,0.12); color: #CA8A04;',
+    sin_datos: 'background: rgba(214,68,85,0.12); color: #D64455;',
+    fuera_servicio: 'background: rgba(156,163,175,0.12); color: #6B7280;',
+  }[v] || 'color:#6b5a8a;'
+}
+
 // ── Carga inicial ─────────────────────────────────────────────────────────────
 onMounted(async () => {
   try {
@@ -1233,6 +1402,8 @@ onMounted(async () => {
     for (const s of SERVICIOS_FLAGS) srvFlags[s.key] = proyRes.data[s.key]
     if (isEditMode.value) populateEditForm()
     loadCrossData()
+    cargarFronterasProyecto()
+    loadRendimiento()
   } catch (e) {
     errorMsg.value = e.response?.data?.detail || e.message || 'Error de conexión con el servidor'
   } finally {
