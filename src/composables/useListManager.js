@@ -1,4 +1,4 @@
-import { ref, reactive, watch, computed, onMounted } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import api from '@/api/client'
 
 // ── useListManager ──────────────────────────────────────────────────────────
@@ -88,17 +88,29 @@ export function useListManager(apiEndpoint, options = {}) {
     return fetchData()
   }
 
+  // Debounce SOLO para la búsqueda global (evita una petición por tecla). La
+  // paginación y el ordenamiento son acciones discretas del usuario y refetchean
+  // de inmediato — meterlos en el debounce añadía ~300ms de latencia percibida
+  // en cada clic de página.
+  let debounceTimer = null
+  function debouncedFetch() {
+    clearTimeout(debounceTimer)
+    debounceTimer = setTimeout(fetchData, debounceMs)
+  }
+
   // ── Handlers (modelos de PrimeVue) ──────────────────────────────────────────
   function onPage(event) {
     pagination.page = event.page
     pagination.rows = event.rows
     pagination.first = event.first ?? event.page * event.rows
+    fetchData()
   }
 
   function onSort(event) {
     sort.field = event.sortField ?? null
     sort.order = event.sortOrder ?? null
     resetToFirstPage()
+    fetchData()
   }
 
   function onFilter(event) {
@@ -113,24 +125,13 @@ export function useListManager(apiEndpoint, options = {}) {
   function setGlobalFilter(value) {
     filters.global = value || null
     resetToFirstPage()
+    debouncedFetch()
   }
 
   function resetToFirstPage() {
     pagination.page = 0
     pagination.first = 0
   }
-
-  // ── Watchers ────────────────────────────────────────────────────────────────
-  // Una sola "clave de consulta" resume todos los parámetros: cualquier cambio
-  // neto (página, orden, filtro) dispara un único refetch con debounce, sin
-  // peticiones duplicadas.
-  const queryKey = computed(() => JSON.stringify(buildParams()))
-
-  let debounceTimer = null
-  watch(queryKey, () => {
-    clearTimeout(debounceTimer)
-    debounceTimer = setTimeout(fetchData, debounceMs)
-  })
 
   onMounted(fetchData)
 
