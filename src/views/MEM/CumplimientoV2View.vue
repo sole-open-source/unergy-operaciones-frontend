@@ -686,20 +686,28 @@
           <label class="text-xs font-semibold uppercase tracking-wider" style="color: #915BD8;">Mes</label>
           <Select v-model="pcMonth" :options="MESES_OPTIONS" optionLabel="label" optionValue="value" class="w-40" @change="loadPlantasContratos" />
         </div>
-        <div class="flex rounded-lg overflow-hidden border" style="border-color: rgba(44,32,57,0.15);">
-          <button
-            v-for="mode in PC_MODES" :key="mode.key"
-            @click="pcMode = mode.key"
-            class="px-4 py-2 text-sm font-semibold transition-colors"
-            :style="pcMode === mode.key
-              ? `background: ${mode.bg}; color: ${mode.color};`
-              : 'background: transparent; color: #7a6e8a;'"
-          >{{ mode.label }}</button>
+        <!-- Estados estandarizados a-f (catálogo GET /clasificacion-energia/categorias) -->
+        <div class="flex flex-wrap items-end gap-3">
+          <div v-for="grupo in PC_GRUPOS" :key="grupo.label" class="flex flex-col gap-1">
+            <span class="text-[10px] font-semibold uppercase tracking-wider" style="color: #9b89b5;">{{ grupo.label }}</span>
+            <div class="flex rounded-lg overflow-hidden border" style="border-color: rgba(44,32,57,0.15);">
+              <button
+                v-for="mode in grupo.modes" :key="mode.key"
+                @click="pcMode = mode.key"
+                class="px-3 py-1.5 text-xs font-semibold transition-colors inline-flex items-center gap-1.5"
+                :style="pcMode === mode.key
+                  ? `background: ${mode.bg}; color: ${mode.color};`
+                  : 'background: transparent; color: #7a6e8a;'"
+              >
+                {{ mode.agente }}
+                <span v-if="pcCounts" class="font-mono text-[10px] px-1 rounded"
+                  style="background: rgba(44,32,57,0.08);">{{ pcCounts[mode.key] ?? 0 }}</span>
+              </button>
+            </div>
+          </div>
         </div>
-        <span class="text-xs" style="color: #7a6e8a;">
-          {{ pcMode === 'venta' ? 'Plantas inscritas en GESCON por contrato de venta'
-           : pcMode === 'compra' ? 'Plantas que Unergy compra energía'
-           : 'Plantas sin asignación GESCON este mes (van a bolsa)' }}
+        <span class="text-xs max-w-md" style="color: #7a6e8a;">
+          {{ PC_MODE_DESC[pcMode] }}
         </span>
         <Button label="Exportar resumen (Excel)" icon="pi pi-file-excel" size="small" outlined class="ml-auto"
           :disabled="!pcData || pcLoading" @click="exportarResumenPlantasContratos"
@@ -716,9 +724,9 @@
 
       <template v-else-if="pcData">
 
-        <!-- VENTA mode -->
-        <template v-if="pcMode === 'venta'">
-          <div v-for="c in pcData.venta" :key="c.id" class="cv-card">
+        <!-- a. PPA Venta (UNGG) -->
+        <template v-if="pcMode === 'ppa_venta_ungg'">
+          <div v-for="c in pcPools.ppa_venta_ungg" :key="c.id" class="cv-card">
             <div class="px-4 py-3 flex items-center justify-between"
               style="background: rgba(145,91,216,0.04); border-bottom: 1px solid rgba(44,32,57,0.07);">
               <div>
@@ -764,12 +772,12 @@
           </div>
         </template>
 
-        <!-- COMPRA mode -->
-        <template v-if="pcMode === 'compra'">
-          <div v-if="!pcData.compra.length" class="text-center py-12 text-sm" style="color: #7a6e8a;">
+        <!-- b. PPA Compra (UNGC) -->
+        <template v-if="pcMode === 'ppa_compra_ungc'">
+          <div v-if="!pcPools.ppa_compra_ungc.length" class="text-center py-12 text-sm" style="color: #7a6e8a;">
             No hay contratos de compra vigentes en {{ MESES[pcMonth - 1] }} {{ pcYear }}
           </div>
-          <div v-for="c in pcData.compra" :key="c.id" class="cv-card-gold">
+          <div v-for="c in pcPools.ppa_compra_ungc" :key="c.id" class="cv-card-gold">
             <div class="px-4 py-3 flex items-center justify-between"
               style="background: rgba(240,192,64,0.08); border-bottom: 1px solid rgba(240,192,64,0.2);">
               <div>
@@ -794,45 +802,101 @@
           </div>
         </template>
 
-        <!-- BOLSA mode -->
-        <template v-if="pcMode === 'bolsa'">
-          <!-- En bolsa con el comercializador (UNGC) -->
-          <div v-if="pcBolsaComercializador.length" class="cv-card">
-            <div class="px-4 py-3" style="background: rgba(44,32,57,0.04); border-bottom: 1px solid rgba(44,32,57,0.07);">
-              <span class="font-bold text-sm" style="color: #2C2039;">En bolsa con el comercializador (UNGC)</span>
-              <span class="ml-2 text-xs" style="color: #7a6e8a;">SIC vigente con comprador UNGC en {{ MESES[pcMonth - 1] }} {{ pcYear }}</span>
-              <span class="ml-2 text-xs font-mono px-2 py-0.5 rounded" style="background: rgba(44,32,57,0.08); color: #7a6e8a;">
-                {{ pcBolsaComercializador.length }}
+        <!-- c. Compra en Bolsa (UNGG): duplicados agrupados por el contrato al que aportan -->
+        <template v-if="pcMode === 'bolsa_compra_ungg'">
+          <div v-if="!pcPools.bolsa_compra_ungg.length" class="cv-card">
+            <div class="px-4 py-8 text-xs text-center" style="color: rgba(44,32,57,0.35);">
+              Sin compras en bolsa de UNGG en {{ MESES[pcMonth - 1] }} {{ pcYear }}.<br/>
+              Aquí aparecen las plantas duplicadas (origen bolsa) que aportan a un contrato de venta.
+              Los contratos PLC entrarán cuando se liquiden en plataforma.
+            </div>
+          </div>
+          <div v-for="c in pcPools.bolsa_compra_ungg" :key="c.id" class="cv-card-gold">
+            <div class="px-4 py-3 flex items-center justify-between"
+              style="background: rgba(240,192,64,0.08); border-bottom: 1px solid rgba(240,192,64,0.2);">
+              <div>
+                <span class="font-bold text-sm" style="color: #9a6700;">{{ c.nombre }}</span>
+                <span class="ml-2 text-xs" style="color: #7a6e8a;">compra en bolsa para cumplir este contrato · {{ c.comprador_nombre }}</span>
+              </div>
+              <span class="text-xs font-mono px-2 py-0.5 rounded" style="background: rgba(240,192,64,0.18); color: #9a6700;">
+                {{ c.plantas.length }} plantas
               </span>
             </div>
             <div class="divide-y" style="border-color: rgba(44,32,57,0.05);">
-              <div v-for="p in pcBolsaComercializador" :key="p.id" class="px-4 py-2.5 flex items-center gap-2 text-sm font-medium" style="color: #2C2039;">
+              <div v-for="p in c.plantas" :key="p.id" class="px-4 py-2.5 flex items-center justify-between text-sm">
+                <div class="flex items-center gap-2">
+                  <i class="pi pi-shopping-cart" style="font-size: 10px; color: #9a6700;" />
+                  <span class="font-medium" style="color: #2C2039;">{{ p.nombre }}</span>
+                  <span v-if="p.codigo_sic" class="text-xs font-mono px-1.5 py-0.5 rounded" style="background: rgba(44,32,57,0.06); color: #7a6e8a;">{{ p.codigo_sic }}</span>
+                </div>
+                <div class="text-xs font-mono" style="color: #7a6e8a;">
+                  <span v-if="p.fecha_inicio">{{ p.fecha_inicio }}</span>
+                  <span v-if="p.fecha_inicio && p.fecha_fin"> → </span>
+                  <span v-if="p.fecha_fin">{{ p.fecha_fin }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
+
+        <!-- d. Compra en Bolsa (UNGC): reglas por definir -->
+        <template v-if="pcMode === 'bolsa_compra_ungc'">
+          <div class="cv-card">
+            <div class="px-4 py-10 text-center space-y-2">
+              <i class="pi pi-compass" style="font-size: 22px; color: #9b89b5;" />
+              <p class="text-sm font-semibold" style="color: #2C2039;">Compra en Bolsa (UNGC) — reglas por definir</p>
+              <p class="text-xs max-w-lg mx-auto" style="color: #7a6e8a;">
+                Ocurre cuando UNGC debe comprar en bolsa, pero todavía no hay reglas de negocio
+                definidas para clasificarlo. La categoría queda reservada en el estándar
+                (<span class="font-mono">bolsa_compra_ungc</span>) y se activará cuando se definan.
+              </p>
+            </div>
+          </div>
+        </template>
+
+        <!-- e. Venta en Bolsa (UNGG): sin contrato GESCON -->
+        <template v-if="pcMode === 'bolsa_venta_ungg'">
+          <div v-if="pcPools.bolsa_venta_ungg.length" class="cv-card">
+            <div class="px-4 py-3" style="background: rgba(44,32,57,0.04); border-bottom: 1px solid rgba(44,32,57,0.07);">
+              <span class="font-bold text-sm" style="color: #2C2039;">Venta en Bolsa (UNGG)</span>
+              <span class="ml-2 text-xs" style="color: #7a6e8a;">Sin contrato vigente en GESCON en {{ MESES[pcMonth - 1] }} {{ pcYear }} — venden en bolsa como generador</span>
+              <span class="ml-2 text-xs font-mono px-2 py-0.5 rounded" style="background: rgba(44,32,57,0.08); color: #7a6e8a;">
+                {{ pcPools.bolsa_venta_ungg.length }}
+              </span>
+            </div>
+            <div class="divide-y" style="border-color: rgba(44,32,57,0.05);">
+              <div v-for="p in pcPools.bolsa_venta_ungg" :key="p.id" class="px-4 py-2.5 text-sm font-medium" style="color: #2C2039;">
+                {{ p.nombre }}
+              </div>
+            </div>
+          </div>
+          <div v-else class="cv-card">
+            <div class="px-4 py-8 text-xs text-center" style="color: rgba(44,32,57,0.3);">
+              Todas las plantas tienen asignación GESCON este mes
+            </div>
+          </div>
+        </template>
+
+        <!-- f. Venta en Bolsa (UNGC): SIC vigente con comprador UNGC -->
+        <template v-if="pcMode === 'bolsa_venta_ungc'">
+          <div v-if="pcPools.bolsa_venta_ungc.length" class="cv-card">
+            <div class="px-4 py-3" style="background: rgba(44,32,57,0.04); border-bottom: 1px solid rgba(44,32,57,0.07);">
+              <span class="font-bold text-sm" style="color: #2C2039;">Venta en Bolsa (UNGC)</span>
+              <span class="ml-2 text-xs" style="color: #7a6e8a;">UNGC compra la energía a UNGG (usualmente a precio de bolsa) para venderla en bolsa — SIC vigente con comprador UNGC</span>
+              <span class="ml-2 text-xs font-mono px-2 py-0.5 rounded" style="background: rgba(44,32,57,0.08); color: #7a6e8a;">
+                {{ pcPools.bolsa_venta_ungc.length }}
+              </span>
+            </div>
+            <div class="divide-y" style="border-color: rgba(44,32,57,0.05);">
+              <div v-for="p in pcPools.bolsa_venta_ungc" :key="p.id" class="px-4 py-2.5 flex items-center gap-2 text-sm font-medium" style="color: #2C2039;">
                 <span>{{ p.nombre }}</span>
                 <span v-if="p.codigo_sic" class="text-xs font-mono px-1.5 py-0.5 rounded" style="background: rgba(44,32,57,0.06); color: #7a6e8a;">{{ p.codigo_sic }}</span>
               </div>
             </div>
           </div>
-
-          <!-- Libre en bolsa -->
-          <div v-if="pcBolsaLibre.length" class="cv-card">
-            <div class="px-4 py-3" style="background: rgba(44,32,57,0.04); border-bottom: 1px solid rgba(44,32,57,0.07);">
-              <span class="font-bold text-sm" style="color: #2C2039;">Libre en bolsa</span>
-              <span class="ml-2 text-xs" style="color: #7a6e8a;">Sin SIC vigente en {{ MESES[pcMonth - 1] }} {{ pcYear }}</span>
-              <span class="ml-2 text-xs font-mono px-2 py-0.5 rounded" style="background: rgba(44,32,57,0.08); color: #7a6e8a;">
-                {{ pcBolsaLibre.length }}
-              </span>
-            </div>
-            <div class="divide-y" style="border-color: rgba(44,32,57,0.05);">
-              <div v-for="p in pcBolsaLibre" :key="p.id" class="px-4 py-2.5 text-sm font-medium" style="color: #2C2039;">
-                {{ p.nombre }}
-              </div>
-            </div>
-          </div>
-
-          <!-- Sin plantas en bolsa -->
-          <div v-if="!pcBolsaComercializador.length && !pcBolsaLibre.length" class="cv-card">
+          <div v-else class="cv-card">
             <div class="px-4 py-8 text-xs text-center" style="color: rgba(44,32,57,0.3);">
-              Todas las plantas tienen asignación GESCON este mes
+              Ninguna planta está en bolsa con el comercializador este mes
             </div>
           </div>
         </template>
@@ -1411,14 +1475,33 @@ const dragFromContrato = ref(undefined)
 const dragOver         = ref(null)
 
 // ── Proyectos tab state ──────────────────────────────────────────────────────
-const PC_MODES = [
-  { key: 'venta',  label: 'Venta',  bg: 'rgba(145,91,216,0.12)', color: '#915BD8' },
-  { key: 'compra', label: 'Compra', bg: 'rgba(240,192,64,0.18)', color: '#9a6700' },
-  { key: 'bolsa',  label: 'Bolsa',  bg: 'rgba(44,32,57,0.10)',   color: '#2C2039' },
+// Estados estandarizados a-f (mismo catálogo que GET /clasificacion-energia/categorias
+// en el backend): agente UNGG (generador) / UNGC (comercializador) × PPA / bolsa × rol.
+const PC_GRUPOS = [
+  { label: 'PPA', modes: [
+    { key: 'ppa_venta_ungg',  agente: 'Venta · UNGG',  bg: 'rgba(145,91,216,0.12)', color: '#915BD8' },
+    { key: 'ppa_compra_ungc', agente: 'Compra · UNGC', bg: 'rgba(240,192,64,0.18)', color: '#9a6700' },
+  ]},
+  { label: 'Compra en bolsa', modes: [
+    { key: 'bolsa_compra_ungg', agente: 'UNGG', bg: 'rgba(240,192,64,0.18)', color: '#9a6700' },
+    { key: 'bolsa_compra_ungc', agente: 'UNGC', bg: 'rgba(44,32,57,0.10)',   color: '#2C2039' },
+  ]},
+  { label: 'Venta en bolsa', modes: [
+    { key: 'bolsa_venta_ungg', agente: 'UNGG', bg: 'rgba(44,32,57,0.10)', color: '#2C2039' },
+    { key: 'bolsa_venta_ungc', agente: 'UNGC', bg: 'rgba(44,32,57,0.10)', color: '#2C2039' },
+  ]},
 ]
+const PC_MODE_DESC = {
+  ppa_venta_ungg:   'a. Plantas en contratos GESCON donde UNGG le vende a otro agente (Terpel, NEU, …).',
+  ppa_compra_ungc:  'b. Contratos en que UNGC compra energía a algún agente en GESCON (usualmente a UNGG).',
+  bolsa_compra_ungg:'c. Compras de UNGG a precio de bolsa: plantas duplicadas que aportan a un contrato con origen bolsa (los PLC entrarán cuando se liquiden).',
+  bolsa_compra_ungc:'d. UNGC comprando en bolsa — reglas de negocio por definir.',
+  bolsa_venta_ungg: 'e. Plantas sin contrato en GESCON: venden en bolsa desde UNGG.',
+  bolsa_venta_ungc: 'f. UNGC compra la energía a UNGG (usualmente a precio de bolsa) para venderla en bolsa.',
+}
 const pcYear    = ref(now.getFullYear())
 const pcMonth   = ref(now.getMonth() + 1)
-const pcMode    = ref('venta')
+const pcMode    = ref('ppa_venta_ungg')
 const pcData    = ref(null)
 const pcLoading = ref(false)
 const pcError   = ref(null)
@@ -1438,6 +1521,45 @@ const pcBolsaLibre = computed(() => {
   return (d.bolsa || []).filter(p => p.piscina !== 'comercializador')
 })
 
+// Piscinas estandarizadas a-f: usa `pools` del backend; si aún no llega
+// (deploy en tránsito), las deriva client-side con la misma regla.
+const pcPools = computed(() => {
+  const d = pcData.value
+  if (!d) return { ppa_venta_ungg: [], ppa_compra_ungc: [], bolsa_compra_ungg: [],
+                   bolsa_compra_ungc: [], bolsa_venta_ungg: [], bolsa_venta_ungc: [] }
+  if (d.pools) return d.pools
+  const a = [], c = []
+  for (const ct of (d.venta || [])) {
+    const noDup = (ct.plantas || []).filter(p => !p.es_duplicado)
+    const dup = (ct.plantas || []).filter(p => p.es_duplicado)
+    a.push({ ...ct, plantas: noDup })
+    if (dup.length) c.push({ ...ct, plantas: dup })
+  }
+  return {
+    ppa_venta_ungg: a,
+    ppa_compra_ungc: d.compra || [],
+    bolsa_compra_ungg: c,
+    bolsa_compra_ungc: [],
+    bolsa_venta_ungg: pcBolsaLibre.value,
+    bolsa_venta_ungc: pcBolsaComercializador.value,
+  }
+})
+const pcCounts = computed(() => {
+  const d = pcData.value
+  if (!d) return null
+  if (d.counts) return d.counts
+  const P = pcPools.value
+  const nPlantas = list => list.reduce((s, ct) => s + (ct.plantas?.length || 0), 0)
+  return {
+    ppa_venta_ungg: nPlantas(P.ppa_venta_ungg),
+    ppa_compra_ungc: nPlantas(P.ppa_compra_ungc),
+    bolsa_compra_ungg: nPlantas(P.bolsa_compra_ungg),
+    bolsa_compra_ungc: 0,
+    bolsa_venta_ungg: P.bolsa_venta_ungg.length,
+    bolsa_venta_ungc: P.bolsa_venta_ungc.length,
+  }
+})
+
 // Exporta un resumen plano y filtrable: cada contrato (venta + compra) con sus plantas,
 // y al final las plantas SIN contrato (libre) o en bolsa con el comercializador UNGC.
 async function exportarResumenPlantasContratos() {
@@ -1451,27 +1573,33 @@ async function exportarResumenPlantasContratos() {
   const headerRow = aoa.length
   aoa.push(header)
 
-  for (const c of (pcData.value.venta || [])) {
+  // Categorías estandarizadas a-f (mismo catálogo que GET /clasificacion-energia)
+  const P = pcPools.value
+  for (const c of P.ppa_venta_ungg) {
     if (c.plantas.length) {
       for (const p of c.plantas)
-        aoa.push(['Venta', c.nombre, c.comprador_nombre || '', p.nombre, p.codigo_sic || '',
-          pct(p.pct_despacho), p.fecha_inicio || '', p.fecha_fin || '', p.es_duplicado ? 'Compra bolsa' : ''])
+        aoa.push(['a. PPA Venta (UNGG)', c.nombre, c.comprador_nombre || '', p.nombre, p.codigo_sic || '',
+          pct(p.pct_despacho), p.fecha_inicio || '', p.fecha_fin || '', ''])
     } else {
-      aoa.push(['Venta', c.nombre, c.comprador_nombre || '', '(sin plantas en GESCON)', '', '', '', '', ''])
+      aoa.push(['a. PPA Venta (UNGG)', c.nombre, c.comprador_nombre || '', '(sin plantas en GESCON)', '', '', '', '', ''])
     }
   }
-  for (const c of (pcData.value.compra || [])) {
+  for (const c of P.ppa_compra_ungc) {
     if (c.plantas.length) {
       for (const p of c.plantas)
-        aoa.push(['Compra', c.nombre, c.vendedor_nombre || '', p.nombre, '', '', p.fecha_inicio || '', p.fecha_fin || '', ''])
+        aoa.push(['b. PPA Compra (UNGC)', c.nombre, c.vendedor_nombre || '', p.nombre, '', '', p.fecha_inicio || '', p.fecha_fin || '', ''])
     } else {
-      aoa.push(['Compra', c.nombre, c.vendedor_nombre || '', '(sin plantas)', '', '', '', '', ''])
+      aoa.push(['b. PPA Compra (UNGC)', c.nombre, c.vendedor_nombre || '', '(sin plantas)', '', '', '', '', ''])
     }
   }
-  for (const p of pcBolsaComercializador.value)
-    aoa.push(['Bolsa UNGC', '', 'UNGC (comercializador)', p.nombre, p.codigo_sic || '', '', '', '', 'En contrato con UNGC'])
-  for (const p of pcBolsaLibre.value)
-    aoa.push(['Sin contrato', '', '', p.nombre, '', '', '', '', 'Sin SIC vigente'])
+  for (const c of P.bolsa_compra_ungg)
+    for (const p of c.plantas)
+      aoa.push(['c. Compra en Bolsa (UNGG)', c.nombre, c.comprador_nombre || '', p.nombre, p.codigo_sic || '',
+        pct(p.pct_despacho), p.fecha_inicio || '', p.fecha_fin || '', 'Duplicado — origen bolsa'])
+  for (const p of P.bolsa_venta_ungg)
+    aoa.push(['e. Venta en Bolsa (UNGG)', '', '', p.nombre, '', '', '', '', 'Sin SIC vigente'])
+  for (const p of P.bolsa_venta_ungc)
+    aoa.push(['f. Venta en Bolsa (UNGC)', '', 'UNGC (comercializador)', p.nombre, p.codigo_sic || '', '', '', '', 'SIC con comprador UNGC'])
 
   const ws = XLSX.utils.aoa_to_sheet(aoa)
   const C = { morado: '915BD8', oscuro: '2C2039', blanco: 'FFFFFF' }
