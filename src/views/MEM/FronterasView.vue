@@ -135,6 +135,8 @@
           </div>
 
           <template v-else>
+            <SimuladoBanner :activo="useMock" />
+
             <div style="height:400px">
               <ChartRendimiento :series="rendSeries" :loading="rendLoading" :title="rendTitle" />
             </div>
@@ -312,6 +314,7 @@ import TabView from 'primevue/tabview'
 import TabPanel from 'primevue/tabpanel'
 import ToggleSwitch from 'primevue/toggleswitch'
 import ChartRendimiento from '@/components/ChartRendimiento.vue'
+import SimuladoBanner from '@/components/SimuladoBanner.vue'
 import FronterasSyncPanel from './FronterasSyncPanel.vue'
 import { getFronteraPerformance, syncFronteras } from '@/services/rendimientoService'
 import { formatMWh } from '@/utils/financialCalculations'

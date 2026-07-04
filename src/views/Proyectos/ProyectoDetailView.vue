@@ -406,6 +406,8 @@
             </div>
           </div>
 
+          <SimuladoBanner :activo="rendUseMock" />
+
           <!-- KPIs -->
           <div v-if="rendKpis && !rendLoading" class="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div class="bg-white rounded-xl shadow-sm p-3" style="border:1px solid #e8e0f0;">
@@ -839,6 +841,7 @@ import * as XLSX from 'xlsx'
 import api from '@/api/client'
 import ContratoServicioWizard from '@/views/Contratos/ContratoServicioWizard.vue'
 import ChartRendimiento from '@/components/ChartRendimiento.vue'
+import SimuladoBanner from '@/components/SimuladoBanner.vue'
 import { getProjectPerformance, syncFronteras } from '@/services/rendimientoService'
 import { formatMWh } from '@/utils/financialCalculations'
 

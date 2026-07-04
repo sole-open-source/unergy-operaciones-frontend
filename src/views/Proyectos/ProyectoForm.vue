@@ -173,6 +173,8 @@
                 :loading="rendSyncing" @click="syncRendimiento" />
       </div>
 
+      <SimuladoBanner :activo="rendUseMock" />
+
       <div v-if="rendLoading" class="text-xs text-gray-400">Cargando rendimiento…</div>
       <div v-else-if="rendKpis" class="grid grid-cols-2 md:grid-cols-3 gap-3">
         <div class="bg-gray-50 rounded-lg px-3 py-2">
@@ -220,6 +222,7 @@ import Divider from 'primevue/divider'
 import Tag from 'primevue/tag'
 import { useToast } from 'primevue/usetoast'
 import api from '@/api/client'
+import SimuladoBanner from '@/components/SimuladoBanner.vue'
 import { getProjectPerformance, syncFronteras } from '@/services/rendimientoService'
 import { formatMWh } from '@/utils/financialCalculations'
 
