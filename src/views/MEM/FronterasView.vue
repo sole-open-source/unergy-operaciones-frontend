@@ -126,7 +126,7 @@
               <span class="text-xs" style="color:#6b5a8a;">{{ useMock ? 'Datos demo' : 'Datos reales' }}</span>
             </div>
             <Button icon="pi pi-sync" label="Sincronizar" size="small" outlined :loading="quickSyncing"
-                    :disabled="!rendFronteraId" @click="quickSync" class="mb-1" />
+                    :disabled="!rendFronteraId || useMock" @click="quickSync" class="mb-1" />
           </div>
 
           <div v-if="!rendFronteraId" class="text-center py-12" style="color:#9b8fb0;">
@@ -164,7 +164,8 @@
                 </p>
               </div>
             </div>
-            <div v-if="rendKpis && rendKpis.belowP90 && !rendLoading"
+            <!-- Alarma operacional solo con datos reales: nunca sobre cifras demo. -->
+            <div v-if="rendKpis && rendKpis.belowP90 && !rendLoading && !useMock"
                  class="rounded-lg px-3 py-2 text-xs"
                  style="background:rgba(214,68,85,0.08); color:#D64455; border:1px solid rgba(214,68,85,0.2);">
               <i class="pi pi-exclamation-triangle mr-1" />
@@ -577,7 +578,7 @@ async function loadRendimiento() {
 }
 
 async function quickSync() {
-  if (!rendFronteraId.value) return
+  if (!rendFronteraId.value || useMock.value) return  // demo: sin backend, no fabricar sync
   quickSyncing.value = true
   try {
     await syncFronteras([rendFronteraId.value], { useMock: useMock.value })

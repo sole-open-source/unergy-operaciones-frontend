@@ -170,7 +170,7 @@
       <div class="flex items-center justify-between">
         <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Resumen de rendimiento</p>
         <Button type="button" icon="pi pi-sync" label="Sincronizar" size="small" text
-                :loading="rendSyncing" @click="syncRendimiento" />
+                :loading="rendSyncing" :disabled="rendUseMock" @click="syncRendimiento" />
       </div>
 
       <SimuladoBanner :activo="rendUseMock" />
@@ -346,7 +346,7 @@ async function loadRendimiento() {
 }
 
 async function syncRendimiento() {
-  if (!props.proyectoId) return
+  if (!props.proyectoId || rendUseMock.value) return  // demo: sin backend, no fabricar sync
   rendSyncing.value = true
   try {
     const { data } = await api.get('/fronteras', { params: { proyecto_id: props.proyectoId } })

@@ -402,7 +402,7 @@
                 <span class="text-xs" style="color:#6b5a8a;">{{ rendUseMock ? 'Datos demo' : 'Datos reales' }}</span>
               </div>
               <Button icon="pi pi-sync" label="Sincronizar fronteras" size="small" outlined
-                      :loading="rendSyncing" :disabled="!rendFronteras.length" @click="syncProyectoFronteras" />
+                      :loading="rendSyncing" :disabled="!rendFronteras.length || rendUseMock" @click="syncProyectoFronteras" />
             </div>
           </div>
 
@@ -432,7 +432,8 @@
               </p>
             </div>
           </div>
-          <div v-if="rendKpis && rendKpis.belowP90 && !rendLoading" class="rounded-lg px-3 py-2 text-xs"
+          <!-- Alarma operacional solo con datos reales: nunca sobre cifras demo. -->
+          <div v-if="rendKpis && rendKpis.belowP90 && !rendLoading && !rendUseMock" class="rounded-lg px-3 py-2 text-xs"
                style="background:rgba(214,68,85,0.08); color:#D64455; border:1px solid rgba(214,68,85,0.2);">
             <i class="pi pi-exclamation-triangle mr-1" />
             La generación real acumulada del proyecto está por debajo del escenario P90.
@@ -1356,7 +1357,7 @@ async function loadRendimiento() {
 }
 
 async function syncProyectoFronteras() {
-  if (!rendFronteras.value.length) return
+  if (!rendFronteras.value.length || rendUseMock.value) return  // demo: sin backend, no fabricar sync
   rendSyncing.value = true
   try {
     const ids = rendFronteras.value.map(f => f.id)

@@ -9,10 +9,16 @@
         </p>
       </div>
       <Button icon="pi pi-sync" label="Sincronizar Todas" size="small" :loading="syncing"
-              :disabled="!fronteras.length"
+              :disabled="!fronteras.length || useMock"
               style="background:#915BD8; border-color:#915BD8;"
               @click="sincronizarTodas" />
     </div>
+
+    <SimuladoBanner :activo="useMock">
+      <strong>Modo demo.</strong> El backend de sincronización aún no existe: la
+      sincronización está deshabilitada y los estados operacionales y medidores
+      mostrados son datos de ejemplo, no lecturas reales de Quoia.
+    </SimuladoBanner>
 
     <!-- Aviso de fronteras con problemas -->
     <div v-if="conProblemas.length" class="rounded-lg px-3 py-2 text-xs"
@@ -63,7 +69,7 @@
         <Column header="" style="width:120px">
           <template #body="{ data }">
             <Button icon="pi pi-sync" label="Sync" size="small" text
-                    :loading="rowSyncing === data.id" @click="sincronizarUna(data)" />
+                    :loading="rowSyncing === data.id" :disabled="useMock" @click="sincronizarUna(data)" />
           </template>
         </Column>
         <template #empty>
@@ -93,6 +99,7 @@ import Column from 'primevue/column'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import ProgressBar from 'primevue/progressbar'
+import SimuladoBanner from '@/components/SimuladoBanner.vue'
 import { syncFronteras } from '@/services/rendimientoService'
 
 const props = defineProps({
@@ -140,7 +147,10 @@ function fmtSync(v) {
 }
 
 async function sincronizarTodas() {
-  if (!props.fronteras.length) return
+  // Anti-fabricación: en modo demo no hay backend que sincronizar, así que no
+  // emitimos un éxito falso ni estampamos un "Último sync" real. El botón ya
+  // está deshabilitado; esto es el cinturón de seguridad.
+  if (!props.fronteras.length || props.useMock) return
   syncing.value = true
   showProgress.value = true
   progreso.total = props.fronteras.length
@@ -173,6 +183,7 @@ async function sincronizarTodas() {
 }
 
 async function sincronizarUna(frontera) {
+  if (props.useMock) return  // demo: sin backend real, no fabricar sync
   rowSyncing.value = frontera.id
   try {
     const res = await syncFronteras([frontera.id], { useMock: props.useMock })
