@@ -755,7 +755,8 @@
                 <div class="flex items-center gap-2">
                   <span class="font-medium" style="color: #2C2039;">{{ p.nombre }}</span>
                   <span v-if="p.es_duplicado" class="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded"
-                    style="background: rgba(240,192,64,0.22); color: #9a6700;" v-tooltip="'Compra en bolsa'"><i class="pi pi-shopping-cart" style="font-size: 9px;" />Compra bolsa</span>
+                    style="background: rgba(240,192,64,0.22); color: #9a6700;"
+                    v-tooltip="'Duplicado: suministra a este contrato con origen bolsa — también listado en c. Compra en Bolsa (UNGG)'"><i class="pi pi-shopping-cart" style="font-size: 9px;" />Duplicado</span>
                   <span v-if="p.codigo_sic" class="text-xs font-mono px-1.5 py-0.5 rounded" style="background: rgba(44,32,57,0.06); color: #7a6e8a;">{{ p.codigo_sic }}</span>
                   <span v-if="p.pct_despacho != null" class="text-xs font-mono" style="color: #915BD8;">{{ (p.pct_despacho * 100).toFixed(0) }}%</span>
                 </div>
@@ -1530,9 +1531,9 @@ const pcPools = computed(() => {
   if (d.pools) return d.pools
   const a = [], c = []
   for (const ct of (d.venta || [])) {
-    const noDup = (ct.plantas || []).filter(p => !p.es_duplicado)
     const dup = (ct.plantas || []).filter(p => p.es_duplicado)
-    a.push({ ...ct, plantas: noDup })
+    // (a) muestra TODAS las plantas (duplicadas con badge); (c) agrupa las duplicadas
+    a.push({ ...ct, plantas: ct.plantas || [] })
     if (dup.length) c.push({ ...ct, plantas: dup })
   }
   return {
@@ -1579,7 +1580,7 @@ async function exportarResumenPlantasContratos() {
     if (c.plantas.length) {
       for (const p of c.plantas)
         aoa.push(['a. PPA Venta (UNGG)', c.nombre, c.comprador_nombre || '', p.nombre, p.codigo_sic || '',
-          pct(p.pct_despacho), p.fecha_inicio || '', p.fecha_fin || '', ''])
+          pct(p.pct_despacho), p.fecha_inicio || '', p.fecha_fin || '', p.es_duplicado ? 'Duplicado — ver c.' : ''])
     } else {
       aoa.push(['a. PPA Venta (UNGG)', c.nombre, c.comprador_nombre || '', '(sin plantas en GESCON)', '', '', '', '', ''])
     }
