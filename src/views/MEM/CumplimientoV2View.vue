@@ -711,7 +711,7 @@
         </span>
         <Button label="Exportar resumen (Excel)" icon="pi pi-file-excel" size="small" outlined class="ml-auto"
           :disabled="!pcData || pcLoading" @click="exportarResumenPlantasContratos"
-          v-tooltip.bottom="'Contratos con sus plantas (venta + compra) y, al final, plantas sin contrato o en bolsa con UNGC'"
+          v-tooltip.bottom="'Descarga TODAS las categorías a-f del mes (todos los contratos y plantas), sin importar el filtro activo'"
           style="color:#915BD8; border-color:#915BD8;" />
       </div>
 
