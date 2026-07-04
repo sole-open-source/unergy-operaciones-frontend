@@ -86,7 +86,13 @@
 
         <Column field="fecha_fin" header="Fin" sortable style="width:95px;">
           <template #body="{ data }">
-            <span class="text-xs" :style="{ color: esVencido(data.fecha_fin) ? '#ef4444' : '#6b5a8a' }">
+            <span v-if="finRecortado(data)" class="text-xs inline-flex items-center gap-1"
+              :style="{ color: esVencido(finEfectivo(data)) ? '#ef4444' : '#6b5a8a' }"
+              v-tooltip.top="`Vigencia recortada: un relevo o modificación posterior en este SIC superó esta fila. Fecha registrada: ${fmt(data.fecha_fin)}`">
+              {{ fmt(finEfectivo(data)) }}
+              <i class="pi pi-history" style="font-size:9px; color:#e6a817;" />
+            </span>
+            <span v-else class="text-xs" :style="{ color: esVencido(data.fecha_fin) ? '#ef4444' : '#6b5a8a' }">
               {{ fmt(data.fecha_fin) }}
             </span>
           </template>
@@ -491,10 +497,20 @@ const opcionesTipo = [
   { label: 'Desistimiento', value: 'desistimiento' },
 ]
 
+// Fin EFECTIVO de la fila: si un relevo/modificación posterior en su SIC la
+// superó, el backend manda fecha_fin_efectiva (< fecha_fin cruda). Una fila
+// superada NO está vigente aunque su fecha registrada diga 2039 — caso real:
+// SIC 89116, la fila vieja de La Reserva tras la modificación que cambió la
+// planta. Fallback a la cruda si el backend aún no manda el campo.
+function finEfectivo(x) { return x.fecha_fin_efectiva || x.fecha_fin }
+function finRecortado(x) {
+  return !!(x.fecha_fin_efectiva && x.fecha_fin && x.fecha_fin_efectiva < x.fecha_fin)
+}
+
 function filtrar() {
   let r = rows.value.slice()
   if (filtroEstado.value === 'vigentes')
-    r = r.filter(x => x.fecha_fin && x.fecha_fin >= hoy)
+    r = r.filter(x => finEfectivo(x) && finEfectivo(x) >= hoy)
   if (filtroTipo.value)
     r = r.filter(x => x.tipo_solicitud === filtroTipo.value)
   const q = filtroTexto.value.trim().toLowerCase()
