@@ -35,95 +35,67 @@
         </IconField>
       </div>
 
-      <DataTable
+      <BaseDataTable
         :value="contratosFiltrados"
+        :columns="ppaColumns"
         :loading="loading"
-        stripedRows
-        class="text-sm"
-        paginator
         :rows="20"
-        :rowsPerPageOptions="[10, 20, 50]"
-        paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown"
-        emptyMessage="No hay contratos PPA registrados."
-        rowHover
         sortField="fecha_inicio"
         :sortOrder="1"
+        emptyMessage="No hay contratos PPA registrados."
+        actionsStyle="width:120px"
       >
-        <Column field="nombre_interno" header="Nombre interno" sortable>
-          <template #body="{ data }">
-            <span class="font-medium text-gray-800">{{ data.nombre_interno || '—' }}</span>
-          </template>
-        </Column>
-        <Column field="tipo_contrato" header="Tipo" sortable style="width:90px">
-          <template #body="{ data }">
-            <Tag :value="(data.tipo_contrato === 'compra') ? 'Compra' : 'Venta'"
-              :style="(data.tipo_contrato === 'compra')
-                ? 'background:#915BD8;color:#fff'
-                : 'background:#F6FF72;color:#2C2039'" class="text-xs" />
-          </template>
-        </Column>
-        <Column field="numero_codigo_contrato" header="N° contrato" sortable style="width:160px">
-          <template #body="{ data }">
-            <span class="font-mono text-xs text-gray-500">{{ data.numero_codigo_contrato || '—' }}</span>
-          </template>
-        </Column>
-        <Column header="Comprador">
-          <template #body="{ data }">{{ data.comprador_nombre || '—' }}</template>
-        </Column>
-        <Column header="Vendedor">
-          <template #body="{ data }">{{ data.vendedor_nombre || '—' }}</template>
-        </Column>
-        <Column field="fecha_inicio" header="Inicio" sortable style="width:100px">
-          <template #body="{ data }">{{ formatFecha(data.fecha_inicio) }}</template>
-        </Column>
-        <Column field="fecha_fin" header="Fin" sortable style="width:100px">
-          <template #body="{ data }">{{ formatFecha(data.fecha_fin) }}</template>
-        </Column>
-        <Column header="Días rest." style="width:90px">
-          <template #body="{ data }">
-            <span v-if="data.dias_restantes != null" class="font-mono text-xs"
-              :style="{ color: data.dias_restantes <= 30 ? '#D64455' : data.dias_restantes <= 90 ? '#CA8A04' : '#6b5a8a' }">
-              {{ data.dias_restantes }}d
-            </span>
-            <span v-else class="text-xs" style="color: #9CA3AF;">—</span>
-          </template>
-        </Column>
-        <Column header="Cumplimiento" style="width:120px">
-          <template #body="{ data }">
-            <Tag v-if="data.estado_cumplimiento"
-              :value="CUMPLIMIENTO_LABELS[data.estado_cumplimiento] || data.estado_cumplimiento"
-              :severity="CUMPLIMIENTO_SEVERITY[data.estado_cumplimiento] || 'secondary'" class="text-xs" />
-            <span v-else class="text-xs" style="color: #9CA3AF;">—</span>
-          </template>
-        </Column>
-        <Column header="Cobertura" style="width:120px">
-          <template #body="{ data }">
-            <div v-if="data.cobertura_actual_pct != null" class="flex items-center gap-1.5">
-              <div class="flex-1 h-2 rounded-full overflow-hidden" style="background: #f3f0f7;">
-                <div class="h-full rounded-full"
-                  :style="{
-                    width: Math.min(data.cobertura_actual_pct, 100) + '%',
-                    backgroundColor: data.cobertura_actual_pct >= 90 ? '#10B981' : data.cobertura_actual_pct >= 70 ? '#F0C040' : '#D64455'
-                  }" />
-              </div>
-              <span class="text-[10px] font-mono w-8 text-right" style="color: #6b5a8a;">{{ data.cobertura_actual_pct }}%</span>
+        <template #cell-nombre_interno="{ data }">
+          <span class="font-medium text-gray-800">{{ data.nombre_interno || '—' }}</span>
+        </template>
+        <template #cell-tipo_contrato="{ data }">
+          <Tag :value="(data.tipo_contrato === 'compra') ? 'Compra' : 'Venta'"
+            :style="(data.tipo_contrato === 'compra')
+              ? 'background:#915BD8;color:#fff'
+              : 'background:#F6FF72;color:#2C2039'" class="text-xs" />
+        </template>
+        <template #cell-numero_codigo_contrato="{ data }">
+          <span class="font-mono text-xs text-gray-500">{{ data.numero_codigo_contrato || '—' }}</span>
+        </template>
+        <template #cell-comprador="{ data }">{{ data.comprador_nombre || '—' }}</template>
+        <template #cell-vendedor="{ data }">{{ data.vendedor_nombre || '—' }}</template>
+        <template #cell-dias="{ data }">
+          <span v-if="data.dias_restantes != null" class="font-mono text-xs"
+            :style="{ color: data.dias_restantes <= 30 ? '#D64455' : data.dias_restantes <= 90 ? '#CA8A04' : '#6b5a8a' }">
+            {{ data.dias_restantes }}d
+          </span>
+          <span v-else class="text-xs" style="color: #9CA3AF;">—</span>
+        </template>
+        <template #cell-cumplimiento="{ data }">
+          <Tag v-if="data.estado_cumplimiento"
+            :value="CUMPLIMIENTO_LABELS[data.estado_cumplimiento] || data.estado_cumplimiento"
+            :severity="CUMPLIMIENTO_SEVERITY[data.estado_cumplimiento] || 'secondary'" class="text-xs" />
+          <span v-else class="text-xs" style="color: #9CA3AF;">—</span>
+        </template>
+        <template #cell-cobertura="{ data }">
+          <div v-if="data.cobertura_actual_pct != null" class="flex items-center gap-1.5">
+            <div class="flex-1 h-2 rounded-full overflow-hidden" style="background: #f3f0f7;">
+              <div class="h-full rounded-full"
+                :style="{
+                  width: Math.min(data.cobertura_actual_pct, 100) + '%',
+                  backgroundColor: data.cobertura_actual_pct >= 90 ? '#10B981' : data.cobertura_actual_pct >= 70 ? '#F0C040' : '#D64455'
+                }" />
             </div>
-            <span v-else class="text-xs" style="color: #9CA3AF;">—</span>
-          </template>
-        </Column>
-        <Column style="width:120px">
-          <template #body="{ data }">
-            <Button icon="pi pi-copy" text size="small" severity="secondary"
-              v-tooltip.top="'Duplicar contrato'"
-              @click.stop="duplicarContrato(data)" />
-            <Button icon="pi pi-arrow-right" text size="small" severity="secondary"
-              @click.stop="irAContrato(data)" v-tooltip="'Ver detalle'" />
-            <Button icon="pi pi-trash" text size="small" severity="danger"
-              v-tooltip.top="'Eliminar contrato'"
-              @click.stop="confirmarEliminar(data)" />
-          </template>
-        </Column>
-      </DataTable>
+            <span class="text-[10px] font-mono w-8 text-right" style="color: #6b5a8a;">{{ data.cobertura_actual_pct }}%</span>
+          </div>
+          <span v-else class="text-xs" style="color: #9CA3AF;">—</span>
+        </template>
+        <template #actions="{ data }">
+          <Button icon="pi pi-copy" text size="small" severity="secondary"
+            v-tooltip.top="'Duplicar contrato'"
+            @click.stop="duplicarContrato(data)" />
+          <Button icon="pi pi-arrow-right" text size="small" severity="secondary"
+            @click.stop="irAContrato(data)" v-tooltip="'Ver detalle'" />
+          <Button icon="pi pi-trash" text size="small" severity="danger"
+            v-tooltip.top="'Eliminar contrato'"
+            @click.stop="confirmarEliminar(data)" />
+        </template>
+      </BaseDataTable>
     </template>
 
     <!-- REPRESENTACIÓN — Lista de plantas -->
@@ -136,72 +108,50 @@
         </IconField>
       </div>
 
-      <DataTable
+      <BaseDataTable
         :value="plantasRepresentacionFiltradas"
+        :columns="representacionColumns"
         :loading="loadingPlantas"
-        stripedRows
-        class="text-sm"
-        paginator
         :rows="20"
-        :rowsPerPageOptions="[10, 20, 50]"
-        paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown"
-        emptyMessage="No hay plantas con servicio de representación."
-        rowHover
         sortField="nombre_comercial"
         :sortOrder="1"
+        emptyMessage="No hay plantas con servicio de representación."
+        actionsStyle="width:50px"
       >
-        <Column field="nombre_comercial" header="Planta" sortable>
-          <template #body="{ data }">
-            <span class="font-medium text-gray-800">{{ data.nombre_comercial }}</span>
-          </template>
-        </Column>
-        <Column field="potencia_instalada_kwp" header="Potencia (kWp)" sortable style="width:130px">
-          <template #body="{ data }">
-            <span class="text-gray-600">{{ data.potencia_instalada_kwp ? Number(data.potencia_instalada_kwp).toLocaleString('es-CO') : '—' }}</span>
-          </template>
-        </Column>
-        <Column field="estado" header="Estado" sortable style="width:130px">
-          <template #body="{ data }">
-            <Tag :value="ESTADO_PROYECTO_LABELS[data.estado] || data.estado"
-              :severity="ESTADO_PROYECTO_SEVERITY[data.estado]" />
-          </template>
-        </Column>
-        <Column header="Ubicación" style="width:180px">
-          <template #body="{ data }">
-            <span class="text-gray-600 text-xs">{{ [data.municipio, data.departamento].filter(Boolean).join(', ') || '—' }}</span>
-          </template>
-        </Column>
-        <Column header="Representante" style="width:180px">
-          <template #body="{ data }">
-            <span class="text-gray-700">{{ data.servicio_representacion?.nombre_rf || '—' }}</span>
-          </template>
-        </Column>
-        <Column header="Modalidad venta" style="width:160px">
-          <template #body="{ data }">
-            <Tag v-if="data.servicio_representacion?.modalidad_venta"
-              :value="MODALIDAD_LABELS[data.servicio_representacion.modalidad_venta] || data.servicio_representacion.modalidad_venta"
-              severity="info" />
-            <span v-else class="text-gray-300">—</span>
-          </template>
-        </Column>
-        <Column header="Cód. despacho XM" style="width:140px">
-          <template #body="{ data }">
-            <span class="font-mono text-xs text-gray-500">{{ data.servicio_representacion?.codigo_despacho_xm || '—' }}</span>
-          </template>
-        </Column>
-        <Column header="CGM" style="width:60px">
-          <template #body="{ data }">
-            <i v-if="data.srv_cgm" class="pi pi-check-circle text-green-500" v-tooltip="'Tiene CGM'" />
-            <i v-else class="pi pi-minus text-gray-300" />
-          </template>
-        </Column>
-        <Column style="width:50px">
-          <template #body="{ data }">
-            <Button icon="pi pi-arrow-right" text size="small" severity="secondary"
-              @click.stop="irAProyecto(data)" v-tooltip="'Ver planta'" />
-          </template>
-        </Column>
-      </DataTable>
+        <template #cell-nombre_comercial="{ data }">
+          <span class="font-medium text-gray-800">{{ data.nombre_comercial }}</span>
+        </template>
+        <template #cell-potencia_instalada_kwp="{ data }">
+          <span class="text-gray-600">{{ data.potencia_instalada_kwp ? Number(data.potencia_instalada_kwp).toLocaleString('es-CO') : '—' }}</span>
+        </template>
+        <template #cell-estado="{ data }">
+          <Tag :value="ESTADO_PROYECTO_LABELS[data.estado] || data.estado"
+            :severity="ESTADO_PROYECTO_SEVERITY[data.estado]" />
+        </template>
+        <template #cell-ubicacion="{ data }">
+          <span class="text-gray-600 text-xs">{{ [data.municipio, data.departamento].filter(Boolean).join(', ') || '—' }}</span>
+        </template>
+        <template #cell-representante="{ data }">
+          <span class="text-gray-700">{{ data.servicio_representacion?.nombre_rf || '—' }}</span>
+        </template>
+        <template #cell-modalidad="{ data }">
+          <Tag v-if="data.servicio_representacion?.modalidad_venta"
+            :value="MODALIDAD_LABELS[data.servicio_representacion.modalidad_venta] || data.servicio_representacion.modalidad_venta"
+            severity="info" />
+          <span v-else class="text-gray-300">—</span>
+        </template>
+        <template #cell-despacho="{ data }">
+          <span class="font-mono text-xs text-gray-500">{{ data.servicio_representacion?.codigo_despacho_xm || '—' }}</span>
+        </template>
+        <template #cell-cgm="{ data }">
+          <i v-if="data.srv_cgm" class="pi pi-check-circle text-green-500" v-tooltip="'Tiene CGM'" />
+          <i v-else class="pi pi-minus text-gray-300" />
+        </template>
+        <template #actions="{ data }">
+          <Button icon="pi pi-arrow-right" text size="small" severity="secondary"
+            @click.stop="irAProyecto(data)" v-tooltip="'Ver planta'" />
+        </template>
+      </BaseDataTable>
     </template>
 
     <!-- OPERACIÓN / REC — contratos de servicio -->
@@ -214,43 +164,24 @@
         </IconField>
       </div>
 
-      <DataTable
+      <BaseDataTable
         :value="contratosServicioFiltrados"
+        :columns="servicioColumns"
         :loading="loadingServicio"
-        stripedRows
-        class="text-sm"
-        paginator
         :rows="20"
-        :rowsPerPageOptions="[10, 20, 50]"
-        paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown"
-        :emptyMessage="`No hay contratos de ${servicioInfo?.label} registrados.`"
-        rowHover
         sortField="fecha_inicio"
         :sortOrder="1"
+        :emptyMessage="`No hay contratos de ${servicioInfo?.label} registrados.`"
       >
-        <Column field="numero_contrato" header="N° contrato" sortable style="width:160px">
-          <template #body="{ data }">
-            <span class="font-mono text-xs text-gray-500">{{ data.numero_contrato || '—' }}</span>
-          </template>
-        </Column>
-        <Column header="Contratante">
-          <template #body="{ data }">{{ data.contratante_nombre || '—' }}</template>
-        </Column>
-        <Column header="Prestador">
-          <template #body="{ data }">{{ data.prestador_nombre || '—' }}</template>
-        </Column>
-        <Column field="fecha_inicio" header="Inicio" sortable style="width:100px">
-          <template #body="{ data }">{{ formatFecha(data.fecha_inicio) }}</template>
-        </Column>
-        <Column field="fecha_fin" header="Fin" sortable style="width:100px">
-          <template #body="{ data }">{{ formatFecha(data.fecha_fin) }}</template>
-        </Column>
-        <Column header="Estado" style="width:120px">
-          <template #body="{ data }">
-            <Tag :value="ESTADO_LABELS[data.estado] || data.estado" :severity="ESTADO_SEVERITY[data.estado]" />
-          </template>
-        </Column>
-      </DataTable>
+        <template #cell-numero_contrato="{ data }">
+          <span class="font-mono text-xs text-gray-500">{{ data.numero_contrato || '—' }}</span>
+        </template>
+        <template #cell-contratante="{ data }">{{ data.contratante_nombre || '—' }}</template>
+        <template #cell-prestador="{ data }">{{ data.prestador_nombre || '—' }}</template>
+        <template #cell-estado="{ data }">
+          <Tag :value="ESTADO_LABELS[data.estado] || data.estado" :severity="ESTADO_SEVERITY[data.estado]" />
+        </template>
+      </BaseDataTable>
     </template>
 
     <!-- Wizards -->
@@ -274,14 +205,13 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import { useConfirm } from 'primevue/useconfirm'
-import DataTable from 'primevue/datatable'
-import Column from 'primevue/column'
 import Tag from 'primevue/tag'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import IconField from 'primevue/iconfield'
 import InputIcon from 'primevue/inputicon'
 import ConfirmDialog from 'primevue/confirmdialog'
+import BaseDataTable from '@/components/crud/BaseDataTable.vue'
 import PPAContratoWizard from './PPAContratoWizard.vue'
 import ContratoServicioWizard from './ContratoServicioWizard.vue'
 import api from '@/api/client'
@@ -295,6 +225,41 @@ const SERVICIOS = [
   { key: 'representacion',label: 'Representación', icon: 'pi pi-file-edit', color: '#3b82f6', bg: '#eff6ff' },
   { key: 'operacion',     label: 'Operación',      icon: 'pi pi-chart-bar', color: '#10b981', bg: '#f0fdf4' },
   { key: 'rec',           label: 'REC',            icon: 'pi pi-verified',  color: '#14b8a6', bg: '#f0fdfa' },
+]
+
+// ── Definición de columnas para BaseDataTable ────────────────────────────────
+// Las celdas con formato/estilo se resuelven vía slots `cell-<field|slot>`.
+const ppaColumns = [
+  { field: 'nombre_interno', header: 'Nombre interno', sortable: true },
+  { field: 'tipo_contrato', header: 'Tipo', sortable: true, style: 'width:90px' },
+  { field: 'numero_codigo_contrato', header: 'N° contrato', sortable: true, style: 'width:160px' },
+  { header: 'Comprador', slot: 'comprador' },
+  { header: 'Vendedor', slot: 'vendedor' },
+  { field: 'fecha_inicio', header: 'Inicio', sortable: true, style: 'width:100px', format: (v) => formatFecha(v) },
+  { field: 'fecha_fin', header: 'Fin', sortable: true, style: 'width:100px', format: (v) => formatFecha(v) },
+  { header: 'Días rest.', slot: 'dias', style: 'width:90px' },
+  { header: 'Cumplimiento', slot: 'cumplimiento', style: 'width:120px' },
+  { header: 'Cobertura', slot: 'cobertura', style: 'width:120px' },
+]
+
+const representacionColumns = [
+  { field: 'nombre_comercial', header: 'Planta', sortable: true },
+  { field: 'potencia_instalada_kwp', header: 'Potencia (kWp)', sortable: true, style: 'width:130px' },
+  { field: 'estado', header: 'Estado', sortable: true, style: 'width:130px' },
+  { header: 'Ubicación', slot: 'ubicacion', style: 'width:180px' },
+  { header: 'Representante', slot: 'representante', style: 'width:180px' },
+  { header: 'Modalidad venta', slot: 'modalidad', style: 'width:160px' },
+  { header: 'Cód. despacho XM', slot: 'despacho', style: 'width:140px' },
+  { header: 'CGM', slot: 'cgm', style: 'width:60px' },
+]
+
+const servicioColumns = [
+  { field: 'numero_contrato', header: 'N° contrato', sortable: true, style: 'width:160px' },
+  { header: 'Contratante', slot: 'contratante' },
+  { header: 'Prestador', slot: 'prestador' },
+  { field: 'fecha_inicio', header: 'Inicio', sortable: true, style: 'width:100px', format: (v) => formatFecha(v) },
+  { field: 'fecha_fin', header: 'Fin', sortable: true, style: 'width:100px', format: (v) => formatFecha(v) },
+  { header: 'Estado', slot: 'estado', style: 'width:120px' },
 ]
 
 const ESTADO_LABELS = {

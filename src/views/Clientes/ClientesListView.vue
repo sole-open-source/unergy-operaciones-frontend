@@ -11,20 +11,20 @@
     </PageHeader>
 
     <div class="bg-white rounded-xl shadow-sm overflow-hidden border" style="border-color:#ECE7F2">
-      <DataTable :value="items" lazy :loading="loading" :rows="size" :totalRecords="total"
-        paginator @page="onPage" rowHover class="text-sm">
-        <Column field="razon_social_nombre" header="Razón social / Nombre" sortable />
-        <Column field="nit_cedula" header="NIT / Cédula" />
-        <Column field="tipo_persona" header="Tipo" />
-        <Column field="ciudad" header="Ciudad" />
-        <Column field="correo_electronico" header="Correo" />
-        <Column header="Acciones" style="width: 120px">
-          <template #body="{ data }">
-            <Button icon="pi pi-eye" text rounded size="small" v-tooltip.top="'Ver detalle'" @click="$router.push(`/clientes/${data.id}`)" />
-            <Button icon="pi pi-pencil" text rounded size="small" v-tooltip.top="'Editar'" @click="openEdit(data)" />
-          </template>
-        </Column>
-      </DataTable>
+      <BaseDataTable
+        :value="items"
+        :columns="columns"
+        :loading="loading"
+        lazy
+        :rows="pagination.size"
+        :total-records="total"
+        @page="onPage"
+      >
+        <template #actions="{ data }">
+          <Button icon="pi pi-eye" text rounded size="small" v-tooltip.top="'Ver detalle'" @click="$router.push(`/clientes/${data.id}`)" />
+          <Button icon="pi pi-pencil" text rounded size="small" v-tooltip.top="'Editar'" @click="openEdit(data)" />
+        </template>
+      </BaseDataTable>
     </div>
 
     <Dialog v-model:visible="dialogVisible" :header="editingId ? 'Editar cliente' : 'Nuevo cliente'"
@@ -36,50 +36,39 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import DataTable from 'primevue/datatable'
-import Column from 'primevue/column'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import IconField from 'primevue/iconfield'
 import InputIcon from 'primevue/inputicon'
 import { useToast } from 'primevue/usetoast'
-import api from '@/api/client'
+import BaseDataTable from '@/components/crud/BaseDataTable.vue'
+import { useCrudManager } from '@/composables/useCrudManager'
+import { clientesConfig } from '@/utils/crudConfig'
 import ClienteForm from './ClienteForm.vue'
 
 const toast = useToast()
-const items = ref([])
-const total = ref(0)
-const page = ref(1)
-const size = ref(20)
+
+const {
+  items, total, loading, pagination,
+  fetchData, setFilter, setPage, createItem, updateItem,
+} = useCrudManager({ endpoint: clientesConfig.endpoint, lazy: true, pageSize: clientesConfig.pageSize })
+
+const columns = clientesConfig.columns
+
 const q = ref('')
-const loading = ref(false)
 const dialogVisible = ref(false)
 const editingId = ref(null)
 const form = ref({})
 
-async function load() {
-  loading.value = true
-  try {
-    const { data } = await api.get('/clientes', { params: { page: page.value, size: size.value, q: q.value || undefined } })
-    items.value = data.items
-    total.value = data.total
-  } finally {
-    loading.value = false
-  }
-}
+onMounted(fetchData)
 
-onMounted(load)
-
-let searchTimer
 function onSearch() {
-  clearTimeout(searchTimer)
-  searchTimer = setTimeout(() => { page.value = 1; load() }, 350)
+  setFilter('q', q.value || undefined, { debounce: 350 })
 }
 
 function onPage(e) {
-  page.value = e.page + 1
-  load()
+  setPage(e.page + 1, e.rows)
 }
 
 function openNew() {
@@ -97,14 +86,14 @@ function openEdit(row) {
 async function onSave(payload) {
   try {
     if (editingId.value) {
-      await api.patch(`/clientes/${editingId.value}`, payload)
+      await updateItem(editingId.value, payload)
       toast.add({ severity: 'success', summary: 'Cliente actualizado', life: 3000 })
     } else {
-      await api.post('/clientes', payload)
+      await createItem(payload)
       toast.add({ severity: 'success', summary: 'Cliente creado', life: 3000 })
     }
     dialogVisible.value = false
-    load()
+    fetchData()
   } catch (e) {
     toast.add({ severity: 'error', summary: 'Error', detail: e.response?.data?.detail, life: 4000 })
   }

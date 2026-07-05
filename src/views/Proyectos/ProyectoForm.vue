@@ -3,7 +3,9 @@
     <div class="grid grid-cols-2 gap-4">
       <div class="col-span-2">
         <label class="field-label">Nombre comercial *</label>
-        <InputText v-model="f.nombre_comercial" class="w-full" required />
+        <InputText v-model="f.nombre_comercial" class="w-full" :invalid="!!errors.nombre_comercial"
+          @blur="validateField('nombre_comercial')" />
+        <small v-if="errors.nombre_comercial" class="text-red-500 text-xs mt-1 block">{{ errors.nombre_comercial }}</small>
       </div>
       <div>
         <label class="field-label">Tipo de proyecto</label>
@@ -186,6 +188,8 @@ import Divider from 'primevue/divider'
 import Tag from 'primevue/tag'
 import { useToast } from 'primevue/usetoast'
 import api from '@/api/client'
+import { useFormValidation } from '@/composables/useFormValidation'
+import { proyectosConfig } from '@/utils/crudConfig'
 
 const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 
@@ -203,20 +207,24 @@ const tipos = ['minigranja', 'autoconsumo', 'gd', 'movilidad_electrica', 'otro']
 const tecnologias = ['solar', 'eolica', 'hidraulica', 'biomasa', 'otra']
 const clasificaciones = ['AGP', 'AGPE', 'AGGE', 'GD', 'DER', 'otra']
 
-const f = reactive({
-  nombre_comercial: '',
-  estado: 'en_desarrollo',
-  tipo_proyecto: null,
-  potencia_instalada_kwp: null,
-  tipo_tecnologia: null,
-  departamento: null,
-  municipio: null,
-  operador_red: null,
-  clasificacion_regulatoria: null,
-  carpeta_drive_codigo: null,
-  sub_project: null,
-  codigo_tsf: null,
-})
+// Estado del formulario + validación estandarizada (esquema en crudConfig).
+const { form: f, errors, validate, validateField } = useFormValidation(
+  {
+    nombre_comercial: '',
+    estado: 'en_desarrollo',
+    tipo_proyecto: null,
+    potencia_instalada_kwp: null,
+    tipo_tecnologia: null,
+    departamento: null,
+    municipio: null,
+    operador_red: null,
+    clasificacion_regulatoria: null,
+    carpeta_drive_codigo: null,
+    sub_project: null,
+    codigo_tsf: null,
+  },
+  proyectosConfig.validation,
+)
 
 // Fechas del proyecto (DatePicker usa Date; el API espera 'YYYY-MM-DD')
 const fechaEntrada = ref(null)
@@ -318,6 +326,7 @@ function serializeMonthArray(arr) {
 }
 
 function submit() {
+  if (!validate()) return
   const payload = {}
   for (const [k, v] of Object.entries(f)) {
     if (v !== null && v !== undefined && v !== '') payload[k] = v

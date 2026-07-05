@@ -3,7 +3,9 @@
     <div class="grid grid-cols-2 gap-4">
       <div class="col-span-2">
         <label class="field-label">Razón social / Nombre *</label>
-        <InputText v-model="f.razon_social_nombre" class="w-full" required />
+        <InputText v-model="f.razon_social_nombre" class="w-full" :invalid="!!errors.razon_social_nombre"
+          @blur="validateField('razon_social_nombre')" />
+        <small v-if="errors.razon_social_nombre" class="text-red-500 text-xs mt-1 block">{{ errors.razon_social_nombre }}</small>
       </div>
       <div>
         <label class="field-label">NIT / Cédula</label>
@@ -19,7 +21,9 @@
       </div>
       <div>
         <label class="field-label">Correo</label>
-        <InputText v-model="f.correo_electronico" type="email" class="w-full" />
+        <InputText v-model="f.correo_electronico" type="email" class="w-full" :invalid="!!errors.correo_electronico"
+          @blur="validateField('correo_electronico')" />
+        <small v-if="errors.correo_electronico" class="text-red-500 text-xs mt-1 block">{{ errors.correo_electronico }}</small>
       </div>
       <div>
         <label class="field-label">Teléfono</label>
@@ -161,26 +165,33 @@
 </template>
 
 <script setup>
-import { reactive, watch } from 'vue'
+import { watch } from 'vue'
 import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import Select from 'primevue/select'
 import Button from 'primevue/button'
+import { useFormValidation } from '@/composables/useFormValidation'
+import { clientesConfig } from '@/utils/crudConfig'
 
-const props = defineProps({ initial: Object })
+const props = defineProps({ initial: Object, inline: Boolean })
 const emit = defineEmits(['save', 'cancel', 'test-correo'])
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 function emailValido(e) { return !e || EMAIL_RE.test(e.trim()) }
 
-const f = reactive({
-  ...props.initial,
-  correos_operacionales: Array.isArray(props.initial?.correos_operacionales)
-    ? [...props.initial.correos_operacionales]
-    : [],
-})
+// Validación estandarizada vía useFormValidation (esquema en crudConfig).
+const { form: f, errors, validate, validateField, setForm } = useFormValidation(
+  {
+    ...props.initial,
+    correos_operacionales: Array.isArray(props.initial?.correos_operacionales)
+      ? [...props.initial.correos_operacionales]
+      : [],
+  },
+  clientesConfig.validation,
+)
+
 watch(() => props.initial, (v) => {
-  Object.assign(f, v)
+  setForm(v || {})
   if (Array.isArray(v?.correos_operacionales)) {
     f.correos_operacionales = [...v.correos_operacionales]
   }
@@ -191,6 +202,7 @@ function eliminarCorreo(idx)           { f.correos_operacionales = f.correos_ope
 function actualizarCorreo(idx, val)    { f.correos_operacionales = f.correos_operacionales.map((e, i) => i === idx ? val : e) }
 
 function submit() {
+  if (!validate()) return
   const payload = {}
   for (const [k, v] of Object.entries(f)) {
     if (v !== null && v !== undefined && v !== '') payload[k] = v

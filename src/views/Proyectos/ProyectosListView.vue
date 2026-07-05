@@ -11,23 +11,7 @@
     </PageHeader>
 
     <!-- Filtros -->
-    <div class="bg-white rounded-xl shadow-sm p-3 flex flex-wrap gap-3 items-end border" style="border-color:#ECE7F2">
-      <div>
-        <label class="field-label">Buscar</label>
-        <IconField>
-          <InputIcon class="pi pi-search" />
-          <InputText v-model="filters.q" placeholder="Nombre comercial…" class="w-56" />
-        </IconField>
-      </div>
-      <div>
-        <label class="field-label">Estado</label>
-        <Select v-model="filters.estado" :options="ESTADOS" class="w-40" placeholder="Todos" showClear />
-      </div>
-      <div>
-        <label class="field-label">Tipo</label>
-        <Select v-model="filters.tipo_proyecto" :options="TIPOS_PROYECTO" class="w-44" placeholder="Todos" showClear />
-      </div>
-    </div>
+    <BaseFilterBar :fields="proyectosConfig.filters" v-model="filters" />
 
     <!-- Loading -->
     <div v-if="loading" class="bg-white rounded-xl shadow-sm p-10 flex justify-center">
@@ -269,12 +253,11 @@ import { ref, computed, onMounted, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
-import InputText from 'primevue/inputtext'
-import Select from 'primevue/select'
-import IconField from 'primevue/iconfield'
-import InputIcon from 'primevue/inputicon'
 import { useToast } from 'primevue/usetoast'
 import api from '@/api/client'
+import BaseFilterBar from '@/components/crud/BaseFilterBar.vue'
+import { useCrudManager } from '@/composables/useCrudManager'
+import { proyectosConfig } from '@/utils/crudConfig'
 import ProyectoForm from './ProyectoForm.vue'
 
 const router = useRouter()
@@ -321,8 +304,7 @@ async function applyInversoresBackfill() {
 }
 
 // ── Catálogos ──────────────────────────────────────────────────────────────────
-const ESTADOS       = ['en_desarrollo', 'en_operacion', 'suspendido', 'cancelado']
-const TIPOS_PROYECTO = ['minigranja', 'autoconsumo', 'gd', 'movilidad_electrica', 'otro']
+// Los catálogos de filtros (estado, tipo) viven ahora en proyectosConfig.filters.
 
 const SERVICIOS_BADGES = [
   { key: 'srv_operacion',    badge: 'OP',   tooltip: null },
@@ -410,8 +392,13 @@ function avatarStackWidth(n) {
 }
 
 // ── Estado ─────────────────────────────────────────────────────────────────────
-const allItems    = ref([])
-const loading     = ref(false)
+// La carga de la lista (fetch + loading) se centraliza en useCrudManager.
+// El backend de /proyectos devuelve todo el portafolio (size grande); la vista
+// filtra y agrupa por tipo en cliente, así que NO usamos modo lazy.
+const { items: allItems, loading, fetchData } = useCrudManager({
+  endpoint: proyectosConfig.endpoint,
+  params: { page: 1, size: proyectosConfig.pageSize },
+})
 const dialogVisible = ref(false)
 const deleteVisible = ref(false)
 const deleteProyecto = ref(null)
@@ -460,17 +447,11 @@ function toggleSection(tipo) {
 
 // ── Carga de datos ─────────────────────────────────────────────────────────────
 async function load() {
-  loading.value = true
-  try {
-    const { data } = await api.get('/proyectos', { params: { page: 1, size: 200 } })
-    allItems.value = data.items ?? data
-    // Abrir la primera sección automáticamente en la carga inicial
-    if (openSections.value.size === 0) {
-      const first = sectionList.value[0]?.tipo
-      if (first) openSections.value = new Set([first])
-    }
-  } finally {
-    loading.value = false
+  await fetchData()
+  // Abrir la primera sección automáticamente en la carga inicial
+  if (openSections.value.size === 0) {
+    const first = sectionList.value[0]?.tipo
+    if (first) openSections.value = new Set([first])
   }
 }
 
