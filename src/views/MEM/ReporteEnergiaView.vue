@@ -1,13 +1,13 @@
 <template>
   <div class="space-y-5">
-    <PageHeader title="Reporte de Energía" subtitle="Envío del reporte CGM a los operadores de red" />
+    <PageHeader title="Reporte de Energía" />
 
     <div class="ret-tabs">
       <button :class="['ret-tab', tab === 'automatizacion' && 'ret-tab--on']" @click="tab = 'automatizacion'">
-        <i class="pi pi-cog" /> Reporte-Energía
+        <i class="pi pi-cog" /> Reporte ASIC
       </button>
       <button :class="['ret-tab', tab === 'cgm' && 'ret-tab--on']" @click="tab = 'cgm'">
-        <i class="pi pi-envelope" /> ReporteCGM
+        <i class="pi pi-envelope" /> Reporte CGM
       </button>
     </div>
 

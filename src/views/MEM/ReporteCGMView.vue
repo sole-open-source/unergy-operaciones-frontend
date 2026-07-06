@@ -2,7 +2,7 @@
   <div class="space-y-4">
     <div class="flex items-center justify-between">
       <p class="text-xs" style="color: #9b89b5;">
-        Destinatarios resueltos por frontera (operador de red + cliente). El envío del correo todavía no está conectado.
+        Destinatarios del reporte CGM (operador de red + cliente). El envío del correo todavía no está conectado.
       </p>
       <button type="button" disabled
         v-tooltip.top="'Pendiente: falta conectar el motor de generación y envío (hoy solo existe en el script standalone)'"
@@ -20,40 +20,58 @@
       <table class="w-full text-sm">
         <thead>
           <tr style="background: #f9f7ff;">
-            <th class="text-left px-4 py-2.5 font-semibold" style="color: #6b5a8a;">Frontera</th>
-            <th class="text-left px-4 py-2.5 font-semibold" style="color: #6b5a8a;">Operador de Red</th>
-            <th class="text-left px-4 py-2.5 font-semibold" style="color: #6b5a8a;">Cliente</th>
+            <th class="text-left px-4 py-2.5 font-semibold" style="color: #6b5a8a;">Destinatario</th>
+            <th class="text-left px-4 py-2.5 font-semibold" style="color: #6b5a8a;">Tipo</th>
+            <th class="text-left px-4 py-2.5 font-semibold" style="color: #6b5a8a;">Correos</th>
+            <th class="text-left px-4 py-2.5 font-semibold" style="color: #6b5a8a;">Proyectos</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="f in fronteras" :key="f.id" class="border-t" style="border-color: #f0ecf6;">
-            <td class="px-4 py-2.5">
-              <p class="font-medium" style="color: #2C2039;">{{ f.nombre_frontera }}</p>
-              <p class="text-xs" style="color: #9b89b5;">{{ f.codigo_frontera || '—' }}</p>
-            </td>
-            <td class="px-4 py-2.5">
-              <p v-if="f.operador_comercial" style="color: #2C2039;">{{ f.operador_comercial }}</p>
-              <p v-else class="text-xs italic" style="color: #c4b8d4;">Sin operador vinculado</p>
-              <span v-if="f.operador_correos.length" class="text-xs" style="color: #6b5a8a;">
-                {{ f.operador_correos.length }} correo{{ f.operador_correos.length > 1 ? 's' : '' }}
-              </span>
-              <RouterLink v-else to="/mem/operadores-red"
-                class="text-xs font-medium underline" style="color: #D64455;">
-                Sin correos — corregir
-              </RouterLink>
-            </td>
-            <td class="px-4 py-2.5">
-              <p v-if="f.cliente_nombre" style="color: #2C2039;">{{ f.cliente_nombre }}</p>
-              <p v-else class="text-xs italic" style="color: #c4b8d4;">Sin cliente vinculado</p>
-              <span v-if="f.cliente_correos_cgm.length" class="text-xs" style="color: #6b5a8a;">
-                {{ f.cliente_correos_cgm.length }} correo{{ f.cliente_correos_cgm.length > 1 ? 's' : '' }}
-              </span>
-              <RouterLink v-else-if="f.cliente_id" :to="`/clientes/${f.cliente_id}`"
-                class="text-xs font-medium underline" style="color: #D64455;">
-                Sin correos CGM — corregir
-              </RouterLink>
-            </td>
-          </tr>
+          <template v-for="row in destinatarios" :key="row.key">
+            <tr class="border-t" style="border-color: #f0ecf6;">
+              <td class="px-4 py-2.5">
+                <p v-if="row.nombre" class="font-medium" style="color: #2C2039;">{{ row.nombre }}</p>
+                <p v-else class="text-xs italic" style="color: #c4b8d4;">{{ row.sinVinculo }}</p>
+              </td>
+              <td class="px-4 py-2.5">
+                <span class="text-xs px-2 py-0.5 rounded-full font-semibold"
+                  :style="row.tipo === 'Operador de Red'
+                    ? 'background: rgba(145,91,216,0.1); color: #6E3FB8;'
+                    : 'background: rgba(16,185,129,0.1); color: #059669;'">
+                  {{ row.tipo }}
+                </span>
+              </td>
+              <td class="px-4 py-2.5">
+                <RouterLink v-if="row.linkCorregir && row.correos.length"
+                  :to="row.linkCorregir" class="font-medium underline" style="color: #6E3FB8;"
+                  v-tooltip.top="'Ver y editar correos'">
+                  {{ row.correos.length }} correo{{ row.correos.length > 1 ? 's' : '' }}
+                </RouterLink>
+                <RouterLink v-else-if="row.linkCorregir"
+                  :to="row.linkCorregir" class="text-xs font-medium underline" style="color: #D64455;">
+                  {{ row.textoCorregir }}
+                </RouterLink>
+                <span v-else class="text-xs italic" style="color: #c4b8d4;">—</span>
+              </td>
+              <td class="px-4 py-2.5">
+                <button type="button" @click="toggle(row.key)"
+                  class="flex items-center gap-1.5 text-xs font-medium" style="color: #6b5a8a;">
+                  <i :class="['pi text-[10px]', expanded.has(row.key) ? 'pi-chevron-down' : 'pi-chevron-right']" />
+                  {{ row.proyectos.length }} proyecto{{ row.proyectos.length > 1 ? 's' : '' }}
+                </button>
+              </td>
+            </tr>
+            <tr v-if="expanded.has(row.key)" class="border-t" style="border-color: #f0ecf6; background: #fbfaff;">
+              <td colspan="4" class="px-4 py-3">
+                <div class="flex flex-wrap gap-2">
+                  <span v-for="p in row.proyectos" :key="p"
+                    class="text-xs px-2.5 py-1 rounded-lg" style="background: #fff; border: 1px solid #e8e0f0; color: #6b5a8a;">
+                    {{ p }}
+                  </span>
+                </div>
+              </td>
+            </tr>
+          </template>
         </tbody>
       </table>
     </div>
@@ -61,11 +79,49 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import api from '@/api/client'
 
 const fronteras = ref([])
 const loading = ref(true)
+const expanded = ref(new Set())
+
+function toggle(key) {
+  const next = new Set(expanded.value)
+  next.has(key) ? next.delete(key) : next.add(key)
+  expanded.value = next
+}
+
+// Una fila por destinatario único (no por proyecto): agrupa generación+consumo
+// de la misma planta y, si un mismo operador/cliente cubre varios proyectos,
+// los junta en una sola fila con el detalle expandible.
+const destinatarios = computed(() => {
+  const proyectos = new Map()
+  for (const f of fronteras.value) {
+    const key = f.proyecto_nombre || `frontera-${f.id}`
+    if (!proyectos.has(key)) proyectos.set(key, f)
+  }
+
+  const grupos = new Map()
+  function addEntry(entidadKey, tipo, nombre, sinVinculo, correos, linkCorregir, textoCorregir, proyecto) {
+    const key = `${tipo}-${entidadKey}`
+    if (!grupos.has(key)) {
+      grupos.set(key, { key, tipo, nombre, sinVinculo, correos, linkCorregir, textoCorregir, proyectos: [] })
+    }
+    grupos.get(key).proyectos.push(proyecto)
+  }
+
+  for (const [proyecto, f] of proyectos) {
+    addEntry(f.operador_comercial || 'sin-operador', 'Operador de Red', f.operador_comercial,
+      'Sin operador vinculado', f.operador_correos,
+      f.operador_comercial ? '/mem/operadores-red' : null, 'Sin correos — corregir', proyecto)
+    addEntry(f.cliente_id ?? 'sin-cliente', 'Cliente', f.cliente_nombre,
+      'Sin cliente vinculado', f.cliente_correos_cgm,
+      f.cliente_id ? `/clientes/${f.cliente_id}` : null, 'Sin correos CGM — corregir', proyecto)
+  }
+
+  return [...grupos.values()].sort((a, b) => (a.nombre || 'zzz').localeCompare(b.nombre || 'zzz'))
+})
 
 async function loadData() {
   loading.value = true
