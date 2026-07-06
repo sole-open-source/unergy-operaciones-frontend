@@ -6,9 +6,9 @@
       </p>
       <button type="button" disabled
         v-tooltip.top="'Pendiente: falta conectar el motor de generación y envío (hoy solo existe en el script standalone)'"
-        class="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg opacity-40 cursor-not-allowed"
+        class="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg opacity-40 cursor-not-allowed whitespace-nowrap"
         style="background:#915BD8;color:#fff;">
-        <i class="pi pi-send text-xs" /> Enviar
+        <i class="pi pi-send text-xs" /> Enviar a {{ totalSeleccionados }}
       </button>
     </div>
 
@@ -19,16 +19,14 @@
     <div v-else class="space-y-3">
       <div class="flex items-center gap-2 flex-wrap">
         <button v-for="opt in tipoOpciones" :key="opt.value" type="button" @click="filtroTipo = opt.value"
-          class="text-xs font-bold px-3 py-1.5 rounded-full transition-colors"
-          :style="filtroTipo === opt.value
-            ? 'background:#915BD8;color:#fff;'
-            : 'background:#fff;color:#6b5a8a;border:1.5px solid #e8e0f0;'">
+          class="text-xs font-bold rounded-full transition-colors"
+          :style="`height:34px;padding:0 14px;box-sizing:border-box;border:1.5px solid ${filtroTipo === opt.value ? '#915BD8' : '#e8e0f0'};background:${filtroTipo === opt.value ? '#915BD8' : '#fff'};color:${filtroTipo === opt.value ? '#fff' : '#6b5a8a'};`">
           {{ opt.label }}
         </button>
-        <span class="p-input-icon-left" style="max-width: 240px; flex: 1;">
-          <i class="pi pi-search" />
-          <InputText v-model="busqueda" placeholder="Buscar destinatario…" class="w-full" size="small" />
-        </span>
+        <IconField style="max-width: 240px; flex: 1;">
+          <InputIcon class="pi pi-search" />
+          <InputText v-model="busqueda" placeholder="Buscar destinatario…" class="w-full" style="height: 34px;" />
+        </IconField>
       </div>
 
       <div class="bg-white rounded-xl shadow-sm overflow-hidden" style="border: 1px solid #e8e0f0;">
@@ -39,6 +37,13 @@
               <th class="text-left px-4 py-2.5 font-semibold" style="color: #6b5a8a;">Tipo</th>
               <th class="text-left px-4 py-2.5 font-semibold" style="color: #6b5a8a;">Correos</th>
               <th class="text-left px-4 py-2.5 font-semibold" style="color: #6b5a8a;">Proyectos</th>
+              <th class="text-left px-4 py-2.5 font-semibold" style="color: #6b5a8a;">
+                <label class="flex items-center gap-1.5 cursor-pointer select-none">
+                  <input type="checkbox" :checked="todosSeleccionados" @change="toggleTodos"
+                    style="accent-color: #915BD8; width: 14px; height: 14px;" />
+                  Enviar
+                </label>
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -75,9 +80,16 @@
                   {{ row.proyectos.length }} proyecto{{ row.proyectos.length > 1 ? 's' : '' }}
                 </button>
               </td>
+              <td class="px-4 py-2.5">
+                <input type="checkbox" :checked="seleccionados.has(row.key)" :disabled="!row.correos.length"
+                  @change="toggleSeleccion(row.key)"
+                  v-tooltip.top="!row.correos.length ? 'Sin correos, no se puede enviar' : ''"
+                  style="accent-color: #915BD8; width: 14px; height: 14px;"
+                  :style="!row.correos.length ? 'opacity:.35;cursor:not-allowed;' : 'cursor:pointer;'" />
+              </td>
             </tr>
             <tr v-if="expanded.has(row.key)" class="border-t" style="border-color: #f0ecf6; background: #fbfaff;">
-              <td colspan="4" class="px-4 py-3">
+              <td colspan="5" class="px-4 py-3">
                 <div class="flex flex-wrap gap-2">
                   <span v-for="p in row.proyectos" :key="p"
                     class="text-xs px-2.5 py-1 rounded-lg" style="background: #fff; border: 1px solid #e8e0f0; color: #6b5a8a;">
@@ -88,7 +100,7 @@
             </tr>
           </template>
           <tr v-if="!destinatariosFiltrados.length">
-            <td colspan="4" class="px-4 py-8 text-center text-xs italic" style="color: #c4b8d4;">
+            <td colspan="5" class="px-4 py-8 text-center text-xs italic" style="color: #c4b8d4;">
               Ningún destinatario coincide con el filtro.
             </td>
           </tr>
@@ -100,8 +112,10 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import InputText from 'primevue/inputtext'
+import IconField from 'primevue/iconfield'
+import InputIcon from 'primevue/inputicon'
 import api from '@/api/client'
 
 const fronteras = ref([])
@@ -161,6 +175,41 @@ const destinatariosFiltrados = computed(() => {
     return true
   })
 })
+
+// Selección de a quién enviarle (checkbox por fila). Por defecto se marcan
+// todos los que ya tienen correos cargados -- los que no tienen, no se
+// pueden seleccionar (no hay a dónde enviar).
+const seleccionados = ref(new Set())
+
+watch(destinatarios, (rows) => {
+  const next = new Set(seleccionados.value)
+  for (const r of rows) {
+    if (r.correos.length && !next.has(r.key)) next.add(r.key)
+  }
+  seleccionados.value = next
+}, { immediate: true })
+
+function toggleSeleccion(key) {
+  const next = new Set(seleccionados.value)
+  next.has(key) ? next.delete(key) : next.add(key)
+  seleccionados.value = next
+}
+
+const seleccionablesFiltrados = computed(() => destinatariosFiltrados.value.filter(r => r.correos.length))
+const todosSeleccionados = computed(() =>
+  seleccionablesFiltrados.value.length > 0 && seleccionablesFiltrados.value.every(r => seleccionados.value.has(r.key))
+)
+const totalSeleccionados = computed(() => destinatarios.value.filter(r => seleccionados.value.has(r.key)).length)
+
+function toggleTodos() {
+  const next = new Set(seleccionados.value)
+  if (todosSeleccionados.value) {
+    for (const r of seleccionablesFiltrados.value) next.delete(r.key)
+  } else {
+    for (const r of seleccionablesFiltrados.value) next.add(r.key)
+  }
+  seleccionados.value = next
+}
 
 async function loadData() {
   loading.value = true
