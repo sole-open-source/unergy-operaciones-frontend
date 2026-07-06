@@ -19,6 +19,19 @@ api.interceptors.request.use((config) => {
   return config
 })
 
+// Rutas del backend para la gestión de informes faltantes. Se centralizan aquí
+// como única fuente de verdad; el servicio (@/services/informesService) las
+// consume. El backend responde 201 al crear, 200 al actualizar y 409 cuando el
+// faltante ya existe o ya fue convertido a borrador — la vista traduce esos
+// estados a mensajes para el usuario. Axios rechaza cualquier respuesta no-2xx,
+// por lo que 409 llega como error con `err.response.status === 409`.
+export const FALTANTES_ENDPOINTS = {
+  list: '/informes/faltantes',
+  create: '/informes/faltantes',
+  update: (id) => `/informes/faltantes/${id}`,
+  convertirDraft: (id) => `/informes/faltantes/${id}/convertir-draft`,
+}
+
 api.interceptors.response.use(
   (r) => r,
   (err) => {

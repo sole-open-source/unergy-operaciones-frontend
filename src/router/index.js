@@ -33,6 +33,7 @@ const routes = [
   // ── Operaciones ──────────────────────────────────────────────────
   { path: '/operaciones/informes-mensuales', name: 'InformesMensuales', component: () => import('@/views/Operaciones/InformesMensualesView.vue'), meta: { roles: ['admin', 'operaciones', 'monitoreo'] } },
   { path: '/operaciones/informes-mensuales/dashboard', name: 'InformesMensualesDashboard', component: () => import('@/views/Operaciones/InformesMensualesDashboard.vue'), meta: { roles: ['admin', 'operaciones', 'monitoreo'] } },
+  { path: '/operaciones/informes-faltantes', name: 'InformesFaltantes', component: () => import('@/views/Operaciones/InformesFaltantesView.vue'), meta: { roles: ['admin', 'operaciones', 'monitoreo'] } },
   { path: '/operaciones/control-generacion', name: 'ControlGeneracion', component: () => import('@/views/Operaciones/ControlGeneracion.vue'), meta: { roles: ['admin', 'operaciones', 'monitoreo'] } },
   { path: '/informes/:id', name: 'InformeDetalle', component: () => import('@/views/Operaciones/InformeDetailView.vue'), meta: { roles: ['admin', 'operaciones', 'monitoreo'] } },
   { path: '/operaciones/gestion-fallas', name: 'GestionFallas', component: () => import('@/views/Operaciones/GestionFallasView.vue'), meta: { roles: ['admin', 'operaciones', 'monitoreo'] } },

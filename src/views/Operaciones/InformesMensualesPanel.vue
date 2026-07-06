@@ -180,7 +180,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import Select from 'primevue/select'
 import MultiSelect from 'primevue/multiselect'
 import Button from 'primevue/button'
@@ -190,6 +190,7 @@ import { buildReportHtmlDoc } from '@/utils/rptStyles'
 import { tituloFalla } from '@/utils/fallaTitulo'
 
 const router = useRouter()
+const route = useRoute()
 
 // ── Constantes ─────────────────────────────────────────────────────────
 const TIPOS = [
@@ -406,7 +407,28 @@ async function cargarFallas() {
   } catch { /* no crítico */ }
 }
 
-onMounted(cargarCatalogos)
+// Pre-carga del wizard desde la query string. Se usa cuando se llega aquí desde
+// la pestaña «Faltantes» con el botón "Generar borrador": ?proyecto=<sub_project>&mes=<YYYY-MM>.
+function prefillDesdeQuery() {
+  const qProyecto = route.query.proyecto
+  const qMes = route.query.mes
+  if (!qProyecto && !qMes) return
+  tipo.value = 'proyecto'
+  periodoMode.value = 'mes'
+  if (typeof qMes === 'string' && /^\d{4}-\d{2}$/.test(qMes) && qMes <= mesMax) {
+    mesSel.value = qMes
+  }
+  if (typeof qProyecto === 'string') {
+    // Sólo pre-seleccionar si el sub_project existe entre las opciones cargadas.
+    const existe = opcionesProyecto.value.some(o => o.value === qProyecto)
+    if (existe) proyectoSel.value = qProyecto
+  }
+}
+
+onMounted(async () => {
+  await cargarCatalogos()
+  prefillDesdeQuery()
+})
 
 // ── Resolver rango ─────────────────────────────────────────────────────
 function pad(n) { return String(n).padStart(2, '0') }

@@ -22,6 +22,12 @@
           <span>Revisión y envío</span>
           <span class="imv-tab-badge" v-if="badgePipeline">{{ badgePipeline }}</span>
         </button>
+        <button class="imv-tab" :class="{ 'imv-tab--on': tab === 'faltantes' }"
+                @click="tab = 'faltantes'">
+          <i class="pi pi-exclamation-triangle" />
+          <span>Faltantes</span>
+          <span class="imv-tab-badge" v-if="badgeFaltantes">{{ badgeFaltantes }}</span>
+        </button>
         <button class="imv-tab" :class="{ 'imv-tab--on': tab === 'portafolios' }"
                 @click="tab = 'portafolios'">
           <i class="pi pi-th-large" />
@@ -38,6 +44,9 @@
     <!-- Pipeline de verificación + envío -->
     <EnvioMensualPanel v-else-if="tab === 'pipeline'" />
 
+    <!-- Gestión de informes faltantes -->
+    <InformesFaltantesView v-else-if="tab === 'faltantes'" @faltantes-updated="onFaltantesUpdated" />
+
     <!-- Gestión de portafolios (drag-and-drop) -->
     <PortafoliosGestionPanel v-else-if="tab === 'portafolios'" />
 
@@ -45,19 +54,22 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import InformesMensualesPanel from './InformesMensualesPanel.vue'
 import EnvioMensualPanel from './EnvioMensualPanel.vue'
 import PortafoliosGestionPanel from './PortafoliosGestionPanel.vue'
+import InformesFaltantesView from './InformesFaltantesView.vue'
 import api from '@/api/client'
+import { listarFaltantes, ESTADO } from '@/services/informesService'
 
 const route = useRoute()
 const router = useRouter()
 
-const _TABS = ['generar', 'pipeline', 'portafolios']
+const _TABS = ['generar', 'pipeline', 'faltantes', 'portafolios']
 const tab = ref(_TABS.includes(route.query.tab) ? route.query.tab : 'generar')
 const badgePipeline = ref(null)   // cantidad de informes del mes en curso pendientes/comentados
+const badgeFaltantes = ref(null)  // cantidad de informes faltantes sin justificar
 
 // Sync con query string para deep-link
 function setTab(t) {
@@ -86,7 +98,41 @@ async function cargarBadge() {
     badgePipeline.value = pendientes || null
   } catch { /* no crítico */ }
 }
-onMounted(cargarBadge)
+
+// ── Alertas de faltantes (badge + toast para PMs) ──────────────────────────
+let _yaAvisado = false
+async function cargarBadgeFaltantes(avisar = false) {
+  try {
+    const items = await listarFaltantes()
+    const noJust = items.filter(i => i.estado === ESTADO.NO_JUSTIFICADO).length
+    badgeFaltantes.value = noJust || null
+    // Aviso visual una sola vez por sesión de vista cuando hay faltantes críticos.
+    if (avisar && noJust > 0 && !_yaAvisado) {
+      _yaAvisado = true
+      window.__primeToast?.({
+        severity: 'warn',
+        summary: 'Informes faltantes',
+        detail: `Hay ${noJust} informe(s) mensual(es) sin justificar. Revisa la pestaña «Faltantes».`,
+        life: 6000,
+      })
+    }
+  } catch { /* no crítico */ }
+}
+
+// Refresco periódico del badge (polling ligero; el backend no expone WebSocket).
+let _pollFaltantes = null
+function onFaltantesUpdated(payload) {
+  badgeFaltantes.value = payload?.noJustificados || null
+}
+
+onMounted(() => {
+  cargarBadge()
+  cargarBadgeFaltantes(true)
+  _pollFaltantes = setInterval(() => cargarBadgeFaltantes(false), 90000)
+})
+onBeforeUnmount(() => {
+  if (_pollFaltantes) clearInterval(_pollFaltantes)
+})
 </script>
 
 <style scoped>
