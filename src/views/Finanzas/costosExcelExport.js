@@ -11,6 +11,7 @@
  */
 import * as XLSX from 'xlsx'
 import api from '@/api/client'
+import { sanitizeCell } from '../../utils/excelSanitizer.js'
 
 const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
                'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
@@ -152,7 +153,9 @@ export async function generarExcelCostos(periodo) {
     }
     for (const pt of PAYMENT_TYPES) {
       rows.push({
-        project_pk:        o.pk,
+        // project_pk puede caer al nombre crudo del proyecto (fallback de
+        // resolvePk), que es dato externo → se sanea contra inyección de fórmulas.
+        project_pk:        sanitizeCell(o.pk),
         payment_type:      pt,
         value:             valorDe[pt] ?? 0,
         from_date:         fromDate,

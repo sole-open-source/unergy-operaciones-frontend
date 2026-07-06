@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx'
 import XLSXStyle from 'xlsx-js-style'
+import { sanitizeCell } from '../../../../utils/excelSanitizer.js'
 
 const FONT = 'Arial'
 const PURPLE = '7030A0'
@@ -45,7 +46,7 @@ export function exportHojaMadreExcel(data, filename = 'garantias_hoja_madre.xlsx
     set(r, 0, 'AGENTE')
     const headerRow = r; r++
     const startData = r
-    for (const row of rows) { set(r, 1, row.label); set(r, 2, Number(row.valor) || 0); r++ }
+    for (const row of rows) { set(r, 1, sanitizeCell(row.label)); set(r, 2, Number(row.valor) || 0); r++ }
     const endData = r - 1
     const total = rows.reduce((s, x) => s + (Number(x.valor) || 0), 0)
     set(r, 1, 'TOTAL A PAGAR'); set(r, 2, total)
@@ -134,7 +135,10 @@ export function exportHojaMadreExcel(data, filename = 'garantias_hoja_madre.xlsx
 
 export function exportTablaExcel(rows, filename = 'tabla.xlsx') {
   if (!rows || !rows.length) return
-  const ws = XLSX.utils.json_to_sheet(rows)
+  // Filas arbitrarias: saneamos cada valor de texto (los no-string quedan igual).
+  const safeRows = rows.map((row) =>
+    Object.fromEntries(Object.entries(row).map(([k, v]) => [k, sanitizeCell(v)])))
+  const ws = XLSX.utils.json_to_sheet(safeRows)
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, 'Datos')
   XLSX.writeFile(wb, filename)
@@ -143,8 +147,8 @@ export function exportTablaExcel(rows, filename = 'tabla.xlsx') {
 export function exportHistorialExcel(historial, filename = 'historial_garantias.xlsx') {
   if (!historial || !historial.length) return
   const rows = historial.map((r) => ({
-    Fecha: r.fecha,
-    Tipo: r.tipo,
+    Fecha: sanitizeCell(r.fecha),
+    Tipo: sanitizeCell(r.tipo),
     'PB ($)': r.pb,
     'Total UNGC': r.totalUNGC,
     'Total UNGG': r.totalUNGG,
