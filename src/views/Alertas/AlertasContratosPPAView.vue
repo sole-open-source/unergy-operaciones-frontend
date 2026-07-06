@@ -125,11 +125,11 @@
               </div>
               <div class="flex items-center gap-2">
                 <Tag
-                  :value="`Σ % Desp.: ${fmtPct(sumaFncer(dup))}`"
-                  :severity="fncerSev(sumaFncer(dup))"
-                  :icon="fncerIcon(sumaFncer(dup))"
+                  :value="fncerTag(dup).value"
+                  :severity="fncerTag(dup).severity"
+                  :icon="fncerTag(dup).icon"
                   class="text-xs"
-                  v-tooltip.left="fncerTooltip(sumaFncer(dup))"
+                  v-tooltip.left="fncerTag(dup).tooltip"
                 />
                 <Tag :value="`${dup.sics.length} contratos activos`" severity="danger" class="text-xs" />
               </div>
@@ -197,37 +197,75 @@ function tipoSev(t) {
   return { registro: 'success', modificacion: 'info', terminacion: 'danger', desistimiento: 'warn' }[t] || 'secondary'
 }
 
-// Suma del % de despacho (porcentaje_fncer) de los contratos activos de un proyecto.
-// Los SIC devueltos por el endpoint ya son todos activos; se toleran valores null/undefined.
-function sumaFncer(dup) {
-  return (dup?.sics || []).reduce((acc, s) => acc + (Number(s?.porcentaje_fncer) || 0), 0)
-}
-
-// Redondea a 2 decimales y elimina ceros sobrantes (100.00 → 100, 33.33 → 33.33).
+// Formatea un porcentaje: redondea a 2 decimales y elimina ceros sobrantes (100.00 → 100).
 function fmtPct(n) {
   return `${Number(n.toFixed(2))}%`
 }
 
-// Verde si suma exactamente 100 %, rojo si sobrepasa (sobreasignación),
-// amarillo si es menor a 100 % (subasignación), gris si no hay datos.
-function fncerSev(sum) {
-  if (Math.abs(sum - 100) < 0.01) return 'success'
-  if (sum > 100) return 'danger'
-  if (sum > 0) return 'warn'
-  return 'secondary'
-}
+// Descriptor único del Tag "Σ % Desp." de un proyecto: suma el porcentaje_fncer de sus
+// contratos activos y decide etiqueta + semáforo + tooltip en una sola pasada.
+//
+// Casos (mutuamente excluyentes, en orden):
+//  1. sin datos        → gris "—"      : ningún contrato tiene % registrado.
+//  2. registro incompleto → amarillo   : algún contrato activo NO tiene % (≠ subasignación;
+//                                         la acción es completar el registro, no asignar más).
+//  3. completo (≈100 %) → verde        : asignación correcta.
+//  4. > 100 %          → rojo          : sobreasignación.
+//  5. < 100 %          → amarillo      : subasignación real.
+//
+// La suma se redondea UNA vez para que la etiqueta y el semáforo siempre concuerden.
+// Tolerancia 0.05: porcentaje_fncer se almacena como NUMERIC(5,2); con hasta ~10 contratos
+// el error de redondeo acumulado (N × 0,005) queda por debajo de 0,05, así que 3×33,33 = 99,99
+// se reconoce como 100 % sin enmascarar faltantes reales de asignación.
+function fncerTag(dup) {
+  const sics = dup?.sics || []
+  const conValor = sics.filter(
+    (s) => s?.porcentaje_fncer != null && Number.isFinite(Number(s.porcentaje_fncer)),
+  )
+  const sum = Number(conValor.reduce((acc, s) => acc + Number(s.porcentaje_fncer), 0).toFixed(2))
+  const incompleto = conValor.length < sics.length
 
-function fncerIcon(sum) {
-  if (Math.abs(sum - 100) < 0.01) return 'pi pi-check-circle'
-  if (sum > 0) return 'pi pi-exclamation-triangle'
-  return 'pi pi-minus-circle'
-}
+  if (conValor.length === 0) {
+    return {
+      value: 'Σ % Desp.: —',
+      severity: 'secondary',
+      icon: 'pi pi-minus-circle',
+      tooltip: 'Ningún contrato activo tiene porcentaje de despacho registrado.',
+    }
+  }
 
-function fncerTooltip(sum) {
-  if (Math.abs(sum - 100) < 0.01) return 'Los contratos activos suman 100 % del despacho — asignación completa y correcta.'
-  if (sum > 100) return `Sobreasignación: los contratos activos suman ${fmtPct(sum)} (> 100 %). Revisar registro en GESCON.`
-  if (sum > 0) return `Subasignación: los contratos activos suman ${fmtPct(sum)} (< 100 %). Falta despacho por asignar.`
-  return 'Sin porcentaje de despacho registrado en los contratos activos.'
+  const value = `Σ % Desp.: ${fmtPct(sum)}`
+
+  if (incompleto) {
+    return {
+      value,
+      severity: 'warn',
+      icon: 'pi pi-exclamation-triangle',
+      tooltip: `Registro incompleto: uno o más contratos activos no tienen % de despacho. Los registrados suman ${fmtPct(sum)}. Completar en GESCON.`,
+    }
+  }
+  if (Math.abs(sum - 100) <= 0.05) {
+    return {
+      value,
+      severity: 'success',
+      icon: 'pi pi-check-circle',
+      tooltip: 'Los contratos activos suman 100 % del despacho — asignación completa y correcta.',
+    }
+  }
+  if (sum > 100) {
+    return {
+      value,
+      severity: 'danger',
+      icon: 'pi pi-exclamation-triangle',
+      tooltip: `Sobreasignación: los contratos activos suman ${fmtPct(sum)} (> 100 %). Revisar registro en GESCON.`,
+    }
+  }
+  return {
+    value,
+    severity: 'warn',
+    icon: 'pi pi-exclamation-triangle',
+    tooltip: `Subasignación: los contratos activos suman ${fmtPct(sum)} (< 100 %). Falta despacho por asignar.`,
+  }
 }
 
 onMounted(async () => {
