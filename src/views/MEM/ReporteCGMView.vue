@@ -16,18 +16,33 @@
       <i class="pi pi-spin pi-spinner text-3xl" style="color: #915BD8;" />
     </div>
 
-    <div v-else class="bg-white rounded-xl shadow-sm overflow-hidden" style="border: 1px solid #e8e0f0;">
-      <table class="w-full text-sm">
-        <thead>
-          <tr style="background: #f9f7ff;">
-            <th class="text-left px-4 py-2.5 font-semibold" style="color: #6b5a8a;">Destinatario</th>
-            <th class="text-left px-4 py-2.5 font-semibold" style="color: #6b5a8a;">Tipo</th>
-            <th class="text-left px-4 py-2.5 font-semibold" style="color: #6b5a8a;">Correos</th>
-            <th class="text-left px-4 py-2.5 font-semibold" style="color: #6b5a8a;">Proyectos</th>
-          </tr>
-        </thead>
-        <tbody>
-          <template v-for="row in destinatarios" :key="row.key">
+    <div v-else class="space-y-3">
+      <div class="flex items-center gap-2 flex-wrap">
+        <button v-for="opt in tipoOpciones" :key="opt.value" type="button" @click="filtroTipo = opt.value"
+          class="text-xs font-bold px-3 py-1.5 rounded-full transition-colors"
+          :style="filtroTipo === opt.value
+            ? 'background:#915BD8;color:#fff;'
+            : 'background:#fff;color:#6b5a8a;border:1.5px solid #e8e0f0;'">
+          {{ opt.label }}
+        </button>
+        <span class="p-input-icon-left" style="max-width: 240px; flex: 1;">
+          <i class="pi pi-search" />
+          <InputText v-model="busqueda" placeholder="Buscar destinatario…" class="w-full" size="small" />
+        </span>
+      </div>
+
+      <div class="bg-white rounded-xl shadow-sm overflow-hidden" style="border: 1px solid #e8e0f0;">
+        <table class="w-full text-sm">
+          <thead>
+            <tr style="background: #f9f7ff;">
+              <th class="text-left px-4 py-2.5 font-semibold" style="color: #6b5a8a;">Destinatario</th>
+              <th class="text-left px-4 py-2.5 font-semibold" style="color: #6b5a8a;">Tipo</th>
+              <th class="text-left px-4 py-2.5 font-semibold" style="color: #6b5a8a;">Correos</th>
+              <th class="text-left px-4 py-2.5 font-semibold" style="color: #6b5a8a;">Proyectos</th>
+            </tr>
+          </thead>
+          <tbody>
+          <template v-for="row in destinatariosFiltrados" :key="row.key">
             <tr class="border-t" style="border-color: #f0ecf6;">
               <td class="px-4 py-2.5">
                 <p v-if="row.nombre" class="font-medium" style="color: #2C2039;">{{ row.nombre }}</p>
@@ -72,19 +87,34 @@
               </td>
             </tr>
           </template>
-        </tbody>
-      </table>
+          <tr v-if="!destinatariosFiltrados.length">
+            <td colspan="4" class="px-4 py-8 text-center text-xs italic" style="color: #c4b8d4;">
+              Ningún destinatario coincide con el filtro.
+            </td>
+          </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import InputText from 'primevue/inputtext'
 import api from '@/api/client'
 
 const fronteras = ref([])
 const loading = ref(true)
 const expanded = ref(new Set())
+const filtroTipo = ref('todos')
+const busqueda = ref('')
+
+const tipoOpciones = [
+  { value: 'todos', label: 'Todos' },
+  { value: 'Operador de Red', label: 'Operador de Red' },
+  { value: 'Cliente', label: 'Cliente' },
+]
 
 function toggle(key) {
   const next = new Set(expanded.value)
@@ -121,6 +151,15 @@ const destinatarios = computed(() => {
   }
 
   return [...grupos.values()].sort((a, b) => (a.nombre || 'zzz').localeCompare(b.nombre || 'zzz'))
+})
+
+const destinatariosFiltrados = computed(() => {
+  const texto = busqueda.value.trim().toLowerCase()
+  return destinatarios.value.filter(row => {
+    if (filtroTipo.value !== 'todos' && row.tipo !== filtroTipo.value) return false
+    if (texto && !(row.nombre || '').toLowerCase().includes(texto)) return false
+    return true
+  })
 })
 
 async function loadData() {
