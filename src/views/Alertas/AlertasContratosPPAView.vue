@@ -123,7 +123,16 @@
                 </RouterLink>
                 <Tag :value="dup.tipo_proyecto || '—'" severity="secondary" class="text-xs" />
               </div>
-              <Tag :value="`${dup.sics.length} contratos activos`" severity="danger" class="text-xs" />
+              <div class="flex items-center gap-2">
+                <Tag
+                  :value="`Σ % Desp.: ${fmtPct(sumaFncer(dup))}`"
+                  :severity="fncerSev(sumaFncer(dup))"
+                  :icon="fncerIcon(sumaFncer(dup))"
+                  class="text-xs"
+                  v-tooltip.left="fncerTooltip(sumaFncer(dup))"
+                />
+                <Tag :value="`${dup.sics.length} contratos activos`" severity="danger" class="text-xs" />
+              </div>
             </div>
 
             <DataTable :value="dup.sics" size="small" class="text-xs">
@@ -186,6 +195,39 @@ function estadoSev(e) {
 
 function tipoSev(t) {
   return { registro: 'success', modificacion: 'info', terminacion: 'danger', desistimiento: 'warn' }[t] || 'secondary'
+}
+
+// Suma del % de despacho (porcentaje_fncer) de los contratos activos de un proyecto.
+// Los SIC devueltos por el endpoint ya son todos activos; se toleran valores null/undefined.
+function sumaFncer(dup) {
+  return (dup?.sics || []).reduce((acc, s) => acc + (Number(s?.porcentaje_fncer) || 0), 0)
+}
+
+// Redondea a 2 decimales y elimina ceros sobrantes (100.00 → 100, 33.33 → 33.33).
+function fmtPct(n) {
+  return `${Number(n.toFixed(2))}%`
+}
+
+// Verde si suma exactamente 100 %, rojo si sobrepasa (sobreasignación),
+// amarillo si es menor a 100 % (subasignación), gris si no hay datos.
+function fncerSev(sum) {
+  if (Math.abs(sum - 100) < 0.01) return 'success'
+  if (sum > 100) return 'danger'
+  if (sum > 0) return 'warn'
+  return 'secondary'
+}
+
+function fncerIcon(sum) {
+  if (Math.abs(sum - 100) < 0.01) return 'pi pi-check-circle'
+  if (sum > 0) return 'pi pi-exclamation-triangle'
+  return 'pi pi-minus-circle'
+}
+
+function fncerTooltip(sum) {
+  if (Math.abs(sum - 100) < 0.01) return 'Los contratos activos suman 100 % del despacho — asignación completa y correcta.'
+  if (sum > 100) return `Sobreasignación: los contratos activos suman ${fmtPct(sum)} (> 100 %). Revisar registro en GESCON.`
+  if (sum > 0) return `Subasignación: los contratos activos suman ${fmtPct(sum)} (< 100 %). Falta despacho por asignar.`
+  return 'Sin porcentaje de despacho registrado en los contratos activos.'
 }
 
 onMounted(async () => {
