@@ -148,6 +148,50 @@
               </div>
             </div>
 
+            <!-- ── Correos CGM (múltiples) ── -->
+            <div class="col-span-2">
+              <div class="rounded-xl p-4 space-y-3" style="background:#f9f7ff;border:1.5px solid #e8e0f0;">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <p class="text-xs font-bold uppercase tracking-wide" style="color:#915BD8;">
+                      <i class="pi pi-file-edit text-xs mr-1" />
+                      Correos CGM
+                    </p>
+                    <p class="text-xs mt-0.5" style="color:#9b89b5;">Se enviarán aquí las copias del reporte CGM.</p>
+                  </div>
+                  <button type="button" @click="agregarCorreoCgm"
+                    class="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
+                    style="background:#915BD8;color:#fff;">
+                    <i class="pi pi-plus text-xs" /> Agregar
+                  </button>
+                </div>
+
+                <div v-if="!f.correos_cgm?.length" class="text-xs italic py-1" style="color:#c4b3df;">
+                  Sin correos CGM configurados
+                </div>
+
+                <div v-for="(email, idx) in f.correos_cgm" :key="idx"
+                  class="flex items-center gap-2">
+                  <div class="flex-1 relative">
+                    <i class="pi pi-envelope absolute left-3 top-1/2 -translate-y-1/2 text-xs" style="color:#9b89b5;" />
+                    <input
+                      :value="email"
+                      @input="actualizarCorreoCgm(idx, $event.target.value)"
+                      type="email"
+                      :placeholder="`correo${idx+1}@empresa.com`"
+                      class="w-full pl-8 pr-3 py-2 text-sm rounded-lg outline-none transition-colors"
+                      :style="emailValido(email) ? 'border:1.5px solid #e8e0f0;background:#fff;' : 'border:1.5px solid #fca5a5;background:#fff5f5;'"
+                    />
+                  </div>
+                  <span v-if="!emailValido(email) && email" class="text-xs" style="color:#ef4444;white-space:nowrap;">Inválido</span>
+                  <button type="button" @click="eliminarCorreoCgm(idx)"
+                    class="p-1.5 rounded-lg transition-colors hover:bg-red-50">
+                    <i class="pi pi-trash text-xs" style="color:#ef4444;" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
       </div>
@@ -178,17 +222,27 @@ const f = reactive({
   correos_operacionales: Array.isArray(props.initial?.correos_operacionales)
     ? [...props.initial.correos_operacionales]
     : [],
+  correos_cgm: Array.isArray(props.initial?.correos_cgm)
+    ? [...props.initial.correos_cgm]
+    : [],
 })
 watch(() => props.initial, (v) => {
   Object.assign(f, v)
   if (Array.isArray(v?.correos_operacionales)) {
     f.correos_operacionales = [...v.correos_operacionales]
   }
+  if (Array.isArray(v?.correos_cgm)) {
+    f.correos_cgm = [...v.correos_cgm]
+  }
 }, { deep: true })
 
 function agregarCorreo()               { f.correos_operacionales = [...(f.correos_operacionales || []), ''] }
 function eliminarCorreo(idx)           { f.correos_operacionales = f.correos_operacionales.filter((_, i) => i !== idx) }
 function actualizarCorreo(idx, val)    { f.correos_operacionales = f.correos_operacionales.map((e, i) => i === idx ? val : e) }
+
+function agregarCorreoCgm()            { f.correos_cgm = [...(f.correos_cgm || []), ''] }
+function eliminarCorreoCgm(idx)        { f.correos_cgm = f.correos_cgm.filter((_, i) => i !== idx) }
+function actualizarCorreoCgm(idx, val) { f.correos_cgm = f.correos_cgm.map((e, i) => i === idx ? val : e) }
 
 function submit() {
   const payload = {}
@@ -197,6 +251,9 @@ function submit() {
   }
   // Limpiar correos vacíos o inválidos antes de guardar
   payload.correos_operacionales = (f.correos_operacionales || [])
+    .map(e => e.trim().toLowerCase())
+    .filter(e => e && emailValido(e))
+  payload.correos_cgm = (f.correos_cgm || [])
     .map(e => e.trim().toLowerCase())
     .filter(e => e && emailValido(e))
   emit('save', payload)
