@@ -4,9 +4,17 @@
       <p class="text-xs" style="color: #9b89b5;">
         Destinatarios del reporte CGM (operador de red + cliente). A cada uno le llega solo el Excel de sus propias fronteras.
       </p>
-      <div class="flex items-center gap-2 shrink-0">
-        <DatePicker v-model="fechaRango" selectionMode="range" dateFormat="dd/mm/yy" :maxDate="ayer"
-          showIcon iconDisplay="input" placeholder="Rango de fechas" style="width: 190px;" />
+      <div class="flex items-center gap-3 shrink-0 flex-wrap">
+        <div class="flex items-center gap-1.5">
+          <label class="text-xs font-medium" style="color: #6b5a8a;">Desde</label>
+          <DatePicker v-model="fechaDesde" dateFormat="dd/mm/yy" :maxDate="fechaHasta || ayer"
+            showIcon iconDisplay="input" style="width: 130px;" />
+        </div>
+        <div class="flex items-center gap-1.5">
+          <label class="text-xs font-medium" style="color: #6b5a8a;">Hasta</label>
+          <DatePicker v-model="fechaHasta" dateFormat="dd/mm/yy" :minDate="fechaDesde" :maxDate="ayer"
+            showIcon iconDisplay="input" style="width: 130px;" />
+        </div>
         <button type="button" :disabled="!totalSeleccionados || enviando"
           @click="enviarSeleccionados"
           v-tooltip.top="!totalSeleccionados ? 'Selecciona al menos un destinatario' : ''"
@@ -135,7 +143,8 @@ const filtroTipo = ref('todos')
 const busqueda = ref('')
 
 const ayer = new Date(Date.now() - 86400000)
-const fechaRango = ref([new Date(ayer), new Date(ayer)])
+const fechaDesde = ref(new Date(ayer))
+const fechaHasta = ref(new Date(ayer))
 
 function formatFecha(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -234,10 +243,9 @@ async function enviarSeleccionados() {
 
   enviando.value = true
   try {
-    const [inicio, fin] = fechaRango.value
     const { data } = await api.post('/reporte-cgm/enviar', {
-      fecha_inicio: formatFecha(inicio),
-      fecha_fin: formatFecha(fin || inicio),
+      fecha_inicio: formatFecha(fechaDesde.value),
+      fecha_fin: formatFecha(fechaHasta.value || fechaDesde.value),
       destinatarios: filas.map(r => ({ tipo: r.refTipo, id: r.refId })),
     })
     const ok = data.resultados.filter(r => r.ok)
