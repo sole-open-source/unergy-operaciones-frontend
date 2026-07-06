@@ -5,8 +5,8 @@
         Destinatarios del reporte CGM (operador de red + cliente). A cada uno le llega solo el Excel de sus propias fronteras.
       </p>
       <div class="flex items-center gap-2 shrink-0">
-        <DatePicker v-model="fecha" dateFormat="dd/mm/yy" :maxDate="ayer" showIcon iconDisplay="input"
-          style="width: 140px;" />
+        <DatePicker v-model="fechaRango" selectionMode="range" dateFormat="dd/mm/yy" :maxDate="ayer"
+          showIcon iconDisplay="input" placeholder="Rango de fechas" style="width: 190px;" />
         <button type="button" :disabled="!totalSeleccionados || enviando"
           @click="enviarSeleccionados"
           v-tooltip.top="!totalSeleccionados ? 'Selecciona al menos un destinatario' : ''"
@@ -135,7 +135,11 @@ const filtroTipo = ref('todos')
 const busqueda = ref('')
 
 const ayer = new Date(Date.now() - 86400000)
-const fecha = ref(new Date(ayer))
+const fechaRango = ref([new Date(ayer), new Date(ayer)])
+
+function formatFecha(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
 
 const tipoOpciones = [
   { value: 'todos', label: 'Todos' },
@@ -230,9 +234,10 @@ async function enviarSeleccionados() {
 
   enviando.value = true
   try {
-    const fechaStr = fecha.value.toISOString().slice(0, 10)
+    const [inicio, fin] = fechaRango.value
     const { data } = await api.post('/reporte-cgm/enviar', {
-      fecha: fechaStr,
+      fecha_inicio: formatFecha(inicio),
+      fecha_fin: formatFecha(fin || inicio),
       destinatarios: filas.map(r => ({ tipo: r.refTipo, id: r.refId })),
     })
     const ok = data.resultados.filter(r => r.ok)
