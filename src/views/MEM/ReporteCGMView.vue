@@ -184,7 +184,7 @@ const destinatarios = computed(() => {
   for (const [proyecto, f] of proyectos) {
     addEntry('operador', f.operador_red_id, 'Operador de Red', f.operador_comercial,
       'Sin operador vinculado', f.operador_correos,
-      f.operador_comercial ? '/mem/operadores-red' : null, 'Sin correos — corregir', proyecto)
+      f.operador_red_id ? `/mem/operadores-red/${f.operador_red_id}` : null, 'Sin correos — corregir', proyecto)
     addEntry('cliente', f.cliente_id, 'Cliente', f.cliente_nombre,
       'Sin cliente vinculado', f.cliente_correos_cgm,
       f.cliente_id ? `/clientes/${f.cliente_id}` : null, 'Sin correos CGM — corregir', proyecto)
