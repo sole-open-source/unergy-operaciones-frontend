@@ -65,6 +65,7 @@ const routes = [
   { path: '/mem/fronteras',    name: 'MemFronteras',    component: () => import('@/views/MEM/FronterasView.vue'),     meta: { roles: ['admin', 'operaciones'] } },
   { path: '/mem/reporte-energia', name: 'MemReporteEnergia', component: () => import('@/views/MEM/ReporteEnergiaView.vue'), meta: { roles: ['admin', 'operaciones'] } },
   { path: '/mem/operadores-red', name: 'MemOperadoresRed', component: () => import('@/views/MEM/OperadoresRedView.vue'), meta: { roles: ['admin', 'operaciones'] } },
+  { path: '/mem/operadores-red/:id', name: 'MemOperadorRedDetalle', component: () => import('@/views/MEM/OperadorRedDetailView.vue'), meta: { roles: ['admin', 'operaciones'] } },
   { path: '/mem/precio-bolsa', name: 'MemPrecioBolsa',  component: () => import('@/views/MEM/PrecioBolsaView.vue') },
   { path: '/mem/balance',      name: 'MemBalance',      component: () => import('@/views/MEM/BalanceView.vue') },
   { path: '/mem/clima',        name: 'MemClima',        component: () => import('@/views/MEM/ClimaView.vue') },
