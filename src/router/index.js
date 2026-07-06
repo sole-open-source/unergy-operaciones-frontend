@@ -50,7 +50,7 @@ const routes = [
   // ── Finanzas ─────────────────────────────────────────────────────
   { path: '/liquidaciones',                  name: 'Liquidaciones',                  component: () => import('@/views/Liquidaciones/LiquidacionesView.vue'),                     meta: { roles: ['admin', 'liquidaciones'] } },
   { path: '/liquidaciones/inversionista',    redirect: '/liquidaciones?tab=inversionistas' },
-  { path: '/liquidaciones/cargar-excel',     redirect: '/liquidaciones?tab=cargar' },
+  { path: '/liquidaciones/cargar-excel',     redirect: '/liquidaciones' },
   { path: '/finanzas/costos',             name: 'Costos',                     component: () => import('@/views/Finanzas/CostosView.vue'),                                meta: { roles: ['admin', 'liquidaciones'] } },
   { path: '/validador-mandatos',          name: 'ValidadorMandatos',          component: () => import('@/views/Finanzas/ValidadorMandatosView.vue'),                     meta: { roles: ['admin', 'liquidaciones'] } },
   { path: '/finanzas/descarga-xm',     name: 'DescargaXM',     component: () => import('@/views/Finanzas/DescargaXMView.vue'),        meta: { roles: ['admin', 'liquidaciones'] } },

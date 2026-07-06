@@ -31,10 +31,9 @@
     </div>
 
     <!-- ══ Contenido por tab ═══════════════════════════════════════ -->
-    <ResumenPanel v-if="tab === 'resumen'" :periodo="periodo" @go-proyectos="onGoProyectos" />
+    <ResumenPanel v-if="tab === 'resumen'" :periodo="periodo" />
     <LiquidacionesListView v-else-if="tab === 'proyectos'" embedded />
     <LiquidacionesPorInversionistaView v-else-if="tab === 'inversionistas'" embedded />
-    <CargaExcelView v-else-if="tab === 'cargar'" embedded />
 
   </div>
 </template>
@@ -45,14 +44,12 @@ import { useRoute, useRouter } from 'vue-router'
 import ResumenPanel from './panels/ResumenPanel.vue'
 import LiquidacionesListView from './LiquidacionesListView.vue'
 import LiquidacionesPorInversionistaView from './LiquidacionesPorInversionistaView.vue'
-import CargaExcelView from './CargaExcelView.vue'
 import { formatPeriodo, mesActualISO } from '@/utils/liquidaciones'
 
 const TABS = [
   { key: 'resumen', label: 'Resumen', icon: 'pi pi-chart-bar' },
   { key: 'proyectos', label: 'Proyectos', icon: 'pi pi-folder' },
   { key: 'inversionistas', label: 'Inversionistas', icon: 'pi pi-users' },
-  { key: 'cargar', label: 'Cargar Excel', icon: 'pi pi-upload' },
 ]
 const VALID = TABS.map(t => t.key)
 
@@ -89,7 +86,6 @@ function stepMes(delta) {
   periodo.value = next
 }
 
-function onGoProyectos() { tab.value = 'proyectos' }
 </script>
 
 <style scoped>
