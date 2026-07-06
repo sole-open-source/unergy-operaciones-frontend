@@ -192,6 +192,31 @@
             </div>
           </div>
 
+          <Divider />
+
+          <!-- Detalles operacionales y contractuales -->
+          <div>
+            <p class="text-xs font-semibold text-amber-600 uppercase tracking-wide mb-3">Detalles Operacionales y Contractuales</p>
+            <div class="grid grid-cols-1 gap-4 text-sm">
+              <div class="flex flex-col gap-0.5">
+                <span class="text-xs font-medium" style="color:#9b89b5">Alcance del servicio</span>
+                <span class="text-sm whitespace-pre-line" style="color:#2C2039">{{ contrato.service_scope || '—' }}</span>
+              </div>
+              <div class="flex flex-col gap-0.5">
+                <span class="text-xs font-medium" style="color:#9b89b5">Términos específicos del servicio</span>
+                <span class="text-sm whitespace-pre-line" style="color:#2C2039">{{ contrato.specific_service_terms || '—' }}</span>
+              </div>
+              <div class="flex flex-col gap-0.5">
+                <span class="text-xs font-medium" style="color:#9b89b5">SLAs (Acuerdos de nivel de servicio)</span>
+                <span class="text-sm whitespace-pre-line" style="color:#2C2039">{{ contrato.slas || '—' }}</span>
+              </div>
+              <div class="flex flex-col gap-0.5">
+                <span class="text-xs font-medium" style="color:#9b89b5">Responsabilidades</span>
+                <span class="text-sm whitespace-pre-line" style="color:#2C2039">{{ contrato.responsibilities || '—' }}</span>
+              </div>
+            </div>
+          </div>
+
         </div>
       </TabPanel>
 
