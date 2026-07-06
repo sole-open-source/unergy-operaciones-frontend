@@ -1,15 +1,21 @@
 <template>
   <div class="space-y-4">
-    <div class="flex items-center justify-between">
+    <div class="flex items-center justify-between gap-3">
       <p class="text-xs" style="color: #9b89b5;">
-        Destinatarios del reporte CGM (operador de red + cliente). El envío del correo todavía no está conectado.
+        Destinatarios del reporte CGM (operador de red + cliente). A cada uno le llega solo el Excel de sus propias fronteras.
       </p>
-      <button type="button" disabled
-        v-tooltip.top="'Pendiente: falta conectar el motor de generación y envío (hoy solo existe en el script standalone)'"
-        class="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg opacity-40 cursor-not-allowed whitespace-nowrap"
-        style="background:#915BD8;color:#fff;">
-        <i class="pi pi-send text-xs" /> Enviar a {{ totalSeleccionados }}
-      </button>
+      <div class="flex items-center gap-2 shrink-0">
+        <DatePicker v-model="fecha" dateFormat="dd/mm/yy" :maxDate="ayer" showIcon iconDisplay="input"
+          style="width: 140px;" />
+        <button type="button" :disabled="!totalSeleccionados || enviando"
+          @click="enviarSeleccionados"
+          v-tooltip.top="!totalSeleccionados ? 'Selecciona al menos un destinatario' : ''"
+          class="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors"
+          :style="!totalSeleccionados || enviando ? 'background:#915BD8;color:#fff;opacity:.4;cursor:not-allowed;' : 'background:#915BD8;color:#fff;cursor:pointer;'">
+          <i :class="['pi text-xs', enviando ? 'pi-spin pi-spinner' : 'pi-send']" />
+          {{ enviando ? 'Enviando…' : `Enviar a ${totalSeleccionados}` }}
+        </button>
+      </div>
     </div>
 
     <div v-if="loading" class="flex items-center justify-center py-12">
@@ -116,13 +122,20 @@ import { ref, computed, watch, onMounted } from 'vue'
 import InputText from 'primevue/inputtext'
 import IconField from 'primevue/iconfield'
 import InputIcon from 'primevue/inputicon'
+import DatePicker from 'primevue/datepicker'
+import { useToast } from 'primevue/usetoast'
 import api from '@/api/client'
 
+const toast = useToast()
 const fronteras = ref([])
 const loading = ref(true)
+const enviando = ref(false)
 const expanded = ref(new Set())
 const filtroTipo = ref('todos')
 const busqueda = ref('')
+
+const ayer = new Date(Date.now() - 86400000)
+const fecha = ref(new Date(ayer))
 
 const tipoOpciones = [
   { value: 'todos', label: 'Todos' },
@@ -147,19 +160,19 @@ const destinatarios = computed(() => {
   }
 
   const grupos = new Map()
-  function addEntry(entidadKey, tipo, nombre, sinVinculo, correos, linkCorregir, textoCorregir, proyecto) {
-    const key = `${tipo}-${entidadKey}`
+  function addEntry(refTipo, refId, tipo, nombre, sinVinculo, correos, linkCorregir, textoCorregir, proyecto) {
+    const key = `${tipo}-${refId ?? 'sin-vinculo'}`
     if (!grupos.has(key)) {
-      grupos.set(key, { key, tipo, nombre, sinVinculo, correos, linkCorregir, textoCorregir, proyectos: [] })
+      grupos.set(key, { key, refTipo, refId, tipo, nombre, sinVinculo, correos, linkCorregir, textoCorregir, proyectos: [] })
     }
     grupos.get(key).proyectos.push(proyecto)
   }
 
   for (const [proyecto, f] of proyectos) {
-    addEntry(f.operador_comercial || 'sin-operador', 'Operador de Red', f.operador_comercial,
+    addEntry('operador', f.operador_red_id, 'Operador de Red', f.operador_comercial,
       'Sin operador vinculado', f.operador_correos,
       f.operador_comercial ? '/mem/operadores-red' : null, 'Sin correos — corregir', proyecto)
-    addEntry(f.cliente_id ?? 'sin-cliente', 'Cliente', f.cliente_nombre,
+    addEntry('cliente', f.cliente_id, 'Cliente', f.cliente_nombre,
       'Sin cliente vinculado', f.cliente_correos_cgm,
       f.cliente_id ? `/clientes/${f.cliente_id}` : null, 'Sin correos CGM — corregir', proyecto)
   }
@@ -209,6 +222,32 @@ function toggleTodos() {
     for (const r of seleccionablesFiltrados.value) next.add(r.key)
   }
   seleccionados.value = next
+}
+
+async function enviarSeleccionados() {
+  const filas = destinatarios.value.filter(r => seleccionados.value.has(r.key) && r.refId != null)
+  if (!filas.length) return
+
+  enviando.value = true
+  try {
+    const fechaStr = fecha.value.toISOString().slice(0, 10)
+    const { data } = await api.post('/reporte-cgm/enviar', {
+      fecha: fechaStr,
+      destinatarios: filas.map(r => ({ tipo: r.refTipo, id: r.refId })),
+    })
+    const ok = data.resultados.filter(r => r.ok)
+    const conError = data.resultados.filter(r => !r.ok)
+    toast.add({
+      severity: conError.length ? 'warn' : 'success',
+      summary: `${ok.length} enviado${ok.length === 1 ? '' : 's'}${conError.length ? `, ${conError.length} con error` : ''}`,
+      detail: conError.length ? conError.map(r => `${r.nombre}: ${r.error}`).join(' · ') : undefined,
+      life: 6000,
+    })
+  } catch (e) {
+    toast.add({ severity: 'error', summary: 'Error al enviar', detail: e.response?.data?.detail || e.message, life: 5000 })
+  } finally {
+    enviando.value = false
+  }
 }
 
 async function loadData() {
