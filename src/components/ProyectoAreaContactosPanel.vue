@@ -74,8 +74,6 @@ const TIPOS = [
   { value: 'operacional', label: 'Operacional' },
   { value: 'cgm', label: 'CGM' },
   { value: 'liquidacion', label: 'Liquidación' },
-  { value: 'soporte', label: 'Soporte' },
-  { value: 'monitoreo', label: 'Monitoreo' },
 ]
 
 const overrides = ref({})
