@@ -1,10 +1,10 @@
 <template>
   <div class="space-y-4">
-    <div class="flex items-center justify-between gap-3">
-      <p class="text-xs" style="color: #9b89b5;">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <p class="text-xs flex-1 min-w-[200px]" style="color: #9b89b5;">
         Destinatarios del reporte CGM (operador de red + cliente). A cada uno le llega solo el Excel de sus propias fronteras.
       </p>
-      <div class="flex items-center gap-3 shrink-0 flex-wrap">
+      <div class="flex items-center gap-3 flex-wrap">
         <div class="flex items-center gap-1.5">
           <label class="text-xs font-medium" style="color: #6b5a8a;">Desde</label>
           <DatePicker v-model="fechaDesde" dateFormat="dd/mm/yy" :maxDate="fechaHasta || ayer"
@@ -43,8 +43,8 @@
         </IconField>
       </div>
 
-      <div class="bg-white rounded-xl shadow-sm overflow-hidden" style="border: 1px solid #e8e0f0;">
-        <table class="w-full text-sm">
+      <div class="bg-white rounded-xl shadow-sm overflow-x-auto" style="border: 1px solid #e8e0f0;">
+        <table class="w-full text-sm" style="min-width: 560px;">
           <thead>
             <tr style="background: #f9f7ff;">
               <th class="text-left px-4 py-2.5 font-semibold" style="color: #6b5a8a;">Destinatario</th>

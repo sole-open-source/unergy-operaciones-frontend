@@ -15,6 +15,7 @@ const routes = [
   { path: '/m/coordinador', name: 'MobileCoordinador', component: () => import('@/mobile/MobileCoordinadorFallasView.vue'), meta: { mobile: true, roles: ['coordinador', 'admin'] } },
   { path: '/m/tecnico',     name: 'MobileTecnico',     component: () => import('@/mobile/MobileTecnicoFallasView.vue'),    meta: { mobile: true, roles: ['tecnico'] } },
   { path: '/m/resumen',   name: 'MobileResumen', component: () => import('@/mobile/MobileResumenView.vue'), meta: { mobile: true } },
+  { path: '/m/reporte-cgm', name: 'MobileReporteCGM', component: () => import('@/mobile/MobileReporteCGMView.vue'), meta: { mobile: true } },
 
   // ── General ──────────────────────────────────────────────────────
   { path: '/', redirect: '/dashboard' },

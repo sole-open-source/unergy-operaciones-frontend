@@ -19,6 +19,9 @@
       <RouterLink to="/m/resumen" class="mtb-item" active-class="mtb-item--active">
         <i class="pi pi-chart-bar" /><span>Resumen</span>
       </RouterLink>
+      <RouterLink to="/m/reporte-cgm" class="mtb-item" active-class="mtb-item--active">
+        <i class="pi pi-envelope" /><span>CGM</span>
+      </RouterLink>
     </template>
   </nav>
 </template>
