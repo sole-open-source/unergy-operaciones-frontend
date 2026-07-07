@@ -276,7 +276,14 @@ body {
   .rpt-section-title, .fmo-section-title { break-after: avoid; page-break-after: avoid; }
   /* Reducir el margen inferior de sección en impresión para compactar */
   .rpt-section { margin-bottom: 18px !important; }
-  .rpt-table tr, .fmo-inv-table tr, .fmo-mant-table tr { break-inside: avoid; page-break-inside: avoid; }
+  /* Las filas de tabla PUEDEN partirse entre hojas: una fila alta (evento con
+     mucho texto) que no cabe al final de la hoja se divide en lugar de saltar
+     entera y dejar medio página en blanco. Se evitan huérfanas/viudas para que
+     el corte quede limpio. */
+  .rpt-table tr, .fmo-inv-table tr, .fmo-mant-table tr {
+    break-inside: auto; page-break-inside: auto;
+  }
+  .rpt-table td, .fmo-inv-table td, .fmo-mant-table td { orphans: 2; widows: 2; }
   .rpt-table thead, .fmo-inv-table thead, .fmo-mant-table thead { display: table-header-group; }
   .rpt-page-sep { display: none !important; }
   .rpt-edit-hint { display: none !important; }
