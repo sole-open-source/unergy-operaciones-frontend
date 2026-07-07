@@ -805,6 +805,17 @@
 
         <!-- g. Plantas externas: PPAs de compra directa a terceros, fuera de GESCON -->
         <template v-if="pcMode === 'ppa_compra_externa'">
+          <Message v-if="externasSinPlantas.length" severity="warn" :closable="false">
+            <span v-if="externasSinPlantas.length === 1">
+              El contrato <b>{{ externasSinPlantas[0].nombre }}</b> no tiene plantas vinculadas:
+              no sabemos a qué planta le estamos comprando. Asóciala en el módulo PPA.
+            </span>
+            <span v-else>
+              {{ externasSinPlantas.length }} contratos de compra externa no tienen plantas vinculadas:
+              <b>{{ externasSinPlantas.map(c => c.nombre).join(', ') }}</b>.
+              Asócialas en el módulo PPA para saber a qué planta le compramos.
+            </span>
+          </Message>
           <div v-if="!pcPools.ppa_compra_externa.length" class="text-center py-12 text-sm" style="color: #7a6e8a;">
             No hay PPAs de compra a plantas externas vigentes en {{ MESES[pcMonth - 1] }} {{ pcYear }}.<br/>
             <span class="text-xs">Se registran en el módulo PPA con tipo de contrato «compra» (sin código GESCON).</span>
@@ -823,7 +834,12 @@
                 <span v-if="c.tarifa_base != null" class="text-xs font-mono px-2 py-0.5 rounded"
                   style="background: rgba(240,192,64,0.18); color: #9a6700;"
                   v-tooltip="'Tarifa base del PPA'">{{ Number(c.tarifa_base).toLocaleString('es-CO') }} $/kWh</span>
-                <span class="text-xs font-mono px-2 py-0.5 rounded" style="background: rgba(240,192,64,0.18); color: #9a6700;">
+                <span v-if="!c.plantas.length" class="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded"
+                  style="background: rgba(214,68,85,0.12); color: #D64455;"
+                  v-tooltip="'No sabemos a qué planta le compramos — asóciala en el módulo PPA'">
+                  <i class="pi pi-exclamation-triangle" style="font-size: 10px;" />Sin plantas vinculadas
+                </span>
+                <span v-else class="text-xs font-mono px-2 py-0.5 rounded" style="background: rgba(240,192,64,0.18); color: #9a6700;">
                   {{ c.plantas.length }} plantas
                 </span>
               </div>
@@ -1591,6 +1607,11 @@ const pcPools = computed(() => {
     ppa_compra_externa: d.compra_externa || [],
   }
 })
+// Contratos de compra externa sin plantas vinculadas: no sabemos a qué planta
+// le compramos — se alerta arriba de las tarjetas (g).
+const externasSinPlantas = computed(() =>
+  (pcPools.value.ppa_compra_externa || []).filter(c => !(c.plantas || []).length)
+)
 const pcCounts = computed(() => {
   const d = pcData.value
   if (!d) return null
