@@ -108,7 +108,6 @@ const titles = {
   Proyectos:       'Proyectos',
   ProyectoDetalle: 'Detalle de proyecto',
   GeneracionSolar:    'Generacion Solar',
-  ControlGeneracion:  'Control de Generación',
   Fallas:          'Gestión de Fallas',
   FallasLista:     'Gestión de fallas',
   FallaDetalle:    'Detalle de falla',
