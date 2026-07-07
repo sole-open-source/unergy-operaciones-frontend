@@ -1,15 +1,23 @@
 <template>
   <div class="space-y-3">
-    <p class="text-sm" style="color: #6b5a8a;">
-      Por defecto cada área usa los contactos de los inversionistas vigentes de este proyecto
-      <template v-if="inversionistasConId.length">:
-        <template v-for="(inv, idx) in inversionistasConId" :key="inv.cliente_id">
-          <RouterLink :to="`/clientes/${inv.cliente_id}?tab=contactos`" class="font-semibold underline" style="color:#915BD8;">{{ inv.cliente_nombre }}</RouterLink>{{ idx < inversionistasConId.length - 1 ? ', ' : '' }}
-        </template>
-      </template>
-      <template v-else> — este proyecto aún no tiene inversionistas registrados, así que ningún tipo tendrá contacto por defecto</template>.
-      Si para este proyecto la comunicación de alguna área la lleva otro cliente en particular, apúntala aquí.
-    </p>
+    <div>
+      <p class="text-sm" style="color: #6b5a8a;">
+        Por defecto cada área usa los contactos de los inversionistas vigentes de este proyecto.
+        Si para este proyecto la comunicación de alguna área la lleva otro cliente en particular, apúntala abajo.
+      </p>
+
+      <div v-if="inversionistasConId.length" class="flex flex-wrap gap-1.5 mt-2">
+        <RouterLink v-for="inv in inversionistasConId" :key="inv.cliente_id"
+          :to="`/clientes/${inv.cliente_id}?tab=contactos`"
+          class="text-xs font-medium px-2.5 py-1 rounded-full no-underline"
+          style="background:#f0eaf9;color:#915BD8;">
+          {{ inv.cliente_nombre }}
+        </RouterLink>
+      </div>
+      <p v-else class="text-xs italic mt-2" style="color: #c4b3df;">
+        Este proyecto aún no tiene inversionistas registrados, así que ningún tipo tendrá contacto por defecto.
+      </p>
+    </div>
 
     <div v-for="tipo in TIPOS" :key="tipo.value" class="flex items-center gap-2 py-1.5">
       <span class="w-32 text-sm font-medium" style="color: #2C2039;">{{ tipo.label }}</span>
