@@ -138,9 +138,17 @@ const destinatarios = computed(() => {
     addEntry('operador', f.operador_red_id, 'Operador de Red', f.operador_comercial,
       'Sin operador vinculado', f.operador_correos,
       f.operador_red_id ? `/mem/operadores-red/${f.operador_red_id}` : null, 'Sin correos — corregir', proyecto)
-    addEntry('cliente', f.cliente_id, 'Cliente', f.cliente_nombre,
-      'Sin cliente vinculado', f.cliente_correos_cgm,
-      f.cliente_id ? `/clientes/${f.cliente_id}?tab=contactos` : null, 'Sin correos CGM — corregir', proyecto)
+
+    if (f.clientes_cgm && f.clientes_cgm.length) {
+      for (const c of f.clientes_cgm) {
+        addEntry('cliente', c.id, 'Cliente', c.nombre,
+          'Sin cliente vinculado', c.correos,
+          `/clientes/${c.id}?tab=contactos`, 'Sin correos CGM — corregir', proyecto)
+      }
+    } else {
+      addEntry('cliente', null, 'Cliente', null,
+        'Sin inversionistas registrados', [], null, 'Sin inversionistas — corregir', proyecto)
+    }
   }
 
   return [...grupos.values()].sort((a, b) => (a.nombre || 'zzz').localeCompare(b.nombre || 'zzz'))
