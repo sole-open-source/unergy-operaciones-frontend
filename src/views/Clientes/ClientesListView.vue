@@ -22,6 +22,7 @@
           <template #body="{ data }">
             <Button icon="pi pi-eye" text rounded size="small" v-tooltip.top="'Ver detalle'" @click="$router.push(`/clientes/${data.id}`)" />
             <Button icon="pi pi-pencil" text rounded size="small" v-tooltip.top="'Editar'" @click="openEdit(data)" />
+            <Button icon="pi pi-trash" text rounded size="small" severity="danger" v-tooltip.top="'Eliminar'" @click="confirmDelete(data)" />
           </template>
         </Column>
       </DataTable>
@@ -30,6 +31,18 @@
     <Dialog v-model:visible="dialogVisible" :header="editingId ? 'Editar cliente' : 'Nuevo cliente'"
       modal class="w-full max-w-lg">
       <ClienteForm :initial="form" @save="onSave" @cancel="dialogVisible = false" />
+    </Dialog>
+
+    <Dialog v-model:visible="deleteVisible" header="Eliminar cliente" modal class="w-full max-w-sm">
+      <p class="text-sm text-gray-700 mb-4">
+        ¿Estás seguro de que deseas eliminar
+        <strong>{{ deleteCliente?.razon_social_nombre }}</strong>?
+        Esta acción no se puede deshacer.
+      </p>
+      <div class="flex justify-end gap-2">
+        <Button label="Cancelar" severity="secondary" @click="deleteVisible = false" />
+        <Button label="Eliminar" severity="danger" :loading="deleting" @click="doDelete" />
+      </div>
     </Dialog>
   </div>
 </template>
@@ -57,6 +70,9 @@ const loading = ref(false)
 const dialogVisible = ref(false)
 const editingId = ref(null)
 const form = ref({})
+const deleteVisible = ref(false)
+const deleteCliente = ref(null)
+const deleting = ref(false)
 
 async function load() {
   loading.value = true
@@ -92,6 +108,26 @@ function openEdit(row) {
   editingId.value = row.id
   form.value = { ...row }
   dialogVisible.value = true
+}
+
+function confirmDelete(row) {
+  deleteCliente.value = row
+  deleteVisible.value = true
+}
+
+async function doDelete() {
+  deleting.value = true
+  try {
+    await api.delete(`/clientes/${deleteCliente.value.id}`)
+    toast.add({ severity: 'success', summary: 'Cliente eliminado', life: 3000 })
+    deleteVisible.value = false
+    load()
+  } catch (e) {
+    const detail = e.response?.data?.detail || 'Error al eliminar'
+    toast.add({ severity: 'error', summary: 'No se pudo eliminar', detail, life: 5000 })
+  } finally {
+    deleting.value = false
+  }
 }
 
 async function onSave(payload) {
