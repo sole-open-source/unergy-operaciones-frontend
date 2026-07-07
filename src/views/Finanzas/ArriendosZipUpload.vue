@@ -212,8 +212,14 @@ import JSZip from 'jszip'
 import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist'
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import { uploadCuentaCobro, fetchDocsPeriodo } from '@/composables/useArriendosDocs'
+import { validateZipEntries, getSafeFilePath } from '@/utils/zipSecurityValidator'
 
 GlobalWorkerOptions.workerSrc = pdfWorkerUrl
+
+// Extensiones que estos ZIP de cuentas de cobro contienen legítimamente
+// (PDF/JPG que se procesan + XML/PNG de facturas electrónicas que se acompañan).
+// El resto — en especial ejecutables — hace que se rechace todo el ZIP.
+const EXTENSIONES_PERMITIDAS = ['pdf', 'jpg', 'jpeg', 'png', 'xml']
 
 const toast = useToast()
 
@@ -280,6 +286,15 @@ function nombrePredio(grupo, predio) {
   let base = partes.join('_')
   if (predio.conPago) base += `_pago${grupo.pagoId}`
   return base + '.pdf'
+}
+
+// ── Nombre de archivo seguro para enviar al backend ────────────────────────────
+// Descarta cualquier componente de directorio de la ruta del ZIP: nunca se usa
+// la ruta cruda como nombre de archivo (evita traversal si el backend confía en
+// el nombre entregado por el cliente).
+function nombreSeguro(rawPath, fallback) {
+  const base = getSafeFilePath(rawPath).split('/').pop()
+  return base || fallback
 }
 
 // ── Selección del archivo principal según prioridad ───────────────────────────
@@ -451,6 +466,21 @@ async function onZipSelected(e) {
 
   try {
     const zip = await JSZip.loadAsync(file)
+
+    // ── Validación de seguridad (Zip Slip + allowlist de extensiones) ──────────
+    const { valid, errors } = validateZipEntries(zip, { allowedExtensions: EXTENSIONES_PERMITIDAS })
+    if (!valid) {
+      const primeros = errors.slice(0, 4).map(e => e.message).join(' · ')
+      const extra = errors.length > 4 ? ` (+${errors.length - 4} más)` : ''
+      toast.add({
+        severity: 'error',
+        summary: 'ZIP rechazado por seguridad',
+        detail: `Estructura de archivos inválida o tipo no permitido. ${primeros}${extra}`,
+        life: 8000,
+      })
+      return
+    }
+
     const carpetas = new Set()
     zip.forEach((path) => {
       const top = path.split('/')[0]
@@ -601,8 +631,8 @@ async function confirmar() {
       const filename = `documento_pago${grupo.pagoId}.pdf`   // nombre del archivo original enviado
       try {
         await uploadCuentaCobro({
-          file:           new File([grupo.pdfBlob], grupo.originalName || filename),
-          fileSecundario: grupo.pdfSecBlob ? new File([grupo.pdfSecBlob], grupo.pdfSecNombre || 'enviada.pdf') : null,
+          file:           new File([grupo.pdfBlob], nombreSeguro(grupo.originalName, filename)),
+          fileSecundario: grupo.pdfSecBlob ? new File([grupo.pdfSecBlob], nombreSeguro(grupo.pdfSecNombre, 'enviada.pdf')) : null,
           periodo:        periodoParse,
           pagoId:         grupo.pagoId,
           codigoContrato: grupo.codigoExtraido,
