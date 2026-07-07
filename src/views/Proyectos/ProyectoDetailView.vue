@@ -28,7 +28,6 @@
       <TabPanel header="General">
         <div class="grid grid-cols-2 md:grid-cols-3 gap-4 p-4 text-sm">
           <template v-if="!isEditMode">
-            <InfoField label="Cliente titular" :value="clienteTitularNombre || '— sin asignar —'" />
             <InfoField label="Tipo" :value="proyecto.tipo_proyecto" />
             <InfoField label="Tecnología" :value="proyecto.tipo_tecnologia" />
             <InfoField label="Capacidad instalada (kWp)" :value="proyecto.info_tecnica?.capacidad_instalada_kwp" />
@@ -43,11 +42,6 @@
             <InfoField label="Fecha fin de representación" :value="proyecto.fecha_fin_representacion ? fmtFecha(proyecto.fecha_fin_representacion) : '—'" />
           </template>
           <template v-else>
-            <div class="flex flex-col gap-1">
-              <label class="field-label">Cliente titular</label>
-              <Select v-model="editForm.cliente_id" :options="clientes" optionLabel="razon_social_nombre"
-                optionValue="id" class="w-full" placeholder="Sin asignar" filter showClear />
-            </div>
             <div class="flex flex-col gap-1">
               <label class="field-label">Tipo de proyecto</label>
               <Select v-model="editForm.tipo_proyecto" :options="TIPOS_PROYECTO" class="w-full" placeholder="Seleccionar" showClear />
@@ -835,7 +829,6 @@ const isEditMode = computed(() => route.query.edit === 'true')
 
 const editForm = reactive({
   nombre_comercial: '',
-  cliente_id: null,
   estado: '',
   tipo_proyecto: null,
   tipo_tecnologia: null,
@@ -1059,9 +1052,6 @@ const editPct = ref(null)
 const editFechaInicio = ref(null)
 const editFechaFin = ref(null)
 
-const clienteTitularNombre = computed(() =>
-  clientes.value.find(c => c.id === proyecto.value?.cliente_id)?.razon_social_nombre || null
-)
 
 const clientesDisponibles = computed(() => {
   if (!proyecto.value) return clientes.value
