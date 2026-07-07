@@ -27,8 +27,12 @@
 
         <!-- ── Tab: Información ── -->
         <div v-if="activeTab === 'info'" class="space-y-6">
-          <ClienteForm :initial="cliente" @save="saveInfo" @cancel="() => {}" :inline="true"
-            @test-correo="enviarCorreoPrueba" />
+          <ClienteForm :initial="cliente" @save="saveInfo" @cancel="() => {}" :inline="true" />
+        </div>
+
+        <!-- ── Tab: Contactos ── -->
+        <div v-if="activeTab === 'contactos'" class="space-y-4">
+          <ContactosPanel :cliente-id="cliente.id" />
         </div>
 
         <!-- ── Tab: Servicios ── -->
@@ -449,16 +453,18 @@ import Textarea from 'primevue/textarea'
 import DatePicker from 'primevue/datepicker'
 import api from '@/api/client'
 import ClienteForm from './ClienteForm.vue'
+import ContactosPanel from '@/components/ContactosPanel.vue'
 
 const route = useRoute()
 const toast = useToast()
 const cliente = ref(null)
-const activeTab = ref('info')
+const activeTab = ref(typeof route.query.tab === 'string' ? route.query.tab : 'info')
 const guardando = ref(false)
 const archivoSeleccionado = ref(null)
 
 const tabs = [
   { key: 'info',       label: 'Información',  icon: 'pi pi-user' },
+  { key: 'contactos',  label: 'Contactos',     icon: 'pi pi-envelope' },
   { key: 'servicios',  label: 'Servicios',     icon: 'pi pi-briefcase' },
   { key: 'documentos', label: 'Documentos',    icon: 'pi pi-folder' },
   { key: 'proyectos',  label: 'Proyectos',     icon: 'pi pi-bolt' },
@@ -682,16 +688,6 @@ async function saveInfo(payload) {
   await api.patch(`/clientes/${route.params.id}`, payload)
   toast.add({ severity: 'success', summary: 'Información actualizada', life: 3000 })
   await cargar()
-}
-
-async function enviarCorreoPrueba(email) {
-  if (!email) return
-  try {
-    await api.post(`/clientes/${route.params.id}/test-correo`, { email })
-    toast.add({ severity: 'success', summary: 'Correo de prueba enviado', detail: `✓ Enviado a ${email}`, life: 4000 })
-  } catch (e) {
-    toast.add({ severity: 'error', summary: 'Error al enviar', detail: e.response?.data?.detail || e.message, life: 5000 })
-  }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

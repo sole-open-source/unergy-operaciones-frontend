@@ -522,6 +522,17 @@
         </div>
       </TabPanel>
 
+      <!-- ══ CONTACTOS ══ -->
+      <TabPanel header="Contactos">
+        <div class="p-4">
+          <ProyectoAreaContactosPanel
+            :proyecto-id="proyecto.id"
+            :cliente-titular-nombre="clienteTitularNombre"
+            :clientes-options="clientes"
+          />
+        </div>
+      </TabPanel>
+
       <!-- ══ SERVICIOS ══ -->
       <TabPanel header="Servicios">
         <div class="p-6 space-y-4">
@@ -756,6 +767,7 @@ import { useToast } from 'primevue/usetoast'
 import * as XLSX from 'xlsx'
 import api from '@/api/client'
 import ContratoServicioWizard from '@/views/Contratos/ContratoServicioWizard.vue'
+import ProyectoAreaContactosPanel from '@/components/ProyectoAreaContactosPanel.vue'
 
 const route = useRoute()
 const router = useRouter()

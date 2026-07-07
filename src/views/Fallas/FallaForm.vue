@@ -340,10 +340,10 @@
       <label class="ff-notif-label">
         <input type="checkbox" v-model="form.notificacion" class="ff-notif-check" />
         <i class="pi pi-send" style="color:#915BD8;font-size:13px" />
-        <span>Enviar notificación por correo a los correos operacionales del cliente</span>
+        <span>Enviar notificación por correo a los contactos operacionales del proyecto</span>
       </label>
       <span v-if="form.notificacion" class="ff-notif-hint">
-        Se enviará un correo a los destinatarios configurados en Clientes → Correos Operacionales.
+        Se enviará a los contactos tipo "Operacional" del cliente (o del proyecto, si tiene uno propio) — configúralos en la ficha del Cliente o del Proyecto, tab Contactos.
       </span>
     </div>
 
