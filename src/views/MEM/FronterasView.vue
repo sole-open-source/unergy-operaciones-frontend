@@ -326,7 +326,7 @@ const filteredFronteras = computed(() => {
       (f.operador_red || '').toLowerCase().includes(s) ||
       (f.operador_comercial || '').toLowerCase().includes(s) ||
       (f.municipio || '').toLowerCase().includes(s) ||
-      (f.quoia_meter_id || '').toLowerCase().includes(s)
+      String(f.quoia_meter_id ?? '').toLowerCase().includes(s)
     )
   }
   return list
