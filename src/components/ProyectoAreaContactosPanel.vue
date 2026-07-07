@@ -42,13 +42,7 @@
       </template>
 
       <template v-else>
-        <span v-if="inversionistasConId.length" class="text-sm flex-1 italic" style="color: #9b89b5;">
-          Hereda de:
-          <template v-for="(inv, idx) in inversionistasConId" :key="inv.cliente_id">
-            <RouterLink :to="`/clientes/${inv.cliente_id}?tab=contactos`" class="underline" style="color:#915BD8;">{{ inv.cliente_nombre }}</RouterLink>{{ idx < inversionistasConId.length - 1 ? ', ' : '' }}
-          </template>
-        </span>
-        <span v-else class="text-sm flex-1 italic" style="color: #c4b3df;">Sin inversionistas registrados — sin contacto por defecto</span>
+        <span class="flex-1"></span>
         <button type="button" @click="editando = tipo.value; clienteSeleccionado = null"
           class="text-xs px-2 py-1 rounded hover:bg-gray-50" style="color:#915BD8;">Usar otro cliente</button>
       </template>
