@@ -711,7 +711,7 @@
         </span>
         <Button label="Exportar resumen (Excel)" icon="pi pi-file-excel" size="small" outlined class="ml-auto"
           :disabled="!pcData || pcLoading" @click="exportarResumenPlantasContratos"
-          v-tooltip.bottom="'Descarga TODAS las categorías a-f del mes (todos los contratos y plantas), sin importar el filtro activo'"
+          v-tooltip.bottom="'Descarga TODAS las categorías del mes, incl. plantas externas (todos los contratos y plantas), sin importar el filtro activo'"
           style="color:#915BD8; border-color:#915BD8;" />
       </div>
 
@@ -799,6 +799,47 @@
                   <span v-if="p.fecha_fin" :style="isExpiringSoon(p.fecha_fin) ? 'color: #D64455; font-weight: 600;' : ''">{{ p.fecha_fin }}</span>
                 </div>
               </div>
+            </div>
+          </div>
+        </template>
+
+        <!-- g. Plantas externas: PPAs de compra directa a terceros, fuera de GESCON -->
+        <template v-if="pcMode === 'ppa_compra_externa'">
+          <div v-if="!pcPools.ppa_compra_externa.length" class="text-center py-12 text-sm" style="color: #7a6e8a;">
+            No hay PPAs de compra a plantas externas vigentes en {{ MESES[pcMonth - 1] }} {{ pcYear }}.<br/>
+            <span class="text-xs">Se registran en el módulo PPA con tipo de contrato «compra» (sin código GESCON).</span>
+          </div>
+          <div v-for="c in pcPools.ppa_compra_externa" :key="c.id" class="cv-card-gold">
+            <div class="px-4 py-3 flex items-center justify-between"
+              style="background: rgba(240,192,64,0.08); border-bottom: 1px solid rgba(240,192,64,0.2);">
+              <div>
+                <span class="font-bold text-sm" style="color: #9a6700;">{{ c.nombre }}</span>
+                <span class="ml-2 text-xs" style="color: #7a6e8a;">
+                  Le compramos a: <span class="font-semibold" style="color: #2C2039;">{{ c.vendedor_nombre || '—' }}</span>
+                  <span v-if="c.vendedor_nit"> · NIT {{ c.vendedor_nit }}</span>
+                </span>
+              </div>
+              <div class="flex items-center gap-2 flex-shrink-0">
+                <span v-if="c.tarifa_base != null" class="text-xs font-mono px-2 py-0.5 rounded"
+                  style="background: rgba(240,192,64,0.18); color: #9a6700;"
+                  v-tooltip="'Tarifa base del PPA'">{{ Number(c.tarifa_base).toLocaleString('es-CO') }} $/kWh</span>
+                <span class="text-xs font-mono px-2 py-0.5 rounded" style="background: rgba(240,192,64,0.18); color: #9a6700;">
+                  {{ c.plantas.length }} plantas
+                </span>
+              </div>
+            </div>
+            <div v-if="c.plantas.length" class="divide-y" style="border-color: rgba(44,32,57,0.05);">
+              <div v-for="p in c.plantas" :key="p.id" class="px-4 py-2.5 flex items-center justify-between text-sm">
+                <span class="font-medium" style="color: #2C2039;">{{ p.nombre }}</span>
+                <div class="text-xs font-mono text-right" style="color: #7a6e8a;">
+                  <span v-if="p.fecha_inicio">{{ p.fecha_inicio }}</span>
+                  <span v-if="p.fecha_inicio && p.fecha_fin"> → </span>
+                  <span v-if="p.fecha_fin" :style="isExpiringSoon(p.fecha_fin) ? 'color: #D64455; font-weight: 600;' : ''">{{ p.fecha_fin }}</span>
+                </div>
+              </div>
+            </div>
+            <div v-else class="px-4 py-4 text-xs text-center" style="color: rgba(44,32,57,0.3);">
+              Sin plantas vinculadas — asócialas al contrato en el módulo PPA
             </div>
           </div>
         </template>
@@ -1482,6 +1523,7 @@ const PC_GRUPOS = [
   { label: 'PPA', modes: [
     { key: 'ppa_venta_ungg',  agente: 'Venta · UNGG',  bg: 'rgba(145,91,216,0.12)', color: '#915BD8' },
     { key: 'ppa_compra_ungc', agente: 'Compra · UNGC', bg: 'rgba(240,192,64,0.18)', color: '#9a6700' },
+    { key: 'ppa_compra_externa', agente: 'Plantas externas', bg: 'rgba(240,192,64,0.18)', color: '#9a6700' },
   ]},
   { label: 'Compra en bolsa', modes: [
     { key: 'bolsa_compra_ungg', agente: 'UNGG', bg: 'rgba(240,192,64,0.18)', color: '#9a6700' },
@@ -1495,6 +1537,7 @@ const PC_GRUPOS = [
 const PC_MODE_DESC = {
   ppa_venta_ungg:   'a. Plantas en contratos GESCON donde UNGG le vende a otro agente (Terpel, NEU, …).',
   ppa_compra_ungc:  'b. Contratos en que UNGC compra energía a algún agente en GESCON (usualmente a UNGG).',
+  ppa_compra_externa: 'g. Plantas externas: PPAs firmados para comprarle energía directamente a terceros, SIN registro en GESCON — aquí está el detalle de a quién le compramos.',
   bolsa_compra_ungg:'c. Compras de UNGG a precio de bolsa: plantas duplicadas que aportan a un contrato con origen bolsa (los PLC entrarán cuando se liquiden).',
   bolsa_compra_ungc:'d. UNGC comprando en bolsa — reglas de negocio por definir.',
   bolsa_venta_ungg: 'e. Plantas sin contrato en GESCON: venden en bolsa desde UNGG.',
@@ -1527,8 +1570,10 @@ const pcBolsaLibre = computed(() => {
 const pcPools = computed(() => {
   const d = pcData.value
   if (!d) return { ppa_venta_ungg: [], ppa_compra_ungc: [], bolsa_compra_ungg: [],
-                   bolsa_compra_ungc: [], bolsa_venta_ungg: [], bolsa_venta_ungc: [] }
-  if (d.pools) return d.pools
+                   bolsa_compra_ungc: [], bolsa_venta_ungg: [], bolsa_venta_ungc: [],
+                   ppa_compra_externa: [] }
+  // ppa_compra_externa por delante: un payload cacheado de un backend viejo puede no traerla
+  if (d.pools) return { ppa_compra_externa: d.compra_externa || [], ...d.pools }
   const a = [], c = []
   for (const ct of (d.venta || [])) {
     const dup = (ct.plantas || []).filter(p => p.es_duplicado)
@@ -1543,6 +1588,7 @@ const pcPools = computed(() => {
     bolsa_compra_ungc: [],
     bolsa_venta_ungg: pcBolsaLibre.value,
     bolsa_venta_ungc: pcBolsaComercializador.value,
+    ppa_compra_externa: d.compra_externa || [],
   }
 })
 const pcCounts = computed(() => {
@@ -1558,6 +1604,7 @@ const pcCounts = computed(() => {
     bolsa_compra_ungc: 0,
     bolsa_venta_ungg: P.bolsa_venta_ungg.length,
     bolsa_venta_ungc: P.bolsa_venta_ungc.length,
+    ppa_compra_externa: nPlantas(P.ppa_compra_externa || []),
   }
 })
 
@@ -1591,6 +1638,14 @@ async function exportarResumenPlantasContratos() {
         aoa.push(['b. PPA Compra (UNGC)', c.nombre, c.vendedor_nombre || '', p.nombre, '', '', p.fecha_inicio || '', p.fecha_fin || '', ''])
     } else {
       aoa.push(['b. PPA Compra (UNGC)', c.nombre, c.vendedor_nombre || '', '(sin plantas)', '', '', '', '', ''])
+    }
+  }
+  for (const c of P.ppa_compra_externa || []) {
+    if (c.plantas.length) {
+      for (const p of c.plantas)
+        aoa.push(['g. Plantas externas (PPA)', c.nombre, c.vendedor_nombre || '', p.nombre, '', '', p.fecha_inicio || '', p.fecha_fin || '', 'Compra directa fuera de GESCON'])
+    } else {
+      aoa.push(['g. Plantas externas (PPA)', c.nombre, c.vendedor_nombre || '', '(sin plantas vinculadas)', '', '', c.fecha_inicio || '', c.fecha_fin || '', 'Compra directa fuera de GESCON'])
     }
   }
   for (const c of P.bolsa_compra_ungg)
