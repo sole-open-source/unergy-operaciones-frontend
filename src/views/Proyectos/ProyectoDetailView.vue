@@ -527,7 +527,7 @@
         <div class="p-4">
           <ProyectoAreaContactosPanel
             :proyecto-id="proyecto.id"
-            :cliente-titular-nombre="clienteTitularNombre"
+            :inversionistas="proyecto.inversionistas"
             :clientes-options="clientes"
           />
         </div>

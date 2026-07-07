@@ -1,9 +1,14 @@
 <template>
   <div class="space-y-3">
     <p class="text-sm" style="color: #6b5a8a;">
-      Por defecto cada área usa los contactos de la razón social titular
-      (<strong>{{ clienteTitularNombre || '— sin asignar —' }}</strong>). Si para este proyecto la
-      comunicación de alguna área la lleva otro cliente, apúntala aquí.
+      Por defecto cada área usa los contactos de los inversionistas vigentes de este proyecto
+      <template v-if="inversionistasConId.length">:
+        <template v-for="(inv, idx) in inversionistasConId" :key="inv.cliente_id">
+          <RouterLink :to="`/clientes/${inv.cliente_id}?tab=contactos`" class="font-semibold underline" style="color:#915BD8;">{{ inv.cliente_nombre }}</RouterLink>{{ idx < inversionistasConId.length - 1 ? ', ' : '' }}
+        </template>
+      </template>
+      <template v-else> — este proyecto aún no tiene inversionistas registrados, así que ningún tipo tendrá contacto por defecto</template>.
+      Si para este proyecto la comunicación de alguna área la lleva otro cliente en particular, apúntala aquí.
     </p>
 
     <div v-for="tipo in TIPOS" :key="tipo.value" class="flex items-center gap-2 py-1.5">
@@ -12,7 +17,9 @@
       <template v-if="overrides[tipo.value] && editando !== tipo.value">
         <span class="text-sm flex-1" style="color: #6b5a8a;">
           <i class="pi pi-arrow-right-arrow-left text-xs mr-1" style="color:#915BD8;" />
-          {{ overrides[tipo.value].cliente_nombre }}
+          <RouterLink :to="`/clientes/${overrides[tipo.value].cliente_id}?tab=contactos`" class="underline" style="color:#915BD8;">
+            {{ overrides[tipo.value].cliente_nombre }}
+          </RouterLink>
         </span>
         <button type="button" @click="editando = tipo.value"
           class="text-xs px-2 py-1 rounded hover:bg-gray-50" style="color:#915BD8;">Cambiar</button>
@@ -35,7 +42,13 @@
       </template>
 
       <template v-else>
-        <span class="text-sm flex-1 italic" style="color: #c4b3df;">Hereda del titular</span>
+        <span v-if="inversionistasConId.length" class="text-sm flex-1 italic" style="color: #9b89b5;">
+          Hereda de:
+          <template v-for="(inv, idx) in inversionistasConId" :key="inv.cliente_id">
+            <RouterLink :to="`/clientes/${inv.cliente_id}?tab=contactos`" class="underline" style="color:#915BD8;">{{ inv.cliente_nombre }}</RouterLink>{{ idx < inversionistasConId.length - 1 ? ', ' : '' }}
+          </template>
+        </span>
+        <span v-else class="text-sm flex-1 italic" style="color: #c4b3df;">Sin inversionistas registrados — sin contacto por defecto</span>
         <button type="button" @click="editando = tipo.value; clienteSeleccionado = null"
           class="text-xs px-2 py-1 rounded hover:bg-gray-50" style="color:#915BD8;">Usar otro cliente</button>
       </template>
@@ -44,17 +57,24 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
 import Select from 'primevue/select'
 import { useToast } from 'primevue/usetoast'
 import api from '@/api/client'
 
 const props = defineProps({
   proyectoId: { type: [Number, String], required: true },
-  clienteTitularNombre: { type: String, default: '' },
+  inversionistas: { type: Array, default: () => [] },
   clientesOptions: { type: Array, default: () => [] },
 })
 const toast = useToast()
+
+const inversionistasConId = computed(() => {
+  const hoy = new Date().toISOString().slice(0, 10)
+  return (props.inversionistas || []).filter(inv =>
+    inv.cliente_id && inv.cliente_nombre && (!inv.fecha_fin || inv.fecha_fin >= hoy)
+  )
+})
 
 const TIPOS = [
   { value: 'operacional', label: 'Operacional' },
