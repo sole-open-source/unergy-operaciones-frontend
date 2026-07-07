@@ -241,41 +241,41 @@ body {
 
 /* ── Impresión ── */
 /*
-  6mm top/bottom + 8mm left/right = mínimo seguro en impresoras modernas.
-  Área de contenido resultante: (210-16)mm × (297-12)mm = 194mm × 285mm ≈ 733px × 1078px.
-  NO reducir más de 6mm o las impresoras de borde pueden cortar.
+  8mm en todos los lados = margen seguro en impresoras modernas sin cortes de borde.
+  Área de contenido resultante: (210-16)mm × (297-16)mm = 194mm × 281mm.
+  El contenido FLUYE de forma natural: el pie queda justo debajo del contenido y
+  las hojas se llenan sin dejar grandes espacios en blanco.
 */
-@page { margin: 6mm 8mm; size: A4 portrait; }
+@page { margin: 8mm; size: A4 portrait; }
 @media print {
   body { background: #fff !important; margin: 0 !important; padding: 0 !important; }
   .rpt-page, .fmo-page {
     box-shadow: none !important;
     border-radius: 0 !important;
-    /* Ocupa el 100% del área de contenido sin margen entre páginas */
     margin: 0 !important;
-    padding: 0 10px !important;   /* padding lateral mínimo para que el header no se pegue al borde */
-    page-break-after: always;
-    break-after: page;
+    padding: 0 2px !important;   /* padding lateral mínimo para que el header no toque el borde */
     width: 100% !important;
     max-width: 100% !important;
     box-sizing: border-box !important;
-    /* Cada página ocupa el alto imprimible (A4 − márgenes @page) para que el
-       pie quede SIEMPRE al fondo y el encabezado arriba, sin depender del contenido */
-    display: flex !important;
-    flex-direction: column !important;
-    min-height: calc(297mm - 12mm - 1mm);
+    page-break-after: always;
+    break-after: page;
   }
   .rpt-page:last-child, .fmo-page:last-child { page-break-after: avoid; break-after: avoid; }
-  /* El header negativo necesita ajustarse al nuevo padding de la página */
-  .rpt-header, .fmo-header { margin: 0 -10px 18px !important; border-radius: 0 !important; }
-  /* Pie de página anclado al fondo de la hoja (no depende del tamaño del contenido) */
-  .rpt-footer { margin-top: auto !important; }
-  /* No partir estructuras entre páginas */
-  .rpt-section, .rpt-kpi-row, .rpt-kpi, .rpt-chart-card, .rpt-status-box,
+  /* El header con margen negativo se ajusta al nuevo padding de la página */
+  .rpt-header, .fmo-header { margin: 0 -2px 18px !important; border-radius: 0 !important; }
+  /* El pie sigue al contenido (no se ancla al fondo → sin huecos en blanco) */
+  .rpt-footer { margin-top: 18px !important; }
+
+  /* Evitar cortes feos SOLO en bloques pequeños. Las secciones grandes pueden
+     fluir entre hojas para que se llenen por completo y no quede espacio vacío. */
+  .rpt-kpi-row, .rpt-kpi, .rpt-chart-card, .rpt-status-box,
   .rpt-obs-text, .rpt-obs-editable, .fmo-ok-box, .fmo-multa-box {
     break-inside: avoid; page-break-inside: avoid;
   }
+  /* Un título de sección nunca queda huérfano al final de una hoja */
   .rpt-section-title, .fmo-section-title { break-after: avoid; page-break-after: avoid; }
+  /* Reducir el margen inferior de sección en impresión para compactar */
+  .rpt-section { margin-bottom: 18px !important; }
   .rpt-table tr, .fmo-inv-table tr, .fmo-mant-table tr { break-inside: avoid; page-break-inside: avoid; }
   .rpt-table thead, .fmo-inv-table thead, .fmo-mant-table thead { display: table-header-group; }
   .rpt-page-sep { display: none !important; }
