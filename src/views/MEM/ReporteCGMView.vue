@@ -44,7 +44,14 @@
       </div>
 
       <div class="bg-white rounded-xl shadow-sm overflow-x-auto" style="border: 1px solid #e8e0f0;">
-        <table class="w-full text-sm" style="min-width: 560px;">
+        <table class="w-full text-sm" style="min-width: 680px; table-layout: fixed;">
+          <colgroup>
+            <col style="width: 34%;" />
+            <col style="width: 18%;" />
+            <col style="width: 20%;" />
+            <col style="width: 16%;" />
+            <col style="width: 12%;" />
+          </colgroup>
           <thead>
             <tr style="background: #f9f7ff;">
               <th class="text-left px-4 py-2.5 font-semibold" style="color: #6b5a8a;">Destinatario</th>
