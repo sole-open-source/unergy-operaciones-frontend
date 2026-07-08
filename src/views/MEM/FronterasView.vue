@@ -241,7 +241,7 @@
     <Dialog v-model:visible="showPendientesDialog" header="Fronteras nuevas en Quoia" modal class="w-full max-w-3xl">
       <p class="text-sm mb-4" style="color: #6b5a8a;">
         Estas fronteras existen en Quoia pero todavía no tienen fila aquí. Asígnales un proyecto para agregarlas,
-        o ignóralas si no aplican (ej. medidor de prueba).
+        o ignóralas si no aplican.
       </p>
       <div v-if="loadingPendientes" class="flex items-center justify-center py-8">
         <i class="pi pi-spin pi-spinner text-2xl" style="color: #915BD8;" />
