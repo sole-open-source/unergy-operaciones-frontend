@@ -298,10 +298,9 @@ async function loadMeters() {
   if (meters.value.length || metersLoading.value) return
   metersLoading.value = true
   try {
-    const { data } = await api.get('/fronteras/quoia/meters')
-    meters.value = (data.meters || [])
-      .filter(m => !m.archived)
-      .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+    // Nodos/medidores desde Gaia (JWT) — el backend ya los ordena por nombre.
+    const { data } = await api.get('/fronteras/fasorial/nodos')
+    meters.value = data.nodos || []
   } catch (e) {
     toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo cargar la lista de medidores de Quoia.', life: 4000 })
   } finally {
