@@ -462,7 +462,7 @@ function toggleSection(tipo) {
 async function load() {
   loading.value = true
   try {
-    const { data } = await api.get('/proyectos', { params: { page: 1, size: 200 } })
+    const { data } = await api.get('/proyectos', { params: { page: 1, size: 500 } })
     allItems.value = data.items ?? data
     // Abrir la primera sección automáticamente en la carga inicial
     if (openSections.value.size === 0) {

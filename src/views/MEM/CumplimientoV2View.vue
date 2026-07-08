@@ -1673,7 +1673,7 @@ const backendProyectos = ref([])
 
 async function loadBackendProyectos() {
   try {
-    const res = await client.get('/proyectos', { params: { size: 200 } })
+    const res = await client.get('/proyectos', { params: { size: 500 } })
     backendProyectos.value = res.data.items || []
   } catch { /* degradar silenciosamente */ }
 }
