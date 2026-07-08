@@ -66,15 +66,60 @@ export const projectTokens = (s) => norm(s).split(' ').filter((t) => t.length > 
 /** Conjunto de tokens distintivos de un nombre de empresa/persona (palabra completa). */
 export const nameTokenSet = (s) => new Set(norm(s).split(' ').filter((w) => w.length >= 3 && !STOP.has(w)))
 
-/** Convierte "1.234.567,89" / "$ 1.234.567,89" a número (formato CO). */
-export const parseNum = (s) => {
-  if (s == null) return 0
-  if (typeof s === 'number') return s
+/**
+ * Normaliza un string monetario a "cuerpo numérico" y signo: quita $, espacios,
+ * y detecta negativo por signo menos o paréntesis contables "(1.234)".
+ * @returns {{body: string, neg: boolean} | null}  null si queda vacío.
+ */
+const stripMoney = (s) => {
+  if (s == null) return null
+  if (typeof s === 'number') return { body: String(s), neg: false, isNumber: true, value: s }
   let t = s.toString().trim().replace(/\$/g, '').replace(/\s/g, '')
-  t = t.replace(/\./g, '').replace(/,/g, '.')
-  const n = parseFloat(t)
-  return isNaN(n) ? 0 : n
+  if (!t) return null
+  const neg = /^-/.test(t) || /^\(.*\)$/.test(t)
+  t = t.replace(/[()]/g, '').replace(/^-/, '')
+  if (!t) return null
+  return { body: t, neg }
 }
+
+/**
+ * Parsea un monto del MANDATO (PDF), en formato US:
+ *   coma (,) = separador de MILES,  punto (.) = separador DECIMAL.
+ *   Ej.: "2,011.51" -> 2011.51 ; "129" -> 129 ; "$ 2,011,510.00" -> 2011510.
+ * Maneja vacío/null (→0), negativos (signo o paréntesis) y números ya parseados.
+ */
+export const parseMandatoNumber = (s) => {
+  const p = stripMoney(s)
+  if (!p) return 0
+  if (p.isNumber) return p.value
+  const t = p.body.replace(/,/g, '')          // comas = miles -> quitar; punto = decimal, se conserva
+  const n = parseFloat(t)
+  if (isNaN(n)) return 0
+  return p.neg ? -n : n
+}
+
+/**
+ * Parsea un monto del ASIENTO contable (Excel Odoo), en formato CO:
+ *   punto (.) = separador de MILES,  coma (,) = separador DECIMAL.
+ *   Ej.: "2.011,51" -> 2011.51 ; "129.413" -> 129413 ; "129" -> 129.
+ * Maneja vacío/null (→0), negativos (signo o paréntesis) y números ya parseados.
+ */
+export const parseAsientoNumber = (s) => {
+  const p = stripMoney(s)
+  if (!p) return 0
+  if (p.isNumber) return p.value
+  const t = p.body.replace(/\./g, '').replace(/,/g, '.')  // puntos=miles -> quitar; coma=decimal -> punto
+  const n = parseFloat(t)
+  if (isNaN(n)) return 0
+  return p.neg ? -n : n
+}
+
+/**
+ * @deprecated Usar parseAsientoNumber (CO) o parseMandatoNumber (US) según la
+ * fuente del dato. Se mantiene como alias del parseo de ASIENTO (formato CO)
+ * para compatibilidad con código que aún lo importe.
+ */
+export const parseNum = parseAsientoNumber
 
 // ===================== PARSEO DE ASIENTOS (Excel Odoo) =====================
 
@@ -126,10 +171,10 @@ export function parseAsientos(rows) {
     // Débito/haber: usar DEBE/HABER si existen; si no, derivar del importe con signo.
     let debe = 0, haber = 0
     if (col.debe !== -1 || col.haber !== -1) {
-      debe = parseNum(r[col.debe])
-      haber = parseNum(r[col.haber])
+      debe = parseAsientoNumber(r[col.debe])
+      haber = parseAsientoNumber(r[col.haber])
     } else if (col.importe !== -1) {
-      const imp = parseNum(r[col.importe])
+      const imp = parseAsientoNumber(r[col.importe])
       if (imp >= 0) debe = imp; else haber = -imp
     }
 
@@ -185,7 +230,7 @@ export function extractMandate(text, filename = '') {
   text.split('\n').forEach((line) => {
     const m = line.match(/^(.*?)\$\s*([\d.,]+)\s*$/)
     if (!m) return
-    const label = norm(m[1]); const v = parseNum(m[2])
+    const label = norm(m[1]); const v = parseMandatoNumber(m[2])
     if (label.includes('VALOR A PAGAR')) { total = v; return }
     for (const [kw, key] of map) {
       if (label.startsWith(kw) || (kw.startsWith('IVA') && label.includes(kw))) {

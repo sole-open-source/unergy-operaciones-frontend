@@ -13,11 +13,38 @@ import { dirname, join } from 'path'
 const here = dirname(fileURLToPath(import.meta.url))
 let src = fs.readFileSync(join(here, 'conciliacionMandatos.js'), 'utf8')
 src = src.replace(/export const /g, 'const ').replace(/export function /g, 'function ')
-const api = new Function(src + '\nreturn { parseAsientos, extractMandate, suggestTag, reconciliar, plantaDesdeEtiqueta, parseIngresos, matchIngresoContab };')()
-const { parseAsientos, extractMandate, suggestTag, reconciliar, plantaDesdeEtiqueta, parseIngresos, matchIngresoContab } = api
+const api = new Function(src + '\nreturn { parseAsientos, extractMandate, suggestTag, reconciliar, plantaDesdeEtiqueta, parseIngresos, matchIngresoContab, parseMandatoNumber, parseAsientoNumber };')()
+const { parseAsientos, extractMandate, suggestTag, reconciliar, plantaDesdeEtiqueta, parseIngresos, matchIngresoContab, parseMandatoNumber, parseAsientoNumber } = api
 
 let ok = true
 const assert = (cond, msg) => { console.log((cond ? '✅' : '❌') + ' ' + msg); if (!cond) ok = false }
+
+// 0) PARSEO NUMÉRICO POR FUENTE — el mandato (PDF) usa formato US (coma=miles,
+//    punto=decimal) y el asiento (Odoo) usa formato CO (punto=miles, coma=decimal).
+//    Parsearlos igual genera diferencias falsas enormes en la conciliación.
+// -- Mandato (US): coma=miles, punto=decimal --
+assert(parseMandatoNumber('2,011.51') === 2011.51, `parseMandatoNumber("2,011.51") = ${parseMandatoNumber('2,011.51')} (esperado 2011.51)`)
+assert(parseMandatoNumber('129') === 129, `parseMandatoNumber("129") = ${parseMandatoNumber('129')} (esperado 129)`)
+assert(parseMandatoNumber('$ 2,011,510.00') === 2011510, `parseMandatoNumber("$ 2,011,510.00") = ${parseMandatoNumber('$ 2,011,510.00')} (esperado 2011510)`)
+assert(parseMandatoNumber('497,333') === 497333, `parseMandatoNumber("497,333") = ${parseMandatoNumber('497,333')} (esperado 497333)`)
+assert(parseMandatoNumber('0.50') === 0.5, `parseMandatoNumber("0.50") = ${parseMandatoNumber('0.50')} (esperado 0.5)`)
+assert(parseMandatoNumber('-1,000.50') === -1000.5, `parseMandatoNumber("-1,000.50") = ${parseMandatoNumber('-1,000.50')} (esperado -1000.5)`)
+assert(parseMandatoNumber('') === 0 && parseMandatoNumber(null) === 0 && parseMandatoNumber(undefined) === 0, 'parseMandatoNumber vacío/null/undefined = 0')
+assert(parseMandatoNumber(2011.51) === 2011.51, 'parseMandatoNumber(number) pasa directo')
+// -- Asiento (CO): punto=miles, coma=decimal --
+assert(parseAsientoNumber('2.011,51') === 2011.51, `parseAsientoNumber("2.011,51") = ${parseAsientoNumber('2.011,51')} (esperado 2011.51)`)
+assert(parseAsientoNumber('129.413') === 129413, `parseAsientoNumber("129.413") = ${parseAsientoNumber('129.413')} (esperado 129413, son miles)`)
+assert(parseAsientoNumber('129') === 129, `parseAsientoNumber("129") = ${parseAsientoNumber('129')} (esperado 129)`)
+assert(parseAsientoNumber('$ 1.234.567,89') === 1234567.89, `parseAsientoNumber("$ 1.234.567,89") = ${parseAsientoNumber('$ 1.234.567,89')} (esperado 1234567.89)`)
+assert(parseAsientoNumber('-1.000,50') === -1000.5, `parseAsientoNumber("-1.000,50") = ${parseAsientoNumber('-1.000,50')} (esperado -1000.5)`)
+assert(parseAsientoNumber('') === 0 && parseAsientoNumber(null) === 0, 'parseAsientoNumber vacío/null = 0')
+assert(parseAsientoNumber(2011.51) === 2011.51, 'parseAsientoNumber(number) pasa directo')
+// -- Mismo valor, distinta fuente: deben coincidir (diferencia = céntimos, no miles) --
+{
+  const mv = parseMandatoNumber('2,011.51')   // mandato US
+  const av = parseAsientoNumber('2.011,51')   // asiento CO
+  assert(Math.abs(mv - av) < 0.001, `mismo valor US vs CO: |${mv} - ${av}| ≈ 0 (no diferencia de miles)`)
+}
 
 // 1) STRADA / La Reserva — el emparejamiento por palabra completa NO debe sumar Estrada.
 const TAG = 'MINIGRANJA SOLAR LA RESERVA'
@@ -34,14 +61,37 @@ const resEstrada = reconciliar({ mandante: 'INVERSIONES ESTRADA ARBELAEZ Y CIA S
 assert(resEstrada.sums.mant === 2655667, `ESTRADA: suma mant = ${resEstrada.sums.mant} (esperado 2655667)`)
 
 // 2) extractMandate lee mandante/NIT/total del CUERPO del PDF.
+//    Montos en formato US del mandato (coma=miles, punto=decimal).
 const pdf = `CMU12345
 en calidad de mandatario, y STRADA ASOCIADOS S.A.S., con NIT. 900.123.456-7, en calidad de mandante, relacionado con el proyecto MINIGRANJA SOLAR LA RESERVA.
-MANTENIMIENTO $ 497.333
-VALOR A PAGAR $ 497.333`
+MANTENIMIENTO $ 497,333.00
+VALOR A PAGAR $ 497,333.00`
 const m = extractMandate(pdf, 'x-CMU12345.pdf')
 assert(m.mandante.includes('STRADA'), `extractMandate mandante = "${m.mandante}"`)
 assert(m.nit === '900.123.456-7', `extractMandate nit = "${m.nit}"`)
 assert(m.vals.mant === 497333 && m.total === 497333, `extractMandate mant=${m.vals.mant} total=${m.total}`)
+
+// 2b) REGRESIÓN del bug: un mandato con miles en formato US (comas) NO debe
+//     producir una diferencia falsa de millones contra un asiento del mismo valor.
+{
+  const pdfBug = `CMU9999
+en calidad de mandatario, y ACME S.A.S., con NIT. 900.000.000-0, en calidad de mandante, relacionado con el proyecto PLANTA DEMO.
+MANTENIMIENTO $ 2,011,510.00
+VALOR A PAGAR $ 2,011,510.00`
+  const mb = extractMandate(pdfBug, 'x-CMU9999.pdf')
+  assert(mb.vals.mant === 2011510, `regresión: mandato US 2,011,510.00 = ${mb.vals.mant} (esperado 2011510, NO 2.01)`)
+  // Asiento CO con el mismo valor real.
+  const asientoRows = [
+    ['Asiento contable', 'Asociado', 'Cuenta', 'Debe', 'Haber', 'Etiqueta', 'Cuenta analitica'],
+    ['AS9', 'ACME S A S', '28151002 Mantenimiento', '2.011.510,00', '0', 'x', 'PLANTA DEMO'],
+  ]
+  const { details: db } = parseAsientos(asientoRows)
+  const resBug = reconciliar(mb, db, 'PLANTA DEMO')
+  assert(Math.round(resBug.sums.mant) === 2011510, `regresión: asiento CO 2.011.510,00 = ${resBug.sums && resBug.sums.mant} (esperado 2011510)`)
+  const difMant = resBug.flags.find((f) => f.code === 'DIFERENCIA')
+  assert(!difMant, `regresión: NO debe haber DIFERENCIA falsa (fue: ${difMant && difMant.txt})`)
+  assert(resBug.status === 'ok', `regresión: status = ${resBug.status} (esperado ok — valores iguales)`)
+}
 
 // 3) parseAsientos + suggestTag.
 const rows = [
