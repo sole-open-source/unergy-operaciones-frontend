@@ -117,7 +117,7 @@ import Checkbox from 'primevue/checkbox'
 import Button from 'primevue/button'
 import { iniciarDescargaXM, consultarEstadoXM, agenteLocalNoDisponible } from '@/api/xm'
 
-const TIPOS = ['dspcttos', 'aenc', 'BalCttos', 'grip', 'arrpas', 'tgrl', 'trsd', 'cxcsb']
+const TIPOS = ['dspcttos', 'aenc', 'BalCttos', 'grip', 'arrpas', 'tgrl', 'trsd', 'cxcsb', 'tserv']
 const EXTENSIONES = ['txf', 'txr', 'tx1', 'tx2', 'tx3', 'tx4', 'tx5', 'tx6', 'tx7', 'tx8']
 const TIPOS_ENRIQUECIBLES = ['grip', 'arrpas', 'tgrl', 'cxcsb']
 const STORAGE_KEY = 'xm_credenciales_sesion'
