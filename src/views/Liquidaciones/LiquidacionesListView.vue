@@ -218,7 +218,7 @@ function toISOMonth(d) {
 
 async function loadProyectosOpciones() {
   try {
-    const { data } = await api.get('/proyectos', { params: { size: 200 } })
+    const { data } = await api.get('/proyectos', { params: { size: 500 } })
     proyectosOpciones.value = data.items || []
   } catch {
     proyectosOpciones.value = []

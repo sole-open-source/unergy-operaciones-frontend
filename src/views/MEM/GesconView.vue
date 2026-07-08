@@ -694,7 +694,7 @@ function confirmarEliminar(row) {
 const proyectos = ref([])
 async function cargarProyectos() {
   try {
-    const { data } = await api.get('/proyectos', { params: { size: 300 } })
+    const { data } = await api.get('/proyectos', { params: { size: 500 } })
     proyectos.value = (data.items ?? data).sort((a, b) =>
       a.nombre_comercial.localeCompare(b.nombre_comercial))
   } catch { /* silencioso */ }

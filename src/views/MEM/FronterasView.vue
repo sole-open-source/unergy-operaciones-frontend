@@ -20,6 +20,16 @@
       </template>
     </PageHeader>
 
+    <!-- Aviso: fronteras nuevas detectadas en Quoia -->
+    <div v-if="pendientesQuoia.length" class="rounded-xl px-4 py-3 flex items-center justify-between gap-3"
+         style="background: rgba(214,68,85,0.06); border: 1.5px solid rgba(214,68,85,0.25);">
+      <span class="text-sm font-medium" style="color: #D64455;">
+        <i class="pi pi-exclamation-triangle text-xs mr-1.5" />
+        {{ pendientesQuoia.length }} {{ pendientesQuoia.length === 1 ? 'frontera nueva detectada' : 'fronteras nuevas detectadas' }} en Quoia, sin registrar aquí
+      </span>
+      <Button label="Revisar" size="small" text style="color: #D64455;" @click="abrirPendientes" />
+    </div>
+
     <!-- Resumen Card -->
     <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
       <div v-for="stat in stats" :key="stat.label"
@@ -225,6 +235,36 @@
         <Button label="Cancelar" severity="secondary" text @click="showEdit = false" />
         <Button label="Guardar" :loading="saving" @click="saveFrontera" />
       </template>
+    </Dialog>
+
+    <!-- Pendientes de Quoia Dialog -->
+    <Dialog v-model:visible="showPendientesDialog" header="Fronteras nuevas en Quoia" modal class="w-full max-w-3xl">
+      <p class="text-sm mb-4" style="color: #6b5a8a;">
+        Estas fronteras existen en Quoia pero todavía no tienen fila aquí. Asígnales un proyecto para agregarlas,
+        o ignóralas si no aplican.
+      </p>
+      <div v-if="loadingPendientes" class="flex items-center justify-center py-8">
+        <i class="pi pi-spin pi-spinner text-2xl" style="color: #915BD8;" />
+      </div>
+      <div v-else-if="!pendientesQuoia.length" class="text-center py-8 text-sm" style="color: #9b89b5;">
+        No hay fronteras pendientes por revisar.
+      </div>
+      <div v-else class="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+        <div v-for="p in pendientesQuoia" :key="p.frt_code"
+          class="rounded-xl p-3 flex items-center gap-3" style="border: 1.5px solid #e8e0f0;">
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-semibold truncate" style="color: #2C2039;">{{ p.nombre_quoia }}</p>
+            <p class="text-xs font-mono" style="color: #9b89b5;">{{ p.frt_code }} · {{ p.categoria }}</p>
+          </div>
+          <Dropdown v-model="p._proyectoId" :options="proyectosAll" optionLabel="nombre_comercial" optionValue="id"
+            placeholder="Proyecto..." filter showClear class="w-64" />
+          <Button icon="pi pi-check" label="Agregar" size="small"
+            :loading="p._loading === 'confirmar'" :disabled="!p._proyectoId"
+            @click="confirmarPendiente(p)" style="background: #915BD8; border-color: #915BD8;" />
+          <Button icon="pi pi-times" text severity="secondary" size="small"
+            :loading="p._loading === 'ignorar'" @click="ignorarPendiente(p)" v-tooltip="'Ignorar'" />
+        </div>
+      </div>
     </Dialog>
   </div>
 </template>
@@ -534,7 +574,7 @@ function deleteFrontera(f) {
 async function loadData() {
   loading.value = true
   try {
-    const { data } = await api.get('/fronteras')
+    const { data } = await api.get('/fronteras', { params: { limit: 500 } })
     fronteras.value = data
   } catch (e) {
     console.error('Error loading fronteras:', e)
@@ -543,5 +583,76 @@ async function loadData() {
   }
 }
 
-onMounted(loadData)
+// ── Fronteras pendientes de Quoia (detectar + confirmar manual) ────────────────
+const pendientesQuoia = ref([])
+const loadingPendientes = ref(false)
+const showPendientesDialog = ref(false)
+const proyectosAll = ref([])
+
+async function loadPendientesQuoia() {
+  try {
+    const { data } = await api.get('/fronteras/quoia/pendientes')
+    pendientesQuoia.value = data.map(p => ({ ...p, _proyectoId: p.proyecto_sugerido_id ?? null, _loading: null }))
+  } catch (e) {
+    // Gaia sin configurar u otro error -- no bloquea la vista, solo no se muestra el aviso.
+    pendientesQuoia.value = []
+  }
+}
+
+async function loadProyectosAll() {
+  if (proyectosAll.value.length) return
+  try {
+    const { data } = await api.get('/proyectos', { params: { size: 500 } })
+    proyectosAll.value = data.items ?? []
+  } catch {
+    proyectosAll.value = []
+  }
+}
+
+function abrirPendientes() {
+  showPendientesDialog.value = true
+  loadingPendientes.value = true
+  Promise.all([loadPendientesQuoia(), loadProyectosAll()]).finally(() => { loadingPendientes.value = false })
+}
+
+async function confirmarPendiente(p) {
+  p._loading = 'confirmar'
+  try {
+    await api.post(`/fronteras/quoia/pendientes/${p.frt_code}/confirmar`, { proyecto_id: p._proyectoId })
+    pendientesQuoia.value = pendientesQuoia.value.filter(x => x.frt_code !== p.frt_code)
+    toast.add({ severity: 'success', summary: 'Frontera agregada', life: 2500 })
+    await loadData()
+  } catch (e) {
+    toast.add({ severity: 'error', summary: 'Error', detail: e.response?.data?.detail || 'No se pudo agregar la frontera', life: 4000 })
+  } finally {
+    p._loading = null
+  }
+}
+
+function ignorarPendiente(p) {
+  confirm.require({
+    message: `¿Ignorar "${p.nombre_quoia}" (${p.frt_code})? No volverá a aparecer como pendiente.`,
+    header: 'Ignorar frontera de Quoia',
+    icon: 'pi pi-exclamation-triangle',
+    rejectProps: { label: 'Cancelar', severity: 'secondary' },
+    acceptProps: { label: 'Ignorar', severity: 'danger' },
+    accept: async () => {
+      p._loading = 'ignorar'
+      try {
+        await api.post(`/fronteras/quoia/pendientes/${p.frt_code}/ignorar`, {})
+        pendientesQuoia.value = pendientesQuoia.value.filter(x => x.frt_code !== p.frt_code)
+        toast.add({ severity: 'success', summary: 'Ignorada', life: 2000 })
+      } catch (e) {
+        toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo ignorar', life: 4000 })
+      } finally {
+        p._loading = null
+      }
+    },
+  })
+}
+
+onMounted(() => {
+  loadData()
+  loadPendientesQuoia()
+})
 </script>

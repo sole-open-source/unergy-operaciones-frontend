@@ -427,8 +427,8 @@ onMounted(async () => {
   loadingProyectos.value = true
   try {
     const [r1, r2] = await Promise.allSettled([
-      api.get('/proyectos', { params: { limit: 500 } }),
-      api.get('/proyectos', { params: { limit: 500, tipo_proyecto: 'minigranja' } }),
+      api.get('/proyectos', { params: { size: 500 } }),
+      api.get('/proyectos', { params: { size: 500, tipo_proyecto: 'minigranja' } }),
     ])
     const lista1 = r1.status === 'fulfilled' ? (Array.isArray(r1.value.data) ? r1.value.data : (r1.value.data.items ?? [])) : []
     const lista2 = r2.status === 'fulfilled' ? (Array.isArray(r2.value.data) ? r2.value.data : (r2.value.data.items ?? [])) : []

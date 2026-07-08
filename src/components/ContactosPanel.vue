@@ -19,7 +19,7 @@
       </div>
 
       <div v-for="c in porTipo[tipo.value]" :key="c.id" class="flex items-center gap-2">
-        <div class="flex-1 relative">
+        <div class="flex-[2] relative">
           <i class="pi pi-envelope absolute left-3 top-1/2 -translate-y-1/2 text-xs" style="color: #9b89b5;" />
           <input v-model="c.email" type="email" placeholder="correo@empresa.com"
             @blur="guardarContacto(c)"
@@ -28,7 +28,7 @@
         </div>
         <input v-model="c.nombre" type="text" placeholder="Nombre (opcional)"
           @blur="guardarContacto(c)"
-          class="w-40 px-3 py-2 text-sm rounded-lg outline-none"
+          class="flex-1 px-3 py-2 text-sm rounded-lg outline-none"
           style="border:1.5px solid #e8e0f0;background:#fff;" />
         <button type="button" @click="enviarPrueba(c.email)" :disabled="!emailValido(c.email)"
           title="Enviar correo de prueba"
@@ -42,7 +42,7 @@
       </div>
 
       <div v-if="nuevoTipo === tipo.value" class="flex items-center gap-2">
-        <div class="flex-1 relative">
+        <div class="flex-[2] relative">
           <i class="pi pi-envelope absolute left-3 top-1/2 -translate-y-1/2 text-xs" style="color: #9b89b5;" />
           <input v-model="nuevo.email" type="email" placeholder="correo@empresa.com" autofocus
             @keyup.enter="crearContacto"
@@ -51,7 +51,7 @@
         </div>
         <input v-model="nuevo.nombre" type="text" placeholder="Nombre (opcional)"
           @keyup.enter="crearContacto"
-          class="w-40 px-3 py-2 text-sm rounded-lg outline-none"
+          class="flex-1 px-3 py-2 text-sm rounded-lg outline-none"
           style="border:1.5px solid #e8e0f0;background:#fff;" />
         <button type="button" @click="crearContacto" class="p-1.5 rounded-lg hover:bg-green-50">
           <i class="pi pi-check text-xs" style="color: #16a34a;" />
