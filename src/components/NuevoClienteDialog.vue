@@ -22,21 +22,31 @@
       </div>
 
       <div class="border-t border-gray-100 pt-3">
-        <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
-          Documentos <span class="normal-case font-normal">(links de Google Drive)</span>
+        <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">
+          Documentos
+        </p>
+        <p class="text-xs text-gray-400 mb-3">
+          Sube los archivos de forma segura a la nube de Unergy (PDF, JPG, PNG o WEBP · máx. {{ maxSizeMb }} MB).
         </p>
         <div class="space-y-3">
-          <div class="flex flex-col gap-1">
-            <label class="field-label">RUT</label>
-            <InputText v-model="form.rut_url" class="w-full" placeholder="https://drive.google.com/…" />
-          </div>
-          <div class="flex flex-col gap-1">
-            <label class="field-label">Cámara de comercio</label>
-            <InputText v-model="cc_url" class="w-full" placeholder="https://drive.google.com/…" />
-          </div>
-          <div class="flex flex-col gap-1">
-            <label class="field-label">Certificación bancaria</label>
-            <InputText v-model="cert_url" class="w-full" placeholder="https://drive.google.com/…" />
+          <div v-for="doc in documentos" :key="doc.tipo" class="flex flex-col gap-1">
+            <label class="field-label">{{ doc.label }}</label>
+            <div class="flex items-center gap-2">
+              <label class="doc-btn">
+                <i class="pi pi-upload text-xs" />
+                {{ doc.file ? 'Cambiar' : 'Seleccionar archivo' }}
+                <input type="file" :accept="accept" class="hidden"
+                  @change="onSelect(doc, $event)" />
+              </label>
+              <template v-if="doc.file">
+                <span class="text-sm truncate max-w-[220px]" style="color: #2C2039;">{{ doc.file.name }}</span>
+                <button type="button" class="text-red-400 hover:text-red-600 shrink-0"
+                  @click="quitarArchivo(doc)" aria-label="Quitar archivo">
+                  <i class="pi pi-times text-xs" />
+                </button>
+              </template>
+              <span v-else class="text-sm" style="color: #bba8d4;">Sin archivo</span>
+            </div>
           </div>
         </div>
       </div>
@@ -55,22 +65,65 @@ import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
+import { useToast } from 'primevue/usetoast'
 import api from '@/api/client'
+import {
+  uploadClienteDocumento,
+  validarArchivo,
+  DOCUMENTO_ACCEPT,
+  DOCUMENTO_MAX_SIZE,
+} from '@/services/documentService'
 
 defineProps({ visible: Boolean })
 const emit = defineEmits(['update:visible', 'creado'])
 
+const toast = useToast()
+const accept = DOCUMENTO_ACCEPT
+const maxSizeMb = DOCUMENTO_MAX_SIZE / 1024 / 1024
+
 const guardando = ref(false)
 const errores = reactive({})
-const cc_url = ref('')
-const cert_url = ref('')
 
 const form = reactive({
   razon_social_nombre: '',
   nit_cedula: '',
   tipo_persona: null,
-  rut_url: '',
 })
+
+// Documentos de identificación. Cada uno conserva su `tipo` porque el backend
+// requiere categorizar el documento (rut / camara_comercio / certificado_bancario).
+const documentos = reactive([
+  { tipo: 'rut', nombre: 'RUT', label: 'RUT', file: null },
+  { tipo: 'camara_comercio', nombre: 'Cámara de comercio', label: 'Cámara de comercio', file: null },
+  { tipo: 'certificado_bancario', nombre: 'Certificación bancaria', label: 'Certificación bancaria', file: null },
+])
+
+function onSelect(doc, e) {
+  const file = e.target.files?.[0] || null
+  // Permite reseleccionar el mismo archivo más tarde.
+  e.target.value = ''
+  if (!file) return
+
+  const error = validarArchivo(file)
+  if (error) {
+    toast.add({ severity: 'warn', summary: 'Archivo no válido', detail: `${doc.label}: ${error}`, life: 5000 })
+    return
+  }
+  doc.file = file
+}
+
+function quitarArchivo(doc) {
+  doc.file = null
+}
+
+function resetForm() {
+  form.razon_social_nombre = ''
+  form.nit_cedula = ''
+  form.tipo_persona = null
+  documentos.forEach(d => { d.file = null })
+  errores.nombre = null
+  errores.nit = null
+}
 
 async function guardar() {
   errores.nombre = form.razon_social_nombre.trim() ? null : 'Campo obligatorio'
@@ -83,25 +136,37 @@ async function guardar() {
       razon_social_nombre: form.razon_social_nombre.trim(),
       nit_cedula: form.nit_cedula.trim(),
       tipo_persona: form.tipo_persona,
-      rut_url: form.rut_url.trim() || null,
     })
 
-    const docs = [
-      { tipo: 'camara_comercio', url: cc_url.value.trim(), nombre: 'Cámara de comercio' },
-      { tipo: 'certificado_bancario', url: cert_url.value.trim(), nombre: 'Certificación bancaria' },
-    ].filter(d => d.url)
+    // Subir los archivos seleccionados al almacenamiento seguro de Unergy.
+    const pendientes = documentos.filter(d => d.file)
+    const fallidos = []
+    for (const doc of pendientes) {
+      try {
+        await uploadClienteDocumento(cliente.id, {
+          tipo: doc.tipo,
+          nombre: doc.nombre,
+          file: doc.file,
+        })
+      } catch (err) {
+        fallidos.push(doc.label)
+      }
+    }
 
-    for (const d of docs) {
-      await api.post(`/clientes/${cliente.id}/documentos`, {
-        tipo: d.tipo,
-        nombre: d.nombre,
-        archivo_url: d.url,
-        estado: 'aceptado',
+    if (fallidos.length) {
+      toast.add({
+        severity: 'warn',
+        summary: 'Cliente creado con advertencias',
+        detail: `No se pudo subir: ${fallidos.join(', ')}. Puedes reintentarlo desde la ficha del cliente.`,
+        life: 6000,
       })
+    } else {
+      toast.add({ severity: 'success', summary: 'Cliente creado', life: 3000 })
     }
 
     emit('creado', cliente)
     emit('update:visible', false)
+    resetForm()
   } catch (e) {
     errores.nombre = e.response?.data?.detail || e.message
   } finally {
@@ -112,4 +177,9 @@ async function guardar() {
 
 <style scoped>
 .field-label { @apply block text-xs font-medium text-gray-600 mb-1; }
+.doc-btn {
+  @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium
+    text-gray-700 bg-gray-50 border border-gray-200 cursor-pointer whitespace-nowrap
+    hover:bg-gray-100 transition-colors shrink-0;
+}
 </style>
