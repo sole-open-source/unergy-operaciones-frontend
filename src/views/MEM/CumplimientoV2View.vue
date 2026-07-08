@@ -954,9 +954,15 @@
               </span>
             </div>
             <div class="divide-y" style="border-color: rgba(44,32,57,0.05);">
-              <div v-for="p in pcPools.bolsa_venta_ungc" :key="p.id" class="px-4 py-2.5 flex items-center gap-2 text-sm font-medium" style="color: #2C2039;">
-                <span>{{ p.nombre }}</span>
-                <span v-if="p.codigo_sic" class="text-xs font-mono px-1.5 py-0.5 rounded" style="background: rgba(44,32,57,0.06); color: #7a6e8a;">{{ p.codigo_sic }}</span>
+              <div v-for="p in pcPools.bolsa_venta_ungc" :key="p.id" class="px-4 py-2.5 text-sm font-medium" style="color: #2C2039;">
+                <div class="flex items-center gap-2">
+                  <span>{{ p.nombre }}</span>
+                  <span v-if="p.codigo_sic" class="text-xs font-mono px-1.5 py-0.5 rounded" style="background: rgba(44,32,57,0.06); color: #7a6e8a;">{{ p.codigo_sic }}</span>
+                </div>
+                <div v-if="ventanaBolsa(p)" class="text-xs mt-0.5" style="color: #7a6e8a;"
+                     v-tooltip.right="'Vigencia del registro SIC con comprador UNGC que pone la planta en esta modalidad'">
+                  <i class="pi pi-calendar" style="font-size: 10px;" /> {{ ventanaBolsa(p) }}
+                </div>
               </div>
             </div>
           </div>
@@ -2616,6 +2622,19 @@ function fmtFecha(iso) {
   if (!iso) return '—'
   const [y, m] = iso.split('-')
   return `${MESES_CORTOS[parseInt(m) - 1]} ${y}`
+}
+function fmtFechaDia(iso) {
+  if (!iso) return '—'
+  const [y, m, d] = iso.split('-')
+  return `${d} ${MESES_CORTOS[parseInt(m) - 1].toLowerCase()} ${y}`
+}
+// Ventana de la modalidad Venta en Bolsa (UNGC): fecha_inicio del registro SIC
+// y fecha_fin EFECTIVA (recortada por relevos) que envía el backend.
+function ventanaBolsa(p) {
+  if (!p.fecha_inicio && !p.fecha_fin) return ''
+  if (!p.fecha_fin) return `En bolsa UNGC desde ${fmtFechaDia(p.fecha_inicio)} · vigente`
+  if (!p.fecha_inicio) return `En bolsa UNGC hasta ${fmtFechaDia(p.fecha_fin)}`
+  return `En bolsa UNGC del ${fmtFechaDia(p.fecha_inicio)} al ${fmtFechaDia(p.fecha_fin)}`
 }
 
 // ── Helpers de barras de cumplimiento (simulador) ─────────────────────────────
