@@ -727,10 +727,11 @@
         <!-- a. PPA Venta (UNGG) -->
         <template v-if="pcMode === 'ppa_venta_ungg'">
           <div v-for="c in pcPools.ppa_venta_ungg" :key="c.id" class="cv-card">
-            <div class="px-4 py-3 flex items-center justify-between"
-              style="background: rgba(145,91,216,0.04); border-bottom: 1px solid rgba(44,32,57,0.07);">
-              <div class="cursor-pointer" @click="abrirDetalleContrato(c, 'ppa_venta_ungg')"
-                v-tooltip.right="'Ver detalle del contrato (PPA + GESCON)'">
+            <div class="px-4 py-3 flex items-center justify-between cv-row-click"
+              style="background: rgba(145,91,216,0.04); border-bottom: 1px solid rgba(44,32,57,0.07);"
+              @click="abrirDetalleContrato(c, 'ppa_venta_ungg')"
+              v-tooltip.right="'Ver detalle del contrato (PPA + GESCON)'">
+              <div>
                 <span class="font-bold text-sm" style="color: #2C2039;">{{ c.nombre }}</span>
                 <span class="ml-2 text-xs" style="color: #7a6e8a;">{{ c.comprador_nombre }}</span>
                 <i class="pi pi-info-circle ml-1.5" style="font-size: 11px; color: #9b89b5;" />
@@ -741,7 +742,7 @@
                   {{ c.plantas.length }} plantas
                 </span>
                 <button
-                  @click="copiarImagenVenta(c)"
+                  @click.stop="copiarImagenVenta(c)"
                   class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors"
                   :style="copiadoVentaId === c.id ? 'background: rgba(46,125,50,0.12); color: #2e7d32;' : 'background: #915BD8; color: white;'"
                   v-tooltip.left="'Copia la imagen al portapapeles (o la descarga si el navegador no lo permite)'"
@@ -752,8 +753,10 @@
               </div>
             </div>
             <div v-if="c.plantas.length" class="divide-y" style="border-color: rgba(44,32,57,0.05);">
-              <div v-for="p in c.plantas" :key="p.id" class="px-4 py-2.5 flex items-center justify-between text-sm"
-                :style="p.es_duplicado ? 'background: rgba(240,192,64,0.08);' : ''">
+              <div v-for="p in c.plantas" :key="p.id" class="px-4 py-2.5 flex items-center justify-between text-sm cv-row-click"
+                :style="p.es_duplicado ? 'background: rgba(240,192,64,0.08);' : ''"
+                @click="abrirDetalleContrato(c, 'ppa_venta_ungg')"
+                v-tooltip.left="'Ver detalle del contrato (PPA + GESCON)'">
                 <div class="flex items-center gap-2">
                   <span class="font-medium" style="color: #2C2039;">{{ p.nombre }}</span>
                   <span v-if="p.es_duplicado" class="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded"
@@ -781,10 +784,11 @@
             No hay contratos de compra vigentes en {{ MESES[pcMonth - 1] }} {{ pcYear }}
           </div>
           <div v-for="c in pcPools.ppa_compra_ungc" :key="c.id" class="cv-card-gold">
-            <div class="px-4 py-3 flex items-center justify-between"
-              style="background: rgba(240,192,64,0.08); border-bottom: 1px solid rgba(240,192,64,0.2);">
-              <div class="cursor-pointer" @click="abrirDetalleContrato(c, 'ppa_compra_ungc')"
-                v-tooltip.right="'Ver detalle del contrato (PPA + GESCON)'">
+            <div class="px-4 py-3 flex items-center justify-between cv-row-click"
+              style="background: rgba(240,192,64,0.08); border-bottom: 1px solid rgba(240,192,64,0.2);"
+              @click="abrirDetalleContrato(c, 'ppa_compra_ungc')"
+              v-tooltip.right="'Ver detalle del contrato (PPA + GESCON)'">
+              <div>
                 <span class="font-bold text-sm" style="color: #9a6700;">{{ c.nombre }}</span>
                 <span class="ml-2 text-xs" style="color: #7a6e8a;">Vendedor: {{ c.vendedor_nombre }}</span>
                 <i class="pi pi-info-circle ml-1.5" style="font-size: 11px; color: #9b89b5;" />
@@ -795,7 +799,9 @@
               </span>
             </div>
             <div v-if="c.plantas.length" class="divide-y" style="border-color: rgba(44,32,57,0.05);">
-              <div v-for="p in c.plantas" :key="p.id" class="px-4 py-2.5 flex items-center justify-between text-sm">
+              <div v-for="p in c.plantas" :key="p.id" class="px-4 py-2.5 flex items-center justify-between text-sm cv-row-click"
+                @click="abrirDetalleContrato(c, 'ppa_compra_ungc')"
+                v-tooltip.left="'Ver detalle del contrato (PPA + GESCON)'">
                 <span class="font-medium" style="color: #2C2039;">{{ p.nombre }}</span>
                 <div class="text-xs font-mono text-right" style="color: #7a6e8a;">
                   <span v-if="p.fecha_inicio">{{ p.fecha_inicio }}</span>
@@ -825,10 +831,11 @@
             <span class="text-xs">Se registran en el módulo PPA con tipo de contrato «compra» (sin código GESCON).</span>
           </div>
           <div v-for="c in pcPools.ppa_compra_externa" :key="c.id" class="cv-card-gold">
-            <div class="px-4 py-3 flex items-center justify-between"
-              style="background: rgba(240,192,64,0.08); border-bottom: 1px solid rgba(240,192,64,0.2);">
-              <div class="cursor-pointer" @click="abrirDetalleContrato(c, 'ppa_compra_externa')"
-                v-tooltip.right="'Ver detalle del contrato PPA'">
+            <div class="px-4 py-3 flex items-center justify-between cv-row-click"
+              style="background: rgba(240,192,64,0.08); border-bottom: 1px solid rgba(240,192,64,0.2);"
+              @click="abrirDetalleContrato(c, 'ppa_compra_externa')"
+              v-tooltip.right="'Ver detalle del contrato PPA'">
+              <div>
                 <span class="font-bold text-sm" style="color: #9a6700;">{{ c.nombre }}</span>
                 <span class="ml-2 text-xs" style="color: #7a6e8a;">
                   Le compramos a: <span class="font-semibold" style="color: #2C2039;">{{ c.vendedor_nombre || '—' }}</span>
@@ -851,7 +858,9 @@
               </div>
             </div>
             <div v-if="c.plantas.length" class="divide-y" style="border-color: rgba(44,32,57,0.05);">
-              <div v-for="p in c.plantas" :key="p.id" class="px-4 py-2.5 flex items-center justify-between text-sm">
+              <div v-for="p in c.plantas" :key="p.id" class="px-4 py-2.5 flex items-center justify-between text-sm cv-row-click"
+                @click="abrirDetalleContrato(c, 'ppa_compra_externa')"
+                v-tooltip.left="'Ver detalle del contrato PPA'">
                 <span class="font-medium" style="color: #2C2039;">{{ p.nombre }}</span>
                 <div class="text-xs font-mono text-right" style="color: #7a6e8a;">
                   <span v-if="p.fecha_inicio">{{ p.fecha_inicio }}</span>
@@ -876,10 +885,11 @@
             </div>
           </div>
           <div v-for="c in pcPools.bolsa_compra_ungg" :key="c.id" class="cv-card-gold">
-            <div class="px-4 py-3 flex items-center justify-between"
-              style="background: rgba(240,192,64,0.08); border-bottom: 1px solid rgba(240,192,64,0.2);">
-              <div class="cursor-pointer" @click="abrirDetalleContrato(c, 'bolsa_compra_ungg')"
-                v-tooltip.right="'Ver detalle del contrato (PPA + GESCON)'">
+            <div class="px-4 py-3 flex items-center justify-between cv-row-click"
+              style="background: rgba(240,192,64,0.08); border-bottom: 1px solid rgba(240,192,64,0.2);"
+              @click="abrirDetalleContrato(c, 'bolsa_compra_ungg')"
+              v-tooltip.right="'Ver detalle del contrato (PPA + GESCON)'">
+              <div>
                 <span class="font-bold text-sm" style="color: #9a6700;">{{ c.nombre }}</span>
                 <span class="ml-2 text-xs" style="color: #7a6e8a;">compra en bolsa para cumplir este contrato · {{ c.comprador_nombre }}</span>
                 <i class="pi pi-info-circle ml-1.5" style="font-size: 11px; color: #9b89b5;" />
@@ -889,7 +899,9 @@
               </span>
             </div>
             <div class="divide-y" style="border-color: rgba(44,32,57,0.05);">
-              <div v-for="p in c.plantas" :key="p.id" class="px-4 py-2.5 flex items-center justify-between text-sm">
+              <div v-for="p in c.plantas" :key="p.id" class="px-4 py-2.5 flex items-center justify-between text-sm cv-row-click"
+                @click="abrirDetalleContrato(c, 'bolsa_compra_ungg')"
+                v-tooltip.left="'Ver detalle del contrato (PPA + GESCON)'">
                 <div class="flex items-center gap-2">
                   <i class="pi pi-shopping-cart" style="font-size: 10px; color: #9a6700;" />
                   <span class="font-medium" style="color: #2C2039;">{{ p.nombre }}</span>
@@ -931,7 +943,9 @@
               </span>
             </div>
             <div class="divide-y" style="border-color: rgba(44,32,57,0.05);">
-              <div v-for="p in pcPools.bolsa_venta_ungg" :key="p.id" class="px-4 py-2.5 text-sm font-medium" style="color: #2C2039;">
+              <div v-for="p in pcPools.bolsa_venta_ungg" :key="p.id" class="px-4 py-2.5 text-sm font-medium cv-row-click" style="color: #2C2039;"
+                @click="abrirDetallePlanta(p, 'bolsa_venta_ungg')"
+                v-tooltip.left="'Ver historial GESCON de la planta'">
                 {{ p.nombre }}
               </div>
             </div>
@@ -954,7 +968,9 @@
               </span>
             </div>
             <div class="divide-y" style="border-color: rgba(44,32,57,0.05);">
-              <div v-for="p in pcPools.bolsa_venta_ungc" :key="p.id" class="px-4 py-2.5 text-sm font-medium" style="color: #2C2039;">
+              <div v-for="p in pcPools.bolsa_venta_ungc" :key="p.id" class="px-4 py-2.5 text-sm font-medium cv-row-click" style="color: #2C2039;"
+                @click="abrirDetallePlanta(p, 'bolsa_venta_ungc')"
+                v-tooltip.left="'Ver detalle GESCON de la planta'">
                 <div class="flex items-center gap-2">
                   <span>{{ p.nombre }}</span>
                   <span v-if="p.codigo_sic" class="text-xs font-mono px-1.5 py-0.5 rounded" style="background: rgba(44,32,57,0.06); color: #7a6e8a;">{{ p.codigo_sic }}</span>
@@ -1503,14 +1519,15 @@
                 </table>
               </div>
               <div v-else class="px-4 py-4 text-xs text-center rounded-lg border" style="color: rgba(44,32,57,0.35); border-color: rgba(44,32,57,0.08);">
-                Sin registros GESCON para este contrato{{ detalleContrato.modo === 'ppa_compra_externa' ? ' — es una compra directa fuera del MEM' : '' }}
+                <template v-if="detalleContrato.c._proyecto_id">Sin registros GESCON para esta planta — vende en bolsa como generador</template>
+                <template v-else>Sin registros GESCON para este contrato{{ detalleContrato.modo === 'ppa_compra_externa' ? ' — es una compra directa fuera del MEM' : '' }}</template>
               </div>
             </div>
 
             <!-- 5. Plantas del mes consultado (lo que ve la piscina) -->
             <div v-if="detalleContrato.c.plantas?.length">
               <p class="text-xs font-bold uppercase tracking-widest mb-2" style="color: #915BD8;">
-                Plantas en el contrato · {{ MESES[pcMonth - 1] }} {{ pcYear }} ({{ detalleContrato.c.plantas.length }})
+                {{ detalleContrato.c._proyecto_id ? 'Planta consultada' : 'Plantas en el contrato' }} · {{ MESES[pcMonth - 1] }} {{ pcYear }} ({{ detalleContrato.c.plantas.length }})
               </p>
               <div class="rounded-lg border divide-y" style="border-color: rgba(44,32,57,0.10);">
                 <div v-for="p in detalleContrato.c.plantas" :key="p.id" class="px-3 py-2 flex items-center justify-between text-sm">
@@ -1816,6 +1833,8 @@ const DC_TIPOS = {
   ppa_compra_ungc:    { label: 'Compra PPA · UNGC',  bg: 'rgba(240,192,64,0.18)', color: '#9a6700' },
   ppa_compra_externa: { label: 'Compra externa (fuera de GESCON)', bg: 'rgba(240,192,64,0.18)', color: '#9a6700' },
   bolsa_compra_ungg:  { label: 'Compra en bolsa · UNGG', bg: 'rgba(240,192,64,0.18)', color: '#9a6700' },
+  bolsa_venta_ungg:   { label: 'Venta en bolsa · UNGG', bg: 'rgba(44,32,57,0.08)', color: '#2C2039' },
+  bolsa_venta_ungc:   { label: 'Venta en bolsa · UNGC', bg: 'rgba(44,32,57,0.08)', color: '#2C2039' },
 }
 const dcTipo = computed(() => DC_TIPOS[detalleContrato.value?.modo] || DC_TIPOS.ppa_venta_ungg)
 
@@ -1887,11 +1906,15 @@ async function abrirDetalleContrato(c, modo) {
     if (ppaId) {
       try { ppa = (await client.get(`/ppa/${ppaId}`)).data } catch { ppa = null }
     }
-    // 2) Registros GESCON del contrato (por contrato_interno; fallback por SIC)
+    // 2) Registros GESCON del contrato (por contrato_interno; fallback por SIC;
+    //    último fallback: historial GESCON de la planta, para capas sin contrato)
     let gescon = []
     const ci = c.numero_codigo_contrato || c.contrato_interno || ppa?.numero_codigo_contrato
     if (ci) {
       try { gescon = (await client.get('/asic', { params: { contrato_interno: ci } })).data } catch { gescon = [] }
+    }
+    if (!gescon.length && c._proyecto_id) {
+      try { gescon = (await client.get('/asic', { params: { proyecto_id: c._proyecto_id } })).data } catch { /* sin fallback */ }
     }
     if (!gescon.length && modo !== 'ppa_compra_externa') {
       const sic = (c.plantas || []).find(p => p.codigo_sic)?.codigo_sic
@@ -1902,12 +1925,30 @@ async function abrirDetalleContrato(c, modo) {
     // Vigentes primero, luego por fecha de inicio descendente
     gescon.sort((a, b) => (b.es_version_vigente === true) - (a.es_version_vigente === true)
       || String(b.fecha_inicio || '').localeCompare(String(a.fecha_inicio || '')))
+    // 3) Contrato actual desde GESCON: si la capa no traía PPA, el registro
+    //    vigente puede apuntar al contrato con contrato_ppa_id
+    if (!ppa) {
+      const vig = gescon.find(r => r.es_version_vigente && r.contrato_ppa_id)
+      if (vig) {
+        try { ppa = (await client.get(`/ppa/${vig.contrato_ppa_id}`)).data } catch { ppa = null }
+      }
+    }
     dcPpa.value = ppa
     dcGescon.value = gescon
-    if (!ppa && !gescon.length) dcError.value = 'No se encontraron datos: el contrato no está en el módulo PPA ni tiene registros GESCON.'
+    if (!ppa && !gescon.length) {
+      dcError.value = c._proyecto_id
+        ? 'No se encontraron datos: la planta no tiene registros GESCON ni contrato en el módulo PPA.'
+        : 'No se encontraron datos: el contrato no está en el módulo PPA ni tiene registros GESCON.'
+    }
   } finally {
     dcLoading.value = false
   }
+}
+// Detalle desde una capa de PLANTA (piscinas e/f, sin tarjeta de contrato):
+// tarjeta sintética con la planta; abrirDetalleContrato resuelve GESCON por
+// SIC o por proyecto_id y el contrato actual desde el registro vigente.
+function abrirDetallePlanta(p, modo) {
+  abrirDetalleContrato({ id: null, nombre: p.nombre, plantas: [p], _proyecto_id: p.id }, modo)
 }
 function cerrarDetalleContrato() { detalleContrato.value = null }
 const pcCounts = computed(() => {
@@ -3667,6 +3708,9 @@ onMounted(async () => {
   transform: translateY(-2px);
 }
 .cv-card-dragover { border-color: #915BD8 !important; box-shadow: 0 0 0 2px rgba(145,91,216,0.18) !important; }
+/* Fila/encabezado que abre el detalle (ventana emergente) al hacer click */
+.cv-row-click { cursor: pointer; transition: background .12s; }
+.cv-row-click:hover { background: rgba(145,91,216,0.06); }
 .cv-panel {
   background: #fff; border: 1px solid rgba(44,32,57,0.07); border-radius: 16px;
   box-shadow: 0 1px 2px rgba(44,32,57,0.04), 0 2px 10px rgba(44,32,57,0.035);
