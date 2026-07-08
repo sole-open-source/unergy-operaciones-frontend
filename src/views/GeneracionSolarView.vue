@@ -123,7 +123,16 @@
       </div>
       <div class="gs-search-wrap">
         <i class="pi pi-search gs-search-icon" />
-        <input v-model="searchText" type="text" placeholder="Buscar proyecto..." class="gs-search-input" />
+        <AutoComplete
+          v-model="searchText"
+          :suggestions="projectSuggestions"
+          @complete="onSearchComplete"
+          :completeOnFocus="true"
+          :delay="0"
+          scrollHeight="280px"
+          placeholder="Buscar o seleccionar proyecto..."
+          class="gs-search-ac"
+          inputClass="gs-search-input" />
       </div>
     </div>
 
@@ -704,6 +713,7 @@ import {
 } from 'chart.js'
 import { Bar, Line } from 'vue-chartjs'
 import Dialog from 'primevue/dialog'
+import AutoComplete from 'primevue/autocomplete'
 import { useToast } from 'primevue/usetoast'
 import api from '@/api/client'
 import FallaForm from './Fallas/FallaForm.vue'
@@ -798,6 +808,20 @@ const filteredProjects = computed(() => {
 
   return list
 })
+
+// ── Buscador con autocompletado ──────────────────────────────────────────────
+// AutoComplete enlazado a searchText: escribir filtra en vivo (igual que antes),
+// enfocar/desplegar lista todos los proyectos para seleccionar. No cambia
+// filteredProjects; solo alimenta las sugerencias.
+const projectSuggestions = ref([])
+
+function onSearchComplete(e) {
+  const nombres = [...new Set(
+    (monitoringData.value?.projects || []).map(p => p.nombre).filter(Boolean)
+  )].sort((a, b) => a.localeCompare(b))
+  const q = (e.query || '').toLowerCase().trim()
+  projectSuggestions.value = q ? nombres.filter(n => n.toLowerCase().includes(q)) : nombres
+}
 
 // ── Chart data ────────────────────────────────────────────────────────────────
 const BRAND_PURPLE      = '#915BD8'
@@ -1925,6 +1949,33 @@ onUnmounted(() => {
 }
 
 .gs-search-input::placeholder {
+  color: #c4b5e0;
+}
+
+/* AutoComplete del buscador: mismo aspecto que el input anterior */
+.gs-search-ac {
+  width: 100%;
+  display: block;
+}
+
+.gs-search-ac :deep(input) {
+  width: 100%;
+  padding: 7px 12px 7px 32px;
+  border: 1px solid #e8e0f0;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #2C2039;
+  background: white;
+  outline: none;
+  transition: border-color 0.15s;
+  box-sizing: border-box;
+}
+
+.gs-search-ac :deep(input:focus) {
+  border-color: #915BD8;
+}
+
+.gs-search-ac :deep(input::placeholder) {
   color: #c4b5e0;
 }
 
