@@ -574,7 +574,7 @@ function deleteFrontera(f) {
 async function loadData() {
   loading.value = true
   try {
-    const { data } = await api.get('/fronteras')
+    const { data } = await api.get('/fronteras', { params: { limit: 500 } })
     fronteras.value = data
   } catch (e) {
     console.error('Error loading fronteras:', e)
