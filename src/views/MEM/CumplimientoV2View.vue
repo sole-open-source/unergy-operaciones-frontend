@@ -342,6 +342,12 @@
           </button>
         </div>
 
+        <!-- Filtro por offtaker (comprador del contrato) -->
+        <MultiSelect v-model="offtakersFiltro" :options="offtakerOpts" optionLabel="label" optionValue="value"
+                     filter :showToggleAll="false" placeholder="Todos los offtakers"
+                     :maxSelectedLabels="2" selectedItemsLabel="{0} offtakers" class="text-sm" style="min-width:12rem;"
+                     v-tooltip.bottom="'Filtrar contratos por offtaker (comprador)'" />
+
         <div class="flex-1"></div>
         <button @click="showNuevoForm = true" class="cv-btn-cta">
           <i class="pi pi-plus text-xs" />PPA nuevo
@@ -1710,6 +1716,20 @@ const ESTADO_FILTROS = [
   { key: 'excedente', label: 'Exposición en bolsa', color: '#14B8A6', tip: 'Excedente sobre el máximo o plantas duplicadas (compra en bolsa)' },
 ]
 function toggleEstadoFiltro(k) { estadoFiltro.value = estadoFiltro.value === k ? null : k }
+// Filtro por offtaker (comprador del contrato). Vacío = todos. Opciones derivadas
+// de los contratos cargados; '' agrupa los que no tienen comprador (ej. PPA nuevo).
+const offtakersFiltro = ref([])
+const offtakerOpts = computed(() => {
+  const nombres = new Set(allContratos.value.map(c => c.comprador_nombre || ''))
+  const opts = [...nombres].filter(Boolean).sort((a, b) => a.localeCompare(b, 'es'))
+    .map(n => ({ label: n, value: n }))
+  if (nombres.has('')) opts.push({ label: '(Sin offtaker)', value: '' })
+  return opts
+})
+function contratoMatchOfftaker(c) {
+  if (!offtakersFiltro.value.length) return true
+  return offtakersFiltro.value.includes(c.comprador_nombre || '')
+}
 // Exposición en bolsa = excedente (vende en bolsa) O plantas duplicadas (compra en bolsa,
 // genDup>0), aunque el contrato esté cumplido/déficit. Los demás estados son excluyentes.
 function contratoMatchEstado(r, key) {
@@ -2326,6 +2346,7 @@ const visibleContratos = computed(() => {
   const res = simResults.value
   const filtered = allContratos.value.filter(c => {
     if (hiddenContratos.value.has(c.id)) return false
+    if (!contratoMatchOfftaker(c)) return false
     if (estadoFiltro.value && !contratoMatchEstado(res[c.id], estadoFiltro.value)) return false
     return true
   })
@@ -2336,12 +2357,14 @@ const visibleContratos = computed(() => {
   })
 })
 
-// Conteo por estado (sobre los contratos no ocultos) para mostrar en los botones de filtro.
+// Conteo por estado (sobre los contratos no ocultos, respetando el filtro de
+// offtaker) para mostrar en los botones de filtro.
 const estadoCounts = computed(() => {
   const res = simResults.value
   const counts = { ok: 0, deficit: 0, excedente: 0 }
   for (const c of allContratos.value) {
     if (hiddenContratos.value.has(c.id)) continue
+    if (!contratoMatchOfftaker(c)) continue
     // Conteos por propiedad (no excluyentes: un contrato cumplido puede tener exposición).
     for (const k of ['ok', 'deficit', 'excedente']) {
       if (contratoMatchEstado(res[c.id], k)) counts[k]++
