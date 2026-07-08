@@ -29,11 +29,16 @@
         <!-- Filtro por proyecto -->
         <div class="sl-filter-wrap">
           <i class="pi pi-search sl-filter-icon" />
-          <input
+          <AutoComplete
             v-model="filtro"
-            type="text"
-            class="sl-filter-input"
-            placeholder="Buscar proyecto..."
+            :suggestions="projectSuggestions"
+            @complete="onFiltroComplete"
+            :completeOnFocus="true"
+            :delay="0"
+            scrollHeight="280px"
+            placeholder="Buscar o seleccionar proyecto..."
+            class="sl-filter-ac"
+            inputClass="sl-filter-input"
           />
           <i v-if="filtro" class="pi pi-times sl-filter-clear" @click="filtro = ''" />
         </div>
@@ -242,6 +247,7 @@ import {
 } from 'chart.js'
 import { Line } from 'vue-chartjs'
 import draggable from 'vuedraggable'
+import AutoComplete from 'primevue/autocomplete'
 import api from '@/api/client'
 import GeneracionView from '@/views/Operaciones/GeneracionView.vue'
 
@@ -272,6 +278,16 @@ function matchesFiltro(proy) {
 const sinCoincidencias = computed(() =>
   !!filtro.value.trim() && !proyectos.value.some(matchesFiltro)
 )
+
+// Sugerencias para el AutoComplete: escribir filtra en vivo (mismo filtro),
+// enfocar despliega la lista completa de proyectos para seleccionar.
+const projectSuggestions = ref([])
+function onFiltroComplete(e) {
+  const nombres = [...new Set((proyectos.value || []).map(p => p.nombre).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b))
+  const q = (e.query || '').toLowerCase().trim()
+  projectSuggestions.value = q ? nombres.filter(n => n.toLowerCase().includes(q)) : nombres
+}
 
 // ── Generación de hoy ──────────────────────────────────────────────────────
 const genHoyMap  = reactive({})   // proyecto_id → { kwh_real, fuente }
@@ -632,6 +648,14 @@ onUnmounted(() => {
 }
 .sl-filter-input:focus { border-color: #915BD8; }
 .sl-filter-input::placeholder { color: #9ca3af; }
+/* AutoComplete del filtro: mismo aspecto que el input anterior */
+.sl-filter-ac :deep(input) {
+  width: 200px; padding: 7px 28px 7px 30px; border-radius: 8px; border: 1px solid #e5e7eb;
+  background: #fff; font-size: 13px; font-family: inherit; color: #2C2039; outline: none;
+  transition: border-color 0.15s;
+}
+.sl-filter-ac :deep(input:focus) { border-color: #915BD8; }
+.sl-filter-ac :deep(input::placeholder) { color: #9ca3af; }
 .sl-filter-clear { position: absolute; right: 10px; font-size: 11px; color: #9ca3af; cursor: pointer; }
 .sl-filter-clear:hover { color: #6b5a8a; }
 
