@@ -427,8 +427,8 @@
                     style="color: #915BD8;"
                   />
                   <div class="min-w-0">
-                    <div class="flex items-center gap-1.5">
-                      <span class="font-bold text-sm truncate" style="color: #2C2039;">{{ c.nombre }}</span>
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                      <span class="font-bold text-sm break-words" style="color: #2C2039;">{{ c.nombre }}</span>
                       <span v-if="c._ficticio" class="text-xs px-1.5 py-0.5 rounded font-medium flex-shrink-0" style="background: rgba(240,192,64,0.18); color: #9a6700;">Nuevo</span>
                       <span v-if="simResults[c.id]?.plantasEsp != null"
                         class="text-xs font-semibold px-1.5 py-0.5 rounded flex-shrink-0"
@@ -546,22 +546,6 @@
                   </div>
                 </div>
 
-                <!-- Cumplimiento de plantas: inscritas = registradas y despachando vía GESCON (numerador) / plantas contrato exigidas (denominador) -->
-                <div v-if="simResults[c.id].plantasEsp != null" class="mt-3 pt-3 border-t" style="border-color: rgba(44,32,57,0.07);">
-                  <div class="flex items-center justify-between mb-1.5">
-                    <span class="text-[10px] font-semibold uppercase tracking-wide" style="color: #7a6e8a;">Plantas inscritas / contrato</span>
-                    <div class="flex items-center gap-1.5">
-                      <span class="font-mono text-xs font-bold" style="color: #2C2039;">{{ simResults[c.id].plantasReg }} / {{ simResults[c.id].plantasEsp }}</span>
-                      <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap" :style="estadoBadge(simResults[c.id].estadoPlantas)">
-                        {{ estadoLabel(simResults[c.id].estadoPlantas) }}
-                      </span>
-                    </div>
-                  </div>
-                  <div class="relative rounded-md overflow-hidden" style="height: 8px; background: rgba(44,32,57,0.06);">
-                    <div class="absolute inset-y-0 left-0 rounded-sm transition-all duration-300"
-                      :style="{ width: simResults[c.id].plantasPct + '%', background: estadoColor(simResults[c.id].estadoPlantas) }" />
-                  </div>
-                </div>
               </div>
 
               <!-- Plant drop zone (collapsible) -->
