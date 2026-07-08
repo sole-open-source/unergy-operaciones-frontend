@@ -11,7 +11,9 @@ import api from '@/api/client'
 
 // Tipos y tamaño aceptados (mismos que el diálogo de documentos existente).
 export const DOCUMENTO_ACCEPT = '.pdf,.jpg,.jpeg,.png,.webp'
-export const DOCUMENTO_MAX_SIZE = 10 * 1024 * 1024 // 10 MB
+// 20 MB — mismo tope que muestra el subidor de ClienteDetailView.vue, para que
+// un archivo válido en la ficha no sea rechazado al crear el cliente.
+export const DOCUMENTO_MAX_SIZE = 20 * 1024 * 1024 // 20 MB
 const EXT_PERMITIDAS = ['pdf', 'jpg', 'jpeg', 'png', 'webp']
 
 // Valida un archivo en el frontend antes de subirlo.
