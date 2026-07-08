@@ -113,35 +113,67 @@
       modal class="w-full max-w-lg">
       <div class="space-y-5 pt-2">
 
+        <!-- Selector de proyecto / medidor (Quoia) -->
+        <div>
+          <label class="text-xs font-semibold uppercase block mb-1" style="color: #6b5a8a;">Proyecto / Medidor (Quoia)</label>
+          <Dropdown
+            v-model="selectedMeterId"
+            :options="meters"
+            optionLabel="name"
+            optionValue="id"
+            :loading="metersLoading"
+            filter
+            showClear
+            placeholder="Busca y selecciona un proyecto..."
+            class="w-full"
+            @change="onMeterChange" />
+          <p class="text-xs mt-1" style="color: #9b89b5;">
+            Las tensiones y corrientes se obtienen automáticamente de la última lectura del medidor.
+          </p>
+        </div>
+
         <!-- Título -->
         <div>
           <label class="text-xs font-semibold uppercase block mb-1" style="color: #6b5a8a;">Título / Identificación</label>
           <InputText v-model="fasorial.titulo" class="w-full" placeholder="Ej: GD Agustín 2 Principal" />
         </div>
 
-        <!-- Tensiones -->
-        <div>
-          <p class="text-xs font-semibold uppercase mb-2" style="color: #6b5a8a;">Tensiones de fase (V)</p>
-          <div class="grid grid-cols-3 gap-3">
-            <div v-for="(fase, i) in ['R', 'S', 'T']" :key="'v'+i">
-              <label class="text-xs block mb-1 font-medium" :style="{ color: fasColors[i] }">Fase {{ fase }}</label>
-              <InputText v-model.number="fasorial['vp'+(i+1)]" type="number" step="0.01" class="w-full" :placeholder="'V' + (i+1)" />
-            </div>
-          </div>
+        <!-- Cargando lectura desde Quoia -->
+        <div v-if="lecturaLoading" class="flex items-center justify-center gap-2 py-6" style="color: #915BD8;">
+          <i class="pi pi-spin pi-spinner text-xl" />
+          <span class="text-sm">Consultando Quoia…</span>
         </div>
 
-        <!-- Corrientes -->
-        <div>
-          <p class="text-xs font-semibold uppercase mb-2" style="color: #6b5a8a;">Corrientes de fase (A)</p>
-          <div class="grid grid-cols-3 gap-3">
-            <div v-for="(fase, i) in ['R', 'S', 'T']" :key="'c'+i">
-              <label class="text-xs block mb-1 font-medium" :style="{ color: fasColorsC[i] }">Fase {{ fase }}</label>
-              <InputText v-model.number="fasorial['cp'+(i+1)]" type="number" step="0.001" class="w-full" :placeholder="'I' + (i+1)" />
+        <!-- Valores obtenidos (solo lectura) -->
+        <template v-else-if="lecturaLoaded">
+          <!-- Tensiones -->
+          <div>
+            <p class="text-xs font-semibold uppercase mb-2" style="color: #6b5a8a;">Tensiones de fase (V)</p>
+            <div class="grid grid-cols-3 gap-3">
+              <div v-for="(fase, i) in ['R', 'S', 'T']" :key="'v'+i">
+                <label class="text-xs block mb-1 font-medium" :style="{ color: fasColors[i] }">Fase {{ fase }}</label>
+                <InputText :modelValue="fmtValor(fasorial['vp'+(i+1)])" readonly class="w-full text-center" />
+              </div>
             </div>
           </div>
-        </div>
 
-        <!-- Alerta si faltan datos -->
+          <!-- Corrientes -->
+          <div>
+            <p class="text-xs font-semibold uppercase mb-2" style="color: #6b5a8a;">Corrientes de fase (A)</p>
+            <div class="grid grid-cols-3 gap-3">
+              <div v-for="(fase, i) in ['R', 'S', 'T']" :key="'c'+i">
+                <label class="text-xs block mb-1 font-medium" :style="{ color: fasColorsC[i] }">Fase {{ fase }}</label>
+                <InputText :modelValue="fmtValor(fasorial['cp'+(i+1)])" readonly class="w-full text-center" />
+              </div>
+            </div>
+          </div>
+
+          <p v-if="ultimaLectura" class="text-xs" style="color: #9b89b5;">
+            <i class="pi pi-clock text-xs mr-1" />Última lectura: {{ fmtFecha(ultimaLectura) }}
+          </p>
+        </template>
+
+        <!-- Alerta si faltan datos o hay error -->
         <p v-if="fasorialError" class="text-xs rounded-lg px-3 py-2"
            style="background: rgba(214,68,85,0.08); color: #D64455; border: 1px solid rgba(214,68,85,0.2);">
           {{ fasorialError }}
@@ -151,7 +183,8 @@
       <template #footer>
         <Button label="Cancelar" severity="secondary" text @click="showFasorial = false" />
         <Button icon="pi pi-download" label="Generar y Descargar"
-                :loading="generandoFasorial" @click="generarFasorial"
+                :loading="generandoFasorial" :disabled="!fasorialReady"
+                @click="generarFasorial"
                 style="background: #915BD8; border-color: #915BD8;" />
       </template>
     </Dialog>
@@ -197,11 +230,10 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useToast } from 'primevue/usetoast'
 import { useConfirm } from 'primevue/useconfirm'
 import api from '@/api/client'
-import { getAccessToken } from '@/utils/security'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import InputText from 'primevue/inputtext'
@@ -218,38 +250,119 @@ const showFasorial      = ref(false)
 const generandoFasorial = ref(false)
 const fasorialError     = ref('')
 
+// Selector de medidor (Quoia) + lectura automática
+const meters          = ref([])
+const metersLoading   = ref(false)
+const selectedMeterId = ref(null)
+const lecturaLoading  = ref(false)
+const lecturaLoaded   = ref(false)
+const ultimaLectura   = ref(null)
+
 const fasorial = ref({
   titulo: '',
   vp1: null, vp2: null, vp3: null,
   cp1: null, cp2: null, cp3: null,
 })
 
+// Listo para generar: hay lectura cargada, los 6 valores son numéricos y no
+// negativos, y hay al menos una tensión y una corriente > 0 (evita el diagrama
+// degenerado / división por cero en el backend).
+const fasorialReady = computed(() => {
+  if (!lecturaLoaded.value) return false
+  const f = fasorial.value
+  const vp = [f.vp1, f.vp2, f.vp3].map(Number)
+  const cp = [f.cp1, f.cp2, f.cp3].map(Number)
+  const validos = [...vp, ...cp].every(v => Number.isFinite(v) && v >= 0)
+  return validos && Math.max(...vp) > 0 && Math.max(...cp) > 0
+})
+
+function fmtValor(v) {
+  if (v === null || v === undefined || v === '' || isNaN(Number(v))) return '—'
+  return Number(v).toLocaleString('es-CO', { maximumFractionDigits: 3 })
+}
+
+function fmtFecha(iso) {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  return isNaN(d.getTime()) ? iso : d.toLocaleString('es-CO')
+}
+
+function resetLectura() {
+  fasorial.value.vp1 = fasorial.value.vp2 = fasorial.value.vp3 = null
+  fasorial.value.cp1 = fasorial.value.cp2 = fasorial.value.cp3 = null
+  ultimaLectura.value = null
+  lecturaLoaded.value = false
+}
+
+async function loadMeters() {
+  if (meters.value.length || metersLoading.value) return
+  metersLoading.value = true
+  try {
+    const { data } = await api.get('/fronteras/quoia/meters')
+    meters.value = (data.meters || [])
+      .filter(m => !m.archived)
+      .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+  } catch (e) {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo cargar la lista de medidores de Quoia.', life: 4000 })
+  } finally {
+    metersLoading.value = false
+  }
+}
+
+async function onMeterChange() {
+  fasorialError.value = ''
+  resetLectura()
+  if (!selectedMeterId.value) { fasorial.value.titulo = ''; return }
+  const meter = meters.value.find(m => m.id === selectedMeterId.value)
+  fasorial.value.titulo = meter?.name || ''
+  lecturaLoading.value = true
+  try {
+    const { data } = await api.get(`/fronteras/fasorial/lectura/${selectedMeterId.value}`)
+    fasorial.value.vp1 = data.vp1; fasorial.value.vp2 = data.vp2; fasorial.value.vp3 = data.vp3
+    fasorial.value.cp1 = data.cp1; fasorial.value.cp2 = data.cp2; fasorial.value.cp3 = data.cp3
+    ultimaLectura.value = data.last_time
+    lecturaLoaded.value = true
+    if (!fasorialReady.value) {
+      fasorialError.value = 'El medidor no tiene una lectura válida de tensión/corriente para generar el diagrama.'
+    }
+  } catch (e) {
+    fasorialError.value = e.response?.status === 422
+      ? 'No fue posible obtener la información del medidor.'
+      : 'Error al consultar la información del medidor en Quoia.'
+  } finally {
+    lecturaLoading.value = false
+  }
+}
+
+// Al abrir el diálogo: cargar medidores y limpiar cualquier estado previo
+watch(showFasorial, (open) => {
+  if (!open) return
+  loadMeters()
+  selectedMeterId.value = null
+  fasorial.value.titulo = ''
+  fasorialError.value = ''
+  resetLectura()
+})
+
 async function generarFasorial() {
   fasorialError.value = ''
   const f = fasorial.value
+  if (!selectedMeterId.value) { fasorialError.value = 'Selecciona un proyecto / medidor.'; return }
   if (!f.titulo?.trim()) { fasorialError.value = 'El título es obligatorio.'; return }
-  const nums = [f.vp1, f.vp2, f.vp3, f.cp1, f.cp2, f.cp3]
-  if (nums.some(v => v === null || v === '' || isNaN(Number(v)) || Number(v) <= 0)) {
-    fasorialError.value = 'Todos los valores de tensión y corriente deben ser mayores a 0.'
+  if (!fasorialReady.value) {
+    fasorialError.value = 'No hay datos válidos del medidor para generar el diagrama.'
     return
   }
   generandoFasorial.value = true
   try {
-    const token = getAccessToken()
-    const response = await fetch('/api/v1/fronteras/fasorial/generar', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({
-        titulo: f.titulo.trim(),
-        vp1: Number(f.vp1), vp2: Number(f.vp2), vp3: Number(f.vp3),
-        cp1: Number(f.cp1), cp2: Number(f.cp2), cp3: Number(f.cp3),
-      }),
-    })
-    if (!response.ok) throw new Error(`Error ${response.status}`)
-    const blob = await response.blob()
-    const url  = URL.createObjectURL(blob)
-    const a    = document.createElement('a')
-    a.href     = url
+    const response = await api.post('/fronteras/fasorial/generar', {
+      titulo: f.titulo.trim(),
+      vp1: Number(f.vp1), vp2: Number(f.vp2), vp3: Number(f.vp3),
+      cp1: Number(f.cp1), cp2: Number(f.cp2), cp3: Number(f.cp3),
+    }, { responseType: 'blob' })
+    const url = URL.createObjectURL(response.data)
+    const a   = document.createElement('a')
+    a.href    = url
     a.download = f.titulo.trim().replace(/\s+/g, '_').replace(/\//g, '-') + '_Fasorial.jpg'
     a.click()
     URL.revokeObjectURL(url)
