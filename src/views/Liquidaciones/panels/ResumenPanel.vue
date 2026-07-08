@@ -4,14 +4,8 @@
     <ProgressSpinner v-if="loading" class="block mx-auto my-10" />
 
     <template v-else>
-      <!-- ── Tipo (preliquidación / oficial) + aviso de espejo ──────── -->
-      <div class="flex items-center justify-between flex-wrap gap-2">
-        <div class="liq-tipo-toggle">
-          <button class="liq-tipo-btn" :class="{ 'liq-tipo-btn--on': tipo === 'preliquidacion' }"
-            @click="tipo = 'preliquidacion'">Preliquidación</button>
-          <button class="liq-tipo-btn" :class="{ 'liq-tipo-btn--on': tipo === 'oficial' }"
-            @click="tipo = 'oficial'">Oficial</button>
-        </div>
+      <!-- ── Aviso de espejo ──────────────────────────────────────── -->
+      <div class="flex items-center justify-end">
         <span class="text-[11px]" style="color:#9b8fb0">
           Espejo de lectura del Panel Contable · los valores se editan en Panel Contable
         </span>
@@ -106,10 +100,12 @@ import ProgressSpinner from 'primevue/progressspinner'
 import api from '@/api/client'
 import { fmtCompact, formatPeriodo } from '@/utils/liquidaciones'
 
-const props = defineProps({ periodo: { type: String, required: true } })
+const props = defineProps({
+  periodo: { type: String, required: true },
+  tipo: { type: String, default: 'preliquidacion' },
+})
 
 const loading = ref(false)
-const tipo = ref('preliquidacion')
 const proyectos = ref([])
 const expandedRows = ref({})
 const resumen = ref({ num_proyectos: 0, valor_a_pagar_total: 0, ingresos_total_cop: 0, costos_total_cop: 0, ingreso_neto_cop: 0 })
@@ -130,7 +126,7 @@ async function load() {
   loading.value = true
   try {
     const { data } = await api.get('/liquidaciones/resumen-panel', {
-      params: { periodo: periodoYYYYMM.value, tipo: tipo.value },
+      params: { periodo: periodoYYYYMM.value, tipo: props.tipo },
     })
     proyectos.value = data.proyectos || []
     resumen.value = data.resumen || resumen.value
@@ -141,7 +137,7 @@ async function load() {
   }
 }
 
-watch([() => props.periodo, tipo], load)
+watch([() => props.periodo, () => props.tipo], load)
 onMounted(load)
 </script>
 

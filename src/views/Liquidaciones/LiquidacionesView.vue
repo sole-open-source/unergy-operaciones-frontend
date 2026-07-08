@@ -18,8 +18,16 @@
 
       <div class="liq-topbar-spacer" />
 
-      <!-- Selector de período (sólo en el dashboard) -->
-      <div v-if="tab === 'resumen'" class="liq-period">
+      <!-- Tipo (preliquidación / oficial) — aplica a los 3 tabs, todos leen del Panel -->
+      <div class="liq-tipo-toggle">
+        <button class="liq-tipo-btn" :class="{ 'liq-tipo-btn--on': tipo === 'preliquidacion' }"
+          @click="tipo = 'preliquidacion'">Preliq.</button>
+        <button class="liq-tipo-btn" :class="{ 'liq-tipo-btn--on': tipo === 'oficial' }"
+          @click="tipo = 'oficial'">Oficial</button>
+      </div>
+
+      <!-- Selector de período — aplica a los 3 tabs (todos son espejo del Panel) -->
+      <div class="liq-period">
         <button class="liq-period-btn" @click="stepMes(-1)" v-tooltip.bottom="'Mes anterior'">
           <i class="pi pi-chevron-left text-xs" />
         </button>
@@ -30,10 +38,10 @@
       </div>
     </div>
 
-    <!-- ══ Contenido por tab ═══════════════════════════════════════ -->
-    <ResumenPanel v-if="tab === 'resumen'" :periodo="periodo" />
-    <LiquidacionesListView v-else-if="tab === 'proyectos'" embedded />
-    <LiquidacionesPorInversionistaView v-else-if="tab === 'inversionistas'" embedded />
+    <!-- ══ Contenido por tab — los 3 leen del Panel Contable del período ═══════ -->
+    <ResumenPanel v-if="tab === 'resumen'" :periodo="periodo" :tipo="tipo" />
+    <LiquidacionesListView v-else-if="tab === 'proyectos'" embedded :periodo="periodo" :tipo="tipo" />
+    <LiquidacionesPorInversionistaView v-else-if="tab === 'inversionistas'" embedded :periodo="periodo" :tipo="tipo" />
 
   </div>
 </template>
@@ -75,8 +83,9 @@ watch(() => route.query, (q) => {
   else if (VALID.includes(q.tab) && q.tab !== tab.value) tab.value = q.tab
 })
 
-// Período del dashboard
+// Período + tipo compartidos por los 3 tabs (todos son espejo del Panel Contable)
 const periodo = ref(mesActualISO())
+const tipo = ref('preliquidacion')
 const esMesActual = computed(() => periodo.value === mesActualISO())
 function stepMes(delta) {
   const [y, m] = periodo.value.split('-').map(Number)
@@ -135,6 +144,21 @@ function stepMes(delta) {
 .liq-tab i { font-size: 12px; }
 .liq-tab:hover:not(.liq-tab--on) { color: #2C2039; background: rgba(145,91,216,.08); }
 .liq-tab--on { background: #915BD8; color: #FDFAF7; box-shadow: 0 1px 4px rgba(145,91,216,.3); }
+
+.liq-tipo-toggle {
+  display: inline-flex;
+  background: #F4F1FA;
+  border: 1px solid #E5E2EC;
+  border-radius: 8px;
+  padding: 2px;
+}
+.liq-tipo-btn {
+  background: transparent; border: none;
+  padding: 4px 10px; font-size: 11px; font-weight: 700;
+  color: #6B5A8A; border-radius: 6px; cursor: pointer; transition: all .15s;
+}
+.liq-tipo-btn:hover:not(.liq-tipo-btn--on) { color: #2C2039; background: rgba(145,91,216,.08); }
+.liq-tipo-btn--on { background: #915BD8; color: #FDFAF7; box-shadow: 0 1px 4px rgba(145,91,216,.3); }
 
 .liq-period { display: inline-flex; align-items: center; gap: 6px; }
 .liq-period-btn {
