@@ -52,7 +52,7 @@
             </div>
             <div class="flex flex-col gap-1">
               <label class="field-label">Capacidad instalada (kWp)</label>
-              <InputNumber v-model="editInfoTecnica.capacidad_instalada_kwp" :maxFractionDigits="3" class="w-full" />
+              <InputNumber v-model="editInfoTecnica.capacidad_instalada_kwp" :maxFractionDigits="3" locale="en-US" class="w-full" />
             </div>
             <div class="flex flex-col gap-1">
               <label class="field-label">Departamento</label>
@@ -211,11 +211,11 @@
               <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <div class="flex flex-col gap-1">
                   <label class="field-label">Potencia AC (kW)</label>
-                  <InputNumber v-model="editInfoTecnica.potencia_ac_kw" :maxFractionDigits="3" class="w-full" />
+                  <InputNumber v-model="editInfoTecnica.potencia_ac_kw" :maxFractionDigits="3" locale="en-US" class="w-full" />
                 </div>
                 <div class="flex flex-col gap-1">
                   <label class="field-label">Capacidad instalada (kWp)</label>
-                  <InputNumber v-model="editInfoTecnica.capacidad_instalada_kwp" :maxFractionDigits="3" class="w-full" />
+                  <InputNumber v-model="editInfoTecnica.capacidad_instalada_kwp" :maxFractionDigits="3" locale="en-US" class="w-full" />
                 </div>
                 <div class="flex flex-col gap-1">
                   <label class="field-label">Voltaje red</label>
@@ -227,7 +227,7 @@
                 </div>
                 <div class="flex flex-col gap-1">
                   <label class="field-label">Producción específica (kWh/kWp)</label>
-                  <InputNumber v-model="editForm.produccion_especifica_kwh_kwp" :maxFractionDigits="2" class="w-full" />
+                  <InputNumber v-model="editForm.produccion_especifica_kwh_kwp" :maxFractionDigits="2" locale="en-US" class="w-full" />
                 </div>
               </div>
             </div>
@@ -341,7 +341,7 @@
               <div v-if="editInfoTecnica.tiene_almacenamiento" class="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <div class="flex flex-col gap-1">
                   <label class="field-label">Capacidad (kWh)</label>
-                  <InputNumber v-model="editInfoTecnica.capacidad_almacenamiento_kwh" :maxFractionDigits="3" class="w-full" />
+                  <InputNumber v-model="editInfoTecnica.capacidad_almacenamiento_kwh" :maxFractionDigits="3" locale="en-US" class="w-full" />
                 </div>
                 <div class="flex flex-col gap-1">
                   <label class="field-label">Marca</label>
@@ -376,6 +376,7 @@
                   v-if="isEditMode"
                   v-model="sim.editArray.value[i]"
                   :maxFractionDigits="1"
+                  locale="en-US"
                   class="w-full"
                   inputClass="text-center text-xs px-1 py-1"
                 />
@@ -397,7 +398,7 @@
               <template #body="{ data }">
                 <template v-if="editandoInvId === data.id">
                   <InputNumber v-model="editPct" :min="0" :max="100" :minFractionDigits="2" :maxFractionDigits="7"
-                    suffix="%" class="w-32" />
+                    suffix="%" locale="en-US" class="w-32" />
                 </template>
                 <template v-else>
                   {{ data.porcentaje_participacion != null ? (data.porcentaje_participacion * 100).toFixed(4) + '%' : '—' }}
@@ -491,7 +492,7 @@
             <div class="flex flex-col gap-1">
               <label class="text-xs text-gray-500">Porcentaje de participación (%)</label>
               <InputNumber v-model="nuevoInv.porcentaje_pct" :min="0" :max="100"
-                :minFractionDigits="2" :maxFractionDigits="7" suffix="%" class="w-full" />
+                :minFractionDigits="2" :maxFractionDigits="7" suffix="%" locale="en-US" class="w-full" />
             </div>
             <div class="flex flex-col gap-1">
               <label class="text-xs text-gray-500">Fecha inicio</label>

@@ -232,11 +232,11 @@
           <div class="grid grid-cols-2 gap-3">
             <div class="flex flex-col gap-1">
               <label class="field-label">Cantidad mínima (kWh/mes)</label>
-              <InputNumber v-model="form.cantidad_minima_kwh_mes" :maxFractionDigits="3" class="w-full" />
+              <InputNumber v-model="form.cantidad_minima_kwh_mes" :maxFractionDigits="3" locale="en-US" class="w-full" />
             </div>
             <div class="flex flex-col gap-1">
               <label class="field-label">Cantidad máxima (kWh/mes)</label>
-              <InputNumber v-model="form.cantidad_maxima_kwh_mes" :maxFractionDigits="3" class="w-full" />
+              <InputNumber v-model="form.cantidad_maxima_kwh_mes" :maxFractionDigits="3" locale="en-US" class="w-full" />
             </div>
           </div>
         </fieldset>
@@ -267,7 +267,7 @@
             </div>
             <div class="flex flex-col gap-1">
               <label class="field-label">Cantidades GESCON (kWh)</label>
-              <InputNumber v-model="form.gescon_cantidades_kwh" :maxFractionDigits="3" class="w-full" />
+              <InputNumber v-model="form.gescon_cantidades_kwh" :maxFractionDigits="3" locale="en-US" class="w-full" />
             </div>
           </div>
         </fieldset>

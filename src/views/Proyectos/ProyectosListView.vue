@@ -419,6 +419,7 @@ const deleting    = ref(false)
 const duplicadoVisible = ref(false)
 const duplicadoInfo = ref(null)   // { mensaje, candidato_id, candidato_nombre }
 const pendingPayload = ref(null)  // payload a reintentar con forzar=true
+const pendingInfoTecnica = ref(null)  // potencia_ac_kw/capacidad_instalada_kwp a reintentar junto con pendingPayload
 const forzando = ref(false)
 const openSections = ref(new Set())    // reactive Set via full replacement
 
@@ -487,9 +488,19 @@ function confirmDelete(row) {
   deleteVisible.value  = true
 }
 
-async function onCreate(payload) {
+async function guardarInfoTecnicaSiAplica(proyectoId, infoTecnica) {
+  if (!infoTecnica || (infoTecnica.potencia_ac_kw == null && infoTecnica.capacidad_instalada_kwp == null)) return
   try {
-    await api.post('/proyectos', payload)
+    await api.put(`/proyectos/${proyectoId}/info-tecnica`, infoTecnica)
+  } catch (e) {
+    toast.add({ severity: 'warn', summary: 'Proyecto creado, pero la ficha técnica no se pudo guardar', detail: e.response?.data?.detail, life: 5000 })
+  }
+}
+
+async function onCreate(payload, infoTecnica) {
+  try {
+    const { data } = await api.post('/proyectos', payload)
+    await guardarInfoTecnicaSiAplica(data.id, infoTecnica)
     toast.add({ severity: 'success', summary: 'Proyecto creado', life: 3000 })
     dialogVisible.value = false
     load()
@@ -500,6 +511,7 @@ async function onCreate(payload) {
     if (e.response?.status === 409 && detail?.duplicado_nombre) {
       duplicadoInfo.value = detail
       pendingPayload.value = payload
+      pendingInfoTecnica.value = infoTecnica
       duplicadoVisible.value = true
       return
     }
@@ -510,7 +522,8 @@ async function onCreate(payload) {
 async function crearForzado() {
   forzando.value = true
   try {
-    await api.post('/proyectos', pendingPayload.value, { params: { forzar: true } })
+    const { data } = await api.post('/proyectos', pendingPayload.value, { params: { forzar: true } })
+    await guardarInfoTecnicaSiAplica(data.id, pendingInfoTecnica.value)
     toast.add({ severity: 'success', summary: 'Proyecto creado', life: 3000 })
     duplicadoVisible.value = false
     dialogVisible.value = false

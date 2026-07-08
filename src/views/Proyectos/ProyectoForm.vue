@@ -14,8 +14,12 @@
         <Select v-model="f.estado" :options="estados" class="w-full" />
       </div>
       <div>
-        <label class="field-label">Potencia instalada (kWp)</label>
-        <InputNumber v-model="f.potencia_instalada_kwp" :maxFractionDigits="2" class="w-full" />
+        <label class="field-label">Potencia AC (kW)</label>
+        <InputNumber v-model="potenciaAcKw" :maxFractionDigits="3" locale="en-US" class="w-full" />
+      </div>
+      <div>
+        <label class="field-label">Capacidad instalada (kWp)</label>
+        <InputNumber v-model="capacidadInstaladaKwp" :maxFractionDigits="3" locale="en-US" class="w-full" />
       </div>
       <div>
         <label class="field-label">Tipo tecnología</label>
@@ -207,7 +211,6 @@ const f = reactive({
   nombre_comercial: '',
   estado: 'en_desarrollo',
   tipo_proyecto: null,
-  potencia_instalada_kwp: null,
   tipo_tecnologia: null,
   departamento: null,
   municipio: null,
@@ -217,6 +220,15 @@ const f = reactive({
   sub_project: null,
   codigo_tsf: null,
 })
+
+// Potencia AC y capacidad instalada -- viven en proyecto_info_tecnica (pestaña
+// Técnico), que requiere un proyecto_id existente, así que no son parte de `f`
+// (el payload de POST/PATCH /proyectos). El submit las emite aparte para que
+// quien las reciba haga el PUT a /proyectos/{id}/info-tecnica después de crear.
+// capacidad_instalada_kwp también se copia a proyectos.potencia_instalada_kwp
+// (el campo que usan los cálculos de generación esperada en el resto del backend).
+const potenciaAcKw = ref(null)
+const capacidadInstaladaKwp = ref(null)
 
 // Fechas del proyecto (DatePicker usa Date; el API espera 'YYYY-MM-DD')
 const fechaEntrada = ref(null)
@@ -256,6 +268,8 @@ const p50Array = ref(Array(12).fill(null))
 watch(() => props.proyecto, (p) => {
   if (p) {
     Object.keys(f).forEach(k => { if (k in p) f[k] = p[k] })
+    potenciaAcKw.value = p.info_tecnica?.potencia_ac_kw ?? null
+    capacidadInstaladaKwp.value = p.info_tecnica?.capacidad_instalada_kwp ?? p.potencia_instalada_kwp ?? null
     p90Array.value = parseMonthArray(p.p90_mensual_kwh)
     p50Array.value = parseMonthArray(p.p50_mensual_kwh)
     fechaEntrada.value = toDate(p.fecha_entrada_operacion)
@@ -329,7 +343,15 @@ function submit() {
   // Fechas del proyecto (null = sin fecha / vigente)
   payload.fecha_entrada_operacion = formatFecha(fechaEntrada.value)
   payload.fecha_fin_representacion = formatFecha(fechaFinRep.value)
-  emit('save', payload)
+  // Capacidad instalada (DC) es la que usan los cálculos de generación esperada
+  // en el resto del backend -- se guarda también aquí, no solo en info-tecnica.
+  if (capacidadInstaladaKwp.value !== null) payload.potencia_instalada_kwp = capacidadInstaladaKwp.value
+
+  const infoTecnica = {}
+  if (potenciaAcKw.value !== null) infoTecnica.potencia_ac_kw = potenciaAcKw.value
+  if (capacidadInstaladaKwp.value !== null) infoTecnica.capacidad_instalada_kwp = capacidadInstaladaKwp.value
+
+  emit('save', payload, infoTecnica)
 }
 </script>
 

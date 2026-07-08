@@ -187,7 +187,7 @@
               </div>
               <div class="flex flex-col gap-1">
                 <label class="text-xs font-medium text-gray-600">Cantidades GESCON (kWh)</label>
-                <InputNumber v-model="formGescon.gescon_cantidades_kwh" :maxFractionDigits="3" class="w-full" />
+                <InputNumber v-model="formGescon.gescon_cantidades_kwh" :maxFractionDigits="3" locale="en-US" class="w-full" />
               </div>
             </div>
           </div>

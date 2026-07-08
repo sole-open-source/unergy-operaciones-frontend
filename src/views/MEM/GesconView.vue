@@ -364,12 +364,12 @@
           <div class="flex flex-col gap-1">
             <label class="text-xs font-medium" style="color:#6b5a8a;">% FNCER</label>
             <InputNumber v-model="form.porcentaje_fncer" :min="0" :max="100"
-              :minFractionDigits="0" :maxFractionDigits="2" suffix="%" class="w-full" inputClass="w-full" />
+              :minFractionDigits="0" :maxFractionDigits="2" suffix="%" locale="en-US" class="w-full" inputClass="w-full" />
           </div>
           <div class="flex flex-col gap-1">
             <label class="text-xs font-medium" style="color:#6b5a8a;">% Despacho</label>
             <InputNumber v-model="form.porcentaje_despacho" :min="0" :max="100"
-              :minFractionDigits="0" :maxFractionDigits="2" suffix="%" class="w-full" inputClass="w-full" />
+              :minFractionDigits="0" :maxFractionDigits="2" suffix="%" locale="en-US" class="w-full" inputClass="w-full" />
           </div>
         </div>
 
