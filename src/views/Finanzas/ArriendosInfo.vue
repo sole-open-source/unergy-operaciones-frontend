@@ -12,8 +12,13 @@
         style="border-color:#915BD8;color:#915BD8" />
     </div>
 
+    <!-- ── Cargando ───────────────────────────────────────────────────────── -->
+    <div v-if="cargando" class="flex justify-center py-10">
+      <i class="pi pi-spin pi-spinner" style="font-size:1.5rem; color:#915BD8;" />
+    </div>
+
     <!-- ── Tabla ──────────────────────────────────────────────────────────── -->
-    <div class="rounded-xl border border-gray-100 overflow-hidden">
+    <div v-else class="rounded-xl border border-gray-100 overflow-hidden">
       <div class="overflow-x-auto">
         <table class="w-full text-sm border-collapse" style="min-width:860px">
           <thead>
@@ -151,11 +156,30 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import Button from 'primevue/button'
-import arriendosRaw from '@/data/pagoarriendos.json'
+import { useToast } from 'primevue/usetoast'
+import { getPagoArriendos } from '@/api/finanzasApi'
+
+const toast = useToast()
 
 // ── Storage ────────────────────────────────────────────────────────────────────
 const INFO_KEY  = 'arriendos_info'
 const EXTRA_KEY = 'arriendos_proyectos_extra'
+
+// ── Proyectos del backend (antes JSON estático) ────────────────────────────────
+const cargando       = ref(false)
+const arriendosRaw   = ref([])
+
+async function cargarProyectos() {
+  cargando.value = true
+  try {
+    arriendosRaw.value = await getPagoArriendos()
+  } catch {
+    arriendosRaw.value = []
+    toast.add({ severity: 'error', summary: 'Error al cargar proyectos de arriendo', life: 3000 })
+  } finally {
+    cargando.value = false
+  }
+}
 
 // info guardada: { [id]: { tipo_pago, anticipo_hasta, proxima_fecha, observaciones } }
 const infoStore = ref({})
@@ -186,8 +210,8 @@ function persistirInfo() {
 const filas = ref([])
 
 function construirFilas() {
-  // 1. Proyectos del JSON
-  const fuente = [...arriendosRaw]
+  // 1. Proyectos del backend
+  const fuente = [...arriendosRaw.value]
 
   // 2. Proyectos extras (agregados manualmente en el panel)
   try {
@@ -319,7 +343,11 @@ function proximaFechaStyle(iso) {
   return 'color:#2C2039'
 }
 
-onMounted(() => { cargarInfo(); construirFilas() })
+onMounted(async () => {
+  cargarInfo()
+  await cargarProyectos()
+  construirFilas()
+})
 </script>
 
 <style scoped>
