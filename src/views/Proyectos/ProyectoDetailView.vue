@@ -129,6 +129,8 @@
                 <InfoField label="Voltaje red" :value="proyecto.info_tecnica?.voltaje_red" />
                 <InfoField label="Tipo tracker" :value="proyecto.info_tecnica?.tipo_tracker" />
                 <InfoField label="Producción específica (kWh/kWp)" :value="proyecto.produccion_especifica_kwh_kwp" />
+                <InfoField label="Latitud" :value="proyecto.latitud" />
+                <InfoField label="Longitud" :value="proyecto.longitud" />
               </div>
             </div>
             <!-- Paneles -->
@@ -1256,9 +1258,19 @@ onMounted(async () => {
 </script>
 
 <script>
+import { h } from 'vue'
+
+// Definido con render function (no `template` string) -- el build runtime-only
+// de Vue no puede compilar strings de template en producción, lo que dejaba
+// cada InfoField invisible (solo se veía el label de la sección, sin datos).
 const InfoField = {
   props: { label: String, value: [String, Number, Boolean] },
-  template: `<div><p class="text-xs text-gray-400 uppercase tracking-wide">{{ label }}</p><p class="text-gray-800 font-medium mt-0.5">{{ value ?? '—' }}</p></div>`,
+  render() {
+    return h('div', [
+      h('p', { class: 'text-xs text-gray-400 uppercase tracking-wide' }, this.label),
+      h('p', { class: 'text-gray-800 font-medium mt-0.5' }, this.value ?? '—'),
+    ])
+  },
 }
 export default { components: { InfoField } }
 </script>

@@ -700,9 +700,20 @@ onMounted(async () => {
 </script>
 
 <script>
+import { h } from 'vue'
+
+// Render function (no `template` string) -- el build runtime-only de Vue no
+// compila strings de template en producción, lo que dejaba esto invisible.
 const ResumenFila = {
   props: { label: String, value: [String, Number] },
-  template: `<div v-if="value"><span class="text-gray-400">{{ label }}:</span> <span class="font-medium text-gray-700">{{ value }}</span></div>`,
+  render() {
+    if (!this.value) return null
+    return h('div', [
+      h('span', { class: 'text-gray-400' }, `${this.label}:`),
+      ' ',
+      h('span', { class: 'font-medium text-gray-700' }, this.value),
+    ])
+  },
 }
 export default { components: { ResumenFila } }
 </script>
