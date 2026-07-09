@@ -42,7 +42,13 @@
             </tr>
             <tr v-for="l in g.lineas" :key="g.key + '_' + l.concepto" class="border-t" style="border-color:#f7f3fc">
               <td class="px-3 py-1 sticky left-0 z-10 bg-white">
-                <span class="pl-3 block" style="color:#5b5470">{{ l.concepto }}</span>
+                <span class="pl-3 flex items-center gap-1.5 flex-wrap" style="color:#5b5470">
+                  {{ l.concepto }}
+                  <span v-if="l.origen" class="text-[9px] font-mono px-1 py-0.5 rounded"
+                    style="background:#F1EAF9; color:#6E3FB8" :title="'Celda de origen en el ER'">{{ l.origen }}</span>
+                  <span v-if="l.comprobante" class="text-[9px] px-1 py-0.5 rounded"
+                    style="background:#EAF4FF; color:#2563EB" :title="'Comprobante contable'">{{ l.comprobante }}</span>
+                </span>
               </td>
               <td v-for="c in columnas" :key="c.id"
                 class="px-3 py-1 text-right whitespace-nowrap align-top font-mono tabular-nums"
@@ -130,10 +136,20 @@ const grupos = computed(() => {
         .filter(c => c.grupo === g.key && c.concepto === concepto)
         .reduce((a, x) => a + (x.valor_cop || 0), 0), 0)
 
+    // Meta (origen hoja!celda + comprobante) por concepto — es del 100%, igual en
+    // todas las columnas; se toma del primer concepto que la traiga (trazabilidad).
+    const metaDe = (concepto) => {
+      for (const inv of todos.value)
+        for (const c of (inv.conceptos || []))
+          if (c.grupo === g.key && c.concepto === concepto && (c.origen || c.comprobante_contable))
+            return { origen: c.origen || null, comprobante: c.comprobante_contable || null }
+      return { origen: null, comprobante: null }
+    }
+
     const lineas = order.map(concepto => {
       const celdas = { total: sumConcepto(todos.value, concepto) }   // Total = 100% (todos)
       for (const inv of mostrados.value) celdas[colId(inv)] = sumConcepto([inv], concepto)
-      return { concepto, celdas }
+      return { concepto, celdas, ...metaDe(concepto) }
     })
 
     // Subtotales por columna (Total sobre todos; cada inv desde grupos_totales).

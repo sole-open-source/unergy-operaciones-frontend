@@ -14,6 +14,10 @@
           {{ t.label }}
         </button>
       </div>
+      <IconField class="ml-2">
+        <InputIcon class="pi pi-search" />
+        <InputText v-model="q" placeholder="Buscar inversionista…" class="w-56" />
+      </IconField>
       <span class="text-[11px] ml-auto" style="color:#9b8fb0">
         Espejo del Panel Contable · ventana 12 meses a {{ formatPeriodo(periodo) }}
       </span>
@@ -21,12 +25,12 @@
 
     <ProgressSpinner v-if="loading" class="block mx-auto my-10" />
 
-    <div v-else-if="!clientes.length" class="text-center py-8 text-sm text-gray-400">
-      Sin paneles para este período/tipo. Cárgalos en Panel Contable.
+    <div v-else-if="!clientesMostrados.length" class="text-center py-8 text-sm text-gray-400">
+      {{ clientes.length ? 'Sin inversionistas para la búsqueda.' : 'Sin paneles para este período/tipo. Cárgalos en Panel Contable.' }}
     </div>
 
     <div v-else class="rounded-xl overflow-hidden shadow-sm" style="background:#FDFAF7">
-      <div v-for="cli in clientes" :key="cli.key">
+      <div v-for="cli in clientesMostrados" :key="cli.key">
 
         <!-- Nivel 1: Inversionista -->
         <div class="flex items-center gap-2 px-4 py-2.5 cursor-pointer select-none bg-gray-100 hover:bg-gray-200 transition-colors"
@@ -124,6 +128,9 @@
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import ProgressSpinner from 'primevue/progressspinner'
+import IconField from 'primevue/iconfield'
+import InputIcon from 'primevue/inputicon'
+import InputText from 'primevue/inputtext'
 import api from '@/api/client'
 import NetoMensualBar from './components/NetoMensualBar.vue'
 import { fmtCompact, formatPeriodo } from '@/utils/liquidaciones'
@@ -152,6 +159,7 @@ const TABS_TIPO = [
   { key: 'autoconsumo', label: 'Autoconsumo' },
 ]
 const tabTipo = ref('todas')
+const q = ref('')
 
 const expandidos = reactive({})
 const tablasAbiertas = reactive({})
@@ -227,6 +235,12 @@ const clientes = computed(() => {
       meses, barData, tablaRows, totalRow,
     }
   }).sort((a, b) => b.kpis.ingresoNeto - a.kpis.ingresoNeto)
+})
+
+const clientesMostrados = computed(() => {
+  const term = q.value.toLowerCase().trim()
+  if (!term) return clientes.value
+  return clientes.value.filter(c => (c.cliente_nombre || '').toLowerCase().includes(term))
 })
 
 function kpiCards(cli) {

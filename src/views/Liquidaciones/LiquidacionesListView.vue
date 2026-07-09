@@ -15,6 +15,8 @@
         <InputIcon class="pi pi-search" />
         <InputText v-model="q" placeholder="Buscar proyecto…" class="w-56" />
       </IconField>
+      <Select v-model="estadoFiltro" :options="ESTADO_OPCIONES" optionLabel="label" optionValue="value"
+        showClear placeholder="Estado" class="w-40" />
       <span class="text-[11px] ml-auto" style="color:#9b8fb0">
         Espejo del Panel Contable · edición en Panel Contable
       </span>
@@ -168,13 +170,20 @@ const loading = ref(false)
 const proyectos = ref([])
 const expandedRows = ref({})
 const q = ref('')
+const estadoFiltro = ref(null)
+const ESTADO_OPCIONES = [
+  { label: 'Firmado', value: 'firmado' },
+  { label: 'Pendiente', value: 'pendiente' },
+]
 
 const proyectosFiltrados = computed(() => {
   const term = q.value.toLowerCase().trim()
   const tf = tipoFilter.value
+  const ef = estadoFiltro.value
   return proyectos.value.filter(p =>
     (!term || (p.proyecto || '').toLowerCase().includes(term)) &&
-    (!tf || p.tipo_proyecto === tf)
+    (!tf || p.tipo_proyecto === tf) &&
+    (!ef || p.estado === ef)
   )
 })
 

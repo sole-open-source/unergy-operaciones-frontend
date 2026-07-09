@@ -11,6 +11,19 @@
         </span>
       </div>
 
+      <!-- ── Alertas del período ──────────────────────────────────── -->
+      <div v-if="alertas.length" class="flex flex-col gap-2">
+        <div v-for="a in alertas" :key="a.key"
+          class="flex items-start gap-2 rounded-lg px-3 py-2 text-xs"
+          :style="{ background: a.bg, border: `1px solid ${a.border}` }">
+          <i :class="a.icon" class="mt-0.5 shrink-0" :style="{ color: a.color }" />
+          <div>
+            <span class="font-semibold" :style="{ color: a.color }">{{ a.titulo }}</span>
+            <span style="color:#6b5a8a"> — {{ a.detalle }}</span>
+          </div>
+        </div>
+      </div>
+
       <!-- ── KPIs del período ─────────────────────────────────────── -->
       <div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
         <div v-for="kpi in kpis" :key="kpi.label"
@@ -172,6 +185,7 @@ const router = useRouter()
 
 const loading = ref(false)
 const periodosData = ref([])   // [{periodo, resumen, proyectos}] del Panel (ventana 12m)
+const sinPanel = ref([])       // proyectos en operación sin panel este período
 const expandedRows = ref({})
 
 const periodoYYYYMM = computed(() => props.periodo.slice(0, 7))
@@ -193,6 +207,32 @@ const porPeriodo = computed(() => {
 const entryActual = computed(() => porPeriodo.value[periodoYYYYMM.value] || null)
 const proyectos = computed(() => entryActual.value?.proyectos || [])
 const totalMes = computed(() => proyectos.value.length)
+
+// ── Alertas del período (#10) ──────────────────────────────────────────────────
+const alertas = computed(() => {
+  const out = []
+  const negativos = proyectos.value.filter(p => (p.valor_a_pagar_total || 0) < 0)
+  if (negativos.length) out.push({
+    key: 'neg', icon: 'pi pi-exclamation-triangle', color: '#D64455', bg: '#fef2f3', border: '#f7c7cd',
+    titulo: `${negativos.length} proyecto(s) con valor a pagar negativo`,
+    detalle: negativos.slice(0, 6).map(p => p.proyecto).join(', ') + (negativos.length > 6 ? '…' : ''),
+  })
+  const pctRaros = proyectos.value.filter(p => {
+    const s = (p.inversionistas || []).reduce((a, i) => a + (i.porcentaje || 0), 0)
+    return p.inversionistas?.length && Math.abs(s - 100) > 1
+  })
+  if (pctRaros.length) out.push({
+    key: 'pct', icon: 'pi pi-percentage', color: '#CA8A04', bg: '#fefce8', border: '#f4e2a1',
+    titulo: `${pctRaros.length} proyecto(s) con participación ≠ 100%`,
+    detalle: pctRaros.slice(0, 6).map(p => p.proyecto).join(', ') + (pctRaros.length > 6 ? '…' : ''),
+  })
+  if (sinPanel.value.length) out.push({
+    key: 'sinpanel', icon: 'pi pi-inbox', color: '#6E3FB8', bg: '#faf7ff', border: '#e3d5f5',
+    titulo: `${sinPanel.value.length} proyecto(s) en operación sin panel este período`,
+    detalle: sinPanel.value.slice(0, 6).map(p => p.proyecto).join(', ') + (sinPanel.value.length > 6 ? '…' : ''),
+  })
+  return out
+})
 
 // Meses de la ventana (12) en orden
 const mesesVentana = computed(() => {
@@ -298,12 +338,18 @@ function goDetalle(id) { router.push(`/liquidaciones/${id}`) }
 async function load() {
   loading.value = true
   try {
-    const { data } = await api.get('/liquidaciones/resumen-panel-rango', {
-      params: { periodo_desde: ventana.value.desde, periodo_hasta: ventana.value.hasta, tipo: props.tipo },
-    })
-    periodosData.value = data.periodos || []
+    // Rango (tendencia/tabla) + período único (para 'sin_panel' de las alertas).
+    const [rango, unico] = await Promise.allSettled([
+      api.get('/liquidaciones/resumen-panel-rango', {
+        params: { periodo_desde: ventana.value.desde, periodo_hasta: ventana.value.hasta, tipo: props.tipo },
+      }),
+      api.get('/liquidaciones/resumen-panel', { params: { periodo: periodoYYYYMM.value, tipo: props.tipo } }),
+    ])
+    periodosData.value = rango.status === 'fulfilled' ? (rango.value.data.periodos || []) : []
+    sinPanel.value = unico.status === 'fulfilled' ? (unico.value.data.sin_panel || []) : []
   } catch {
     periodosData.value = []
+    sinPanel.value = []
   } finally {
     loading.value = false
   }
