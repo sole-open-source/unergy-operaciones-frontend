@@ -50,8 +50,8 @@
       <!-- Generación y tarifas del mes (ancho completo) -->
       <GeneracionMensualChart :proyecto-id="liq.proyecto_id" :proyecto-nombre="liq.proyecto_nombre" :periodo="liq.periodo" />
 
-      <!-- Estado de Resultados por inversionista: Total + cada inversionista (con IVA y soportes) -->
-      <EstadoResultadosConsolidado :liq="liq" :inversionistas="inversionistasVista" />
+      <!-- Estado de Resultados por inversionista: espejo del Panel Contable del período -->
+      <EstadoResultadosConsolidado :panel="panelER" :filtro-pi-id="invFiltroId" />
 
       <!-- Datos adicionales: comprobante, consecutivos -->
       <div class="bg-white rounded-lg shadow-sm border px-3 py-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px]" style="color:#2C2039;border-color:#e8e0f0">
@@ -329,6 +329,7 @@ function volver() {
 
 const liq = ref(null)
 const proyectoInversionistas = ref([])
+const panelER = ref(null)   // entrada del Panel Contable (resumen-panel) para este proyecto+período
 const loading = ref(false)
 const guardando = ref(false)
 
@@ -696,6 +697,20 @@ async function load() {
       proyectoInversionistas.value = Array.isArray(raw) ? raw : (raw.items ?? [])
     } catch (e) {
       console.error('[LiquidacionDetail] Error cargando inversionistas:', e?.response?.status, e?.response?.data ?? e)
+    }
+
+    // Estado de Resultados = espejo del Panel Contable del período (fuente única).
+    try {
+      const per = (liq.value.periodo || '').slice(0, 7)   // "YYYY-MM"
+      if (per) {
+        const { data } = await api.get('/liquidaciones/resumen-panel', {
+          params: { periodo: per, tipo: 'preliquidacion' },
+        })
+        panelER.value = (data.proyectos || []).find(p => p.proyecto_id === liq.value.proyecto_id) || null
+      }
+    } catch (e) {
+      console.error('[LiquidacionDetail] Error cargando Panel ER:', e?.response?.status, e?.response?.data ?? e)
+      panelER.value = null
     }
   }
 }
