@@ -1,54 +1,90 @@
 <template>
   <div class="space-y-4">
-    <PageHeader title="Clientes" :subtitle="`${total} cliente${total === 1 ? '' : 's'} · directorio e inversionistas`">
+    <PageHeader title="Clientes" :subtitle="`${filtrados.length} de ${items.length} cliente${items.length === 1 ? '' : 's'} · vista comercial`">
       <template #actions>
         <IconField class="flex-1 sm:flex-none">
           <InputIcon class="pi pi-search" />
-          <InputText v-model="q" placeholder="Buscar..." class="w-full sm:w-64" @input="onSearch" />
+          <InputText v-model="q" placeholder="Buscar razón social o NIT..." class="w-full sm:w-64" />
         </IconField>
         <Button label="Nuevo cliente" icon="pi pi-plus" size="small" @click="openNew" />
       </template>
     </PageHeader>
 
+    <!-- Filtros dinámicos: actualizan la tabla al instante -->
+    <div class="flex flex-wrap items-center gap-3">
+      <MultiSelect v-model="filtroServicios" :options="opcionesServicio" optionLabel="label" optionValue="value"
+        placeholder="Filtrar por servicio" display="chip" class="w-72" showClear />
+      <SelectButton v-model="filtroEstado" :options="opcionesEstado" optionLabel="label" optionValue="value"
+        :allowEmpty="false" />
+    </div>
+
     <div class="bg-white rounded-xl shadow-sm overflow-hidden border" style="border-color:#ECE7F2">
-      <DataTable :value="items" lazy :loading="loading" :rows="size" :totalRecords="total"
-        paginator @page="onPage" rowHover class="text-sm">
-        <Column field="razon_social_nombre" header="Razón social / Nombre" sortable />
-        <Column field="nit_cedula" header="NIT / Cédula" />
-        <Column field="tipo_persona" header="Tipo" />
-        <Column field="ciudad" header="Ciudad" />
-        <Column field="correo_electronico" header="Correo" />
-        <Column header="Acciones" style="width: 120px">
+      <DataTable :value="filtrados" :loading="loading" paginator :rows="25"
+        :rowsPerPageOptions="[25, 50, 100]" rowHover
+        sortField="razon_social_nombre" :sortOrder="1" :rowClass="rowClass"
+        @row-click="abrirCliente" class="text-sm clientes-tabla">
+        <Column field="razon_social_nombre" header="Razón social" sortable>
           <template #body="{ data }">
-            <Button icon="pi pi-eye" text rounded size="small" v-tooltip.top="'Ver detalle'" @click="$router.push(`/clientes/${data.id}`)" />
-            <Button icon="pi pi-pencil" text rounded size="small" v-tooltip.top="'Editar'" @click="openEdit(data)" />
-            <Button icon="pi pi-trash" text rounded size="small" severity="danger" v-tooltip.top="'Eliminar'" @click="confirmDelete(data)" />
+            <div class="flex items-center gap-2">
+              <span class="font-medium" style="color:#2C2039">{{ data.razon_social_nombre }}</span>
+              <span v-if="data.alerta_contrato" class="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                :style="{ color: SEMAFORO[data.alerta_contrato].color, background: SEMAFORO[data.alerta_contrato].bg }">
+                {{ SEMAFORO[data.alerta_contrato].label }}
+              </span>
+            </div>
+          </template>
+        </Column>
+        <Column field="nit_cedula" header="NIT" sortable>
+          <template #body="{ data }">{{ fmt(data.nit_cedula) }}</template>
+        </Column>
+        <Column field="num_plantas" header="Plantas" sortable style="width:90px">
+          <template #body="{ data }">
+            <span class="font-semibold tabular-nums" style="color:#2C2039">{{ data.num_plantas }}</span>
+          </template>
+        </Column>
+        <Column header="Servicios">
+          <template #body="{ data }">
+            <div class="flex flex-wrap gap-1">
+              <span v-for="s in data.servicios" :key="s"
+                class="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
+                style="background:#f0ebfd;color:#915BD8">{{ servicioLabel(s) }}</span>
+              <span v-if="!data.servicios.length" class="text-xs" style="color:#bba8d4">—</span>
+            </div>
+          </template>
+        </Column>
+        <Column header="Contacto comercial">
+          <template #body="{ data }">
+            <div class="leading-tight">
+              <p class="text-sm" style="color:#2C2039">
+                {{ fmt(data.contacto_comercial_nombre) }}
+                <span v-if="data.contactos_comerciales_extra" class="text-[10px]" style="color:#9b89b5">
+                  +{{ data.contactos_comerciales_extra }}
+                </span>
+              </p>
+              <p class="text-xs" style="color:#6b5a8a">{{ fmt(data.contacto_comercial_telefono) }}</p>
+            </div>
+          </template>
+        </Column>
+        <Column field="contacto_comercial_correo" header="Correo comercial" sortable>
+          <template #body="{ data }">{{ fmt(data.contacto_comercial_correo) }}</template>
+        </Column>
+        <Column header="" style="width:44px">
+          <template #body>
+            <i class="pi pi-chevron-right text-xs" style="color:#c5b9db" />
           </template>
         </Column>
       </DataTable>
     </div>
 
-    <Dialog v-model:visible="dialogVisible" :header="editingId ? 'Editar cliente' : 'Nuevo cliente'"
-      modal class="w-full max-w-lg">
-      <ClienteForm :initial="form" @save="onSave" @cancel="dialogVisible = false" />
-    </Dialog>
-
-    <Dialog v-model:visible="deleteVisible" header="Eliminar cliente" modal class="w-full max-w-sm">
-      <p class="text-sm text-gray-700 mb-4">
-        ¿Estás seguro de que deseas eliminar
-        <strong>{{ deleteCliente?.razon_social_nombre }}</strong>?
-        Esta acción no se puede deshacer.
-      </p>
-      <div class="flex justify-end gap-2">
-        <Button label="Cancelar" severity="secondary" @click="deleteVisible = false" />
-        <Button label="Eliminar" severity="danger" :loading="deleting" @click="doDelete" />
-      </div>
+    <Dialog v-model:visible="dialogVisible" header="Nuevo cliente" modal class="w-full max-w-lg">
+      <ClienteForm :initial="{}" @save="onSave" @cancel="dialogVisible = false" />
     </Dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Button from 'primevue/button'
@@ -56,30 +92,66 @@ import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import IconField from 'primevue/iconfield'
 import InputIcon from 'primevue/inputicon'
+import MultiSelect from 'primevue/multiselect'
+import SelectButton from 'primevue/selectbutton'
 import { useToast } from 'primevue/usetoast'
 import api from '@/api/client'
 import ClienteForm from './ClienteForm.vue'
+import { SEMAFORO, servicioLabel, fmt } from './clientesUi'
 
+const router = useRouter()
 const toast = useToast()
 const items = ref([])
-const total = ref(0)
-const page = ref(1)
-const size = ref(20)
-const q = ref('')
 const loading = ref(false)
 const dialogVisible = ref(false)
-const editingId = ref(null)
-const form = ref({})
-const deleteVisible = ref(false)
-const deleteCliente = ref(null)
-const deleting = ref(false)
+
+const q = ref('')
+const filtroServicios = ref([])
+const filtroEstado = ref('todos')
+const opcionesEstado = [
+  { label: 'Todos', value: 'todos' },
+  { label: 'Vigentes', value: 'vigente' },
+  { label: 'Por vencer', value: 'por_vencer' },
+  { label: 'Vencidos', value: 'vencido' },
+]
+
+const opcionesServicio = computed(() => {
+  const set = new Set(items.value.flatMap(c => c.servicios))
+  return [...set].sort().map(s => ({ label: servicioLabel(s), value: s }))
+})
+
+function estadoDe(c) { return c.alerta_contrato || 'vigente' }
+
+// Búsqueda + servicio + estado filtran (ocultan). El resaltado de fila (ámbar/
+// rojo) sigue presente para llamar la atención de un vistazo.
+const filtrados = computed(() => {
+  let rows = items.value
+  const term = q.value.trim().toLowerCase()
+  if (term) rows = rows.filter(c =>
+    (c.razon_social_nombre || '').toLowerCase().includes(term) ||
+    (c.nit_cedula || '').toLowerCase().includes(term))
+  if (filtroServicios.value.length)
+    rows = rows.filter(c => filtroServicios.value.some(s => c.servicios.includes(s)))
+  if (filtroEstado.value !== 'todos')
+    rows = rows.filter(c => estadoDe(c) === filtroEstado.value)
+  return rows
+})
+
+function rowClass(data) {
+  if (data.alerta_contrato === 'vencido') return 'row-vencido'
+  if (data.alerta_contrato === 'por_vencer') return 'row-por-vencer'
+  return ''
+}
+
+function abrirCliente(event) {
+  router.push(`/clientes/${event.data.id}`)
+}
 
 async function load() {
   loading.value = true
   try {
-    const { data } = await api.get('/clientes', { params: { page: page.value, size: size.value, q: q.value || undefined } })
-    items.value = data.items
-    total.value = data.total
+    const { data } = await api.get('/clientes/vista-comercial')
+    items.value = data
   } finally {
     loading.value = false
   }
@@ -87,62 +159,24 @@ async function load() {
 
 onMounted(load)
 
-let searchTimer
-function onSearch() {
-  clearTimeout(searchTimer)
-  searchTimer = setTimeout(() => { page.value = 1; load() }, 350)
-}
-
-function onPage(e) {
-  page.value = e.page + 1
-  load()
-}
-
 function openNew() {
-  editingId.value = null
-  form.value = {}
   dialogVisible.value = true
-}
-
-function openEdit(row) {
-  editingId.value = row.id
-  form.value = { ...row }
-  dialogVisible.value = true
-}
-
-function confirmDelete(row) {
-  deleteCliente.value = row
-  deleteVisible.value = true
-}
-
-async function doDelete() {
-  deleting.value = true
-  try {
-    await api.delete(`/clientes/${deleteCliente.value.id}`)
-    toast.add({ severity: 'success', summary: 'Cliente eliminado', life: 3000 })
-    deleteVisible.value = false
-    load()
-  } catch (e) {
-    const detail = e.response?.data?.detail || 'Error al eliminar'
-    toast.add({ severity: 'error', summary: 'No se pudo eliminar', detail, life: 5000 })
-  } finally {
-    deleting.value = false
-  }
 }
 
 async function onSave(payload) {
   try {
-    if (editingId.value) {
-      await api.patch(`/clientes/${editingId.value}`, payload)
-      toast.add({ severity: 'success', summary: 'Cliente actualizado', life: 3000 })
-    } else {
-      await api.post('/clientes', payload)
-      toast.add({ severity: 'success', summary: 'Cliente creado', life: 3000 })
-    }
+    const { data } = await api.post('/clientes', payload)
+    toast.add({ severity: 'success', summary: 'Cliente creado', life: 3000 })
     dialogVisible.value = false
-    load()
+    router.push(`/clientes/${data.id}`)
   } catch (e) {
     toast.add({ severity: 'error', summary: 'Error', detail: e.response?.data?.detail, life: 4000 })
   }
 }
 </script>
+
+<style scoped>
+:deep(.clientes-tabla tbody tr) { cursor: pointer; }
+:deep(.row-vencido) { background: #FEF2F2 !important; }
+:deep(.row-por-vencer) { background: #FFFBEB !important; }
+</style>
