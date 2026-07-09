@@ -42,8 +42,7 @@
         <Column field="proyecto" header="Proyecto" sortable />
         <Column header="Estado" style="width:110px">
           <template #body="{ data }">
-            <Tag :value="data.estado === 'firmado' ? 'Firmado' : 'Pendiente'"
-              :severity="data.estado === 'firmado' ? 'success' : 'warn'" class="text-[10px]" />
+            <Tag :value="estadoFlujoPanel(data).label" :severity="estadoFlujoPanel(data).sev" class="text-[10px]" />
           </template>
         </Column>
         <Column header="Consec. Ing." style="width:100px">
@@ -143,7 +142,7 @@ import ProgressSpinner from 'primevue/progressspinner'
 import { useToast } from 'primevue/usetoast'
 import api from '@/api/client'
 import { proyectoActivoEnMes } from '@/utils/proyectoActivo'
-import { fmtCompact, formatPeriodo } from '@/utils/liquidaciones'
+import { fmtCompact, formatPeriodo, estadoFlujoPanel } from '@/utils/liquidaciones'
 
 const props = defineProps({
   embedded: { type: Boolean, default: false },

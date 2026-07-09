@@ -112,8 +112,7 @@
           </Column>
           <Column header="Estado">
             <template #body="{ data }">
-              <Tag :value="data.estado === 'firmado' ? 'Firmado' : 'Pendiente'"
-                :severity="data.estado === 'firmado' ? 'success' : 'warn'" class="text-[10px]" />
+              <Tag :value="estadoFlujoPanel(data).label" :severity="estadoFlujoPanel(data).sev" class="text-[10px]" />
             </template>
           </Column>
           <Column header="Ingresos" style="width:130px">
@@ -173,7 +172,7 @@ import {
 } from 'chart.js'
 import { Line } from 'vue-chartjs'
 import api from '@/api/client'
-import { fmtCompact, formatPeriodo } from '@/utils/liquidaciones'
+import { fmtCompact, formatPeriodo, estadoFlujoPanel, ESTADO_FLUJO } from '@/utils/liquidaciones'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler)
 
@@ -290,12 +289,11 @@ const maxTipoIngreso = computed(() => Math.max(1, ...porTipo.value.map(t => t.in
 const barPct = (v) => Math.round(v / maxTipoIngreso.value * 100)
 
 const pipeline = computed(() => {
-  const firmados = proyectos.value.filter(p => p.estado === 'firmado').length
-  const pendientes = proyectos.value.length - firmados
-  return [
-    { estado: 'firmado', label: 'Firmado', count: firmados, color: '#10B981' },
-    { estado: 'pendiente', label: 'Pendiente', count: pendientes, color: '#F59E0B' },
-  ].filter(s => s.count > 0)
+  const counts = { cargado: 0, numerado: 0, firmado: 0 }
+  for (const p of proyectos.value) counts[estadoFlujoPanel(p).key]++
+  return ESTADO_FLUJO
+    .map(s => ({ estado: s.key, label: s.label, count: counts[s.key], color: s.color }))
+    .filter(s => s.count > 0)
 })
 
 // ── Tendencia ────────────────────────────────────────────────────────────────

@@ -54,6 +54,19 @@ export function mesActualISO() {
 // El backend serializa enums como "TipoLineaMandatoEnum.foo" — normalizar a "foo".
 export const normTipo = (t) => (t || '').replace(/^TipoLineaMandatoEnum\./, '')
 
+// Flujo de estado del panel (#12), DERIVADO de señales existentes (sin migración):
+// Cargado (hay panel) → Numerado (tiene consecutivos) → Firmado (fecha_firma).
+export const ESTADO_FLUJO = [
+  { key: 'cargado', label: 'Cargado', color: '#F59E0B', sev: 'warn' },
+  { key: 'numerado', label: 'Numerado', color: '#3B82F6', sev: 'info' },
+  { key: 'firmado', label: 'Firmado', color: '#10B981', sev: 'success' },
+]
+export function estadoFlujoPanel(p) {
+  if (p?.fecha_firma) return ESTADO_FLUJO[2]
+  if (p?.consecutivo_ingresos != null || p?.consecutivo_costos != null) return ESTADO_FLUJO[1]
+  return ESTADO_FLUJO[0]
+}
+
 /** Normaliza un porcentaje de participación que puede venir en 0–1 o 0–100 → fracción 0–1. */
 export function normPct(p) {
   const n = Number(p) || 0
