@@ -4,7 +4,7 @@
  * Combina, para un período (YYYY-MM):
  *  - Mantenimiento  → /om/calculo/{periodo} (incluido + valor_a_facturar)   [mainteinance]
  *  - Arriendos      → /arriendos/calculo/{periodo} (incluido + canon_a_facturar) [lease]
- *  - Internet       → /starlink/factura/{periodo} (agrupado.sin_iva)         [public_services]
+ *  - Internet       → /starlink/factura/{periodo} (lineas.sin_iva, resueltas por proyecto) [public_services]
  *
  * Universo de proyectos = CATÁLOGO MAESTRO (MASTER_PKS), en su orden exacto.
  * Cada proyecto genera SIEMPRE sus 7 filas (una por payment_type); los payment_type
