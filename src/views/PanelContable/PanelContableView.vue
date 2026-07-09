@@ -131,7 +131,12 @@
             </div>
           </div>
 
-          <div v-if="!paneles.length" class="empty sm">
+          <div v-if="cargaError" class="empty sm">
+            No se pudieron cargar los paneles de {{ periodoLabel }} (error de conexión).
+            <button class="mini" style="margin-left:8px" @click="cargarPaneles">Reintentar</button>
+          </div>
+
+          <div v-else-if="!paneles.length" class="empty sm">
             No hay paneles para {{ periodoLabel }}. Carga uno o varios archivos ER.
           </div>
 
@@ -544,6 +549,7 @@ const savedAt = reactive({})
 const origenOpen = reactive({})
 const toggleOrigen = (id) => { origenOpen[id] = !origenOpen[id] }
 const loading = ref(false)
+const cargaError = ref(false)   // distingue "falló la carga" de "no hay paneles"
 const uploading = ref(0)
 const uploadMsg = ref('')
 const consIngIni = ref(793)
@@ -660,6 +666,7 @@ async function cargarPaneles () {
   if (tab.value === 'diferencia') return cargarDiferencia()
   if (!periodo.value) { paneles.value = []; return }
   loading.value = true
+  cargaError.value = false
   try {
     const { data } = await api.get('/panel-contable', { params: { periodo: periodo.value, tipo: tab.value } })
     paneles.value = data.paneles || []
@@ -671,6 +678,8 @@ async function cargarPaneles () {
       await reasignar(true)
     }
   } catch (e) {
+    cargaError.value = true
+    paneles.value = []
     toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudieron cargar los paneles', life: 4000 })
   } finally {
     loading.value = false
@@ -792,23 +801,40 @@ async function onErSelected (e) {
   }
 }
 
+// Aplica un cambio de flags en lote con rollback: si algún PATCH falla, revierte
+// SOLO esos paneles a su valor previo y avisa (antes se tragaba el error y la UI
+// quedaba desincronizada del backend).
+function _aplicarLoteFlags (campos, val, trasReasignar = true) {
+  const prev = paneles.value.map(p => ({ p, old: Object.fromEntries(campos.map(c => [c, p[c]])) }))
+  paneles.value.forEach(p => campos.forEach(c => { p[c] = val }))
+  Promise.all(paneles.value.map(p => {
+    const payload = Object.fromEntries(campos.map(c => [c, p[c]]))
+    return api.patch(`/panel-contable/${p.id}`, payload).then(() => null).catch(() => p.id)
+  })).then(res => {
+    const fallidos = new Set(res.filter(Boolean))
+    if (fallidos.size) {
+      prev.forEach(({ p, old }) => { if (fallidos.has(p.id)) Object.assign(p, old) })
+      toast.add({ severity: 'warn', summary: 'Algunos no se guardaron',
+        detail: `${fallidos.size} panel(es) revertido(s)`, life: 3500 })
+    }
+    if (trasReasignar) reasignar()
+  })
+}
+
 function selAll (campo, val) {
   // El usuario decide qué liquidar; 'liquidar_costos' ya no se ata a si el ER trajo
   // costos (pueden faltar este mes o venir luego de la vista de costos).
-  paneles.value.forEach(p => { p[campo] = val })
-  Promise.all(paneles.value.map(p => api.patch(`/panel-contable/${p.id}`, {
-    [campo]: p[campo],
-  }).catch(() => {}))).then(() => { if (campo !== 'generar_mandatos') reasignar() })
+  _aplicarLoteFlags([campo], val, campo !== 'generar_mandatos')
 }
 
 function selNinguno () {
-  paneles.value.forEach(p => { p.liquidar_ingresos = false; p.liquidar_costos = false })
-  Promise.all(paneles.value.map(p => api.patch(`/panel-contable/${p.id}`, {
-    liquidar_ingresos: false, liquidar_costos: false,
-  }).catch(() => {}))).then(() => reasignar())
+  _aplicarLoteFlags(['liquidar_ingresos', 'liquidar_costos'], false, true)
 }
 
 async function onFlag (p) {
+  // v-model ya aplicó el cambio en p antes de este handler, así que no tenemos el
+  // valor previo para revertir localmente: si el PATCH falla, resincronizamos desde
+  // el backend (autoritativo) para que el checkbox refleje lo realmente guardado.
   try {
     await api.patch(`/panel-contable/${p.id}`, {
       liquidar_ingresos: p.liquidar_ingresos,
@@ -816,7 +842,10 @@ async function onFlag (p) {
       generar_mandatos: p.generar_mandatos,
     })
     reasignar()
-  } catch (e) { /* noop */ }
+  } catch (e) {
+    toast.add({ severity: 'error', summary: 'No se guardó', detail: 'Recargando estado…', life: 3000 })
+    cargarPaneles()
+  }
 }
 
 // Renumeración completa (desde el valor inicial) — al cambiar el consecutivo inicial.
@@ -826,21 +855,24 @@ const reasignarTodo = () => reasignar(false)
 // asignados/editados. false: renumera todo desde el valor inicial.
 async function reasignar (soloFaltantes = true) {
   try {
-    await api.post('/panel-contable/reasignar-consecutivos', {
+    // La respuesta trae 'asignados' con los consecutivos de cada panel, así que
+    // actualizamos en memoria SIN un segundo GET completo (antes: POST + GET =
+    // triple round-trip al entrar/cambiar de pestaña).
+    const { data } = await api.post('/panel-contable/reasignar-consecutivos', {
       periodo: periodo.value,
       tipo: tab.value,
       consecutivo_ingresos_inicial: Number(consIngIni.value) || 0,
       consecutivo_costos_inicial: Number(consCosIni.value) || 0,
       solo_faltantes: soloFaltantes,
     })
-    // Refrescar consecutivos sin perder el estado de despliegue.
-    const { data } = await api.get('/panel-contable', { params: { periodo: periodo.value, tipo: tab.value } })
-    const map = Object.fromEntries((data.paneles || []).map(p => [p.id, p]))
+    const map = Object.fromEntries((data.asignados || []).map(a => [a.panel_id, a]))
     paneles.value.forEach(p => {
       const fresh = map[p.id]
       if (fresh) { p.consecutivo_ingresos = fresh.consecutivo_ingresos; p.consecutivo_costos = fresh.consecutivo_costos }
     })
-  } catch (e) { /* noop */ }
+  } catch (e) {
+    toast.add({ severity: 'warn', summary: 'Consecutivos', detail: 'No se pudieron reasignar los consecutivos', life: 3500 })
+  }
 }
 
 // Reemplaza un panel en paneles.value con la respuesta del backend,
