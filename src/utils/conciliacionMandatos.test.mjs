@@ -13,8 +13,8 @@ import { dirname, join } from 'path'
 const here = dirname(fileURLToPath(import.meta.url))
 let src = fs.readFileSync(join(here, 'conciliacionMandatos.js'), 'utf8')
 src = src.replace(/export const /g, 'const ').replace(/export function /g, 'function ')
-const api = new Function(src + '\nreturn { parseAsientos, extractMandate, suggestTag, reconciliar, plantaDesdeEtiqueta, parseIngresos, matchIngresoContab, parseMandatoNumber, parseAsientoNumber };')()
-const { parseAsientos, extractMandate, suggestTag, reconciliar, plantaDesdeEtiqueta, parseIngresos, matchIngresoContab, parseMandatoNumber, parseAsientoNumber } = api
+const api = new Function(src + '\nreturn { parseAsientos, extractMandate, suggestTag, reconciliar, plantaDesdeEtiqueta, parseIngresos, matchIngresoContab, parseMandatoNumber, parseAsientoNumber, expandirAbreviaturas };')()
+const { parseAsientos, extractMandate, suggestTag, reconciliar, plantaDesdeEtiqueta, parseIngresos, matchIngresoContab, parseMandatoNumber, parseAsientoNumber, expandirAbreviaturas } = api
 
 let ok = true
 const assert = (cond, msg) => { console.log((cond ? '✅' : '❌') + ' ' + msg); if (!cond) ok = false }
@@ -163,6 +163,125 @@ assert(Math.round(resArr.sums.arr) === 1842569,
 assert(resArr.lines.every((l) => l.asociado === BANC),
   'ESMERALDA: las líneas conciliadas son solo del mandante (arrendadores excluidos)')
 assert(resArr.status === 'ok', `ESMERALDA arriendo: status = ${resArr.status} (esperado ok — reconcilia exacto)`)
+
+// 8) BUG 1 — Póliza y Servicios Públicos: cuentas 28151004/28151007/28151008
+//    que antes se ignoraban (ni se sumaban del asiento ni se buscaban en el PDF).
+{
+  const TAGP = '[10099] PLANTA POLIZA'
+  const MANDP = 'ACME S A S'
+  const pdfPol = `CMU7001
+en calidad de mandatario, y ACME S.A.S., con NIT. 900.111.222-3, en calidad de mandante, relacionado con el proyecto PLANTA POLIZA.
+POLIZA TODO RIESGO Y LUCROCESANTE $ 500,000.00
+IVA POLIZA $ 95,000.00
+SERVICIOS PUBLICOS - CONSUMO DE ENERGIA $ 300,000.00
+VALOR A PAGAR $ 895,000.00`
+  const mp = extractMandate(pdfPol, 'x-CMU7001.pdf')
+  assert(mp.vals.poliza === 500000, `BUG1: PDF poliza = ${mp.vals.poliza} (esperado 500000)`)
+  assert(mp.vals.iva_poliza === 95000, `BUG1: PDF iva_poliza = ${mp.vals.iva_poliza} (esperado 95000, NO en poliza)`)
+  assert(mp.vals.serv_pub === 300000, `BUG1: PDF serv_pub = ${mp.vals.serv_pub} (esperado 300000)`)
+  const polLineas = [
+    { asociado: MANDP, acc: '28151004', accDesc: '', debe: 500000, haber: 0, etiqueta: '', proj: TAGP },
+    { asociado: MANDP, acc: '28151007', accDesc: '', debe: 95000, haber: 0, etiqueta: '', proj: TAGP },
+    { asociado: MANDP, acc: '28151008', accDesc: '', debe: 300000, haber: 0, etiqueta: '', proj: TAGP },
+  ]
+  const resPol = reconciliar(mp, polLineas, TAGP)
+  assert(resPol.sums.poliza === 500000 && resPol.sums.iva_poliza === 95000 && resPol.sums.serv_pub === 300000,
+    `BUG1: sums poliza/iva/serv = ${resPol.sums.poliza}/${resPol.sums.iva_poliza}/${resPol.sums.serv_pub}`)
+  assert(resPol.status === 'ok', `BUG1: status = ${resPol.status} (esperado ok — Póliza y Serv. Públicos ahora conciliados)`)
+}
+
+// 9) BUG 2 — abreviatura "PA" (Patrimonio Autónomo) en el Asociado (caso Nestlé).
+//    El asiento abrevia el mandante con "PA"; debe reconocerse igual al mandato
+//    que trae el nombre completo "PATRIMONIOS AUTONOMOS...".
+{
+  assert(expandirAbreviaturas('FIDUCIARIA BANCOLOMBIA PA NESTLE 18254').includes('PATRIMONIOS AUTONOMOS'),
+    'BUG2: expandirAbreviaturas expande "PA" -> "PATRIMONIOS AUTONOMOS"')
+  // "PARQUE" NO debe expandirse (solo la palabra completa "PA").
+  assert(!expandirAbreviaturas('PARQUE INDUSTRIAL').includes('PATRIMONIOS AUTONOMOS'),
+    'BUG2: "PARQUE" no se toca (límite de palabra)')
+  const TAGN = '[18254] NESTLE'
+  const MAND_FULL = 'PATRIMONIOS AUTONOMOS FIDUCIARIA BANCOLOMBIA S A SOCIEDAD FIDUCIARIA NESTLE'
+  const ASO_ABREV = 'FIDUCIARIA BANCOLOMBIA PA NESTLE 18254'
+  const nestleLineas = [
+    { asociado: ASO_ABREV, acc: '28151002', accDesc: '', debe: 1000000, haber: 0, etiqueta: '', proj: TAGN },
+    { asociado: ASO_ABREV, acc: '28151003', accDesc: '', debe: 190000, haber: 0, etiqueta: '', proj: TAGN },
+  ]
+  const resNestle = reconciliar({ mandante: MAND_FULL, vals: { mant: 1000000, iva_mant: 190000 }, total: 1190000 }, nestleLineas, TAGN)
+  assert(resNestle.lines.length === 2, `BUG2: líneas conciliadas = ${resNestle.lines.length} (esperado 2, "PA" reconocido)`)
+  assert(resNestle.sums.mant === 1000000 && resNestle.sums.iva_mant === 190000,
+    `BUG2: mant/iva = ${resNestle.sums.mant}/${resNestle.sums.iva_mant} pasan de "no registrado" a coincide`)
+  assert(resNestle.status === 'ok', `BUG2: status = ${resNestle.status} (esperado ok)`)
+}
+
+// 10) BUG 3 — el mandato lista el mismo concepto en dos líneas: se SUMA (no se pisa).
+{
+  const pdfDup = `CMU7003
+en calidad de mandatario, y ACME S.A.S., con NIT. 900.000.000-0, en calidad de mandante, relacionado con el proyecto PLANTA DUP.
+ARRIENDO CUENTA DE COBRO $ 79,705.00
+ARRIENDO FACTURA ELECTRONICA $ 79,706.00
+VALOR A PAGAR $ 159,411.00`
+  const md = extractMandate(pdfDup, 'x-CMU7003.pdf')
+  // arr_cc y arr_fact son conceptos distintos aquí; el sumar aplica cuando dos
+  // líneas caen en el MISMO concepto — se comprueba con dos genéricos "ARRIENDO".
+  const pdfDup2 = `CMU7004
+en calidad de mandatario, y ACME S.A.S., con NIT. 900.000.000-0, en calidad de mandante, relacionado con el proyecto PLANTA DUP2.
+ARRIENDO $ 40,000.00
+ARRIENDO $ 39,705.00
+VALOR A PAGAR $ 79,705.00`
+  const md2 = extractMandate(pdfDup2, 'x-CMU7004.pdf')
+  assert(md2.vals.arr === 79705, `BUG3: dos líneas "ARRIENDO" se suman = ${md2.vals.arr} (esperado 79705, NO 39705 pisado)`)
+  assert(md.vals.arr_cc === 79705 && md.vals.arr_fact === 79706,
+    `BUG3/4: arr_cc/arr_fact = ${md.vals.arr_cc}/${md.vals.arr_fact} (reglas específicas antes de la genérica)`)
+}
+
+// 11) BUG 4 — split de arriendo por ETIQUETA del asiento (caso La Reserva).
+//     Misma cuenta 28150517, distinta etiqueta: "CC" (Cuenta de Cobro) vs "FACT".
+{
+  const pdfLR = `CMU1136
+en calidad de mandatario, y STRADA ASOCIADOS S.A.S., con NIT. 900.123.456-7, en calidad de mandante, relacionado con el proyecto MINIGRANJA SOLAR LA RESERVA.
+ARRIENDO CUENTA DE COBRO $ 79,705.00
+ARRIENDO FACTURA ELECTRONICA $ 79,706.00
+VALOR A PAGAR $ 159,411.00`
+  const mLR = extractMandate(pdfLR, 'x-CMU1136.pdf')
+  const TAGLR = 'MINIGRANJA SOLAR LA RESERVA'
+  const MANDLR = 'STRADA ASOCIADOS S A S'
+  const lrLineas = [
+    { asociado: MANDLR, acc: '28150517', accDesc: '', debe: 79705, haber: 0, etiqueta: 'ARRIENDO CC 40100', proj: TAGLR },
+    { asociado: MANDLR, acc: '28150517', accDesc: '', debe: 79706, haber: 0, etiqueta: 'ARRIENDO FACT 40101', proj: TAGLR },
+  ]
+  const resLR = reconciliar(mLR, lrLineas, TAGLR)
+  assert(resLR.sums.arr_cc === 79705, `BUG4: arr_cc del asiento = ${resLR.sums.arr_cc} (esperado 79705 por etiqueta CC)`)
+  assert(resLR.sums.arr_fact === 79706, `BUG4: arr_fact del asiento = ${resLR.sums.arr_fact} (esperado 79706 por etiqueta FACT)`)
+  assert(resLR.sums.arr === undefined, 'BUG4: no queda "arr" genérico cuando la etiqueta reclasifica ambas')
+  assert(resLR.status === 'ok', `BUG4: status = ${resLR.status} (esperado ok — cada factura concilia por separado)`)
+  // Regresión: si la etiqueta NO trae CC/FACT, sigue cayendo en 'arr' genérico.
+  const lrGen = [{ asociado: MANDLR, acc: '28150517', accDesc: '', debe: 100, haber: 0, etiqueta: 'ARRIENDO ABRIL', proj: TAGLR }]
+  const resGen = reconciliar({ mandante: MANDLR, vals: { arr: 100 }, total: 100 }, lrGen, TAGLR)
+  assert(resGen.sums.arr === 100, `BUG4: etiqueta sin CC/FACT sigue en 'arr' genérico = ${resGen.sums.arr}`)
+}
+
+// 12) BUG 5 — Administración e IVA administración: cuentas 28151020/28151021
+//     que antes se ignoraban (ni se sumaban del asiento ni se buscaban en el PDF).
+{
+  const TAGA = '[10100] PLANTA ADMIN'
+  const MANDA = 'ACME S A S'
+  const pdfAdm = `CMU7002
+en calidad de mandatario, y ACME S.A.S., con NIT. 900.111.222-3, en calidad de mandante, relacionado con el proyecto PLANTA ADMIN.
+ADMINISTRACION DE PROYECTOS $ 200,000.00
+IVA ADMINISTRACION $ 38,000.00
+VALOR A PAGAR $ 238,000.00`
+  const ma = extractMandate(pdfAdm, 'x-CMU7002.pdf')
+  assert(ma.vals.admin === 200000, `BUG5: PDF admin = ${ma.vals.admin} (esperado 200000)`)
+  assert(ma.vals.iva_admin === 38000, `BUG5: PDF iva_admin = ${ma.vals.iva_admin} (esperado 38000, NO en admin)`)
+  const admLineas = [
+    { asociado: MANDA, acc: '28151020', accDesc: '', debe: 200000, haber: 0, etiqueta: '', proj: TAGA },
+    { asociado: MANDA, acc: '28151021', accDesc: '', debe: 38000, haber: 0, etiqueta: '', proj: TAGA },
+  ]
+  const resAdm = reconciliar(ma, admLineas, TAGA)
+  assert(resAdm.sums.admin === 200000 && resAdm.sums.iva_admin === 38000,
+    `BUG5: sums admin/iva = ${resAdm.sums.admin}/${resAdm.sums.iva_admin}`)
+  assert(resAdm.status === 'ok', `BUG5: status = ${resAdm.status} (esperado ok — Administración ahora conciliada)`)
+}
 
 console.log(ok ? '\nTODOS LOS TESTS PASARON' : '\nHAY FALLOS')
 process.exit(ok ? 0 : 1)
