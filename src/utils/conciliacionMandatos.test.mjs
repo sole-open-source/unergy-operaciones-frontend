@@ -283,5 +283,32 @@ VALOR A PAGAR $ 238,000.00`
   assert(resAdm.status === 'ok', `BUG5: status = ${resAdm.status} (esperado ok — Administración ahora conciliada)`)
 }
 
+// 13) BUG 6 — asociado ABREVIADO en el asiento (caso real Sol Sierra, CMU1107).
+//     El mandante del PDF trae el nombre corporativo completo + fondo, pero el
+//     asiento abrevia a "PA 17844 SOL DE LA SIERRA" (sin FIDUCIARIA/BANCOLOMBIA).
+//     Debe reconciliar; y fondos distintos (18254 Nestlé, Skandia) NO deben cruzar.
+{
+  const TAGSS = '[10051] COLCEST53P1 LA PAZ LEYENDA'
+  const MAND_SS = 'PATRIMONIOS AUTONOMOS FIDUCIARIA BANCOLOMBIA S A SOCIEDAD FIDUCIARIA - 17844 SOL DE LA SIERRA'
+  const lineasSS = [
+    { asociado: 'PA 17844 SOL DE LA SIERRA', acc: '28151009', accDesc: '', debe: 64706.3, haber: 0, etiqueta: '', proj: TAGSS },
+    { asociado: 'PA 17844 SOL DE LA SIERRA', acc: '28151010', accDesc: '', debe: 12294.2, haber: 0, etiqueta: '', proj: TAGSS },
+    { asociado: 'PA 17844 SOL DE LA SIERRA', acc: '28151020', accDesc: '', debe: 2681883.45, haber: 0, etiqueta: '', proj: TAGSS },
+    { asociado: 'PA 17844 SOL DE LA SIERRA', acc: '28151021', accDesc: '', debe: 509557.86, haber: 0, etiqueta: '', proj: TAGSS },
+    // Ruido: otro tercero del MISMO proyecto que NO debe sumarse.
+    { asociado: 'SOLENIUM SAS', acc: '28151020', accDesc: '', debe: 999999, haber: 0, etiqueta: '', proj: TAGSS },
+    // Otro patrimonio Bancolombia con fondo DISTINTO (Nestlé 18254): NO debe cruzar.
+    { asociado: 'FIDUCIARIA BANCOLOMBIA PA NESTLE 18254', acc: '28151020', accDesc: '', debe: 888888, haber: 0, etiqueta: '', proj: TAGSS },
+  ]
+  const resSS = reconciliar({ mandante: MAND_SS, vals: { int: 64706.3, iva_int: 12294.2, admin: 2681883.45, iva_admin: 509557.86 }, total: 3268441.81 }, lineasSS, TAGSS)
+  assert(resSS.lines.length === 4, `BUG6: líneas Sol Sierra = ${resSS.lines.length} (esperado 4, "PA 17844 SOL DE LA SIERRA" reconocido; Solenium y Nestlé fuera)`)
+  assert(Math.round(resSS.sums.admin) === 2681883, `BUG6: admin = ${resSS.sums.admin} (esperado 2681883, sin sumar 999999/888888)`)
+  assert(resSS.status === 'ok', `BUG6: status = ${resSS.status} (esperado ok — antes: todo faltante, suma 0)`)
+  // Fondo distinto: un mandato Nestlé (18254) NO debe emparejar la línea Sol Sierra.
+  const resNo = reconciliar({ mandante: 'PATRIMONIOS AUTONOMOS FIDUCIARIA BANCOLOMBIA S A SOCIEDAD FIDUCIARIA - 18254 NESTLE',
+    vals: { admin: 888888 }, total: 888888 }, lineasSS, TAGSS)
+  assert(resNo.sums.admin === 888888, `BUG6: Nestlé (18254) solo suma su propia línea = ${resNo.sums.admin} (esperado 888888, NO Sol Sierra)`)
+}
+
 console.log(ok ? '\nTODOS LOS TESTS PASARON' : '\nHAY FALLOS')
 process.exit(ok ? 0 : 1)
