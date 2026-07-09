@@ -67,6 +67,7 @@ const router = useRouter()
 
 const liq = ref(null)
 const inversionistas = ref([])
+const panelER = ref(null)   // entrada de proyecto de resumen-panel (fuente única del ER)
 const htmlContent = ref('')
 const actualizadoEn = ref(null)
 const loading = ref(false)
@@ -89,7 +90,7 @@ const comp = ref(null)          // { actual:{ingresos,costosOp,facturas,neto}, p
 const tarifas = ref({ representacion: null, cgm: null, admin: null })
 
 // Columnas (Total + inversionistas con movimientos) para selector y armado
-const cols = computed(() => (liq.value ? columnasDe(liq.value, inversionistas.value) : []))
+const cols = computed(() => columnasDe())
 const opcionesInv = computed(() => [
   { label: 'Todos (Total + inversionistas)', value: null },
   ...cols.value.filter(c => !c.es_total).map(c => ({ label: `${c.nombre} (${c.pct})`, value: Number(String(c.id).replace('inv', '')) })),
@@ -120,51 +121,73 @@ function volver() {
 const esc = (s) => (s == null ? '' : String(s)).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
 const esDel = (m, piId) => m.inversionista?.id === piId || m.inversionista_id === piId
 
-function columnasDe(l, invs) {
-  const esAuto = l.tipo_venta === 'autoconsumo'
-  const soportes = indiceSoportesProyecto(l)
-  const mandatos = l.mandatos || []
-  const pickTotal = (tipo) => {
-    const total = mandatos.filter(x => x.tipo === tipo && x.inversionista_id == null && !x.inversionista)
-    return total.length ? total : mandatos.filter(x => x.tipo === tipo && (x.inversionista || x.inversionista_id != null))
+// Grupos del ER en orden; los negativos (comercializacion/costos/facturas) se
+// muestran como magnitud con signo del grupo (igual que construirEstadoResultados).
+const GRUPOS_ER = [
+  { key: 'ingresos', label: 'Ingresos', sign: 1 },
+  { key: 'comercializacion', label: 'Comercialización / Bolsa', sign: -1 },
+  { key: 'costos', label: 'Costos operativos (OPEX)', sign: -1 },
+  { key: 'facturas', label: 'Facturas de servicio', sign: -1 },
+]
+
+// Construye el mismo shape de `er` que construirEstadoResultados, pero desde los
+// conceptos del Panel Contable (fuente única). El Panel guarda los costos con signo
+// negativo; aquí se toma la magnitud por grupo (sign indica dirección), y el neto se
+// calcula con signo para coincidir con utilidad(inv) del Panel.
+function erDesdeConceptos(conceptos) {
+  const grupos = []
+  let ingresosTot = 0, comercTot = 0, costosTot = 0, facturasTot = 0
+  for (const g of GRUPOS_ER) {
+    const order = []
+    const map = new Map()
+    for (const c of (conceptos || [])) {
+      if (c.grupo !== g.key) continue
+      if (!map.has(c.concepto)) { map.set(c.concepto, 0); order.push(c.concepto) }
+      map.set(c.concepto, map.get(c.concepto) + (Number(c.valor_cop) || 0))
+    }
+    if (!order.length) continue
+    const rawTotal = order.reduce((s, c) => s + map.get(c), 0)
+    const neg = g.sign < 0
+    const lineas = order.map(c => ({
+      label: c, valor: neg ? Math.abs(map.get(c)) : map.get(c),
+      soporte_url: null, referencia: null, refCodigo: null,
+    }))
+    grupos.push({ key: g.key, label: g.label, lineas, total: neg ? Math.abs(rawTotal) : rawTotal, sign: g.sign })
+    if (g.key === 'ingresos') ingresosTot = rawTotal
+    else if (g.key === 'comercializacion') comercTot = Math.abs(rawTotal)
+    else if (g.key === 'costos') costosTot = Math.abs(rawTotal)
+    else if (g.key === 'facturas') facturasTot = Math.abs(rawTotal)
   }
+  const valorAPagar = ingresosTot - comercTot
+  const neto = valorAPagar - costosTot - facturasTot   // = ingresos + comerc + costos + facturas (con signo)
+  return { grupos, valorAPagar, costosOperativos: costosTot, facturasTotal: facturasTot, neto }
+}
+
+// Columnas (Total + cada inversionista) desde el Panel Contable del período.
+function columnasDe() {
+  const p = panelER.value
+  if (!p) return []
+  const invs = p.inversionistas || []
   const cols = [{
     id: 'total', nombre: 'Total', pct: '100%', es_total: true,
-    er: construirEstadoResultados({
-      ingresosMandatos: pickTotal('ingresos'), costosMandatos: pickTotal('costos'),
-      costos: l.costos || [], facturas: l.facturas || [], esAutoconsumo: esAuto, soportes,
-    }),
+    er: erDesdeConceptos(invs.flatMap(i => i.conceptos || [])),
   }]
-  for (const pi of (invs || [])) {
-    const ing = mandatos.filter(m => m.tipo === 'ingresos' && esDel(m, pi.id))
-    const cos = mandatos.filter(m => m.tipo === 'costos' && esDel(m, pi.id))
-    if (!ing.length && !cos.length) continue
-    // er SIN facturas: en la vista "Todos" las facturas de servicio van solo en el Total
-    // (se prorratean por inversionista solo cuando se selecciona uno — ver erConFacturas).
-    const er = construirEstadoResultados({ ingresosMandatos: ing, costosMandatos: cos, esAutoconsumo: esAuto, soportes })
+  for (const inv of invs) {
+    const er = erDesdeConceptos(inv.conceptos || [])
     if (!er.grupos.length) continue
     cols.push({
-      id: 'inv' + pi.id, nombre: pi.cliente_nombre || 'Inversionista',
-      pct: pct(pi.porcentaje_participacion), er,
-      _ing: ing, _cos: cos, _frac: normPct(pi.porcentaje_participacion),
+      id: 'inv' + (inv.proyecto_inversionista_id ?? inv.cliente_id ?? inv.nombre),
+      nombre: inv.cliente_nombre || inv.nombre || 'Inversionista',
+      pct: inv.porcentaje != null ? inv.porcentaje.toFixed(2) + '%' : '—',
+      er,
     })
   }
   for (const c of cols) c.neto = c.er.neto
   return cols
 }
 
-// er del informe para una columna: Total tal cual; inversionista con SUS facturas
-// de servicio prorrateadas (para informe/Excel individual completo).
-function erConFacturas(col) {
-  if (!col || col.es_total) return col?.er
-  const l = liq.value || {}
-  const soportes = indiceSoportesProyecto(l)
-  const facturasInv = (l.facturas || []).map(f => ({ ...f, valor_cop: (Number(f.valor_cop) || 0) * (col._frac || 0) }))
-  return construirEstadoResultados({
-    ingresosMandatos: col._ing || [], costosMandatos: col._cos || [],
-    facturas: facturasInv, esAutoconsumo: l.tipo_venta === 'autoconsumo', soportes,
-  })
-}
+// Con el Panel, cada inversionista ya trae sus facturas de servicio en sus conceptos.
+function erConFacturas(col) { return col?.er }
 
 // Tabla angosta (Concepto · Valor · Soporte) para un estado de resultados.
 function detalleHtml(er) {
@@ -271,7 +294,9 @@ function buildHtml() {
   const sel = selInv.value
   const selCol = sel != null ? cs.find(c => c.id === 'inv' + sel) : null
   let estado = ''
-  if (selCol) {
+  if (!cs.length) {
+    estado = `<section class="rpt-block"><div class="rpt-empty">Sin panel contable para este período. Carga el ER en Panel Contable.</div></section>`
+  } else if (selCol) {
     const erSel = erConFacturas(selCol)
     estado = `
     <section class="rpt-block rpt-inv">
@@ -412,33 +437,31 @@ async function loadTarifas() {
   } catch { /* tarifas opcionales */ }
 }
 async function loadComparativo() {
+  // "Este mes vs promedio 3 meses" desde el Panel Contable (fuente única), no de la
+  // vista operativa vieja. costos_cop ya viene con signo (comercializacion+costos+facturas).
   comp.value = null
-  if (!liq.value?.proyecto_id) return
+  if (!liq.value?.proyecto_id || !liq.value?.periodo) return
   try {
-    const { data } = await api.get('/liquidaciones/vistas/por-proyecto', { params: { proyecto_id: liq.value.proyecto_id } })
-    const proy = Array.isArray(data) ? (data.find(p => String(p.proyecto_id) === String(liq.value.proyecto_id)) || data[0]) : null
-    const liqs = proy?.liquidaciones || []
-    const sum = (arr, k) => (arr || []).reduce((s, x) => s + (Number(x?.[k]) || 0), 0)
-    const itemsDe = (q) => {
-      // "Ingresos" = ingreso bruto; el neto se calcula sobre el valor a pagar.
-      const gross = Number(q.resumen?.total_ingresos_cop) || sum(q.mandatos_total_ingresos, 'total_ingresos_cop') || 0
-      const vap = sum(q.mandatos_total_ingresos, 'valor_neto_cop') || 0
-      const ingresos = gross || vap
-      const cos = Number(q.resumen?.total_costos_cop) || sum(q.mandatos_total_costos, 'valor_neto_cop') || 0
-      const fac = Number(q.resumen?.total_facturas_cop) || sum(q.facturas_servicio, 'valor_cop') || 0
-      const neto = Number(q.resumen?.ingreso_neto_cop) || ((vap || ingresos) - cos - fac)
-      return { ingresos, costosOp: cos, facturas: fac, neto }
+    const per = liq.value.periodo.slice(0, 7)
+    const [y, m] = per.split('-').map(Number)
+    const d0 = new Date(y, m - 1 - 3, 1)
+    const desde = `${d0.getFullYear()}-${String(d0.getMonth() + 1).padStart(2, '0')}`
+    const { data } = await api.get('/liquidaciones/resumen-panel-rango', {
+      params: { periodo_desde: desde, periodo_hasta: per, tipo: 'preliquidacion' },
+    })
+    const byMes = {}
+    for (const entry of (data.periodos || [])) {
+      const proy = (entry.proyectos || []).find(p => p.proyecto_id === liq.value.proyecto_id)
+      if (proy) byMes[entry.periodo] = { ingresos: proy.ingresos_cop, costosOp: proy.costos_cop, facturas: 0, neto: proy.valor_a_pagar_total }
     }
-    const conV = (it) => it.ingresos !== 0 || it.costosOp !== 0 || it.facturas !== 0
-    const per = liq.value.periodo
-    const actualLiq = liqs.find(x => x.periodo === per)
-    const prev = liqs.filter(x => x.periodo < per).sort((a, b) => b.periodo.localeCompare(a.periodo)).slice(0, 3).map(itemsDe).filter(conV)
+    const actual = byMes[per] || null
+    const prevKeys = Object.keys(byMes).filter(k => k < per).sort().slice(-3)
     let promedio = null
-    if (prev.length) {
-      const avg = (k) => prev.reduce((s, it) => s + it[k], 0) / prev.length
+    if (prevKeys.length) {
+      const avg = (f) => prevKeys.reduce((s, k) => s + (byMes[k][f] || 0), 0) / prevKeys.length
       promedio = { ingresos: avg('ingresos'), costosOp: avg('costosOp'), facturas: avg('facturas'), neto: avg('neto') }
     }
-    comp.value = { actual: actualLiq ? itemsDe(actualLiq) : null, promedio }
+    comp.value = { actual, promedio }
   } catch { /* comparativo opcional */ }
 }
 
@@ -453,6 +476,14 @@ async function load() {
         const r = await api.get(`/proyectos/${data.proyecto_id}/inversionistas`)
         inversionistas.value = Array.isArray(r.data) ? r.data : (r.data?.items ?? [])
       } catch { inversionistas.value = [] }
+      // Estado de Resultados del informe = espejo del Panel Contable del período.
+      try {
+        const per = (data.periodo || '').slice(0, 7)
+        if (per) {
+          const { data: rp } = await api.get('/liquidaciones/resumen-panel', { params: { periodo: per, tipo: 'preliquidacion' } })
+          panelER.value = (rp.proyectos || []).find(p => p.proyecto_id === data.proyecto_id) || null
+        }
+      } catch { panelER.value = null }
     }
     // Datos en vivo (generación + comparativo), opcionales y en paralelo
     await Promise.all([loadGeneracion(), loadComparativo()])
