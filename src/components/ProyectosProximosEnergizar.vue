@@ -7,19 +7,27 @@
         <i class="pi pi-bolt" style="color: #F0C040;" />
         <div>
           <h2 class="text-base font-bold" style="color: #2C2039;">Proyectos próximos a energizarse</h2>
-          <p class="text-xs mt-0.5" style="color: #7a6e8a;">
-            {{ projects.length }} proyecto{{ projects.length !== 1 ? 's' : '' }} en el pipeline
-            <span v-if="lastSync"> · última sincronización {{ lastSyncLabel }}</span>
+          <p v-if="lastSync" class="text-xs mt-0.5" style="color: #7a6e8a;">
+            última sincronización {{ lastSyncLabel }}
           </p>
         </div>
       </div>
-      <div class="flex items-center gap-4 flex-wrap">
-        <label class="flex items-center gap-2 text-xs cursor-pointer select-none" style="color: #7a6e8a;">
-          <input type="checkbox" v-model="soloConFrontera" />
-          Solo con frontera asignada
-          <i class="pi pi-info-circle" style="font-size:0.7rem;"
-             v-tooltip="'Proyectos en construcción que ya tienen frontera comercial registrada — señal real de energización inminente'" />
-        </label>
+      <div class="flex items-center gap-2.5 flex-wrap">
+        <div class="stat-pill">
+          <span class="stat-num">{{ projects.length }}</span>
+          <span class="stat-label">en pipeline</span>
+        </div>
+        <button
+          type="button"
+          class="stat-pill clickable"
+          :class="{ active: soloConFrontera }"
+          @click="soloConFrontera = !soloConFrontera"
+          v-tooltip.bottom="'Ya tienen frontera comercial registrada en Quoia — señal real de energización, más confiable que la fase de Sun Factory. Clic para ver solo estos.'"
+        >
+          <span class="stat-num" style="color:#15803d;">{{ conFronteraCount }}</span>
+          <span class="stat-label">con frontera asignada</span>
+          <i class="pi" :class="soloConFrontera ? 'pi-times-circle' : 'pi-filter'" style="font-size:0.65rem;" />
+        </button>
         <Button
           icon="pi pi-sync"
           label="Actualizar"
@@ -298,6 +306,8 @@ const filteredProjects = computed(() =>
   soloConFrontera.value ? projects.value.filter(p => p.tieneFrontera) : projects.value
 )
 
+const conFronteraCount = computed(() => projects.value.filter(p => p.tieneFrontera).length)
+
 const lastSyncLabel = computed(() => {
   if (!lastSync.value) return ''
   const mins = Math.round((Date.now() - lastSync.value.getTime()) / 60000)
@@ -424,6 +434,31 @@ function isProrated(project, year, month) {
 </script>
 
 <style scoped>
+/* Tarjetas de resumen en el header -- responden "cuántos" de un vistazo,
+   y la de "con frontera" duplica como el toggle del filtro (antes un
+   checkbox aparte, poco intuitivo). */
+.stat-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 12px; border-radius: 10px;
+  background: rgba(44,32,57,0.04);
+  border: 1.5px solid transparent;
+  font-size: 12px;
+}
+.stat-pill.clickable {
+  cursor: pointer;
+  background: rgba(22,163,74,0.07);
+  transition: background 0.12s, border-color 0.12s;
+}
+.stat-pill.clickable:hover { background: rgba(22,163,74,0.13); }
+.stat-pill.clickable.active {
+  background: rgba(22,163,74,0.14);
+  border-color: rgba(22,163,74,0.4);
+}
+.stat-pill.clickable .pi-filter,
+.stat-pill.clickable .pi-times-circle { color: #15803d; }
+.stat-num { font-size: 15px; font-weight: 800; color: #2C2039; font-variant-numeric: tabular-nums; }
+.stat-label { color: #7a6e8a; white-space: nowrap; }
+
 :deep(.energ-table .p-datatable-thead th) {
   background: rgba(44,32,57,0.05);
   color: #7a6e8a;
