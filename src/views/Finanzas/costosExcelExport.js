@@ -4,7 +4,7 @@
  * Combina, para un período (YYYY-MM):
  *  - Mantenimiento  → /om/calculo/{periodo} (incluido + valor_a_facturar)   [mainteinance]
  *  - Arriendos      → /arriendos/calculo/{periodo} (incluido + canon_a_facturar) [lease]
- *  - Internet       → /starlink/factura/{periodo} (agrupado.monto_total)     [public_services]
+ *  - Internet       → /starlink/factura/{periodo} (agrupado.sin_iva)         [public_services]
  *
  * Universo de proyectos = CATÁLOGO MAESTRO (MASTER_PKS), en su orden exacto.
  * Cada proyecto genera SIEMPRE sus 7 filas (una por payment_type); los payment_type
@@ -132,7 +132,7 @@ export async function generarExcelCostos(periodo) {
   const pubByPk = {}
   agrupado.forEach(it => {
     const pk = resolvePk(starlinkPanel(it.descripcion))
-    pubByPk[pk] = (pubByPk[pk] || 0) + (it.monto_total || 0)
+    pubByPk[pk] = (pubByPk[pk] || 0) + (it.sin_iva || 0)
   })
 
   // Valores guardados por el usuario, indexados por project_pk.
