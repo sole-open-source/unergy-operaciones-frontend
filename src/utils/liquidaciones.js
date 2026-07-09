@@ -61,7 +61,10 @@ export const ESTADO_FLUJO = [
   { key: 'numerado', label: 'Numerado', color: '#3B82F6', sev: 'info' },
   { key: 'firmado', label: 'Firmado', color: '#10B981', sev: 'success' },
 ]
-export function estadoFlujoPanel(p) {
+export function estadoFlujoPanel(p, tipo = 'oficial') {
+  // La preliquidación no lleva consecutivos ni firma (el mandato oficial = la
+  // diferencia); por eso solo el oficial avanza a Numerado/Firmado.
+  if (tipo !== 'oficial') return ESTADO_FLUJO[0]
   if (p?.fecha_firma) return ESTADO_FLUJO[2]
   if (p?.consecutivo_ingresos != null || p?.consecutivo_costos != null) return ESTADO_FLUJO[1]
   return ESTADO_FLUJO[0]

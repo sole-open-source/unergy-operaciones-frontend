@@ -42,13 +42,13 @@
         <Column field="proyecto" header="Proyecto" sortable />
         <Column header="Estado" style="width:110px">
           <template #body="{ data }">
-            <Tag :value="estadoFlujoPanel(data).label" :severity="estadoFlujoPanel(data).sev" class="text-[10px]" />
+            <Tag :value="estadoFlujoPanel(data, tipo).label" :severity="estadoFlujoPanel(data, tipo).sev" class="text-[10px]" />
           </template>
         </Column>
-        <Column header="Consec. Ing." style="width:100px">
+        <Column v-if="tipo === 'oficial'" header="Consec. Ing." style="width:100px">
           <template #body="{ data }"><span class="font-mono text-xs">{{ data.consecutivo_ingresos ?? '—' }}</span></template>
         </Column>
-        <Column header="Consec. Cos." style="width:100px">
+        <Column v-if="tipo === 'oficial'" header="Consec. Cos." style="width:100px">
           <template #body="{ data }"><span class="font-mono text-xs">{{ data.consecutivo_costos ?? '—' }}</span></template>
         </Column>
         <Column header="Ingresos" style="width:120px">

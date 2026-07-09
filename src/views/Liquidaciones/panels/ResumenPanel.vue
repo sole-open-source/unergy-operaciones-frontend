@@ -112,7 +112,7 @@
           </Column>
           <Column header="Estado">
             <template #body="{ data }">
-              <Tag :value="estadoFlujoPanel(data).label" :severity="estadoFlujoPanel(data).sev" class="text-[10px]" />
+              <Tag :value="estadoFlujoPanel(data, tipo).label" :severity="estadoFlujoPanel(data, tipo).sev" class="text-[10px]" />
             </template>
           </Column>
           <Column header="Ingresos" style="width:130px">
@@ -290,7 +290,7 @@ const barPct = (v) => Math.round(v / maxTipoIngreso.value * 100)
 
 const pipeline = computed(() => {
   const counts = { cargado: 0, numerado: 0, firmado: 0 }
-  for (const p of proyectos.value) counts[estadoFlujoPanel(p).key]++
+  for (const p of proyectos.value) counts[estadoFlujoPanel(p, props.tipo).key]++
   return ESTADO_FLUJO
     .map(s => ({ estado: s.key, label: s.label, count: counts[s.key], color: s.color }))
     .filter(s => s.count > 0)
