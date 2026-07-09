@@ -31,11 +31,13 @@
       </div>
       <div>
         <label class="field-label">Estado</label>
-        <Select v-model="filters.estado" :options="ESTADOS" class="w-40" placeholder="Todos" showClear />
+        <Select v-model="filters.estado" :options="ESTADO_OPTIONS" optionLabel="label" optionValue="value"
+                class="w-40" placeholder="Todos" showClear />
       </div>
       <div>
         <label class="field-label">Tipo</label>
-        <Select v-model="filters.tipo_proyecto" :options="TIPOS_PROYECTO" class="w-44" placeholder="Todos" showClear />
+        <Select v-model="filters.tipo_proyecto" :options="TIPO_OPTIONS" optionLabel="label" optionValue="value"
+                class="w-44" placeholder="Todos" showClear />
       </div>
     </div>
 
@@ -401,7 +403,7 @@ async function applyInversoresBackfill() {
 
 // ── Catálogos ──────────────────────────────────────────────────────────────────
 const ESTADOS       = ['en_desarrollo', 'en_operacion', 'suspendido', 'cancelado']
-const TIPOS_PROYECTO = ['minigranja', 'autoconsumo', 'gd', 'movilidad_electrica', 'otro']
+const TIPOS_PROYECTO = ['minigranja', 'autoconsumo', 'gd', 'movilidad_electrica']
 
 const SERVICIOS_BADGES = [
   { key: 'srv_operacion',    badge: 'OP',   tooltip: null },
@@ -454,6 +456,10 @@ const ESTADO_LABELS = {
   cancelado:       'Cancelado',
   en_construccion: 'En construcción',
 }
+
+// Opciones legibles para los filtros de Estado/Tipo (v-model sigue guardando el valor crudo)
+const ESTADO_OPTIONS = ESTADOS.map(v => ({ value: v, label: ESTADO_LABELS[v] || v }))
+const TIPO_OPTIONS   = TIPOS_PROYECTO.map(v => ({ value: v, label: TIPO_LABELS[v] || v }))
 
 // ── Avatar helpers ─────────────────────────────────────────────────────────────
 const AVATAR_PALETTE = [

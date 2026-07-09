@@ -203,7 +203,7 @@ const emit = defineEmits(['save', 'cancel'])
 const editMode = computed(() => !!props.proyecto)
 
 const estados = ['en_desarrollo', 'en_operacion', 'suspendido', 'cancelado']
-const tipos = ['minigranja', 'autoconsumo', 'gd', 'movilidad_electrica', 'otro']
+const tipos = ['minigranja', 'autoconsumo', 'gd', 'movilidad_electrica']
 const tecnologias = ['solar', 'eolica', 'hidraulica', 'biomasa', 'otra']
 const clasificaciones = ['AGP', 'AGPE', 'AGGE', 'GD', 'DER', 'otra']
 
