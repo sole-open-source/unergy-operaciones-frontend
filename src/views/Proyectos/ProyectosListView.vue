@@ -95,8 +95,13 @@
                               whitespace-nowrap">Estado</th>
                   <th class="text-left px-4 py-2.5 font-medium text-gray-500 text-xs uppercase tracking-wide
                               whitespace-nowrap">Tipo</th>
+                  <th class="text-left px-4 py-2.5 font-medium text-gray-500 text-xs uppercase tracking-wide
+                              whitespace-nowrap">Ubicación</th>
                   <th class="text-right px-4 py-2.5 font-medium text-gray-500 text-xs uppercase tracking-wide
-                              whitespace-nowrap">Capacidad instalada (kWp)</th>
+                              whitespace-nowrap">
+                    <span class="block text-[10px] text-gray-400 font-normal normal-case tracking-normal">kWp</span>
+                    <span>Cap. instalada</span>
+                  </th>
                   <th class="text-right px-4 py-2.5 font-medium text-gray-500 text-xs uppercase tracking-wide
                               whitespace-nowrap">Potencia AC (kW)</th>
                   <th class="text-left px-4 py-2.5 font-medium text-gray-500 text-xs uppercase tracking-wide
@@ -136,6 +141,14 @@
                           :class="TIPO_BADGE_CLASS[row.tipo_proyecto] || 'badge-otro'">
                       {{ TIPO_LABELS[row.tipo_proyecto] || row.tipo_proyecto || '—' }}
                     </span>
+                  </td>
+
+                  <!-- Ubicación -->
+                  <td class="px-4 py-2 text-xs text-gray-500 whitespace-nowrap">
+                    <span v-if="row.municipio || row.departamento">
+                      {{ row.municipio || '—' }}<span v-if="row.departamento">, {{ row.departamento }}</span>
+                    </span>
+                    <span v-else class="text-gray-300">—</span>
                   </td>
 
                   <!-- Capacidad instalada (pestaña Técnico) -->
