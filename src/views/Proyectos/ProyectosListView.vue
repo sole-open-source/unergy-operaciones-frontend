@@ -85,30 +85,33 @@
                 <tr class="bg-gray-50 border-t border-gray-100">
                   <!-- Sticky: Nombre + TSF -->
                   <th class="sticky-col text-left px-4 py-2.5 font-medium text-gray-500 text-xs
-                              uppercase tracking-wide" style="min-width:220px">
+                              uppercase tracking-wide align-bottom" style="min-width:220px">
                     <span class="block text-[10px] text-gray-400 font-normal normal-case tracking-normal">
                       Cód. TSF
                     </span>
                     <span>Nombre comercial</span>
                   </th>
                   <th class="text-left px-4 py-2.5 font-medium text-gray-500 text-xs uppercase tracking-wide
-                              whitespace-nowrap">Estado</th>
+                              whitespace-nowrap align-bottom">Estado</th>
                   <th class="text-left px-4 py-2.5 font-medium text-gray-500 text-xs uppercase tracking-wide
-                              whitespace-nowrap">Tipo</th>
+                              whitespace-nowrap align-bottom">Tipo</th>
                   <th class="text-left px-4 py-2.5 font-medium text-gray-500 text-xs uppercase tracking-wide
-                              whitespace-nowrap">Ubicación</th>
+                              whitespace-nowrap align-bottom">Ubicación</th>
                   <th class="text-right px-4 py-2.5 font-medium text-gray-500 text-xs uppercase tracking-wide
-                              whitespace-nowrap">
+                              whitespace-nowrap align-bottom">
                     <span class="block text-[10px] text-gray-400 font-normal normal-case tracking-normal">kWp</span>
                     <span>Cap. instalada</span>
                   </th>
                   <th class="text-right px-4 py-2.5 font-medium text-gray-500 text-xs uppercase tracking-wide
-                              whitespace-nowrap">Potencia AC (kW)</th>
+                              whitespace-nowrap align-bottom">
+                    <span class="block text-[10px] text-gray-400 font-normal normal-case tracking-normal">kW</span>
+                    <span>Potencia AC</span>
+                  </th>
                   <th class="text-left px-4 py-2.5 font-medium text-gray-500 text-xs uppercase tracking-wide
-                              whitespace-nowrap" style="min-width:140px">Servicios</th>
+                              whitespace-nowrap align-bottom" style="min-width:140px">Servicios</th>
                   <th class="text-left px-4 py-2.5 font-medium text-gray-500 text-xs uppercase tracking-wide
-                              whitespace-nowrap" style="min-width:110px">Inversionistas</th>
-                  <th class="px-4 py-2.5" style="width:116px"></th>
+                              whitespace-nowrap align-bottom" style="min-width:110px">Inversionistas</th>
+                  <th class="px-4 py-2.5 align-bottom" style="width:116px"></th>
                 </tr>
               </thead>
               <tbody>
