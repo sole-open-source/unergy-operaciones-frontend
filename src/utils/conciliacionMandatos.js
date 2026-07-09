@@ -328,11 +328,23 @@ export function reconciliar(mandato, details, tag) {
     return { status: 'bad', flags: [{ lvl: 'bad', code: 'SIN_TAG', txt: 'No se asignó etiqueta analítica; no se puede verificar.' }], sums: {}, lines: [] }
   }
 
-  // Mandante por PALABRA COMPLETA y con TODOS los términos distintivos (fix STRADA/ESTRADA)
+  // Mandante por PALABRA COMPLETA (fix STRADA/ESTRADA) pero tolerando abreviaturas.
   const mandTok = [...nameTokenSet(mandato.mandante)]
   const asociadoMatch = (aso) => {
+    // Coincide si uno de los nombres es SUBCONJUNTO del otro. El asiento suele
+    // abreviar el mandante omitiendo las palabras corporativas — p. ej.
+    // "PA 17844 SOL DE LA SIERRA" vs. el mandante completo "PATRIMONIOS AUTONOMOS
+    // FIDUCIARIA BANCOLOMBIA ... 17844 SOL DE LA SIERRA": comparten patrimonio +
+    // fondo pero el asiento no trae FIDUCIARIA/BANCOLOMBIA. Exigir TODOS los
+    // tokens del mandante fallaba (0 líneas). Se exige que TODOS los tokens del
+    // conjunto MÁS PEQUEÑO estén en el otro, con intersección no vacía. NO
+    // reintroduce STRADA⊂ESTRADA (por palabra completa no comparten tokens) y
+    // distingue fondos distintos por su token distintivo (17844 vs 18254).
     const aset = nameTokenSet(aso)
-    return mandTok.length > 0 && mandTok.every((t) => aset.has(t))
+    if (!mandTok.length || !aset.size) return false
+    let inter = 0
+    for (const t of mandTok) if (aset.has(t)) inter++
+    return inter > 0 && (inter === mandTok.length || inter === aset.size)
   }
   const lines = details.filter((d) => d.proj === tag && asociadoMatch(d.asociado))
 
