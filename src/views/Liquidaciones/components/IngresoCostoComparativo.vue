@@ -52,7 +52,7 @@ const props = defineProps({
 })
 
 const loading = ref(false)
-const liqs = ref([])   // todas las liquidaciones del proyecto (vista por-proyecto)
+const mensual = ref([])   // [{periodo:'YYYY-MM-01', ingresos, costosOp, facturas, neto}] del Panel
 const generado = reactive({ actual: null, promedio: null })   // energía (kWh): mes vs prom.
 
 function fmtKwh(v) {
@@ -61,34 +61,13 @@ function fmtKwh(v) {
   return `${v.toFixed(0)} kWh`
 }
 
-const sum = (arr, k) => (arr || []).reduce((s, x) => s + (Number(x?.[k]) || 0), 0)
-
-// Ítems consistentes (misma fórmula que el neto oficial) a partir de la vista por-proyecto
-function itemsDe(liq) {
-  const ingresos = sum(liq.mandatos_total_ingresos, 'valor_neto_cop')
-  const costosOp = sum(liq.mandatos_total_costos, 'valor_neto_cop')
-  const facturas = sum(liq.facturas_servicio, 'valor_cop')
-  // respaldo al resumen del backend si no hay mandatos "Total"
-  const ing = ingresos || Number(liq.resumen?.total_ingresos_cop) || 0
-  const cos = costosOp || Number(liq.resumen?.total_costos_cop) || 0
-  const fac = facturas || Number(liq.resumen?.total_facturas_cop) || 0
-  return { ingresos: ing, costosOp: cos, facturas: fac, neto: ing - cos - fac }
-}
-
-const conValores = (it) => it.ingresos !== 0 || it.costosOp !== 0 || it.facturas !== 0
-
-const actual = computed(() => {
-  const l = liqs.value.find(x => x.periodo === props.periodo)
-  return l ? itemsDe(l) : null
-})
+const actual = computed(() => mensual.value.find(x => x.periodo === props.periodo) || null)
 
 const historico = computed(() =>
-  liqs.value
+  mensual.value
     .filter(x => x.periodo < props.periodo)
     .sort((a, b) => b.periodo.localeCompare(a.periodo))   // más recientes primero
     .slice(0, 3)                                           // promedio de los 3 meses anteriores
-    .map(itemsDe)
-    .filter(conValores)
 )
 const mesesHist = computed(() => historico.value.length)
 
@@ -146,14 +125,39 @@ const chartOptions = {
 }
 
 async function load() {
-  if (!props.proyectoId) return
+  // Cifras del Panel Contable (fuente única), ventana de meses para el promedio.
+  mensual.value = []
+  if (!props.proyectoId || !props.periodo) return
   loading.value = true
   try {
-    const { data } = await api.get('/liquidaciones/vistas/por-proyecto', { params: { proyecto_id: props.proyectoId } })
-    const proy = Array.isArray(data) ? data.find(p => String(p.proyecto_id) === String(props.proyectoId)) || data[0] : null
-    liqs.value = proy?.liquidaciones || []
+    const per = props.periodo.slice(0, 7)
+    const [y, m] = per.split('-').map(Number)
+    const d0 = new Date(y, m - 1 - 4, 1)
+    const desde = `${d0.getFullYear()}-${String(d0.getMonth() + 1).padStart(2, '0')}`
+    const { data } = await api.get('/liquidaciones/resumen-panel-rango', {
+      params: { periodo_desde: desde, periodo_hasta: per, tipo: 'preliquidacion' },
+    })
+    const out = []
+    for (const entry of (data.periodos || [])) {
+      const p = (entry.proyectos || []).find(x => String(x.proyecto_id) === String(props.proyectoId))
+      if (!p) continue
+      // Split de costos vs facturas desde grupos_totales (con signo negativo → magnitud).
+      let comerc = 0, cost = 0, fact = 0
+      for (const inv of (p.inversionistas || [])) {
+        const g = inv.grupos_totales || {}
+        comerc += g.comercializacion || 0; cost += g.costos || 0; fact += g.facturas || 0
+      }
+      out.push({
+        periodo: entry.periodo + '-01',
+        ingresos: p.ingresos_cop || 0,
+        costosOp: Math.abs(comerc + cost),
+        facturas: Math.abs(fact),
+        neto: p.valor_a_pagar_total || 0,   // valor a pagar del Panel (con signo)
+      })
+    }
+    mensual.value = out
   } catch {
-    liqs.value = []
+    mensual.value = []
   } finally {
     loading.value = false
   }
