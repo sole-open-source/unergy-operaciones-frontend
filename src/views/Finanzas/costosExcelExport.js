@@ -124,16 +124,25 @@ export async function generarExcelCostos(periodo) {
   let omFilas = []
   try { omFilas = (await api.get(`/om/calculo/${periodo}`)).data.filas || [] } catch { omFilas = [] }
 
-  // Internet (backend)
-  let agrupado = []
-  try { agrupado = (await api.get(`/starlink/factura/${periodo}`)).data.agrupado || [] } catch { agrupado = [] }
+  // Internet (backend) — líneas ya resueltas a proyecto (proyecto_id + nombre_comercial)
+  let starlinkData = { lineas: [], agrupado: [] }
+  try { starlinkData = (await api.get(`/starlink/factura/${periodo}`)).data } catch { /* sin datos */ }
 
-  // public_services por pk
+  // public_services por pk. Fuente primaria: lineas resueltas (nombre_comercial).
+  // Fallback (datos aún sin backfill): agrupado + mapeo de nombre en el front.
   const pubByPk = {}
-  agrupado.forEach(it => {
-    const pk = resolvePk(starlinkPanel(it.descripcion))
-    pubByPk[pk] = (pubByPk[pk] || 0) + (it.sin_iva || 0)
-  })
+  const lineas = starlinkData.lineas || []
+  if (lineas.length) {
+    lineas.forEach(l => {
+      const pk = resolvePk(l.nombre_comercial || l.descripcion)
+      pubByPk[pk] = (pubByPk[pk] || 0) + (l.sin_iva || 0)
+    })
+  } else {
+    (starlinkData.agrupado || []).forEach(it => {
+      const pk = resolvePk(starlinkPanel(it.descripcion))
+      pubByPk[pk] = (pubByPk[pk] || 0) + (it.sin_iva || 0)
+    })
+  }
 
   // Valores guardados por el usuario, indexados por project_pk.
   // Mismos criterios de siempre (solo ✓ incluido && habilitado); NO se recalcula
