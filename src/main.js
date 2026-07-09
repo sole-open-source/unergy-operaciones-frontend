@@ -49,3 +49,14 @@ app.component('InfoField', InfoField)
 app.component('PageHeader', PageHeader)
 
 router.isReady().then(() => app.mount('#app'))
+
+// Vite dispara esto cuando falla la carga de un módulo/CSS cargado con import()
+// perezoso (pestaña abierta desde antes de un deploy, pidiendo un archivo que
+// Vercel ya reemplazó). Recarga UNA sola vez para tomar la versión nueva --
+// sin este guardado, si el archivo sigue sin existir tras recargar (deploy
+// roto, no solo desactualizado), esto reintentaría para siempre.
+window.addEventListener('vite:preloadError', () => {
+  if (sessionStorage.getItem('vite_reload_intentado')) return
+  sessionStorage.setItem('vite_reload_intentado', '1')
+  window.location.reload()
+})

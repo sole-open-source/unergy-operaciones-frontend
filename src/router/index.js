@@ -86,6 +86,19 @@ const router = createRouter({
   routes,
 })
 
+// Cada deploy a Vercel borra los archivos JS de la versión anterior. Si el
+// usuario tenía una pestaña abierta desde antes del deploy, el import()
+// perezoso de una vista falla (404) al navegar -- la ruta se queda "pegada"
+// sin ningún error visible, hasta que refresca a mano. El listener de
+// `vite:preloadError` en main.js recarga para tomar los archivos nuevos; aquí
+// solo evitamos que la ruta quede completamente muerta si esa recarga no llega
+// a dispararse por algún motivo (navegamos al dashboard en vez de no hacer nada).
+router.onError((_err, to) => {
+  if (to.fullPath !== router.currentRoute.value.fullPath) {
+    router.push('/dashboard').catch(() => {})
+  }
+})
+
 router.beforeEach((to) => {
   const auth = useAuthStore()
 
