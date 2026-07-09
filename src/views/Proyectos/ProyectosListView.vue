@@ -39,6 +39,11 @@
         <Select v-model="filters.tipo_proyecto" :options="TIPO_OPTIONS" optionLabel="label" optionValue="value"
                 class="w-44" placeholder="Todos" showClear />
       </div>
+      <div>
+        <label class="field-label">Departamento</label>
+        <Select v-model="filters.departamento" :options="departamentoOptions" filter
+                class="w-48" placeholder="Todos" showClear />
+      </div>
     </div>
 
     <!-- Loading -->
@@ -524,7 +529,13 @@ const pendingInfoTecnica = ref(null)  // potencia_ac_kw/capacidad_instalada_kwp 
 const forzando = ref(false)
 const openSections = ref(new Set())    // reactive Set via full replacement
 
-const filters  = reactive({ q: '', estado: null, tipo_proyecto: null })
+const filters  = reactive({ q: '', estado: null, tipo_proyecto: null, departamento: null })
+
+// Departamentos presentes en los proyectos cargados, para el filtro (orden alfabético)
+const departamentoOptions = computed(() => {
+  const set = new Set(allItems.value.map(p => p.departamento).filter(Boolean))
+  return [...set].sort((a, b) => a.localeCompare(b))
+})
 
 // ── Filtrado + agrupación ──────────────────────────────────────────────────────
 const filteredItems = computed(() => {
@@ -535,6 +546,7 @@ const filteredItems = computed(() => {
   }
   if (filters.estado)        list = list.filter(p => p.estado === filters.estado)
   if (filters.tipo_proyecto) list = list.filter(p => p.tipo_proyecto === filters.tipo_proyecto)
+  if (filters.departamento)  list = list.filter(p => p.departamento === filters.departamento)
   return list
 })
 
