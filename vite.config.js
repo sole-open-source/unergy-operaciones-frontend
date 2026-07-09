@@ -9,6 +9,13 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url)),
+        // Algunos componentes locales (definidos inline en un <script> plano,
+        // no en <script setup>) usan `template: \`...\`` como string en vez de
+        // un <template> de SFC. El build "vue" por defecto es runtime-only y
+        // no puede compilar esos strings -- el componente renderiza vacío, sin
+        // error visible (solo un warning en consola). Este alias usa el build
+        // completo (con compilador) para que esos casos sigan funcionando.
+        vue: 'vue/dist/vue.esm-bundler.js',
       },
     },
     server: {
