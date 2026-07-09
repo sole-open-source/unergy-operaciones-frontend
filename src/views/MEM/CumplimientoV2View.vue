@@ -342,6 +342,12 @@
           </button>
         </div>
 
+        <!-- Filtro por offtaker (comprador del contrato) -->
+        <MultiSelect v-model="offtakersFiltro" :options="offtakerOpts" optionLabel="label" optionValue="value"
+                     filter :showToggleAll="false" placeholder="Todos los offtakers"
+                     :maxSelectedLabels="2" selectedItemsLabel="{0} offtakers" class="text-sm" style="min-width:12rem;"
+                     v-tooltip.bottom="'Filtrar contratos por offtaker (comprador)'" />
+
         <div class="flex-1"></div>
         <button @click="showNuevoForm = true" class="cv-btn-cta">
           <i class="pi pi-plus text-xs" />PPA nuevo
@@ -427,8 +433,8 @@
                     style="color: #915BD8;"
                   />
                   <div class="min-w-0">
-                    <div class="flex items-center gap-1.5">
-                      <span class="font-bold text-sm truncate" style="color: #2C2039;">{{ c.nombre }}</span>
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                      <span class="font-bold text-sm break-words" style="color: #2C2039;">{{ c.nombre }}</span>
                       <span v-if="c._ficticio" class="text-xs px-1.5 py-0.5 rounded font-medium flex-shrink-0" style="background: rgba(240,192,64,0.18); color: #9a6700;">Nuevo</span>
                       <span v-if="simResults[c.id]?.plantasEsp != null"
                         class="text-xs font-semibold px-1.5 py-0.5 rounded flex-shrink-0"
@@ -546,22 +552,6 @@
                   </div>
                 </div>
 
-                <!-- Cumplimiento de plantas: inscritas = registradas y despachando vía GESCON (numerador) / plantas contrato exigidas (denominador) -->
-                <div v-if="simResults[c.id].plantasEsp != null" class="mt-3 pt-3 border-t" style="border-color: rgba(44,32,57,0.07);">
-                  <div class="flex items-center justify-between mb-1.5">
-                    <span class="text-[10px] font-semibold uppercase tracking-wide" style="color: #7a6e8a;">Plantas inscritas / contrato</span>
-                    <div class="flex items-center gap-1.5">
-                      <span class="font-mono text-xs font-bold" style="color: #2C2039;">{{ simResults[c.id].plantasReg }} / {{ simResults[c.id].plantasEsp }}</span>
-                      <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap" :style="estadoBadge(simResults[c.id].estadoPlantas)">
-                        {{ estadoLabel(simResults[c.id].estadoPlantas) }}
-                      </span>
-                    </div>
-                  </div>
-                  <div class="relative rounded-md overflow-hidden" style="height: 8px; background: rgba(44,32,57,0.06);">
-                    <div class="absolute inset-y-0 left-0 rounded-sm transition-all duration-300"
-                      :style="{ width: simResults[c.id].plantasPct + '%', background: estadoColor(simResults[c.id].estadoPlantas) }" />
-                  </div>
-                </div>
               </div>
 
               <!-- Plant drop zone (collapsible) -->
@@ -1726,6 +1716,20 @@ const ESTADO_FILTROS = [
   { key: 'excedente', label: 'Exposición en bolsa', color: '#14B8A6', tip: 'Excedente sobre el máximo o plantas duplicadas (compra en bolsa)' },
 ]
 function toggleEstadoFiltro(k) { estadoFiltro.value = estadoFiltro.value === k ? null : k }
+// Filtro por offtaker (comprador del contrato). Vacío = todos. Opciones derivadas
+// de los contratos cargados; '' agrupa los que no tienen comprador (ej. PPA nuevo).
+const offtakersFiltro = ref([])
+const offtakerOpts = computed(() => {
+  const nombres = new Set(allContratos.value.map(c => c.comprador_nombre || ''))
+  const opts = [...nombres].filter(Boolean).sort((a, b) => a.localeCompare(b, 'es'))
+    .map(n => ({ label: n, value: n }))
+  if (nombres.has('')) opts.push({ label: '(Sin offtaker)', value: '' })
+  return opts
+})
+function contratoMatchOfftaker(c) {
+  if (!offtakersFiltro.value.length) return true
+  return offtakersFiltro.value.includes(c.comprador_nombre || '')
+}
 // Exposición en bolsa = excedente (vende en bolsa) O plantas duplicadas (compra en bolsa,
 // genDup>0), aunque el contrato esté cumplido/déficit. Los demás estados son excluyentes.
 function contratoMatchEstado(r, key) {
@@ -2342,6 +2346,7 @@ const visibleContratos = computed(() => {
   const res = simResults.value
   const filtered = allContratos.value.filter(c => {
     if (hiddenContratos.value.has(c.id)) return false
+    if (!contratoMatchOfftaker(c)) return false
     if (estadoFiltro.value && !contratoMatchEstado(res[c.id], estadoFiltro.value)) return false
     return true
   })
@@ -2352,12 +2357,14 @@ const visibleContratos = computed(() => {
   })
 })
 
-// Conteo por estado (sobre los contratos no ocultos) para mostrar en los botones de filtro.
+// Conteo por estado (sobre los contratos no ocultos, respetando el filtro de
+// offtaker) para mostrar en los botones de filtro.
 const estadoCounts = computed(() => {
   const res = simResults.value
   const counts = { ok: 0, deficit: 0, excedente: 0 }
   for (const c of allContratos.value) {
     if (hiddenContratos.value.has(c.id)) continue
+    if (!contratoMatchOfftaker(c)) continue
     // Conteos por propiedad (no excluyentes: un contrato cumplido puede tener exposición).
     for (const k of ['ok', 'deficit', 'excedente']) {
       if (contratoMatchEstado(res[c.id], k)) counts[k]++

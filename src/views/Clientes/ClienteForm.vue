@@ -65,15 +65,15 @@
 
       <div>
         <label class="field-label">IVA %</label>
-        <InputNumber v-model="f.iva_pct" :maxFractionDigits="2" class="w-full" />
+        <InputNumber v-model="f.iva_pct" :maxFractionDigits="2" locale="en-US" class="w-full" />
       </div>
       <div>
         <label class="field-label">Retención %</label>
-        <InputNumber v-model="f.retencion_pct" :maxFractionDigits="2" class="w-full" />
+        <InputNumber v-model="f.retencion_pct" :maxFractionDigits="2" locale="en-US" class="w-full" />
       </div>
       <div>
         <label class="field-label">ReteICA %</label>
-        <InputNumber v-model="f.reteica_pct" :maxFractionDigits="4" class="w-full" />
+        <InputNumber v-model="f.reteica_pct" :maxFractionDigits="4" locale="en-US" class="w-full" />
       </div>
     </div>
 

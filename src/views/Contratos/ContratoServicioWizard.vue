@@ -223,7 +223,7 @@
               <div class="grid grid-cols-3 gap-4">
                 <div class="flex flex-col gap-1">
                   <label class="field-label">Cantidad (kWh)</label>
-                  <InputNumber v-model="form.rec_cantidad" :minFractionDigits="0" :maxFractionDigits="3" class="w-full" />
+                  <InputNumber v-model="form.rec_cantidad" :minFractionDigits="0" :maxFractionDigits="3" locale="en-US" class="w-full" />
                 </div>
                 <div class="flex flex-col gap-1">
                   <label class="field-label">Precio unitario (COP/kWh)</label>
@@ -258,7 +258,7 @@
                 </div>
                 <div class="flex flex-col gap-1">
                   <label class="field-label">% FNCER</label>
-                  <InputNumber v-model="form.cgm_porcentaje_fncer" suffix="%" :minFractionDigits="1" :maxFractionDigits="2" class="w-full" />
+                  <InputNumber v-model="form.cgm_porcentaje_fncer" suffix="%" :minFractionDigits="1" :maxFractionDigits="2" locale="en-US" class="w-full" />
                 </div>
                 <div class="flex flex-col gap-1">
                   <label class="field-label">Tipo de asignación</label>

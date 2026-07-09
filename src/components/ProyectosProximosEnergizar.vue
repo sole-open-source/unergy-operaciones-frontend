@@ -160,7 +160,7 @@
             <InputNumber
               :model-value="data.monthlyMwh"
               @update:model-value="v => persistField(data, 'monthlyMwh', v)"
-              :maxFractionDigits="2" :min="0" class="w-full"
+              :maxFractionDigits="2" :min="0" locale="en-US" class="w-full"
             />
           </template>
         </Column>

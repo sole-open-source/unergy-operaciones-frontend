@@ -293,7 +293,7 @@
           <div class="flex flex-col gap-1">
             <label class="text-xs font-medium text-gray-600">Tarifa Admin (%)</label>
             <InputNumber v-model="editForm.tarifa_admin_pct"
-              :minFractionDigits="1" :maxFractionDigits="2" suffix="%" class="w-full" />
+              :minFractionDigits="1" :maxFractionDigits="2" suffix="%" locale="en-US" class="w-full" />
           </div>
           <div class="flex flex-col gap-1">
             <label class="text-xs font-medium text-gray-600">Contrato en Drive</label>

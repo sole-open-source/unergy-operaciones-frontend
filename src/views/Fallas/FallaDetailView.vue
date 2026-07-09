@@ -319,7 +319,7 @@
             <div class="flex flex-col gap-1">
               <label class="field-label">Energía perdida (kWh)</label>
               <InputNumber v-model="quickEdit.energia_perdida_kwh" :minFractionDigits="0" :maxFractionDigits="2"
-                :min="0" class="w-full" />
+                :min="0" locale="en-US" class="w-full" />
             </div>
             <div class="flex flex-col gap-1">
               <label class="field-label">Causa raíz</label>

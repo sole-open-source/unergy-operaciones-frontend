@@ -271,7 +271,7 @@
           </div>
           <div class="flex flex-col gap-1">
             <label class="text-xs text-gray-600">Porcentaje (%)</label>
-            <InputNumber v-model="lineaForm.porcentaje" :maxFractionDigits="6" class="w-full" />
+            <InputNumber v-model="lineaForm.porcentaje" :maxFractionDigits="6" locale="en-US" class="w-full" />
           </div>
         </div>
         <div class="grid grid-cols-2 gap-2">

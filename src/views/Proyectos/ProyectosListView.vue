@@ -10,6 +10,16 @@
       </template>
     </PageHeader>
 
+    <!-- Aviso: proyectos pendientes de Sun Factory / Quoia / Solenium -->
+    <div v-if="pendientes.length" class="rounded-xl px-4 py-3 flex items-center justify-between gap-3"
+         style="background: rgba(214,68,85,0.06); border: 1.5px solid rgba(214,68,85,0.25);">
+      <span class="text-sm font-medium" style="color: #D64455;">
+        <i class="pi pi-exclamation-triangle text-xs mr-1.5" />
+        Proyectos pendientes ({{ pendientes.length }})
+      </span>
+      <Button label="Revisar" size="small" text style="color: #D64455;" @click="abrirPendientes" />
+    </div>
+
     <!-- Filtros -->
     <div class="bg-white rounded-xl shadow-sm p-3 flex flex-wrap gap-3 items-end border" style="border-color:#ECE7F2">
       <div>
@@ -261,6 +271,75 @@
         <Button label="Crear de todos modos" :loading="forzando" @click="crearForzado" />
       </div>
     </Dialog>
+
+    <!-- Dialog: Proyectos pendientes (Sun Factory / Quoia / Solenium) -->
+    <Dialog v-model:visible="pendientesVisible" header="Proyectos pendientes" modal class="w-full max-w-3xl">
+      <p class="text-sm mb-4" style="color: #6b5a8a;">
+        Sun Factory, Quoia y Solenium reportan estos proyectos. Confirma para crearlos o
+        actualizar el registro existente, o ignóralos si no aplican.
+      </p>
+      <div v-if="loadingPendientes" class="flex items-center justify-center py-8">
+        <i class="pi pi-spin pi-spinner text-2xl" style="color: #915BD8;" />
+      </div>
+      <div v-else-if="!pendientes.length" class="text-center py-8 text-sm" style="color: #9b89b5;">
+        No hay proyectos pendientes por revisar.
+      </div>
+      <div v-else class="space-y-3 max-h-[65vh] overflow-y-auto pr-1">
+        <div v-for="p in pendientes" :key="p.clave" class="rounded-xl p-3" style="border: 1.5px solid #e8e0f0;">
+          <div class="flex items-start justify-between gap-3 mb-2">
+            <div class="min-w-0">
+              <div class="flex items-center gap-2 mb-0.5">
+                <span class="chip" :class="p.tipo_sugerencia === 'crear' ? 'chip-new' : 'chip-update'">
+                  {{ p.tipo_sugerencia === 'crear' ? 'Nuevo' : 'Actualizar' }}
+                </span>
+                <span class="text-xs" style="color:#9b89b5;">{{ p.fuentes.join(' + ') }}</span>
+              </div>
+              <p class="text-sm font-semibold truncate" style="color:#2C2039;">
+                {{ p.proyecto_nombre_actual || p.nombre_sugerido }}
+              </p>
+              <p v-if="p.tipo_sugerencia === 'actualizar' && p.proyecto_nombre_actual" class="text-xs" style="color:#9b89b5;">
+                Sugerido: {{ p.nombre_sugerido }}
+              </p>
+            </div>
+            <Button icon="pi pi-times" text severity="secondary" size="small"
+              :loading="p._loading === 'ignorar'" @click="ignorarPendiente(p)" v-tooltip="'Ignorar'" />
+          </div>
+
+          <!-- Cambios sugeridos -->
+          <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs mb-3" style="color:#6b5a8a;">
+            <span v-if="p.estado_sugerido && p.estado_sugerido !== p.estado_actual">
+              Estado: <b>{{ p.estado_actual ? `${ESTADO_LABELS[p.estado_actual] || p.estado_actual} → ` : '' }}{{ ESTADO_LABELS[p.estado_sugerido] || p.estado_sugerido }}</b>
+            </span>
+            <span v-if="p.fase_construccion_sugerida && p.fase_construccion_sugerida !== p.fase_construccion_actual">
+              Fase: <b>{{ p.fase_construccion_sugerida }}</b>
+            </span>
+            <span v-if="p.potencia_ac_kw">Potencia AC: <b>{{ p.potencia_ac_kw.toFixed(1) }} kW</b></span>
+            <span v-if="p.capacidad_instalada_kwp">Capacidad instalada: <b>{{ p.capacidad_instalada_kwp.toFixed(1) }} kWp</b></span>
+            <span v-if="p.municipio">{{ p.municipio }}<span v-if="p.departamento">, {{ p.departamento }}</span></span>
+          </div>
+
+          <!-- Overrides editables (solo aplican al crear) -->
+          <div v-if="p.tipo_sugerencia === 'crear'" class="flex flex-wrap gap-2 items-end">
+            <div>
+              <label class="field-label">Nombre comercial</label>
+              <InputText v-model="p._nombre" class="w-56" />
+            </div>
+            <div>
+              <label class="field-label">Tipo</label>
+              <Select v-model="p._tipo" :options="TIPOS_PROYECTO" class="w-40" placeholder="Tipo" />
+            </div>
+            <Button icon="pi pi-check" label="Crear" size="small"
+              :loading="p._loading === 'confirmar'" :disabled="!p._nombre"
+              style="background:#915BD8; border-color:#915BD8;" @click="confirmarPendiente(p)" />
+          </div>
+          <div v-else class="flex justify-end">
+            <Button icon="pi pi-check" label="Actualizar" size="small"
+              :loading="p._loading === 'confirmar'"
+              style="background:#915BD8; border-color:#915BD8;" @click="confirmarPendiente(p)" />
+          </div>
+        </div>
+      </div>
+    </Dialog>
   </div>
 </template>
 
@@ -419,6 +498,7 @@ const deleting    = ref(false)
 const duplicadoVisible = ref(false)
 const duplicadoInfo = ref(null)   // { mensaje, candidato_id, candidato_nombre }
 const pendingPayload = ref(null)  // payload a reintentar con forzar=true
+const pendingInfoTecnica = ref(null)  // potencia_ac_kw/capacidad_instalada_kwp a reintentar junto con pendingPayload
 const forzando = ref(false)
 const openSections = ref(new Set())    // reactive Set via full replacement
 
@@ -476,6 +556,7 @@ async function load() {
 
 onMounted(() => {
   load()
+  loadPendientes()
 })
 
 function goDetail(row) { router.push(`/proyectos/${row.id}`) }
@@ -487,9 +568,19 @@ function confirmDelete(row) {
   deleteVisible.value  = true
 }
 
-async function onCreate(payload) {
+async function guardarInfoTecnicaSiAplica(proyectoId, infoTecnica) {
+  if (!infoTecnica || (infoTecnica.potencia_ac_kw == null && infoTecnica.capacidad_instalada_kwp == null)) return
   try {
-    await api.post('/proyectos', payload)
+    await api.put(`/proyectos/${proyectoId}/info-tecnica`, infoTecnica)
+  } catch (e) {
+    toast.add({ severity: 'warn', summary: 'Proyecto creado, pero la ficha técnica no se pudo guardar', detail: e.response?.data?.detail, life: 5000 })
+  }
+}
+
+async function onCreate(payload, infoTecnica) {
+  try {
+    const { data } = await api.post('/proyectos', payload)
+    await guardarInfoTecnicaSiAplica(data.id, infoTecnica)
     toast.add({ severity: 'success', summary: 'Proyecto creado', life: 3000 })
     dialogVisible.value = false
     load()
@@ -500,6 +591,7 @@ async function onCreate(payload) {
     if (e.response?.status === 409 && detail?.duplicado_nombre) {
       duplicadoInfo.value = detail
       pendingPayload.value = payload
+      pendingInfoTecnica.value = infoTecnica
       duplicadoVisible.value = true
       return
     }
@@ -510,7 +602,8 @@ async function onCreate(payload) {
 async function crearForzado() {
   forzando.value = true
   try {
-    await api.post('/proyectos', pendingPayload.value, { params: { forzar: true } })
+    const { data } = await api.post('/proyectos', pendingPayload.value, { params: { forzar: true } })
+    await guardarInfoTecnicaSiAplica(data.id, pendingInfoTecnica.value)
     toast.add({ severity: 'success', summary: 'Proyecto creado', life: 3000 })
     duplicadoVisible.value = false
     dialogVisible.value = false
@@ -536,6 +629,63 @@ async function doDelete() {
   } finally {
     deleting.value = false
   }
+}
+
+// ── Proyectos pendientes (Sun Factory + Quoia + Solenium) ──────────────────────
+const pendientes = ref([])
+const loadingPendientes = ref(false)
+const pendientesVisible = ref(false)
+
+async function loadPendientes() {
+  try {
+    const { data } = await api.get('/proyectos/pendientes')
+    pendientes.value = data.map(p => ({
+      ...p,
+      _nombre: p.nombre_sugerido,
+      _tipo: p.tipo_proyecto_sugerido || null,
+      _loading: null,
+    }))
+  } catch {
+    // Sun Factory/Quoia/Solenium sin configurar u otro error -- no bloquea la vista.
+    pendientes.value = []
+  }
+}
+
+function abrirPendientes() {
+  pendientesVisible.value = true
+  loadingPendientes.value = true
+  loadPendientes().finally(() => { loadingPendientes.value = false })
+}
+
+async function confirmarPendiente(p) {
+  p._loading = 'confirmar'
+  try {
+    await api.post(`/proyectos/pendientes/${p.clave}/confirmar`, {
+      nombre_comercial: p.tipo_sugerencia === 'crear' ? p._nombre : undefined,
+      tipo_proyecto: p.tipo_sugerencia === 'crear' ? p._tipo : undefined,
+    })
+    pendientes.value = pendientes.value.filter(x => x.clave !== p.clave)
+    toast.add({ severity: 'success', summary: p.tipo_sugerencia === 'crear' ? 'Proyecto creado' : 'Proyecto actualizado', life: 3000 })
+    load()
+  } catch (e) {
+    toast.add({ severity: 'error', summary: 'No se pudo confirmar',
+      detail: e.response?.data?.detail || e.message, life: 5000 })
+  } finally {
+    p._loading = null
+  }
+}
+
+function ignorarPendiente(p) {
+  p._loading = 'ignorar'
+  api.post(`/proyectos/pendientes/${p.clave}/ignorar`, {})
+    .then(() => {
+      pendientes.value = pendientes.value.filter(x => x.clave !== p.clave)
+    })
+    .catch(e => {
+      toast.add({ severity: 'error', summary: 'No se pudo ignorar',
+        detail: e.response?.data?.detail || e.message, life: 5000 })
+    })
+    .finally(() => { p._loading = null })
 }
 </script>
 
@@ -574,6 +724,19 @@ thead .sticky-col {
 .chevron-icon {
   display: inline-block;
 }
+
+/* ── Chips: Proyectos pendientes (crear / actualizar) ─────────────────────────── */
+.chip {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.chip-new    { background: #D1FAE5; color: #065F46; }
+.chip-update { background: #EEEDFE; color: #3C3489; }
 
 /* ── Estado badges ───────────────────────────────────────────────────────────── */
 .estado-badge {

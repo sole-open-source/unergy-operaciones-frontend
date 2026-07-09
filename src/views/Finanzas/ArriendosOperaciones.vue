@@ -219,7 +219,7 @@
             <div class="flex flex-col gap-1">
               <label class="text-xs text-gray-500">Tasa (%)</label>
               <InputNumber v-model="ipcForm.tasaPct" :minFractionDigits="2" :maxFractionDigits="4"
-                suffix="%" class="w-full" />
+                suffix="%" locale="en-US" class="w-full" />
             </div>
             <div class="flex flex-col gap-1">
               <label class="text-xs text-gray-500">Fuente</label>

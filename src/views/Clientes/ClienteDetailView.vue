@@ -8,7 +8,24 @@
       </button>
       <span style="color: #c5b9db;">/</span>
       <span class="text-sm font-semibold" style="color: #2C2039;">{{ cliente.razon_social_nombre }}</span>
+      <button @click="deleteVisible = true"
+        class="ml-auto text-xs flex items-center gap-1 px-3 py-1.5 rounded-lg transition-colors hover:bg-red-50"
+        style="color: #dc2626;">
+        <i class="pi pi-trash text-xs" /> Eliminar cliente
+      </button>
     </div>
+
+    <!-- Dialog: eliminar cliente -->
+    <Dialog v-model:visible="deleteVisible" header="Eliminar cliente" modal class="w-full max-w-sm">
+      <p class="text-sm text-gray-700 mb-4">
+        ¿Estás seguro de que deseas eliminar
+        <strong>{{ cliente.razon_social_nombre }}</strong>? Esta acción no se puede deshacer.
+      </p>
+      <div class="flex justify-end gap-2">
+        <Button label="Cancelar" severity="secondary" @click="deleteVisible = false" />
+        <Button label="Eliminar" severity="danger" :loading="deleting" @click="doDelete" />
+      </div>
+    </Dialog>
 
     <!-- Tabs -->
     <div class="bg-white rounded-xl shadow-sm overflow-hidden" style="border: 1px solid #e8e0f0;">
@@ -24,6 +41,11 @@
       </div>
 
       <div class="p-6">
+
+        <!-- ── Tab: Resumen 360 ── -->
+        <div v-if="activeTab === 'resumen'">
+          <ClienteResumen :cliente-id="route.params.id" />
+        </div>
 
         <!-- ── Tab: Información ── -->
         <div v-if="activeTab === 'info'" class="space-y-6">
@@ -443,7 +465,7 @@
 
 <script setup>
 import { ref, computed, onMounted, reactive, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
@@ -453,16 +475,21 @@ import Textarea from 'primevue/textarea'
 import DatePicker from 'primevue/datepicker'
 import api from '@/api/client'
 import ClienteForm from './ClienteForm.vue'
+import ClienteResumen from './ClienteResumen.vue'
 import ContactosPanel from '@/components/ContactosPanel.vue'
 
 const route = useRoute()
+const router = useRouter()
 const toast = useToast()
 const cliente = ref(null)
-const activeTab = ref(typeof route.query.tab === 'string' ? route.query.tab : 'info')
+const deleteVisible = ref(false)
+const deleting = ref(false)
+const activeTab = ref(typeof route.query.tab === 'string' ? route.query.tab : 'resumen')
 const guardando = ref(false)
 const archivoSeleccionado = ref(null)
 
 const tabs = [
+  { key: 'resumen',    label: 'Resumen',       icon: 'pi pi-th-large' },
   { key: 'info',       label: 'Información',  icon: 'pi pi-user' },
   { key: 'contactos',  label: 'Contactos',     icon: 'pi pi-envelope' },
   { key: 'servicios',  label: 'Servicios',     icon: 'pi pi-briefcase' },
@@ -688,6 +715,20 @@ async function saveInfo(payload) {
   await api.patch(`/clientes/${route.params.id}`, payload)
   toast.add({ severity: 'success', summary: 'Información actualizada', life: 3000 })
   await cargar()
+}
+
+async function doDelete() {
+  deleting.value = true
+  try {
+    await api.delete(`/clientes/${route.params.id}`)
+    toast.add({ severity: 'success', summary: 'Cliente eliminado', life: 3000 })
+    router.push('/clientes')
+  } catch (e) {
+    const detail = e.response?.data?.detail || 'Error al eliminar'
+    toast.add({ severity: 'error', summary: 'No se pudo eliminar', detail, life: 5000 })
+  } finally {
+    deleting.value = false
+  }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
