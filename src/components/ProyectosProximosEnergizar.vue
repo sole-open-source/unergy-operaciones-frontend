@@ -74,7 +74,7 @@
               <p class="mt-1 text-xs" style="color: rgba(44,32,57,0.4);">Revisa el aviso de arriba (configuración / fuente de datos).</p>
             </template>
             <template v-else>
-              Aún no hay proyectos en el pipeline. Presiona «Sincronizar ahora» para traerlos desde TSF/Solenium.
+              Aún no hay proyectos en el pipeline. Revisa «Proyectos pendientes» en la pestaña Proyectos para traer nuevos desde TSF/Solenium.
             </template>
           </div>
         </template>
@@ -266,8 +266,8 @@ async function onSync(force) {
   const r = await syncNow(force)
   if (r) {
     const partes = [
-      `Creados: ${r.creados ?? 0}`,
       `Actualizados: ${r.actualizados ?? 0}`,
+      r.sin_match ? `Sin vínculo (revisar en Proyectos › Proyectos pendientes): ${r.sin_match}` : null,
       r.errores ? `Errores: ${r.errores}` : null,
       `Fuente: ${r.fuente ?? 'sunfactory'}`,
     ].filter(Boolean)
