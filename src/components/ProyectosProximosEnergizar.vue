@@ -90,12 +90,13 @@
         <Column expander style="width: 44px" />
 
         <!-- Commercial name (editable) -->
-        <Column header="Proyecto" frozen style="min-width: 280px;">
+        <Column header="Proyecto" frozen style="min-width: 340px;">
           <template #body="{ data }">
             <InputText
               :model-value="data.commercialName"
               @update:model-value="v => persistField(data, 'commercialName', v)"
-              class="w-full"
+              class="w-full proyecto-name-input"
+              v-tooltip.top="data.commercialName"
             />
           </template>
         </Column>
@@ -128,7 +129,7 @@
         </Column>
 
         <!-- Energization date (editable → marca fecha como manual) -->
-        <Column header="Energización" style="min-width: 170px;">
+        <Column header="Energización" style="min-width: 210px;">
           <template #body="{ data }">
             <div class="flex items-center gap-1.5">
               <DatePicker
@@ -458,6 +459,12 @@ function isProrated(project, year, month) {
 .stat-pill.clickable .pi-times-circle { color: #15803d; }
 .stat-num { font-size: 15px; font-weight: 800; color: #2C2039; font-variant-numeric: tabular-nums; }
 .stat-label { color: #7a6e8a; white-space: nowrap; }
+
+/* Nombres largos: no cortar sin avisar -- se ve completo con ellipsis, y el
+   tooltip/foco muestran el valor entero para editar. */
+:deep(.proyecto-name-input) {
+  text-overflow: ellipsis;
+}
 
 :deep(.energ-table .p-datatable-thead th) {
   background: rgba(44,32,57,0.05);
