@@ -566,7 +566,7 @@ const proyectosDisponibles = computed(() =>
   proyectosTodos.value
     .filter(p => !contratosMantProyIds.value.has(p.id))
     .slice()
-    .sort((a, b) => a.nombre_comercial.localeCompare(b.nombre_comercial))
+    .sort((a, b) => (a.nombre_comercial || '').localeCompare(b.nombre_comercial || ''))
 )
 
 async function onCostoAgregado() {
