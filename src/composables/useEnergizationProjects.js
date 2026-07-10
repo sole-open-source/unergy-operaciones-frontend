@@ -75,10 +75,14 @@ export function useEnergizationProjects() {
     _timers[project.id] = setTimeout(async () => {
       try {
         const { data } = await api.patch(`/proximos-energizar/${project.id}`, payload)
-        // Refleja el flag de "editada manual" devuelto por el backend.
+        // Refleja los flags de "editado manual" devueltos por el backend.
         const idx = projects.value.findIndex(p => p.id === project.id)
         if (idx >= 0 && data) {
-          projects.value[idx] = { ...projects.value[idx], editadaManual: data.editadaManual }
+          projects.value[idx] = {
+            ...projects.value[idx],
+            editadaManual: data.editadaManual,
+            estadoEditadoManual: data.estadoEditadoManual,
+          }
         }
       } catch (e) {
         console.error('Error al guardar la edición del proyecto', e)
