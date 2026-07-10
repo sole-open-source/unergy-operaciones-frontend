@@ -48,7 +48,14 @@ app.directive('tooltip', Tooltip)
 app.component('InfoField', InfoField)
 app.component('PageHeader', PageHeader)
 
-router.isReady().then(() => app.mount('#app'))
+router.isReady().then(() => {
+  app.mount('#app')
+  // Si llegamos hasta acá es porque el build actual sí cargó bien -- limpiar
+  // la marca para que un deploy FUTURO (mientras esta pestaña siga abierta)
+  // pueda disparar su propia recarga automática, en vez de quedar bloqueado
+  // por una recarga de un deploy anterior ya resuelta.
+  sessionStorage.removeItem('vite_reload_intentado')
+})
 
 // Vite dispara esto cuando falla la carga de un módulo/CSS cargado con import()
 // perezoso (pestaña abierta desde antes de un deploy, pidiendo un archivo que
