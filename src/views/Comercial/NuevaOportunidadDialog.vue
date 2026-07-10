@@ -15,11 +15,11 @@
       <template v-else>
         <div>
           <label class="block text-sm font-medium mb-1">Nombre del cliente *</label>
-          <InputText v-model.trim="nuevo.razon_social_nombre" class="w-full" placeholder="Razón social" />
+          <InputText v-model="nuevo.razon_social_nombre" class="w-full" placeholder="Razón social" />
         </div>
         <div>
           <label class="block text-sm font-medium mb-1">NIT / Cédula</label>
-          <InputText v-model.trim="nuevo.nit_cedula" class="w-full" />
+          <InputText v-model="nuevo.nit_cedula" class="w-full" />
         </div>
         <div class="grid grid-cols-2 gap-3">
           <div>
@@ -29,7 +29,7 @@
           </div>
           <div>
             <label class="block text-sm font-medium mb-1">Quién lo recomendó/consiguió</label>
-            <InputText v-model.trim="nuevo.origen_detalle" class="w-full" />
+            <InputText v-model="nuevo.origen_detalle" class="w-full" />
           </div>
         </div>
         <div>
@@ -38,9 +38,9 @@
             <Button label="Agregar" icon="pi pi-plus" text size="small" @click="nuevo.contactos.push({ nombre: '', telefono: '', email: '' })" />
           </div>
           <div v-for="(c, i) in nuevo.contactos" :key="i" class="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 mb-2">
-            <InputText v-model.trim="c.nombre" placeholder="Nombre" />
-            <InputText v-model.trim="c.telefono" placeholder="Teléfono" />
-            <InputText v-model.trim="c.email" placeholder="Correo *" />
+            <InputText v-model="c.nombre" placeholder="Nombre" />
+            <InputText v-model="c.telefono" placeholder="Teléfono" />
+            <InputText v-model="c.email" placeholder="Correo *" />
             <Button icon="pi pi-trash" text severity="danger" :disabled="nuevo.contactos.length === 1"
                     @click="nuevo.contactos.splice(i, 1)" />
           </div>
@@ -50,7 +50,7 @@
       <div class="grid grid-cols-2 gap-3">
         <div>
           <label class="block text-sm font-medium mb-1">Nombre del negocio (opcional)</label>
-          <InputText v-model.trim="form.nombre" class="w-full" placeholder="Ej: Comunidad energética 2027" />
+          <InputText v-model="form.nombre" class="w-full" placeholder="Ej: Comunidad energética 2027" />
         </div>
         <div>
           <label class="block text-sm font-medium mb-1">Tipo de servicio</label>
@@ -119,7 +119,21 @@ watch(() => props.visible, async (v) => {
     const { data } = await api.get('/clientes', { params: { size: 500 } })
     todosClientes.value = data.items ?? data
   }
+  if (!v) resetEstado()
 })
+
+function resetEstado() {
+  modo.value = 'existente'
+  clienteSel.value = null
+  form.nombre = ''
+  form.tipo_servicio = null
+  form.notas = ''
+  nuevo.razon_social_nombre = ''
+  nuevo.nit_cedula = ''
+  nuevo.origen_tipo = null
+  nuevo.origen_detalle = ''
+  nuevo.contactos = [{ nombre: '', telefono: '', email: '' }]
+}
 
 function buscarCliente(e) {
   const q = (e.query ?? '').toLowerCase()
@@ -128,22 +142,24 @@ function buscarCliente(e) {
 
 const puedeGuardar = computed(() => {
   if (modo.value === 'existente') return !!clienteSel.value?.id
-  return nuevo.razon_social_nombre.length > 0 && nuevo.contactos.some(c => c.email.includes('@'))
+  return nuevo.razon_social_nombre.trim().length > 0 && nuevo.contactos.some(c => c.email.trim().includes('@'))
 })
 
 async function guardar() {
   guardando.value = true
   try {
-    const payload = { nombre: form.nombre || null, tipo_servicio: form.tipo_servicio, notas: form.notas || null }
+    const payload = { nombre: form.nombre.trim() || null, tipo_servicio: form.tipo_servicio, notas: form.notas || null }
     if (modo.value === 'existente') {
       payload.cliente_id = clienteSel.value.id
     } else {
       payload.cliente_nuevo = {
-        razon_social_nombre: nuevo.razon_social_nombre,
-        nit_cedula: nuevo.nit_cedula || null,
+        razon_social_nombre: nuevo.razon_social_nombre.trim(),
+        nit_cedula: nuevo.nit_cedula.trim() || null,
         origen_tipo: nuevo.origen_tipo,
-        origen_detalle: nuevo.origen_detalle || null,
-        contactos: nuevo.contactos.filter(c => c.email.includes('@')),
+        origen_detalle: nuevo.origen_detalle.trim() || null,
+        contactos: nuevo.contactos
+          .filter(c => c.email.trim().includes('@'))
+          .map(c => ({ nombre: c.nombre.trim(), telefono: c.telefono.trim(), email: c.email.trim().toLowerCase() })),
       }
     }
     const { data } = await api.post('/comercial/oportunidades', payload)
