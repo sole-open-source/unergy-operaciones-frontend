@@ -86,6 +86,10 @@ watch(tab, (val) => {
   const q = { ...route.query }
   if (val === 'resumen') delete q.tab
   else q.tab = val
+  // `tipo` (minigranja/autoconsumo) es un filtro SOLO de Proyectos. Si se deja en la
+  // query al cambiar a otro tab, el watcher de route.query fuerza el tab de vuelta a
+  // 'proyectos' y no deja abrir Resumen/Inversionistas/Diferencia. Se quita aquí.
+  if (val !== 'proyectos') delete q.tipo
   router.replace({ query: q })
 })
 
