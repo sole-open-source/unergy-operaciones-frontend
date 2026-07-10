@@ -39,6 +39,11 @@
         <Select v-model="filters.tipo_proyecto" :options="TIPO_OPTIONS" optionLabel="label" optionValue="value"
                 class="w-44" placeholder="Todos" showClear />
       </div>
+      <div>
+        <label class="field-label">Departamento</label>
+        <Select v-model="filters.departamento" :options="departamentoOptions" filter
+                class="w-48" placeholder="Todos" showClear />
+      </div>
     </div>
 
     <!-- Loading -->
@@ -85,25 +90,33 @@
                 <tr class="bg-gray-50 border-t border-gray-100">
                   <!-- Sticky: Nombre + TSF -->
                   <th class="sticky-col text-left px-4 py-2.5 font-medium text-gray-500 text-xs
-                              uppercase tracking-wide" style="min-width:220px">
+                              uppercase tracking-wide align-bottom" style="min-width:220px">
                     <span class="block text-[10px] text-gray-400 font-normal normal-case tracking-normal">
                       Cód. TSF
                     </span>
                     <span>Nombre comercial</span>
                   </th>
                   <th class="text-left px-4 py-2.5 font-medium text-gray-500 text-xs uppercase tracking-wide
-                              whitespace-nowrap">Estado</th>
+                              whitespace-nowrap align-bottom">Estado</th>
                   <th class="text-left px-4 py-2.5 font-medium text-gray-500 text-xs uppercase tracking-wide
-                              whitespace-nowrap">Tipo</th>
+                              whitespace-nowrap align-bottom">Tipo</th>
+                  <th class="text-left px-4 py-2.5 font-medium text-gray-500 text-xs uppercase tracking-wide
+                              whitespace-nowrap align-bottom">Ubicación</th>
                   <th class="text-right px-4 py-2.5 font-medium text-gray-500 text-xs uppercase tracking-wide
-                              whitespace-nowrap">Capacidad instalada (kWp)</th>
+                              whitespace-nowrap align-bottom">
+                    <span class="block text-[10px] text-gray-400 font-normal normal-case tracking-normal">kWp</span>
+                    <span>Cap. instalada</span>
+                  </th>
                   <th class="text-right px-4 py-2.5 font-medium text-gray-500 text-xs uppercase tracking-wide
-                              whitespace-nowrap">Potencia AC (kW)</th>
+                              whitespace-nowrap align-bottom">
+                    <span class="block text-[10px] text-gray-400 font-normal normal-case tracking-normal">kW</span>
+                    <span>Potencia AC</span>
+                  </th>
                   <th class="text-left px-4 py-2.5 font-medium text-gray-500 text-xs uppercase tracking-wide
-                              whitespace-nowrap" style="min-width:140px">Servicios</th>
+                              whitespace-nowrap align-bottom" style="min-width:140px">Servicios</th>
                   <th class="text-left px-4 py-2.5 font-medium text-gray-500 text-xs uppercase tracking-wide
-                              whitespace-nowrap" style="min-width:110px">Inversionistas</th>
-                  <th class="px-4 py-2.5" style="width:116px"></th>
+                              whitespace-nowrap align-bottom" style="min-width:110px">Inversionistas</th>
+                  <th class="px-4 py-2.5 align-bottom" style="width:116px"></th>
                 </tr>
               </thead>
               <tbody>
@@ -136,6 +149,14 @@
                           :class="TIPO_BADGE_CLASS[row.tipo_proyecto] || 'badge-otro'">
                       {{ TIPO_LABELS[row.tipo_proyecto] || row.tipo_proyecto || '—' }}
                     </span>
+                  </td>
+
+                  <!-- Ubicación -->
+                  <td class="px-4 py-2 text-xs text-gray-500 whitespace-nowrap">
+                    <span v-if="row.municipio || row.departamento">
+                      {{ row.municipio || '—' }}<span v-if="row.departamento">, {{ row.departamento }}</span>
+                    </span>
+                    <span v-else class="text-gray-300">—</span>
                   </td>
 
                   <!-- Capacidad instalada (pestaña Técnico) -->
@@ -508,7 +529,13 @@ const pendingInfoTecnica = ref(null)  // potencia_ac_kw/capacidad_instalada_kwp 
 const forzando = ref(false)
 const openSections = ref(new Set())    // reactive Set via full replacement
 
-const filters  = reactive({ q: '', estado: null, tipo_proyecto: null })
+const filters  = reactive({ q: '', estado: null, tipo_proyecto: null, departamento: null })
+
+// Departamentos presentes en los proyectos cargados, para el filtro (orden alfabético)
+const departamentoOptions = computed(() => {
+  const set = new Set(allItems.value.map(p => p.departamento).filter(Boolean))
+  return [...set].sort((a, b) => a.localeCompare(b))
+})
 
 // ── Filtrado + agrupación ──────────────────────────────────────────────────────
 const filteredItems = computed(() => {
@@ -519,6 +546,7 @@ const filteredItems = computed(() => {
   }
   if (filters.estado)        list = list.filter(p => p.estado === filters.estado)
   if (filters.tipo_proyecto) list = list.filter(p => p.tipo_proyecto === filters.tipo_proyecto)
+  if (filters.departamento)  list = list.filter(p => p.departamento === filters.departamento)
   return list
 })
 

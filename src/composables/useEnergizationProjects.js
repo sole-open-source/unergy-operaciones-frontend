@@ -95,6 +95,18 @@ export function useEnergizationProjects() {
     }
   }
 
+  // Descarta la fecha editada a mano de UN proyecto y trae de nuevo la de Sun
+  // Factory. Reemplaza al botón global de "forzar sobrescritura": más seguro
+  // (un proyecto a la vez) y vive junto al ícono que marca "editada manual".
+  async function restaurarFecha(projectId) {
+    const { data } = await api.post(`/proximos-energizar/${projectId}/restaurar-fecha`)
+    const idx = projects.value.findIndex(p => p.id === projectId)
+    if (idx >= 0 && data) {
+      projects.value[idx] = rehydrate(data)
+    }
+    return data
+  }
+
   // Re-sincroniza con Solenium. force=true sobrescribe las fechas que el operador
   // haya editado manualmente (Solenium suele tener la fecha más fresca).
   async function syncNow(force = false) {
@@ -115,6 +127,6 @@ export function useEnergizationProjects() {
 
   return {
     projects, loading, error, warning, source, syncing, lastSync,
-    loadProjects, persistField, removeProject, syncNow,
+    loadProjects, persistField, removeProject, syncNow, restaurarFecha,
   }
 }
