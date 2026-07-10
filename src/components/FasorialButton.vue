@@ -36,6 +36,13 @@
           @change="onProyectoChange" />
       </div>
 
+      <div class="fz-field fz-field--medidor">
+        <label class="fz-label">Medidor</label>
+        <SelectButton v-model="medidorSel" :options="MEDIDOR_OPCIONES"
+          optionLabel="label" optionValue="value" :allowEmpty="false"
+          @change="onMedidorChange" />
+      </div>
+
       <div class="fz-field">
         <label class="fz-label">Título</label>
         <InputText v-model="titulo" class="w-full" placeholder="Título del diagrama" />
@@ -89,6 +96,7 @@ import { ref, nextTick } from 'vue'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import Select from 'primevue/select'
+import SelectButton from 'primevue/selectbutton'
 import InputText from 'primevue/inputtext'
 import ProgressSpinner from 'primevue/progressspinner'
 import api from '@/api/client'
@@ -98,10 +106,18 @@ import { gaiaSnapshotToFasorial, validarSnapshot } from '@/utils/gaiaSnapshotToF
 // Umbral (min) para considerar una lectura desactualizada
 const STALE_MIN = 15
 
+// Selector de medidor: automático (el que más exporta), principal o respaldo
+const MEDIDOR_OPCIONES = [
+  { label: 'Automático', value: 'auto' },
+  { label: 'Principal', value: 'principal' },
+  { label: 'Respaldo', value: 'respaldo' },
+]
+
 const visible = ref(false)
 const proyectos = ref([])
 const loadingProyectos = ref(false)
 const proyectoSel = ref(null)
+const medidorSel = ref('auto')
 const titulo = ref('')
 
 const loading = ref(false)
@@ -110,6 +126,7 @@ const errorMsg = ref('')
 const stale = ref(null)          // min de antigüedad si supera STALE_MIN, si no null
 const sinCarga = ref(false)      // diagnóstico "en vacío"
 const lastProyId = ref(null)     // último proyecto consultado (para reintentar)
+const lastDetail = ref(null)     // último detalle del backend (para re-dibujar sin reconsultar)
 
 const diagramRef = ref(null)
 
@@ -150,6 +167,59 @@ function onProyectoChange() {
   errorMsg.value = ''
   stale.value = null
   sinCarga.value = false
+  lastDetail.value = null
+}
+
+// Cambiar entre Automático/Principal/Respaldo re-dibuja al instante desde el
+// detalle ya consultado (sin volver a llamar al backend). Si aún no se ha
+// generado, no hace nada — el usuario dará "Generar".
+function onMedidorChange() {
+  if (lastDetail.value) renderFromDetail(lastDetail.value)
+}
+
+// Selecciona el snapshot y el nodo según el medidor elegido
+function pickSnapshot(data) {
+  if (medidorSel.value === 'principal') {
+    return { snapshot: data?.gaia_snapshot_principal, node: data?.gaia_node_principal, etiqueta: 'principal' }
+  }
+  if (medidorSel.value === 'respaldo') {
+    return { snapshot: data?.gaia_snapshot_respaldo, node: data?.gaia_node_respaldo, etiqueta: 'respaldo' }
+  }
+  return { snapshot: data?.gaia_snapshot, node: data?.gaia_node_id, etiqueta: 'auto' }
+}
+
+// Dibuja el diagrama a partir de un detalle ya cargado (no consulta el backend)
+function renderFromDetail(data) {
+  errorMsg.value = ''
+  stale.value = null
+  sinCarga.value = false
+
+  const { snapshot, node } = pickSnapshot(data)
+  const val = validarSnapshot(snapshot)
+  if (!val.ok) {
+    const cual = medidorSel.value === 'respaldo' ? 'de respaldo'
+      : medidorSel.value === 'principal' ? 'principal' : ''
+    errorMsg.value = snapshot
+      ? val.error
+      : `El medidor ${cual} no reporta datos para este proyecto.`
+    rendered.value = false
+    return
+  }
+  if (val.edadMin != null && val.edadMin > STALE_MIN) stale.value = val.edadMin
+
+  const datos = gaiaSnapshotToFasorial(snapshot, {
+    meter: node ?? proyectoSel.value?.proyecto_id,
+    nombre: data?.nombre || proyectoSel.value?.nombre,
+  })
+
+  rendered.value = true
+  nextTick(() => {
+    const res = renderFasorial(diagramRef.value, datos, {
+      titulo: (titulo.value || '').trim() || (data?.nombre || '').toUpperCase(),
+      marca: 'Unergy',
+    })
+    sinCarga.value = res?.diagnostico?.nivel === 'info'
+  })
 }
 
 // ── Generar (o actualizar lectura) ──────────────────────────────────────────
@@ -164,32 +234,13 @@ async function generar() {
 
   try {
     const { data } = await api.get(`/generacion-solar/monitoring/${proyId}`)
-    const snapshot = data?.gaia_snapshot
-
-    const val = validarSnapshot(snapshot)
-    if (!val.ok) {
-      errorMsg.value = val.error
-      rendered.value = false
-      return
-    }
-    if (val.edadMin != null && val.edadMin > STALE_MIN) stale.value = val.edadMin
-
-    const datos = gaiaSnapshotToFasorial(snapshot, {
-      meter: data?.gaia_node_id ?? proyId,
-      nombre: data?.nombre || proyectoSel.value.nombre,
-    })
-
-    rendered.value = true
-    await nextTick()
-    const res = renderFasorial(diagramRef.value, datos, {
-      titulo: (titulo.value || '').trim() || (data?.nombre || '').toUpperCase(),
-      marca: 'Unergy',
-    })
-    sinCarga.value = res?.diagnostico?.nivel === 'info'
+    lastDetail.value = data
+    renderFromDetail(data)
   } catch (e) {
     const detail = e?.response?.data?.detail
     errorMsg.value = detail || e?.message || 'No se pudo obtener la lectura del medidor.'
     rendered.value = false
+    lastDetail.value = null
   } finally {
     loading.value = false
   }
@@ -201,7 +252,10 @@ function nombreArchivo(ext) {
     .toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '')
   const d = new Date()
   const fecha = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`
-  return `fasorial_${serial}_${fecha}.${ext}`
+  // Sufijo del medidor para que principal/respaldo no se pisen al descargar
+  const suf = medidorSel.value === 'principal' ? '_principal'
+    : medidorSel.value === 'respaldo' ? '_respaldo' : ''
+  return `fasorial_${serial}_${fecha}${suf}.${ext}`
 }
 
 function getSvgEl() {
@@ -308,6 +362,9 @@ function disparaDescarga(href, filename, revoke) {
   color: #6b5a8a;
 }
 .fz-actions { flex-shrink: 0; }
+.fz-field--medidor { flex: 0 0 auto; }
+.fz-field--medidor :deep(.p-selectbutton) { display: flex; }
+.fz-field--medidor :deep(.p-togglebutton) { font-size: 12px; }
 
 /* ── Avisos ───────────────────────────────────────────────────────────── */
 .fz-note {
