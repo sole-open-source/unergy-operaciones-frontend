@@ -231,7 +231,8 @@
           </div>
           <div>
             <label class="text-xs font-semibold uppercase block mb-1" style="color: #6b5a8a;">Operador red</label>
-            <InputText v-model="editForm.operador_red" class="w-full" />
+            <Dropdown v-model="editForm.operador_red_id" :options="operadoresRedOptions" optionLabel="label"
+              optionValue="id" class="w-full" placeholder="Seleccionar" showClear filter />
           </div>
         </div>
       </div>
@@ -572,7 +573,7 @@ function editFrontera(f) {
     estado: f.estado,
     estado_operacional: f.estado_operacional || null,
     quoia_meter_id: f.quoia_meter_id || '',
-    operador_red: f.operador_red || '',
+    operador_red_id: f.operador_red_id || null,
   }
   showEdit.value = true
 }
@@ -691,9 +692,23 @@ function ignorarPendiente(p) {
   })
 }
 
+// Catálogo de operadores de red -- select en vez de texto libre, para que
+// coincida con el vínculo real que usa Reporte CGM (Frontera.operador_red_id).
+const operadoresRed = ref([])
+const operadoresRedOptions = computed(() =>
+  operadoresRed.value.map(o => ({ id: o.id, label: o.nombre_comercial || o.nombre_legal }))
+)
+async function loadOperadoresRed() {
+  try {
+    const { data } = await api.get('/operadores-red')
+    operadoresRed.value = Array.isArray(data) ? data : (data.items ?? [])
+  } catch { /* graceful degrade -- el select queda vacío */ }
+}
+
 onMounted(() => {
   loadData()
   loadPendientesQuoia()
+  loadOperadoresRed()
 })
 
 // ── Backfill marca/modelo/serie de medidor (Quoia) ──────────────────────────────

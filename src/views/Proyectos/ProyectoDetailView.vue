@@ -67,7 +67,8 @@
             </div>
             <div class="flex flex-col gap-1">
               <label class="field-label">Operador de red</label>
-              <InputText v-model="editForm.operador_red" class="w-full" />
+              <Select v-model="editForm.operador_red_id" :options="operadoresRedOptions" optionLabel="label"
+                optionValue="id" class="w-full" placeholder="Seleccionar" showClear filter />
             </div>
             <div class="flex flex-col gap-1">
               <label class="field-label">Clasificación regulatoria</label>
@@ -846,7 +847,7 @@ const editForm = reactive({
   potencia_instalada_kwp: null,
   departamento: null,
   municipio: null,
-  operador_red: null,
+  operador_red_id: null,
   clasificacion_regulatoria: null,
   carpeta_drive_codigo: null,
   sub_project: null,
@@ -1249,19 +1250,28 @@ const estadoSeverity = (e) => (
   { en_operacion: 'success', en_desarrollo: 'info', suspendido: 'warn', cancelado: 'secondary' }[e] || 'secondary'
 )
 
+// Catálogo de operadores de red -- select en vez de texto libre, para que
+// coincida con el vínculo real que usa Reporte CGM (Frontera.operador_red_id).
+const operadoresRed = ref([])
+const operadoresRedOptions = computed(() =>
+  operadoresRed.value.map(o => ({ id: o.id, label: o.nombre_comercial || o.nombre_legal }))
+)
+
 // ── Carga inicial ─────────────────────────────────────────────────────────────
 onMounted(async () => {
   try {
-    const [proyRes, clientesRes, invRes] = await Promise.all([
+    const [proyRes, clientesRes, invRes, operadoresRes] = await Promise.all([
       api.get(`/proyectos/${route.params.id}`),
       api.get('/clientes', { params: { size: 200 } }),
       api.get(`/proyectos/${route.params.id}/inversionistas`),
+      api.get('/operadores-red').catch(() => ({ data: [] })),
     ])
     proyecto.value = {
       ...proyRes.data,
       inversionistas: Array.isArray(invRes.data) ? invRes.data : (invRes.data.items ?? []),
     }
     clientes.value = clientesRes.data.items
+    operadoresRed.value = Array.isArray(operadoresRes.data) ? operadoresRes.data : (operadoresRes.data.items ?? [])
     for (const s of SERVICIOS_FLAGS) srvFlags[s.key] = proyRes.data[s.key]
     if (isEditMode.value) populateEditForm()
     loadCrossData()

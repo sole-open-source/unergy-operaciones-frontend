@@ -35,7 +35,8 @@
       </div>
       <div>
         <label class="field-label">Operador de red</label>
-        <InputText v-model="f.operador_red" class="w-full" />
+        <Select v-model="f.operador_red_id" :options="operadoresRedOptions" optionLabel="label"
+          optionValue="id" class="w-full" placeholder="Seleccionar" showClear filter />
       </div>
       <div>
         <label class="field-label">Clasificación regulatoria</label>
@@ -177,7 +178,7 @@
 </template>
 
 <script setup>
-import { reactive, ref, watch, computed } from 'vue'
+import { reactive, ref, watch, computed, onMounted } from 'vue'
 import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import DatePicker from 'primevue/datepicker'
@@ -214,11 +215,24 @@ const f = reactive({
   tipo_tecnologia: null,
   departamento: null,
   municipio: null,
-  operador_red: null,
+  operador_red_id: null,
   clasificacion_regulatoria: null,
   carpeta_drive_codigo: null,
   sub_project: null,
   codigo_tsf: null,
+})
+
+// Catálogo de operadores de red -- select en vez de texto libre, para que
+// coincida con el vínculo real que usa Reporte CGM (Frontera.operador_red_id).
+const operadoresRed = ref([])
+const operadoresRedOptions = computed(() =>
+  operadoresRed.value.map(o => ({ id: o.id, label: o.nombre_comercial || o.nombre_legal }))
+)
+onMounted(async () => {
+  try {
+    const { data } = await api.get('/operadores-red')
+    operadoresRed.value = Array.isArray(data) ? data : (data.items ?? [])
+  } catch { /* graceful degrade -- el select queda vacío */ }
 })
 
 // Potencia AC y capacidad instalada -- viven en proyecto_info_tecnica (pestaña
