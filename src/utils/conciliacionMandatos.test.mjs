@@ -13,8 +13,8 @@ import { dirname, join } from 'path'
 const here = dirname(fileURLToPath(import.meta.url))
 let src = fs.readFileSync(join(here, 'conciliacionMandatos.js'), 'utf8')
 src = src.replace(/export const /g, 'const ').replace(/export function /g, 'function ')
-const api = new Function(src + '\nreturn { parseAsientos, extractMandate, suggestTag, reconciliar, plantaDesdeEtiqueta, parseIngresos, matchIngresoContab, parseMandatoNumber, parseAsientoNumber, expandirAbreviaturas };')()
-const { parseAsientos, extractMandate, suggestTag, reconciliar, plantaDesdeEtiqueta, parseIngresos, matchIngresoContab, parseMandatoNumber, parseAsientoNumber, expandirAbreviaturas } = api
+const api = new Function(src + '\nreturn { parseAsientos, extractMandate, suggestTag, reconciliar, plantaDesdeEtiqueta, parseIngresos, matchIngresoContab, parseMandatoNumber, parseAsientoNumber, normalizarCifra, expandirAbreviaturas };')()
+const { parseAsientos, extractMandate, suggestTag, reconciliar, plantaDesdeEtiqueta, parseIngresos, matchIngresoContab, parseMandatoNumber, parseAsientoNumber, normalizarCifra, expandirAbreviaturas } = api
 
 let ok = true
 const assert = (cond, msg) => { console.log((cond ? '✅' : '❌') + ' ' + msg); if (!cond) ok = false }
@@ -308,6 +308,36 @@ VALOR A PAGAR $ 238,000.00`
   const resNo = reconciliar({ mandante: 'PATRIMONIOS AUTONOMOS FIDUCIARIA BANCOLOMBIA S A SOCIEDAD FIDUCIARIA - 18254 NESTLE',
     vals: { admin: 888888 }, total: 888888 }, lineasSS, TAGSS)
   assert(resNo.sums.admin === 888888, `BUG6: Nestlé (18254) solo suma su propia línea = ${resNo.sums.admin} (esperado 888888, NO Sol Sierra)`)
+}
+
+// 14) normalizarCifra — función ÚNICA que detecta miles/decimal en AMBOS formatos.
+{
+  // Mandato (US): coma=miles, punto=decimal
+  assert(normalizarCifra('1,234,567') === 1234567, `normalizarCifra("1,234,567") = ${normalizarCifra('1,234,567')} (esperado 1234567)`)
+  assert(normalizarCifra('2,011.51') === 2011.51, `normalizarCifra("2,011.51") = ${normalizarCifra('2,011.51')} (esperado 2011.51)`)
+  assert(normalizarCifra('$ 2,011,510.00') === 2011510, `normalizarCifra("$ 2,011,510.00") = ${normalizarCifra('$ 2,011,510.00')} (esperado 2011510)`)
+  assert(normalizarCifra('497,333') === 497333, `normalizarCifra("497,333") = ${normalizarCifra('497,333')} (esperado 497333, miles)`)
+  assert(normalizarCifra('0.50') === 0.5, `normalizarCifra("0.50") = ${normalizarCifra('0.50')} (esperado 0.5)`)
+  // Asiento (CO): punto=miles, coma=decimal
+  assert(normalizarCifra('1.234.567') === 1234567, `normalizarCifra("1.234.567") = ${normalizarCifra('1.234.567')} (esperado 1234567)`)
+  assert(normalizarCifra('2.011,51') === 2011.51, `normalizarCifra("2.011,51") = ${normalizarCifra('2.011,51')} (esperado 2011.51)`)
+  assert(normalizarCifra('129.413') === 129413, `normalizarCifra("129.413") = ${normalizarCifra('129.413')} (esperado 129413, miles)`)
+  assert(normalizarCifra('$ 1.234.567,89') === 1234567.89, `normalizarCifra("$ 1.234.567,89") = ${normalizarCifra('$ 1.234.567,89')} (esperado 1234567.89)`)
+  assert(normalizarCifra('0,50') === 0.5, `normalizarCifra("0,50") = ${normalizarCifra('0,50')} (esperado 0.5)`)
+  // Casos reales del lote Sol Sierra (mandato US)
+  assert(normalizarCifra('2,681,883.45') === 2681883.45, `normalizarCifra("2,681,883.45") = ${normalizarCifra('2,681,883.45')} (esperado 2681883.45)`)
+  assert(normalizarCifra('64,706.30') === 64706.3, `normalizarCifra("64,706.30") = ${normalizarCifra('64,706.30')} (esperado 64706.3)`)
+  // Sin separador, negativos, número nativo, vacío
+  assert(normalizarCifra('129') === 129, `normalizarCifra("129") = ${normalizarCifra('129')}`)
+  assert(normalizarCifra('-1,000.50') === -1000.5, `normalizarCifra("-1,000.50") = ${normalizarCifra('-1,000.50')} (esperado -1000.5)`)
+  assert(normalizarCifra('-1.000,50') === -1000.5, `normalizarCifra("-1.000,50") = ${normalizarCifra('-1.000,50')} (esperado -1000.5)`)
+  assert(normalizarCifra('(1.234)') === -1234, `normalizarCifra("(1.234)") = ${normalizarCifra('(1.234)')} (esperado -1234, paréntesis=negativo)`)
+  assert(normalizarCifra(2011.51) === 2011.51, 'normalizarCifra(number) pasa directo')
+  assert(normalizarCifra('') === 0 && normalizarCifra(null) === 0, 'normalizarCifra vacío/null = 0')
+  // MISMO valor, distinta fuente → deben coincidir (no diferencia de miles)
+  assert(Math.abs(normalizarCifra('2,011.51') - normalizarCifra('2.011,51')) < 0.001, 'US vs CO: mismo valor coincide')
+  // El bug original de "Auditoría PDFs": $2,011,510.00 (US) NO debe leerse como 2.011
+  assert(normalizarCifra('2,011,510.00') !== 2.011, 'regresión Auditoría: US con comas no se lee como 2.011')
 }
 
 console.log(ok ? '\nTODOS LOS TESTS PASARON' : '\nHAY FALLOS')
