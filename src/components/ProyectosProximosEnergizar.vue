@@ -3,9 +3,6 @@
 
     <!-- Header -->
     <div class="px-5 py-4 flex items-center justify-between gap-3 flex-wrap" style="border-bottom: 1px solid rgba(44,32,57,0.10);">
-      <p class="text-xs" style="color: #7a6e8a;">
-        <template v-if="lastSync">última sincronización {{ lastSyncLabel }}</template>
-      </p>
       <div class="flex items-center gap-2.5 flex-wrap">
         <div class="stat-pill">
           <span class="stat-num">{{ projects.length }}</span>
@@ -42,6 +39,9 @@
           v-tooltip.bottom="'Trae % de obra y fecha estimada desde Sun Factory (respeta las fechas editadas a mano)'"
         />
       </div>
+      <p class="text-xs" style="color: #7a6e8a;">
+        <template v-if="lastSync">última sincronización {{ lastSyncLabel }}</template>
+      </p>
     </div>
 
     <!-- Aviso de origen de datos (config faltante / fuente caída) -->
