@@ -37,6 +37,15 @@
         <label class="field-label">Dirección</label>
         <InputText v-model="f.direccion" class="w-full" />
       </div>
+      <div>
+        <label class="field-label">Origen del cliente</label>
+        <Dropdown v-model="f.origen_tipo" :options="ORIGENES" optionLabel="label" optionValue="value"
+                  showClear class="w-full" placeholder="—" />
+      </div>
+      <div>
+        <label class="field-label">Quién lo recomendó/consiguió</label>
+        <InputText v-model="f.origen_detalle" class="w-full" />
+      </div>
 
       <!-- Información bancaria -->
       <div class="col-span-2">
@@ -89,12 +98,20 @@ import { reactive, watch } from 'vue'
 import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import Select from 'primevue/select'
+import Dropdown from 'primevue/dropdown'
 import Button from 'primevue/button'
+
+const ORIGENES = [
+  { label: 'Prospección propia', value: 'prospeccion_propia' },
+  { label: 'Recomendación', value: 'recomendacion' },
+  { label: 'Referido', value: 'referido' },
+  { label: 'Otro', value: 'otro' },
+]
 
 const props = defineProps({ initial: Object })
 const emit = defineEmits(['save', 'cancel'])
 
-const f = reactive({ ...props.initial })
+const f = reactive({ origen_tipo: null, origen_detalle: '', ...props.initial })
 watch(() => props.initial, (v) => { Object.assign(f, v) }, { deep: true })
 
 function submit() {
