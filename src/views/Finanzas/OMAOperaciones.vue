@@ -42,6 +42,9 @@
           :loading="guardando"
           style="background:#915BD8;border-color:#915BD8"
           @click="guardarSeleccion" />
+        <Button label="Agregar Costo" icon="pi pi-plus" size="small"
+          style="background:#915BD8;border-color:#915BD8"
+          @click="showAgregarCosto = true" />
       </div>
     </div>
 
@@ -356,6 +359,11 @@
       </div>
     </Dialog>
 
+    <AgregarCostoMantenimientoDialog
+      v-model:visible="showAgregarCosto"
+      :proyectos-disponibles="proyectosDisponibles"
+      @saved="onCostoAgregado" />
+
   </div>
 </template>
 
@@ -373,6 +381,7 @@ import Popover       from 'primevue/popover'
 import { useToast }  from 'primevue/usetoast'
 import api           from '@/api/client'
 import DocumentoIcon  from '@/components/DocumentoIcon.vue'
+import AgregarCostoMantenimientoDialog from './AgregarCostoMantenimientoDialog.vue'
 
 const toast = useToast()
 
@@ -426,6 +435,9 @@ const showIPCDialog = ref(false)
 const guardandoIPC  = ref(false)
 const notificacionIPC = ref(null)
 const ipcForm = reactive({ año: new Date().getFullYear(), tasaPct: null, fuente: 'DANE' })
+const showAgregarCosto  = ref(false)
+const proyectosTodos    = ref([])   // todos los proyectos de /proyectos
+const contratosMantProyIds = ref(new Set())
 
 // ── Edición inline del Valor a Facturar ──────────────────────────────────────
 const overrides   = reactive({})   // { [contrato_id]: { valor:Number|null, dirty:Boolean } }
@@ -517,12 +529,15 @@ function ipcAcumPct(fila) {
 async function cargarDatos() {
   loading.value = true
   try {
-    const [calcRes, ipcRes] = await Promise.all([
+    const [calcRes, ipcRes, proyRes] = await Promise.all([
       api.get(`/om/calculo/${periodoActual.value}`),
       api.get('/om/ipc'),
+      api.get('/proyectos', { params: { size: 500 } }),
     ])
     filas.value    = calcRes.data.filas
     ipcTasas.value = ipcRes.data
+    const proyData = Array.isArray(proyRes.data) ? proyRes.data : (proyRes.data.items ?? [])
+    proyectosTodos.value = proyData
 
     filas.value.forEach(f => {
       if (seleccion[f.contrato_id] === undefined) {
@@ -534,6 +549,28 @@ async function cargarDatos() {
   } finally {
     loading.value = false
   }
+}
+
+async function cargarContratosMantProyIds() {
+  try {
+    const { data } = await api.get('/om/proyectos')
+    contratosMantProyIds.value = new Set(
+      data.map(c => c.proyecto_id).filter(id => id != null)
+    )
+  } catch {
+    contratosMantProyIds.value = new Set()
+  }
+}
+
+const proyectosDisponibles = computed(() =>
+  proyectosTodos.value
+    .filter(p => !contratosMantProyIds.value.has(p.id))
+    .slice()
+    .sort((a, b) => a.nombre_comercial.localeCompare(b.nombre_comercial))
+)
+
+async function onCostoAgregado() {
+  await Promise.all([cargarDatos(), cargarContratosMantProyIds()])
 }
 
 async function guardarSeleccion() {
@@ -633,5 +670,5 @@ async function descargarDocumento(fila) {
 }
 
 watch(periodoActual, () => { cargarDatos(); cargarFacturaProveedor() })
-onMounted(() => { cargarDatos(); cargarFacturaProveedor() })
+onMounted(() => { cargarDatos(); cargarFacturaProveedor(); cargarContratosMantProyIds() })
 </script>
