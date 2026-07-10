@@ -47,6 +47,9 @@
           :loading="guardando"
           style="background:#915BD8;border-color:#915BD8"
           @click="guardarSeleccion" />
+        <Button label="Agregar Costo" icon="pi pi-plus" size="small"
+          style="background:#915BD8;border-color:#915BD8"
+          @click="showAgregarCosto = true" />
       </div>
     </div>
 
@@ -240,6 +243,11 @@
       :factor="filaCanon ? filaCanon.factor_acumulado : null"
       :valor-a-facturar="filaCanon ? filaCanon.canon_a_facturar : null" />
 
+    <AgregarCostoArriendoDialog
+      v-model:visible="showAgregarCosto"
+      :proyectos-disponibles="proyectosDisponibles"
+      @saved="onCostoAgregado" />
+
   </div>
 </template>
 
@@ -258,6 +266,7 @@ import ArriendosZipUpload from './ArriendosZipUpload.vue'
 import CalculoIpcPopover from '@/components/CalculoIpcPopover.vue'
 import { docsPorProyecto, loadDocs, downloadDoc } from '@/composables/useArriendosDocs'
 import DocumentoIcon from '@/components/DocumentoIcon.vue'
+import AgregarCostoArriendoDialog from './AgregarCostoArriendoDialog.vue'
 
 const toast = useToast()
 
@@ -337,6 +346,9 @@ const guardando = ref(false)
 const filas     = ref([])
 const seleccion = reactive({})   // { [id]: bool }
 const ipcTasas  = ref([])
+const showAgregarCosto  = ref(false)
+const proyectosTodos    = ref([])
+const arrProyectoIdsVinculados = ref(new Set())
 
 async function cargarDatos() {
   loading.value = true
@@ -353,6 +365,33 @@ async function cargarDatos() {
   } finally {
     loading.value = false
   }
+}
+
+async function cargarProyectosYVinculos() {
+  try {
+    const [proyRes, arrRes] = await Promise.all([
+      api.get('/proyectos', { params: { size: 500 } }),
+      api.get('/arriendos/proyectos'),
+    ])
+    proyectosTodos.value = Array.isArray(proyRes.data) ? proyRes.data : (proyRes.data.items ?? [])
+    arrProyectoIdsVinculados.value = new Set(
+      (arrRes.data || []).map(a => a.proyecto_id).filter(id => id != null)
+    )
+  } catch {
+    proyectosTodos.value = []
+    arrProyectoIdsVinculados.value = new Set()
+  }
+}
+
+const proyectosDisponibles = computed(() =>
+  proyectosTodos.value
+    .filter(p => !arrProyectoIdsVinculados.value.has(p.id))
+    .slice()
+    .sort((a, b) => a.nombre_comercial.localeCompare(b.nombre_comercial))
+)
+
+async function onCostoAgregado() {
+  await Promise.all([cargarDatos(), cargarProyectosYVinculos()])
 }
 
 const facturadoActual = computed(() => {
@@ -407,5 +446,5 @@ const filasParaZip = computed(() =>
 )
 
 watch(periodoActual, (p) => { loadDocs(p); cargarDatos() })
-onMounted(() => { loadDocs(periodoActual.value); cargarDatos() })
+onMounted(() => { loadDocs(periodoActual.value); cargarDatos(); cargarProyectosYVinculos() })
 </script>
