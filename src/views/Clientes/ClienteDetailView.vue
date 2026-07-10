@@ -8,6 +8,11 @@
       </button>
       <span style="color: #c5b9db;">/</span>
       <span class="text-sm font-semibold" style="color: #2C2039;">{{ cliente.razon_social_nombre }}</span>
+      <span v-if="cliente.tipo_cliente_unergy"
+        class="text-[11px] font-semibold px-2 py-0.5 rounded-full"
+        style="background: #f0ebfd; color: #915BD8;">
+        {{ cliente.tipo_cliente_unergy }}
+      </span>
       <button @click="deleteVisible = true"
         class="ml-auto text-xs flex items-center gap-1 px-3 py-1.5 rounded-lg transition-colors hover:bg-red-50"
         style="color: #dc2626;">
