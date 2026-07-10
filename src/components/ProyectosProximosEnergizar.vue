@@ -17,6 +17,22 @@
           <span class="stat-num">{{ projects.length }}</span>
           <span class="stat-label">en pipeline</span>
         </div>
+        <div
+          class="stat-pill"
+          v-tooltip.bottom="'Próximos a energizar = tienen frontera asignada o Sun Factory ya los marca \'Próximo a energizar\''"
+        >
+          <span class="stat-num" style="color:#b45309;">{{ proximosAEnergizarCount }}</span>
+          <span class="stat-label">próximos a energizar</span>
+        </div>
+        <MultiSelect
+          v-model="filtroEstados"
+          :options="estadosDisponibles"
+          placeholder="Todos los estados"
+          display="chip"
+          class="w-56 text-xs"
+          showClear
+          v-tooltip.bottom="'Filtrar por estado del pipeline de obra'"
+        />
         <button
           type="button"
           class="stat-pill clickable"
@@ -109,7 +125,7 @@
         </Column>
 
         <!-- Status (editable) -->
-        <Column header="Estado" style="min-width: 190px;">
+        <Column header="Estado" style="min-width: 200px;">
           <template #body="{ data }">
             <div class="flex items-center gap-1.5">
               <Select
@@ -119,10 +135,10 @@
                 class="w-full"
               />
               <i
-                v-if="data.yaOperando"
-                class="pi pi-exclamation-triangle"
-                style="color:#E8823C; font-size:0.75rem; flex-shrink:0;"
-                v-tooltip.top="'Ya está en operación (confirmado) — Sun Factory todavía no actualizó esta fase'"
+                v-if="data.estadoEditadoManual"
+                class="pi pi-lock"
+                style="color:#915BD8; font-size:0.7rem; flex-shrink:0;"
+                v-tooltip.top="'Editado a mano -- Sun Factory no lo sobrescribirá en el próximo sync'"
               />
             </div>
           </template>
@@ -278,6 +294,7 @@ import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import DatePicker from 'primevue/datepicker'
 import Select from 'primevue/select'
+import MultiSelect from 'primevue/multiselect'
 import { useToast } from 'primevue/usetoast'
 import api from '@/api/client'
 import { useEnergizationProjects } from '@/composables/useEnergizationProjects'
@@ -294,6 +311,7 @@ const vinculandoId = ref(null)
 const restaurandoId = ref(null)
 const expandedRows = ref({})
 const soloConFrontera = ref(false)
+const filtroEstados = ref([])
 
 const STATUS_OPTIONS = ['En construcción', 'Pruebas', 'Próximo a energizar', 'Energizado']
 const MESES_CORTOS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
@@ -303,11 +321,30 @@ onMounted(loadProjects)
 // Pregunta frecuente: "¿qué proyectos están por energizar de verdad?" -- en
 // construcción + con frontera comercial ya registrada (señal más confiable
 // que el estado propio de Sun Factory).
-const filteredProjects = computed(() =>
-  soloConFrontera.value ? projects.value.filter(p => p.tieneFrontera) : projects.value
-)
+const filteredProjects = computed(() => {
+  let list = projects.value
+  if (soloConFrontera.value) list = list.filter(p => p.tieneFrontera)
+  if (filtroEstados.value.length) list = list.filter(p => filtroEstados.value.includes(p.status))
+  return list
+})
 
 const conFronteraCount = computed(() => projects.value.filter(p => p.tieneFrontera).length)
+
+// "Próximos a energizar" = unión de dos señales (no se suman, se unen -- un
+// proyecto puede cumplir ambas y solo cuenta una vez): tiene frontera asignada
+// (la señal real, aunque Sun Factory no lo sepa) O Sun Factory ya lo marca
+// como "Próximo a energizar" en su propio pipeline de obra.
+const proximosAEnergizarCount = computed(() =>
+  projects.value.filter(p => p.tieneFrontera || p.status === 'Próximo a energizar').length
+)
+
+// Solo ofrece los estados que de verdad aparecen en este pipeline -- "Energizado"
+// nunca sale (el proyecto sale de la vista al energizarse), así que no tiene
+// sentido listarlo como opción de filtro.
+const estadosDisponibles = computed(() => {
+  const presentes = new Set(projects.value.map(p => p.status))
+  return STATUS_OPTIONS.filter(s => presentes.has(s))
+})
 
 const lastSyncLabel = computed(() => {
   if (!lastSync.value) return ''
