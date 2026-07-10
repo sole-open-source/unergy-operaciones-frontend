@@ -36,7 +36,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, watch } from 'vue'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
@@ -57,10 +57,27 @@ const f = reactive({ nombre_comercial: '', potencia_instalada_kwp: null, departa
 
 function nombreOperador(o) { return o.nombre_comercial || o.nombre_legal }
 
+function resetForm() {
+  Object.assign(f, { nombre_comercial: '', potencia_instalada_kwp: null, departamento: '', municipio: '', operador_red_id: null })
+}
+
+watch(() => props.visible, (v) => {
+  if (!v) resetForm()
+})
+
 onMounted(async () => {
   const { data } = await api.get('/operadores-red')
   operadores.value = data.items ?? data
 })
+
+function mensajeError(det) {
+  if (typeof det === 'string') return det
+  if (Array.isArray(det)) return det.map(e => e.msg).filter(Boolean).join('; ') || 'Datos inválidos'
+  if (det && typeof det === 'object' && (typeof det.mensaje === 'string' || typeof det.msg === 'string')) {
+    return det.mensaje ?? det.msg
+  }
+  return 'No se pudo crear el proyecto'
+}
 
 async function guardar(forzar = false) {
   guardando.value = true
@@ -72,7 +89,7 @@ async function guardar(forzar = false) {
     )
     emit('creado', data)
     emit('update:visible', false)
-    Object.assign(f, { nombre_comercial: '', potencia_instalada_kwp: null, departamento: '', municipio: '', operador_red_id: null })
+    resetForm()
   } catch (err) {
     const det = err.response?.data?.detail
     if (err.response?.status === 409 && det?.codigo === 'posible_duplicado') {
@@ -83,7 +100,7 @@ async function guardar(forzar = false) {
         accept: () => guardar(true),
       })
     } else {
-      toast.add({ severity: 'error', summary: 'No se pudo crear', detail: typeof det === 'string' ? det : 'Error', life: 5000 })
+      toast.add({ severity: 'error', summary: 'No se pudo crear', detail: mensajeError(det), life: 5000 })
     }
   } finally {
     guardando.value = false
