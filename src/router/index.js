@@ -31,6 +31,10 @@ const routes = [
   { path: '/contratos/:id',name: 'ContratoDetalle', component: () => import('@/views/Contratos/ContratoDetailView.vue') },
   { path: '/general/proximos-energizar', name: 'ProximosEnergizar', component: () => import('@/views/General/ProximosEnergizarView.vue') },
 
+  // ── Comercial ────────────────────────────────────────────────────
+  { path: '/comercial', name: 'Comercial', component: () => import('@/views/Comercial/ComercialPipelineView.vue'), meta: { roles: ['admin', 'comercial'] } },
+  { path: '/comercial/oportunidades/:id', name: 'OportunidadDetalle', component: () => import('@/views/Comercial/OportunidadDetailView.vue'), meta: { roles: ['admin', 'comercial'] } },
+
   // ── Operaciones ──────────────────────────────────────────────────
   { path: '/operaciones/informes-mensuales', name: 'InformesMensuales', component: () => import('@/views/Operaciones/InformesMensualesView.vue'), meta: { roles: ['admin', 'operaciones', 'monitoreo'] } },
   { path: '/operaciones/informes-mensuales/dashboard', name: 'InformesMensualesDashboard', component: () => import('@/views/Operaciones/InformesMensualesDashboard.vue'), meta: { roles: ['admin', 'operaciones', 'monitoreo'] } },

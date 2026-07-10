@@ -268,6 +268,12 @@ const ALL_GROUPS = [
     ],
   },
   {
+    label: 'Comercial',
+    items: [
+      { to: '/comercial', label: 'Pipeline', icon: 'pi pi-briefcase', roles: ['admin', 'comercial'] },
+    ],
+  },
+  {
     label: 'Operaciones',
     items: [
       { to: '/solar-live', label: 'Generación Solar', icon: 'pi pi-sun', roles: ['admin', 'operaciones', 'monitoreo'] },
