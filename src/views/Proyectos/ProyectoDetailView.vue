@@ -39,6 +39,9 @@
             <InfoField label="API ID Unergy" :value="proyecto.sub_project" />
             <InfoField label="Código TSF" :value="proyecto.codigo_tsf" />
             <InfoField label="Fecha de entrada en operación" :value="fmtFecha(proyecto.fecha_entrada_operacion)" />
+            <InfoField
+              label="Inicio de comercialización"
+              :value="proyecto.fecha_inicio_comercializacion ? (fmtFecha(proyecto.fecha_inicio_comercializacion) + (proyecto.fecha_comercializacion_editada_manual ? ' (manual)' : ' (auto)')) : '—'" />
             <InfoField label="Fecha fin de representación" :value="proyecto.fecha_fin_representacion ? fmtFecha(proyecto.fecha_fin_representacion) : '—'" />
           </template>
           <template v-else>
@@ -85,6 +88,11 @@
             <div class="flex flex-col gap-1">
               <label class="field-label">Fecha de entrada en operación</label>
               <DatePicker v-model="editFechaEntrada" dateFormat="yy-mm-dd" showIcon showClear class="w-full" placeholder="Seleccionar" />
+            </div>
+            <div class="flex flex-col gap-1">
+              <label class="field-label">Inicio de comercialización</label>
+              <DatePicker v-model="editFechaComerc" dateFormat="yy-mm-dd" showIcon showClear class="w-full" placeholder="Auto (1er día con generación)" />
+              <small class="text-xs text-gray-400">Se autoderiva del 1er día con generación. Si la fijas a mano, el sistema no la vuelve a cambiar.</small>
             </div>
             <div class="flex flex-col gap-1">
               <label class="field-label">Fecha fin de representación</label>
@@ -881,6 +889,7 @@ const editInfoTecnica = reactive({
 
 // Fechas del proyecto (DatePicker trabaja con Date; el API espera 'YYYY-MM-DD')
 const editFechaEntrada = ref(null)
+const editFechaComerc = ref(null)
 const editFechaFinRep = ref(null)
 
 // ── Helpers de fecha ──────────────────────────────────────────────────────────
@@ -987,6 +996,7 @@ function populateEditForm() {
   editP50.value = parseMonthArray(p.p50_mensual_kwh)
   editP99.value = parseMonthArray(p.p99_mensual_kwh)
   editFechaEntrada.value = toDate(p.fecha_entrada_operacion)
+  editFechaComerc.value = toDate(p.fecha_inicio_comercializacion)
   editFechaFinRep.value = toDate(p.fecha_fin_representacion)
 }
 
@@ -1019,6 +1029,12 @@ async function saveEdit() {
     // preserva lo existente y permite limpiarlas (null) explícitamente.
     payload.fecha_entrada_operacion = formatFecha(editFechaEntrada.value)
     payload.fecha_fin_representacion = formatFecha(editFechaFinRep.value)
+    // Inicio de comercialización: solo se envía si el usuario la cambió, para no
+    // marcarla como "editada a mano" en cada guardado (el backend fija ese flag
+    // cuando este campo llega en el payload).
+    const comercNueva = formatFecha(editFechaComerc.value)
+    const comercActual = proyecto.value?.fecha_inicio_comercializacion || null
+    if (comercNueva !== comercActual) payload.fecha_inicio_comercializacion = comercNueva
 
     await api.patch(`/proyectos/${route.params.id}`, payload)
     const itPayload = {}
