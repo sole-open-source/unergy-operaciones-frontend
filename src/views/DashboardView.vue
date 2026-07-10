@@ -4,11 +4,11 @@
     <PageHeader title="Dashboard" subtitle="Resumen operativo de la plataforma" />
 
     <!-- Critical Alerts Banner -->
-    <div v-if="criticalAlerts.length" class="rounded-xl overflow-hidden" style="border: 2px solid #D64455;">
+    <div v-if="criticalAlerts.length || xmAlertsLoading || xmAlertsError" class="rounded-xl overflow-hidden" style="border: 2px solid #D64455;">
       <div class="px-4 py-2.5 flex items-center gap-2" style="background-color: #D64455;">
         <i class="pi pi-exclamation-triangle text-white" />
         <span class="text-sm font-bold text-white">Alertas Operacionales</span>
-        <span class="ml-auto text-xs font-semibold px-2 py-0.5 rounded-full" style="background: rgba(255,255,255,0.2); color: white;">
+        <span v-if="criticalAlerts.length" class="ml-auto text-xs font-semibold px-2 py-0.5 rounded-full" style="background: rgba(255,255,255,0.2); color: white;">
           {{ criticalAlerts.length }}
         </span>
       </div>
@@ -25,6 +25,18 @@
           </div>
           <i class="pi pi-angle-right text-sm" style="color: #D64455;" />
         </RouterLink>
+        <!-- Estado de carga de alertas de datos XM -->
+        <div v-if="xmAlertsLoading" class="flex items-center gap-2 px-4 py-3">
+          <i class="pi pi-spin pi-spinner text-sm" style="color: #D64455;" />
+          <span class="text-sm" style="color: #6b5a8a;">Cargando alertas de datos XM…</span>
+        </div>
+        <!-- Estado de error de alertas de datos XM -->
+        <div v-else-if="xmAlertsError" class="flex items-center gap-3 px-4 py-3">
+          <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style="background-color: rgba(202,138,4,0.1);">
+            <i class="pi pi-exclamation-circle text-sm" style="color: #CA8A04;" />
+          </div>
+          <p class="text-sm" style="color: #6b5a8a;">{{ xmAlertsError }}</p>
+        </div>
       </div>
     </div>
 
@@ -237,11 +249,18 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import api from '@/api/client'
+import { useXmAlertsStore } from '@/stores/xmAlerts'
 
 const data = ref({})
 const pipeline = ref({})
 const cumplimiento = ref(null)
 const cumplimientoLoading = ref(false)
+
+// Alertas críticas de datos XM faltantes para liquidación mensual.
+const xmAlertsStore = useXmAlertsStore()
+const xmDataAlerts = computed(() => xmAlertsStore.missingXmDataAlerts)
+const xmAlertsLoading = computed(() => xmAlertsStore.loading)
+const xmAlertsError = computed(() => xmAlertsStore.error)
 
 const STAGE_CONFIG = {
   operation:     { label: 'Operación',     color: '#10B981', bg: 'rgba(16,185,129,0.1)' },
@@ -342,6 +361,18 @@ const cumplimientoDeficits = computed(() => {
 
 const criticalAlerts = computed(() => {
   const alerts = []
+  // Datos XM faltantes para liquidación — nivel crítico (bloquea facturación).
+  for (const a of xmDataAlerts.value) {
+    alerts.push({
+      key: `xm-${a.project_id}-${a.year}-${a.month}`,
+      title: a.message || `${a.project_name} sin datos de XM para liquidar`,
+      detail: `Faltan datos de XM para la liquidación de ${a.month} ${a.year}`,
+      icon: 'pi pi-database',
+      iconColor: '#DC2626',
+      bgColor: 'rgba(220,38,38,0.1)',
+      to: '/liquidaciones',
+    })
+  }
   const fp = data.value.fallas_por_prioridad || {}
   if (fp.critica > 0) {
     alerts.push({
@@ -428,6 +459,9 @@ const quickLinks = [
 ]
 
 onMounted(async () => {
+  // Cargar alertas de datos XM faltantes (no bloquea el resto del dashboard).
+  xmAlertsStore.fetchMissingXmDataAlerts()
+
   try {
     const [kpiRes, pipeRes] = await Promise.all([
       api.get('/dashboard/kpis').catch(() => null),
