@@ -41,4 +41,34 @@ api.interceptors.response.use(
   }
 )
 
+// ── Términos contractuales PPA ────────────────────────────────────────────────
+// Relación 1:1 opcional con el contrato PPA (puntos de entrega, penalizaciones,
+// base de cálculo y horario de operación). Se persiste en /ppa/{id}/terminos.
+
+// Normaliza `puntos_entrega` a un arreglo JSON antes de enviarlo al backend (JSONB).
+// Acepta un arreglo ya listo, un JSON string (ej. '["Punto A","Punto B"]') o una
+// lista separada por comas (ej. 'Punto A, Punto B'). Cadena vacía → null.
+function normalizarPuntosEntrega(valor) {
+  if (valor == null) return null
+  if (Array.isArray(valor)) return valor
+  const texto = String(valor).trim()
+  if (!texto) return null
+  try {
+    return JSON.parse(texto)
+  } catch {
+    return texto.split(',').map((s) => s.trim()).filter(Boolean)
+  }
+}
+
+// GET términos de un PPA. El backend responde 404/null cuando aún no existen.
+export function getPPATerminos(ppaId) {
+  return api.get(`/ppa/${ppaId}/terminos`)
+}
+
+// PUT (crear o actualizar) términos de un PPA. Serializa `puntos_entrega` a JSONB.
+export function updatePPATerminos(ppaId, data) {
+  const payload = { ...data, puntos_entrega: normalizarPuntosEntrega(data.puntos_entrega) }
+  return api.put(`/ppa/${ppaId}/terminos`, payload)
+}
+
 export default api

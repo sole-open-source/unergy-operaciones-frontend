@@ -217,6 +217,30 @@
             </div>
           </div>
 
+          <Divider />
+
+          <!-- Términos contractuales PPA -->
+          <div>
+            <p class="text-xs font-semibold text-amber-600 uppercase tracking-wide mb-3">Términos Contractuales PPA</p>
+            <div v-if="terminos" class="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+              <InfoField label="Base de cálculo" :value="terminos.base_calculo" />
+              <InfoField label="Penalización por exceso"
+                :value="terminos.penalizacion_exceso != null ? String(terminos.penalizacion_exceso) : null" />
+              <InfoField label="Penalización por falta"
+                :value="terminos.penalizacion_falta != null ? String(terminos.penalizacion_falta) : null" />
+              <InfoField label="Horario de operación" :value="terminos.horario_operacion" />
+              <div class="col-span-2 md:col-span-3 flex flex-col gap-1">
+                <span class="text-xs font-medium" style="color:#9b89b5">Puntos de entrega</span>
+                <div v-if="puntosEntregaList.length" class="flex flex-wrap gap-1">
+                  <span v-for="(p, i) in puntosEntregaList" :key="i"
+                    class="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">{{ p }}</span>
+                </div>
+                <span v-else class="text-sm" style="color:#2C2039">—</span>
+              </div>
+            </div>
+            <div v-else class="text-sm text-gray-400">Términos no definidos.</div>
+          </div>
+
         </div>
       </TabPanel>
 
@@ -592,7 +616,7 @@ import Dialog from 'primevue/dialog'
 import Select from 'primevue/select'
 import InfoField from '@/components/InfoField.vue'
 import PPAContratoWizard from '@/views/Contratos/PPAContratoWizard.vue'
-import api from '@/api/client'
+import api, { getPPATerminos } from '@/api/client'
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 const VISTAS = [{ label: 'Mensual', value: 'mensual' }, { label: 'Anual', value: 'anual' }]
@@ -601,6 +625,33 @@ const route = useRoute()
 const toast = useToast()
 const contrato = ref(null)
 const loading = ref(true)
+
+// Términos contractuales PPA (relación 1:1 opcional). null = aún no consultado o inexistente.
+const terminos = ref(null)
+
+const puntosEntregaList = computed(() => {
+  const pe = terminos.value?.puntos_entrega
+  if (!pe) return []
+  if (Array.isArray(pe)) return pe
+  const texto = String(pe).trim()
+  if (!texto) return []
+  try {
+    const parsed = JSON.parse(texto)
+    return Array.isArray(parsed) ? parsed : [parsed]
+  } catch {
+    return texto.split(',').map((s) => s.trim()).filter(Boolean)
+  }
+})
+
+async function cargarTerminos(id) {
+  try {
+    const { data } = await getPPATerminos(id)
+    terminos.value = data || null
+  } catch {
+    // 404 u otro error → sección muestra "Términos no definidos".
+    terminos.value = null
+  }
+}
 
 // Edición inline de identificación
 const editandoId = ref(false)
@@ -988,6 +1039,7 @@ async function cargar() {
     const { data } = await api.get(`/ppa/${route.params.id}`)
     contrato.value = data
     cargarPlantasInscritas()
+    cargarTerminos(route.params.id)
     Object.assign(formGescon, {
       codigo_sic: data.codigo_sic ?? null,
       gescon_codigo: data.gescon_codigo ?? null,

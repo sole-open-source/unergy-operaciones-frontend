@@ -292,8 +292,51 @@
         </div>
       </template>
 
-      <!-- ── PASO 5: GESCON + Resumen ───────────────────────────────────── -->
+      <!-- ── PASO 5: Términos PPA y Penalizaciones ─────────────────────────── -->
       <template v-if="step === 5">
+        <p class="step-title">Términos PPA y Penalizaciones <span class="normal-case font-normal text-gray-400">(opcional)</span></p>
+        <div class="space-y-4">
+          <div class="flex flex-col gap-1">
+            <label class="field-label">Puntos de entrega</label>
+            <Textarea
+              v-model="terminos.puntos_entrega"
+              rows="3"
+              autoResize
+              placeholder='["Punto A", "Punto B"] o Punto A, Punto B'
+              class="w-full"
+              :class="{ 'p-invalid': !!puntosEntregaError }"
+            />
+            <span v-if="puntosEntregaError" class="text-xs text-red-500">{{ puntosEntregaError }}</span>
+            <span v-else class="text-xs text-gray-400">
+              Acepta un arreglo JSON o una lista separada por comas.
+            </span>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div class="flex flex-col gap-1">
+              <label class="field-label">Penalización por exceso</label>
+              <InputNumber v-model="terminos.penalizacion_exceso" :maxFractionDigits="4" class="w-full" />
+            </div>
+            <div class="flex flex-col gap-1">
+              <label class="field-label">Penalización por falta</label>
+              <InputNumber v-model="terminos.penalizacion_falta" :maxFractionDigits="4" class="w-full" />
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div class="flex flex-col gap-1">
+              <label class="field-label">Base de cálculo</label>
+              <Select v-model="terminos.base_calculo" :options="BASE_CALCULO_OPCIONES"
+                optionLabel="label" optionValue="value" placeholder="Seleccionar" showClear class="w-full" />
+            </div>
+            <div class="flex flex-col gap-1">
+              <label class="field-label">Horario de operación</label>
+              <InputText v-model="terminos.horario_operacion" placeholder="Ej: 6:00 - 18:00" class="w-full" />
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <!-- ── PASO 6: GESCON + Resumen ───────────────────────────────────── -->
+      <template v-if="step === 6">
         <p class="step-title text-gray-400">Registro GESCON / ASIC <span class="normal-case font-normal">(opcional)</span></p>
         <div class="grid grid-cols-3 gap-4 mb-5">
           <div class="flex flex-col gap-1">
@@ -347,6 +390,7 @@
             <ResumenFila label="Tiempo de pago" :value="form.tiempo_pago != null ? `${form.tiempo_pago} días` : null" />
             <ResumenFila label="Tarifas" :value="tarifasRows.length ? `${tarifasRows.length} filas` : null" />
             <ResumenFila label="Compromisos energía" :value="energiaRows.length ? `${energiaRows.length} filas` : null" />
+            <ResumenFila label="Términos PPA" :value="hayTerminos ? 'Definidos' : null" />
           </div>
         </div>
       </template>
@@ -380,7 +424,7 @@ import AutoComplete from 'primevue/autocomplete'
 import DatePicker from 'primevue/datepicker'
 import Textarea from 'primevue/textarea'
 import NuevoClienteDialog from '@/components/NuevoClienteDialog.vue'
-import api from '@/api/client'
+import api, { getPPATerminos, updatePPATerminos } from '@/api/client'
 import * as XLSX from 'xlsx'
 
 const props = defineProps({
@@ -399,6 +443,7 @@ const STEPS = [
   { label: 'Condiciones' },
   { label: 'Tarifas' },
   { label: 'Energía' },
+  { label: 'Términos' },
   { label: 'GESCON' },
 ]
 
@@ -421,6 +466,13 @@ const INDICES_INDEXACION = [
   { label: 'IPP + spread', value: 'IPP + spread' },
   { label: 'Fijo', value: 'Fijo' },
   { label: 'Otro', value: 'Otro' },
+]
+
+// Coincide con BaseCalculoEnum del backend.
+const BASE_CALCULO_OPCIONES = [
+  { label: 'Mensual', value: 'Mensual' },
+  { label: 'Diario', value: 'Diario' },
+  { label: 'Horario', value: 'Horario' },
 ]
 
 const MESES_ES = {
@@ -506,6 +558,35 @@ const form = reactive({
   gescon_codigo: null, gescon_fecha_inicio: null, gescon_fecha_fin: null,
   gescon_precio: null, gescon_cantidades_kwh: null,
 })
+
+// Términos PPA (relación 1:1 opcional, endpoint /ppa/{id}/terminos)
+const terminos = reactive({
+  puntos_entrega: '',
+  penalizacion_exceso: null,
+  penalizacion_falta: null,
+  base_calculo: null,
+  horario_operacion: '',
+})
+
+// Valida el JSON de puntos_entrega solo cuando el usuario lo escribe como arreglo/objeto.
+const puntosEntregaError = computed(() => {
+  const v = String(terminos.puntos_entrega ?? '').trim()
+  if (!v || !(v.startsWith('[') || v.startsWith('{'))) return ''
+  try {
+    JSON.parse(v)
+    return ''
+  } catch {
+    return 'JSON inválido. Usa un arreglo, ej. ["Punto A", "Punto B"], o una lista separada por comas.'
+  }
+})
+
+const hayTerminos = computed(() =>
+  !!String(terminos.puntos_entrega ?? '').trim() ||
+  terminos.penalizacion_exceso != null ||
+  terminos.penalizacion_falta != null ||
+  !!terminos.base_calculo ||
+  !!String(terminos.horario_operacion ?? '').trim()
+)
 
 const EXCLUIR_DUPLICADO = ['numero_codigo_contrato', 'fecha_inicio', 'fecha_fin',
   'gescon_fecha_inicio', 'gescon_fecha_fin', 'gescon_codigo']
@@ -628,6 +709,11 @@ function onPasteEnergia(e) {
 // ── Navegación ───────────────────────────────────────────────────────────────
 
 function avanzar() {
+  // Paso de términos: no permitir avanzar con un JSON de puntos de entrega inválido.
+  if (step.value === 5 && puntosEntregaError.value) {
+    toast.add({ severity: 'warn', summary: 'Puntos de entrega', detail: puntosEntregaError.value, life: 4000 })
+    return
+  }
   step.value++
 }
 
@@ -642,6 +728,11 @@ function formatFecha(v) {
 // ── Guardar ──────────────────────────────────────────────────────────────────
 
 async function guardar() {
+  if (puntosEntregaError.value) {
+    step.value = 5
+    toast.add({ severity: 'warn', summary: 'Puntos de entrega', detail: puntosEntregaError.value, life: 4000 })
+    return
+  }
   guardando.value = true
   try {
     const payload = { ...form }
@@ -665,6 +756,15 @@ async function guardar() {
     }
     if (energiaRows.value.length) {
       await api.put(`/ppa/${contratoId}/compromisos`, energiaRows.value)
+    }
+    if (hayTerminos.value) {
+      await updatePPATerminos(contratoId, {
+        puntos_entrega: terminos.puntos_entrega,
+        penalizacion_exceso: terminos.penalizacion_exceso,
+        penalizacion_falta: terminos.penalizacion_falta,
+        base_calculo: terminos.base_calculo,
+        horario_operacion: terminos.horario_operacion || null,
+      })
     }
 
     if (props.editandoId) {
@@ -696,6 +796,22 @@ onMounted(async () => {
     todosProyectos.value = proy.items
     todosClientes.value = clientes.items
   } catch { /* silencioso */ }
+
+  // En edición, precargar los términos existentes (si los hay).
+  if (props.editandoId) {
+    try {
+      const { data } = await getPPATerminos(props.editandoId)
+      if (data) {
+        terminos.puntos_entrega = Array.isArray(data.puntos_entrega)
+          ? JSON.stringify(data.puntos_entrega)
+          : (data.puntos_entrega ?? '')
+        terminos.penalizacion_exceso = data.penalizacion_exceso ?? null
+        terminos.penalizacion_falta = data.penalizacion_falta ?? null
+        terminos.base_calculo = data.base_calculo ?? null
+        terminos.horario_operacion = data.horario_operacion ?? ''
+      }
+    } catch { /* aún sin términos definidos */ }
+  }
 })
 </script>
 
