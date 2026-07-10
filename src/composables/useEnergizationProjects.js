@@ -49,6 +49,9 @@ export function useEnergizationProjects() {
       const list = Array.isArray(data?.projects) ? data.projects : []
       projects.value = list.map(rehydrate)
       source.value = data?.source || null
+      // Fecha real del último sync (on-demand o job de 6h) que tocó el pipeline
+      // en la BD -- no depende de que esta sesión haya apretado "Actualizar".
+      if (data?.ultimaSincronizacion) lastSync.value = new Date(data.ultimaSincronizacion)
       return true
     } catch (e) {
       console.error('Error loading proyectos próximos a energizar from API', e)
@@ -117,7 +120,6 @@ export function useEnergizationProjects() {
     syncing.value = true
     try {
       const { data } = await api.post(`/proximos-energizar/sync`, null, { params: { force } })
-      lastSync.value = new Date()
       await loadProjects()
       return data
     } catch (e) {

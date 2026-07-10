@@ -17,7 +17,7 @@ import { ref, onMounted, onBeforeUnmount } from 'vue'
 import * as XLSX from 'xlsx'
 import {
   parseAsientos, extractMandate, suggestTag, reconciliar, fmt, norm as normNombre,
-  parseIngresos, matchIngresoContab,
+  parseIngresos, matchIngresoContab, normalizarCifra,
 } from '@/utils/conciliacionMandatos.js'
 
 const root = ref(null)
@@ -382,7 +382,7 @@ function initValidador(el) {
       let valorPagar = 0
       if (mode === 'autoconsumo') {
         const nums = [...text.matchAll(/\b([\d]{1,3}(?:,[\d]{3})+|[\d]{5,})\b/g)]
-          .map(m => ({ val: parseFloat(m[1].replace(/,/g,'')), idx: m.index }))
+          .map(m => ({ val: normalizarCifra(m[1]), idx: m.index }))
           .filter(m => m.val >= 1000)
         const ti = text.indexOf('VALOR A PAGAR')
         if (ti > -1) {
@@ -391,7 +391,7 @@ function initValidador(el) {
         }
       } else {
         const nums = [...text.matchAll(/\$\s*([\d\.,]+)/g)]
-          .map(m => ({ val: parseFloat(m[1].replace(/\./g,'').replace(/,/g,'.')), idx: m.index }))
+          .map(m => ({ val: normalizarCifra(m[1]), idx: m.index }))
         const ti = text.indexOf('VALOR A PAGAR')
         if (ti > -1) {
           const cl = nums.find(v => v.idx > ti && v.idx - ti < 500)
@@ -781,7 +781,7 @@ function initValidador(el) {
       const cmuM = text.match(/CMU\d+/i)
       const cmuInText = cmuM ? cmuM[0].toUpperCase() : null
       const money = [...text.matchAll(/\$\s*([\d\.,]+)/g)].map(m=>({
-        val: parseFloat(m[1].replace(/\./g,'').replace(/,/g,'.')), index:m.index}))
+        val: normalizarCifra(m[1]), index:m.index}))
       const labels=[]
       ;[{type:'SUMA',re:/SUMA/g},{type:'RESTA',re:/RESTA/g},{type:'TOTAL',re:/VALOR\s+A\s+PAGAR/g}].forEach(p=>{
         let m; const r=new RegExp(p.re.source,'g')
@@ -818,7 +818,7 @@ function initValidador(el) {
       const cmuM = text.match(/CMU\d+/i)
       const cmuInText = cmuM ? cmuM[0].toUpperCase() : null
       const money=[...text.matchAll(/\b([\d]{1,3}(?:,[\d]{3})+|[\d]{4,})\b/g)]
-        .map(m=>({val:parseFloat(m[1].replace(/,/g,'')),index:m.index})).filter(m=>m.val>=100)
+        .map(m=>({val:normalizarCifra(m[1]),index:m.index})).filter(m=>m.val>=100)
       const labels=[]
       ;[{type:'SUMA',re:/\bSUMA\b/g},{type:'RESTA',re:/\bRESTA\b/g},{type:'TOTAL',re:/VALOR\s+A\s+PAGAR/g}].forEach(p=>{
         let m; const r=new RegExp(p.re.source,'g')

@@ -13,10 +13,6 @@
                   placeholder="Proyecto" class="w-48" showClear filter />
         <Dropdown v-model="operadorFilter" :options="operadorOptions" optionLabel="label" optionValue="value"
                   placeholder="Operador" class="w-40" showClear />
-        <Button icon="pi pi-microchip" label="Backfill medidor" size="small" severity="secondary" outlined
-                :loading="medBackfillLoading" @click="previewMedidorBackfill"
-                v-tooltip.bottom="'Completar marca/modelo/serie de medidor (ppal + respaldo) desde Quoia en fronteras que les falte'"
-                class="whitespace-nowrap" />
         <Button icon="pi pi-chart-scatter" label="Diagrama Fasorial" size="small"
                 @click="showFasorial = true"
                 style="background: #915BD8; border-color: #915BD8;"
@@ -231,7 +227,8 @@
           </div>
           <div>
             <label class="text-xs font-semibold uppercase block mb-1" style="color: #6b5a8a;">Operador red</label>
-            <InputText v-model="editForm.operador_red" class="w-full" />
+            <Dropdown v-model="editForm.operador_red_id" :options="operadoresRedOptions" optionLabel="label"
+              optionValue="id" class="w-full" placeholder="Seleccionar" showClear filter />
           </div>
         </div>
       </div>
@@ -269,42 +266,6 @@
             :loading="p._loading === 'ignorar'" @click="ignorarPendiente(p)" v-tooltip="'Ignorar'" />
         </div>
       </div>
-    </Dialog>
-
-    <!-- Dialog: Backfill marca/modelo/serie de medidor -->
-    <Dialog v-model:visible="medBackfillVisible" header="Backfill de medidor (Quoia)" modal class="w-full max-w-2xl">
-      <div v-if="medBackfillReport" class="space-y-3 text-sm">
-        <p style="color: #6b5a8a;">
-          Completa <b>marca, modelo y número de serie</b> (medidor principal y respaldo) desde Quoia
-          en fronteras que ya existen pero les falta ese dato. Nunca pisa un campo ya diligenciado.
-        </p>
-
-        <div class="flex flex-wrap gap-4 p-3 rounded-xl" style="background:#F6F3FB;">
-          <span style="color:#16a34a;"><b>{{ medBackfillReport.actualizadas }}</b> se completarán</span>
-          <span style="color:#9b89b5;"><b>{{ medBackfillReport.sin_info_en_quoia }}</b> sin info en Quoia</span>
-          <span class="text-gray-400">{{ medBackfillReport.total_candidatas }} candidatas en total</span>
-        </div>
-
-        <div v-if="medBackfillReport.detalle.length" class="max-h-60 overflow-y-auto border rounded-xl" style="border-color:#eee;">
-          <table class="w-full text-xs">
-            <tbody>
-              <tr v-for="r in medBackfillReport.detalle" :key="r.id" class="border-t" style="border-color:#f0f0f0;">
-                <td class="px-3 py-1.5 text-gray-400">ID {{ r.id }}</td>
-                <td class="px-3 py-1.5">{{ r.nombre }}</td>
-                <td class="px-3 py-1.5 font-mono" style="color:#9b89b5;">{{ Object.keys(r.cambios).join(', ') }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <p v-else class="text-xs" style="color:#9b89b5;">No hay fronteras pendientes de completar.</p>
-      </div>
-
-      <template #footer>
-        <Button label="Cancelar" text @click="medBackfillVisible = false" :disabled="medBackfillExecuting" />
-        <Button label="Completar" icon="pi pi-check" :loading="medBackfillExecuting"
-                :disabled="!medBackfillReport || !medBackfillReport.actualizadas"
-                style="background:#915BD8; border-color:#915BD8;" @click="applyMedidorBackfill" />
-      </template>
     </Dialog>
   </div>
 </template>
@@ -526,13 +487,11 @@ const filteredFronteras = computed(() => {
 
 const stats = computed(() => {
   const all = fronteras.value
-  const sinDatos = all.filter(f => f.estado_operacional === 'sin_datos' || (!f.quoia_meter_id && f.estado === 'activa')).length
   return [
     { label: 'Total', value: all.length, color: '#2C2039' },
     { label: 'Activas', value: all.filter(f => f.estado === 'activa').length, color: '#10B981' },
     { label: 'En registro', value: all.filter(f => f.estado === 'en_registro').length, color: '#F0C040' },
     { label: 'Cap. total MW', value: all.reduce((s, f) => s + (Number(f.capacidad_efectiva_mw) || 0), 0).toFixed(1), color: '#915BD8' },
-    { label: 'Sin datos', value: sinDatos, color: sinDatos > 0 ? '#D64455' : '#10B981' },
   ]
 })
 
@@ -572,7 +531,7 @@ function editFrontera(f) {
     estado: f.estado,
     estado_operacional: f.estado_operacional || null,
     quoia_meter_id: f.quoia_meter_id || '',
-    operador_red: f.operador_red || '',
+    operador_red_id: f.operador_red_id || null,
   }
   showEdit.value = true
 }
@@ -691,45 +650,27 @@ function ignorarPendiente(p) {
   })
 }
 
+// Catálogo de operadores de red -- select en vez de texto libre, para que
+// coincida con el vínculo real que usa Reporte CGM (Frontera.operador_red_id).
+const operadoresRed = ref([])
+const operadoresRedOptions = computed(() =>
+  operadoresRed.value.map(o => ({ id: o.id, label: o.nombre_comercial || o.nombre_legal }))
+)
+async function loadOperadoresRed() {
+  try {
+    const { data } = await api.get('/operadores-red')
+    operadoresRed.value = Array.isArray(data) ? data : (data.items ?? [])
+  } catch { /* graceful degrade -- el select queda vacío */ }
+}
+
 onMounted(() => {
   loadData()
   loadPendientesQuoia()
+  loadOperadoresRed()
 })
 
-// ── Backfill marca/modelo/serie de medidor (Quoia) ──────────────────────────────
-const medBackfillVisible   = ref(false)
-const medBackfillReport    = ref(null)
-const medBackfillLoading   = ref(false)
-const medBackfillExecuting = ref(false)
-
-async function previewMedidorBackfill() {
-  medBackfillLoading.value = true
-  try {
-    const { data } = await api.post('/fronteras/backfill-medidor', null, { params: { dry_run: true } })
-    medBackfillReport.value = data
-    medBackfillVisible.value = true
-  } catch (e) {
-    toast.add({ severity: 'error', summary: 'No se pudo previsualizar',
-      detail: e.response?.data?.detail || e.message, life: 5000 })
-  } finally {
-    medBackfillLoading.value = false
-  }
-}
-
-async function applyMedidorBackfill() {
-  medBackfillExecuting.value = true
-  try {
-    const { data } = await api.post('/fronteras/backfill-medidor', null, { params: { dry_run: false } })
-    toast.add({ severity: 'success', summary: 'Medidores completados',
-      detail: `${data.actualizadas} fronteras actualizadas`, life: 5000 })
-    medBackfillVisible.value = false
-    medBackfillReport.value = null
-    await loadData()
-  } catch (e) {
-    toast.add({ severity: 'error', summary: 'El backfill falló',
-      detail: e.response?.data?.detail || e.message, life: 6000 })
-  } finally {
-    medBackfillExecuting.value = false
-  }
-}
+// Nota: el backfill de marca/modelo/serie de medidor (Quoia) ya no tiene
+// botón aquí -- ya se corrió y hoy no queda nada por completar (Quoia no
+// tiene más info para dar). El endpoint POST /fronteras/backfill-medidor
+// sigue vivo en el backend por si hace falta correrlo puntualmente.
 </script>

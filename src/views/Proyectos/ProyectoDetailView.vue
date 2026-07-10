@@ -39,6 +39,9 @@
             <InfoField label="API ID Unergy" :value="proyecto.sub_project" />
             <InfoField label="Código TSF" :value="proyecto.codigo_tsf" />
             <InfoField label="Fecha de entrada en operación" :value="fmtFecha(proyecto.fecha_entrada_operacion)" />
+            <InfoField
+              label="Inicio de comercialización"
+              :value="proyecto.fecha_inicio_comercializacion ? (fmtFecha(proyecto.fecha_inicio_comercializacion) + (proyecto.fecha_comercializacion_editada_manual ? ' (manual)' : ' (auto)')) : '—'" />
             <InfoField label="Fecha fin de representación" :value="proyecto.fecha_fin_representacion ? fmtFecha(proyecto.fecha_fin_representacion) : '—'" />
           </template>
           <template v-else>
@@ -56,15 +59,17 @@
             </div>
             <div class="flex flex-col gap-1">
               <label class="field-label">Departamento</label>
-              <InputText v-model="editForm.departamento" class="w-full" />
+              <Select v-model="editForm.departamento" :options="departamentos" class="w-full" placeholder="Seleccionar" showClear filter />
             </div>
             <div class="flex flex-col gap-1">
               <label class="field-label">Municipio</label>
-              <InputText v-model="editForm.municipio" class="w-full" />
+              <Select v-model="editForm.municipio" :options="municipiosDisponibles" class="w-full" placeholder="Seleccionar" showClear filter
+                :disabled="!editForm.departamento" />
             </div>
             <div class="flex flex-col gap-1">
               <label class="field-label">Operador de red</label>
-              <InputText v-model="editForm.operador_red" class="w-full" />
+              <Select v-model="editForm.operador_red_id" :options="operadoresRedOptions" optionLabel="label"
+                optionValue="id" class="w-full" placeholder="Seleccionar" showClear filter />
             </div>
             <div class="flex flex-col gap-1">
               <label class="field-label">Clasificación regulatoria</label>
@@ -85,6 +90,11 @@
             <div class="flex flex-col gap-1">
               <label class="field-label">Fecha de entrada en operación</label>
               <DatePicker v-model="editFechaEntrada" dateFormat="yy-mm-dd" showIcon showClear class="w-full" placeholder="Seleccionar" />
+            </div>
+            <div class="flex flex-col gap-1">
+              <label class="field-label">Inicio de comercialización</label>
+              <DatePicker v-model="editFechaComerc" dateFormat="yy-mm-dd" showIcon showClear class="w-full" placeholder="Auto (1er día con generación)" />
+              <small class="text-xs text-gray-400">Se autoderiva del 1er día con generación. Si la fijas a mano, el sistema no la vuelve a cambiar.</small>
             </div>
             <div class="flex flex-col gap-1">
               <label class="field-label">Fecha fin de representación</label>
@@ -763,6 +773,7 @@ import Dialog from 'primevue/dialog'
 import { useToast } from 'primevue/usetoast'
 import * as XLSX from 'xlsx'
 import api from '@/api/client'
+import divipola from '@/data/colombia-divipola.json'
 import ContratoServicioWizard from '@/views/Contratos/ContratoServicioWizard.vue'
 import ProyectoAreaContactosPanel from '@/components/ProyectoAreaContactosPanel.vue'
 
@@ -838,7 +849,7 @@ const editForm = reactive({
   potencia_instalada_kwp: null,
   departamento: null,
   municipio: null,
-  operador_red: null,
+  operador_red_id: null,
   clasificacion_regulatoria: null,
   carpeta_drive_codigo: null,
   sub_project: null,
@@ -881,6 +892,7 @@ const editInfoTecnica = reactive({
 
 // Fechas del proyecto (DatePicker trabaja con Date; el API espera 'YYYY-MM-DD')
 const editFechaEntrada = ref(null)
+const editFechaComerc = ref(null)
 const editFechaFinRep = ref(null)
 
 // ── Helpers de fecha ──────────────────────────────────────────────────────────
@@ -987,6 +999,7 @@ function populateEditForm() {
   editP50.value = parseMonthArray(p.p50_mensual_kwh)
   editP99.value = parseMonthArray(p.p99_mensual_kwh)
   editFechaEntrada.value = toDate(p.fecha_entrada_operacion)
+  editFechaComerc.value = toDate(p.fecha_inicio_comercializacion)
   editFechaFinRep.value = toDate(p.fecha_fin_representacion)
 }
 
@@ -1019,6 +1032,12 @@ async function saveEdit() {
     // preserva lo existente y permite limpiarlas (null) explícitamente.
     payload.fecha_entrada_operacion = formatFecha(editFechaEntrada.value)
     payload.fecha_fin_representacion = formatFecha(editFechaFinRep.value)
+    // Inicio de comercialización: solo se envía si el usuario la cambió, para no
+    // marcarla como "editada a mano" en cada guardado (el backend fija ese flag
+    // cuando este campo llega en el payload).
+    const comercNueva = formatFecha(editFechaComerc.value)
+    const comercActual = proyecto.value?.fecha_inicio_comercializacion || null
+    if (comercNueva !== comercActual) payload.fecha_inicio_comercializacion = comercNueva
 
     await api.patch(`/proyectos/${route.params.id}`, payload)
     const itPayload = {}
@@ -1233,19 +1252,38 @@ const estadoSeverity = (e) => (
   { en_operacion: 'success', en_desarrollo: 'info', suspendido: 'warn', cancelado: 'secondary' }[e] || 'secondary'
 )
 
+// Departamento/municipio -- select en vez de texto libre (DIVIPOLA), para
+// evitar variantes de escritura que luego no se puedan agrupar/filtrar bien.
+const departamentos = Object.keys(divipola).sort()
+const municipiosDisponibles = computed(() => editForm.departamento ? (divipola[editForm.departamento] || []) : [])
+watch(() => editForm.departamento, (nuevo, anterior) => {
+  if (nuevo !== anterior && editForm.municipio && !(divipola[nuevo] || []).includes(editForm.municipio)) {
+    editForm.municipio = null
+  }
+})
+
+// Catálogo de operadores de red -- select en vez de texto libre, para que
+// coincida con el vínculo real que usa Reporte CGM (Frontera.operador_red_id).
+const operadoresRed = ref([])
+const operadoresRedOptions = computed(() =>
+  operadoresRed.value.map(o => ({ id: o.id, label: o.nombre_comercial || o.nombre_legal }))
+)
+
 // ── Carga inicial ─────────────────────────────────────────────────────────────
 onMounted(async () => {
   try {
-    const [proyRes, clientesRes, invRes] = await Promise.all([
+    const [proyRes, clientesRes, invRes, operadoresRes] = await Promise.all([
       api.get(`/proyectos/${route.params.id}`),
       api.get('/clientes', { params: { size: 200 } }),
       api.get(`/proyectos/${route.params.id}/inversionistas`),
+      api.get('/operadores-red').catch(() => ({ data: [] })),
     ])
     proyecto.value = {
       ...proyRes.data,
       inversionistas: Array.isArray(invRes.data) ? invRes.data : (invRes.data.items ?? []),
     }
     clientes.value = clientesRes.data.items
+    operadoresRed.value = Array.isArray(operadoresRes.data) ? operadoresRes.data : (operadoresRes.data.items ?? [])
     for (const s of SERVICIOS_FLAGS) srvFlags[s.key] = proyRes.data[s.key]
     if (isEditMode.value) populateEditForm()
     loadCrossData()

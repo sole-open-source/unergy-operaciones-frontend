@@ -623,6 +623,9 @@
 
     <!-- ══ TAB 2 — MAPA ══════════════════════════════════════════════════ -->
 
+    <!-- ══ BOTÓN FLOTANTE: Diagrama fasorial ══════════════════════════════ -->
+    <FasorialButton />
+
   </div><!-- /gf-page -->
 </template>
 
@@ -646,6 +649,7 @@ import MultiSelect from 'primevue/multiselect'
 import FallaForm from './FallaForm.vue'
 import FallaArchivos from './FallaArchivos.vue'
 import CalendarioFallas from './CalendarioFallas.vue'
+import FasorialButton from '@/components/FasorialButton.vue'
 const FallasMapView = defineAsyncComponent(() => import('./FallasMapView.vue'))
 import { Bar, Line } from 'vue-chartjs'
 import {

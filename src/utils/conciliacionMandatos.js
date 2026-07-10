@@ -109,43 +109,64 @@ const stripMoney = (s) => {
 }
 
 /**
- * Parsea un monto del MANDATO (PDF), en formato US:
- *   coma (,) = separador de MILES,  punto (.) = separador DECIMAL.
- *   Ej.: "2,011.51" -> 2011.51 ; "129" -> 129 ; "$ 2,011,510.00" -> 2011510.
- * Maneja vacío/null (→0), negativos (signo o paréntesis) y números ya parseados.
+ * Normaliza una CIFRA a Number, detectando automáticamente si la coma/punto es
+ * separador de miles o decimal. Es la ÚNICA función de parseo numérico; sirve
+ * para AMBAS fuentes, sin necesidad de saber de cuál viene el dato:
+ *   - Mandato (PDF), formato US: coma=miles, punto=decimal  ("2,011.51" → 2011.51)
+ *   - Asiento (Excel), formato CO: punto=miles, coma=decimal ("2.011,51" → 2011.51)
+ *
+ * Reglas de detección:
+ *   1. Si ya es número, se devuelve tal cual (así llegan las celdas del xlsx).
+ *   2. Se quitan $ y espacios; negativo por signo "-" o paréntesis contable "(1.234)".
+ *   3. Si hay coma Y punto: el ÚLTIMO en aparecer es el DECIMAL; el otro, miles.
+ *      ("1,234.56"→1234.56 US · "1.234,56"→1234.56 CO)
+ *   4. Si hay un solo tipo de separador:
+ *        - aparece varias veces           → miles   ("1.234.567" / "1,234,567" → 1234567)
+ *        - una vez con EXACTAMENTE 3 dígitos detrás → miles ("497,333"→497333 · "129.413"→129413)
+ *        - una vez con ≠3 dígitos detrás   → decimal ("0,50"→0.5 · "12.5"→12.5)
+ *
+ * La regla 4 asume el dominio (pesos colombianos): NO hay importes con 3 decimales
+ * —los decimales son de 2 (,00 / .51)— por eso "X,YYY"/"X.YYY" con 3 dígitos son
+ * siempre miles. Maneja vacío/null → 0.
  */
-export const parseMandatoNumber = (s) => {
+export const normalizarCifra = (s) => {
   const p = stripMoney(s)
   if (!p) return 0
   if (p.isNumber) return p.value
-  const t = p.body.replace(/,/g, '')          // comas = miles -> quitar; punto = decimal, se conserva
+  const body = p.body                          // solo dígitos y separadores , .
+  const hasComma = body.includes(',')
+  const hasDot = body.includes('.')
+  let t
+  if (hasComma && hasDot) {
+    // El último separador que aparece es el decimal; el otro es de miles.
+    const comaEsDecimal = body.lastIndexOf(',') > body.lastIndexOf('.')
+    t = comaEsDecimal
+      ? body.replace(/\./g, '').replace(',', '.')  // CO: puntos=miles fuera, coma=decimal
+      : body.replace(/,/g, '')                     // US: comas=miles fuera, punto=decimal
+  } else if (hasComma || hasDot) {
+    const sep = hasComma ? ',' : '.'
+    const parts = body.split(sep)
+    const unaVez = parts.length === 2
+    const decimales = unaVez ? parts[1].length : 0
+    // Único separador: decimal solo si aparece una vez y NO tiene 3 dígitos detrás.
+    t = (unaVez && decimales !== 3)
+      ? body.replace(sep, '.')                      // decimal
+      : parts.join('')                             // miles
+  } else {
+    t = body
+  }
   const n = parseFloat(t)
   if (isNaN(n)) return 0
   return p.neg ? -n : n
 }
 
 /**
- * Parsea un monto del ASIENTO contable (Excel Odoo), en formato CO:
- *   punto (.) = separador de MILES,  coma (,) = separador DECIMAL.
- *   Ej.: "2.011,51" -> 2011.51 ; "129.413" -> 129413 ; "129" -> 129.
- * Maneja vacío/null (→0), negativos (signo o paréntesis) y números ya parseados.
+ * @deprecated Usar normalizarCifra. Alias mantenidos para compatibilidad con
+ * código/tests que aún los importen; ahora ambos delegan en la función única.
  */
-export const parseAsientoNumber = (s) => {
-  const p = stripMoney(s)
-  if (!p) return 0
-  if (p.isNumber) return p.value
-  const t = p.body.replace(/\./g, '').replace(/,/g, '.')  // puntos=miles -> quitar; coma=decimal -> punto
-  const n = parseFloat(t)
-  if (isNaN(n)) return 0
-  return p.neg ? -n : n
-}
-
-/**
- * @deprecated Usar parseAsientoNumber (CO) o parseMandatoNumber (US) según la
- * fuente del dato. Se mantiene como alias del parseo de ASIENTO (formato CO)
- * para compatibilidad con código que aún lo importe.
- */
-export const parseNum = parseAsientoNumber
+export const parseMandatoNumber = normalizarCifra
+export const parseAsientoNumber = normalizarCifra
+export const parseNum = normalizarCifra
 
 // ===================== PARSEO DE ASIENTOS (Excel Odoo) =====================
 

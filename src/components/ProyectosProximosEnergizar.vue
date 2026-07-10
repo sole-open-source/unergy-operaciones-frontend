@@ -3,15 +3,9 @@
 
     <!-- Header -->
     <div class="px-5 py-4 flex items-center justify-between gap-3 flex-wrap" style="border-bottom: 1px solid rgba(44,32,57,0.10);">
-      <div class="flex items-center gap-2">
-        <i class="pi pi-bolt" style="color: #F0C040;" />
-        <div>
-          <h2 class="text-base font-bold" style="color: #2C2039;">Proyectos próximos a energizarse</h2>
-          <p v-if="lastSync" class="text-xs mt-0.5" style="color: #7a6e8a;">
-            última sincronización {{ lastSyncLabel }}
-          </p>
-        </div>
-      </div>
+      <p class="text-xs" style="color: #7a6e8a;">
+        <template v-if="lastSync">última sincronización {{ lastSyncLabel }}</template>
+      </p>
       <div class="flex items-center gap-2.5 flex-wrap">
         <div class="stat-pill">
           <span class="stat-num">{{ projects.length }}</span>
@@ -19,7 +13,7 @@
         </div>
         <div
           class="stat-pill"
-          v-tooltip.bottom="'Próximos a energizar = tienen frontera asignada o Sun Factory ya los marca \'Próximo a energizar\''"
+          v-tooltip.bottom="'Tienen frontera asignada o Sun Factory ya los marca \'Próximo a energizar\''"
         >
           <span class="stat-num" style="color:#b45309;">{{ proximosAEnergizarCount }}</span>
           <span class="stat-label">próximos a energizar</span>
@@ -38,7 +32,7 @@
           class="stat-pill clickable"
           :class="{ active: soloConFrontera }"
           @click="soloConFrontera = !soloConFrontera"
-          v-tooltip.bottom="'Ya tienen frontera comercial registrada en Quoia — señal real de energización, más confiable que la fase de Sun Factory. Clic para ver solo estos.'"
+          v-tooltip.bottom="'Ya tienen frontera comercial registrada en Quoia.'"
         >
           <span class="stat-num" style="color:#15803d;">{{ conFronteraCount }}</span>
           <span class="stat-label">con frontera asignada</span>
@@ -351,7 +345,11 @@ const lastSyncLabel = computed(() => {
   const mins = Math.round((Date.now() - lastSync.value.getTime()) / 60000)
   if (mins < 1) return 'hace un momento'
   if (mins < 60) return `hace ${mins} min`
-  return lastSync.value.toLocaleTimeString()
+  const hours = Math.round(mins / 60)
+  // Ahora esta fecha viene de la BD (último sync real, no de esta sesión) --
+  // puede tener horas o días, así que no basta con mostrar solo la hora.
+  if (hours < 24) return `hace ${hours} h`
+  return lastSync.value.toLocaleString('es-CO', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
 })
 
 async function onSync() {
