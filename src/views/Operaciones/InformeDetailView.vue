@@ -40,6 +40,10 @@
           <button v-if="editMode" class="inf-btn inf-btn-ghost inf-btn-danger" @click="discardEdit">
             ↩ Descartar cambios
           </button>
+          <button v-if="editMode" class="inf-btn inf-btn-ghost inf-btn-blue"
+                  :disabled="validating" @click="validateDatos">
+            {{ validating ? '…' : '✔ Validar datos' }}
+          </button>
           <button v-if="editMode" class="inf-btn inf-btn-ghost inf-btn-success"
                   :disabled="saving" @click="saveEdit">
             {{ saving ? '…' : '💾 Guardar versión' }}
@@ -94,6 +98,27 @@
         <button v-if="diasRojosActivos.size > 0" class="inf-day-clear" @click="limpiarDiasRojos">✕ Limpiar</button>
       </div>
 
+      <!-- ══ Datos operativos estructurados (solo en editMode) ══ -->
+      <div v-if="editMode" class="inf-datos-panel">
+        <div class="inf-datos-head">
+          <h3 class="inf-datos-h">📊 Datos operativos</h3>
+          <span v-if="!datosValidos" class="inf-datos-warn">⚠️ Faltan campos requeridos</span>
+          <small class="inf-datos-hint">
+            Estos valores se guardan como <code>datos_operativos</code> (JSON) y se validan aparte del contenido HTML.
+          </small>
+        </div>
+
+        <InformeValidationStatus
+          :status="validation.status"
+          :messages="validation.messages"
+        />
+
+        <InformeDatosOperativosEditor
+          v-model="reportData"
+          @update:valid="datosValidos = $event"
+        />
+      </div>
+
       <!-- ══ Contenido del informe ══ -->
       <div
         ref="contentRef"
@@ -107,9 +132,16 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick, watch } from 'vue'
+import { ref, reactive, computed, onMounted, nextTick, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import api from '@/api/client'
+import api, { getInformeById, updateInforme, validateInforme } from '@/api/client'
+import InformeDatosOperativosEditor from '@/components/informes/InformeDatosOperativosEditor.vue'
+import InformeValidationStatus from '@/components/informes/InformeValidationStatus.vue'
+import {
+  emptyDatosOperativos,
+  normalizeDatosOperativos,
+  validateDatosOperativosLocal,
+} from '@/components/informes/datosOperativos'
 
 const route = useRoute()
 
@@ -124,6 +156,12 @@ const htmlContent = ref('')
 const toastMsg   = ref('')
 const toastError = ref(false)
 let _toastTimer  = null
+
+// ── Datos operativos estructurados (datos_operativos JSON) ───────
+const reportData   = ref(emptyDatosOperativos())
+const datosValidos = ref(true)
+const validating   = ref(false)
+const validation   = reactive({ status: null, messages: [] })
 
 // ── Días en rojo ────────────────────────────────────────────────
 const subProjectActivo = ref('')
@@ -204,9 +242,12 @@ async function cargar() {
   loading.value = true
   error.value   = null
   try {
-    const { data } = await api.get(`/informes/${route.params.id}`)
+    const data = await getInformeById(route.params.id)
     informe.value   = data
     htmlContent.value = data.html_content || ''
+    // Inicializa la capa estructurada desde el informe, o vacía si aún no existe.
+    reportData.value = normalizeDatosOperativos(data.datos_operativos)
+    resetValidation()
   } catch (e) {
     error.value = e.response?.data?.detail || e.message
   } finally {
@@ -229,6 +270,9 @@ function enterEdit() {
 function discardEdit() {
   editMode.value  = false
   htmlContent.value = informe.value.html_content || ''
+  // Revierte también la capa estructurada a lo persistido.
+  reportData.value = normalizeDatosOperativos(informe.value.datos_operativos)
+  resetValidation()
 }
 
 async function saveEdit() {
@@ -236,16 +280,25 @@ async function saveEdit() {
   saving.value = true
   try {
     const newHtml = contentRef.value.innerHTML
-    const { data } = await api.post('/informes/', {
+    const data = await updateInforme({
       tipo: informe.value.tipo,
       sub_project: informe.value.sub_project,
       periodo_desde: informe.value.periodo_desde,
       periodo_hasta: informe.value.periodo_hasta,
       periodo_display: informe.value.periodo_display,
       proyecto_nombre: informe.value.proyecto_nombre,
+      // Capa de presentación (texto libre / render).
       html_content: newHtml,
+      // Capa estructurada operativa.
+      datos_operativos: reportData.value,
     })
-    informe.value   = { ...informe.value, ...data }
+    // El backend puede devolver datos_operativos ya normalizados; si no, se
+    // conserva lo enviado para reflejar el estado guardado en la vista.
+    informe.value = {
+      ...informe.value,
+      ...data,
+      datos_operativos: data.datos_operativos ?? reportData.value,
+    }
     htmlContent.value = newHtml
     editMode.value  = false
     toast('💾 Informe guardado')
@@ -253,6 +306,33 @@ async function saveEdit() {
     toast('⚠️ ' + (e.response?.data?.detail || e.message), true)
   } finally {
     saving.value = false
+  }
+}
+
+// ── Validación de datos operativos ───────────────────────────────
+function resetValidation() {
+  validation.status = null
+  validation.messages = []
+}
+
+async function validateDatos() {
+  validating.value = true
+  try {
+    const res = await validateInforme(informe.value.id, reportData.value)
+    validation.status = res?.status || 'valid'
+    validation.messages = res?.messages || []
+  } catch (e) {
+    // Fallback: si el backend aún no expone /validate (404) u ocurre un error
+    // de red, mostramos la validación local para no bloquear al usuario.
+    const local = validateDatosOperativosLocal(reportData.value)
+    const nota =
+      e.response?.status === 404
+        ? 'Validación del servidor no disponible; se muestra validación local.'
+        : 'No se pudo validar en el servidor: ' + (e.response?.data?.detail || e.message)
+    validation.status = local.valid ? 'valid' : 'invalid'
+    validation.messages = [{ text: nota, severity: 'warn' }, ...local.messages]
+  } finally {
+    validating.value = false
   }
 }
 
@@ -431,6 +511,30 @@ onMounted(cargar)
   border: 1px solid rgba(220,50,50,0.3); background: rgba(220,50,50,0.12); border-radius: 6px;
   padding: 3px 9px; font-size: 11px; font-weight: 700; cursor: pointer;
   color: #FF8080; font-family: 'Sora', sans-serif;
+}
+
+/* Panel datos operativos */
+.inf-datos-panel {
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  background: rgba(145,91,216,0.05);
+  border: 1px solid rgba(145,91,216,0.2);
+  border-radius: 12px;
+}
+.inf-datos-head {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+  margin-bottom: 10px;
+}
+.inf-datos-h { font-size: 14px; font-weight: 800; color: #FDFAF7; margin: 0; }
+.inf-datos-warn {
+  font-size: 10px; font-weight: 800; color: #FF8080;
+  background: rgba(220,50,50,0.12); border: 1px solid rgba(220,50,50,0.25);
+  border-radius: 20px; padding: 3px 10px; white-space: nowrap;
+}
+.inf-datos-hint { font-size: 11px; color: #A89EC0; flex: 1 1 auto; }
+.inf-datos-hint code {
+  background: rgba(145,91,216,0.15); color: #C9AEEE;
+  padding: 1px 5px; border-radius: 4px; font-size: 10px;
 }
 
 /* Contenido */
