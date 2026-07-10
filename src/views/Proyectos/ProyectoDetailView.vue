@@ -59,11 +59,12 @@
             </div>
             <div class="flex flex-col gap-1">
               <label class="field-label">Departamento</label>
-              <InputText v-model="editForm.departamento" class="w-full" />
+              <Select v-model="editForm.departamento" :options="departamentos" class="w-full" placeholder="Seleccionar" showClear filter />
             </div>
             <div class="flex flex-col gap-1">
               <label class="field-label">Municipio</label>
-              <InputText v-model="editForm.municipio" class="w-full" />
+              <Select v-model="editForm.municipio" :options="municipiosDisponibles" class="w-full" placeholder="Seleccionar" showClear filter
+                :disabled="!editForm.departamento" />
             </div>
             <div class="flex flex-col gap-1">
               <label class="field-label">Operador de red</label>
@@ -772,6 +773,7 @@ import Dialog from 'primevue/dialog'
 import { useToast } from 'primevue/usetoast'
 import * as XLSX from 'xlsx'
 import api from '@/api/client'
+import divipola from '@/data/colombia-divipola.json'
 import ContratoServicioWizard from '@/views/Contratos/ContratoServicioWizard.vue'
 import ProyectoAreaContactosPanel from '@/components/ProyectoAreaContactosPanel.vue'
 
@@ -1249,6 +1251,16 @@ function formatFechaSrv(f) {
 const estadoSeverity = (e) => (
   { en_operacion: 'success', en_desarrollo: 'info', suspendido: 'warn', cancelado: 'secondary' }[e] || 'secondary'
 )
+
+// Departamento/municipio -- select en vez de texto libre (DIVIPOLA), para
+// evitar variantes de escritura que luego no se puedan agrupar/filtrar bien.
+const departamentos = Object.keys(divipola).sort()
+const municipiosDisponibles = computed(() => editForm.departamento ? (divipola[editForm.departamento] || []) : [])
+watch(() => editForm.departamento, (nuevo, anterior) => {
+  if (nuevo !== anterior && editForm.municipio && !(divipola[nuevo] || []).includes(editForm.municipio)) {
+    editForm.municipio = null
+  }
+})
 
 // Catálogo de operadores de red -- select en vez de texto libre, para que
 // coincida con el vínculo real que usa Reporte CGM (Frontera.operador_red_id).

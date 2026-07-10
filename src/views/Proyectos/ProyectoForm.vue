@@ -27,11 +27,12 @@
       </div>
       <div>
         <label class="field-label">Departamento</label>
-        <InputText v-model="f.departamento" class="w-full" />
+        <Select v-model="f.departamento" :options="departamentos" class="w-full" placeholder="Seleccionar" showClear filter />
       </div>
       <div>
         <label class="field-label">Municipio</label>
-        <InputText v-model="f.municipio" class="w-full" />
+        <Select v-model="f.municipio" :options="municipiosDisponibles" class="w-full" placeholder="Seleccionar" showClear filter
+          :disabled="!f.departamento" />
       </div>
       <div>
         <label class="field-label">Operador de red</label>
@@ -191,6 +192,7 @@ import Divider from 'primevue/divider'
 import Tag from 'primevue/tag'
 import { useToast } from 'primevue/usetoast'
 import api from '@/api/client'
+import divipola from '@/data/colombia-divipola.json'
 
 const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 
@@ -220,6 +222,16 @@ const f = reactive({
   carpeta_drive_codigo: null,
   sub_project: null,
   codigo_tsf: null,
+})
+
+// Departamento/municipio -- select en vez de texto libre (DIVIPOLA), para
+// evitar variantes de escritura que luego no se puedan agrupar/filtrar bien.
+const departamentos = Object.keys(divipola).sort()
+const municipiosDisponibles = computed(() => f.departamento ? (divipola[f.departamento] || []) : [])
+watch(() => f.departamento, (nuevo, anterior) => {
+  if (nuevo !== anterior && f.municipio && !(divipola[nuevo] || []).includes(f.municipio)) {
+    f.municipio = null
+  }
 })
 
 // Catálogo de operadores de red -- select en vez de texto libre, para que
