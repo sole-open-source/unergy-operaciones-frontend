@@ -492,7 +492,6 @@ const stats = computed(() => {
     { label: 'Activas', value: all.filter(f => f.estado === 'activa').length, color: '#10B981' },
     { label: 'En registro', value: all.filter(f => f.estado === 'en_registro').length, color: '#F0C040' },
     { label: 'Cap. total MW', value: all.reduce((s, f) => s + (Number(f.capacidad_efectiva_mw) || 0), 0).toFixed(1), color: '#915BD8' },
-    { label: 'Filtrados', value: filteredFronteras.value.length, color: '#0EA5E9' },
   ]
 })
 
