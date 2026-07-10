@@ -129,13 +129,18 @@ async function exportarExcel() {
     for (const p of proyectos) {
       const invs = p.inversionistas || []
       if (!invs.length) { rows.push([p.proyecto, '—', null, p.ingresos_cop || 0, p.costos_cop || 0, p.valor_a_pagar_total || 0]); continue }
-      invs.forEach((inv, i) => rows.push([
-        i === 0 ? p.proyecto : '', inv.cliente_nombre || inv.nombre || '—',
-        inv.porcentaje != null ? inv.porcentaje / 100 : null,
-        i === 0 ? (p.ingresos_cop || 0) : null,
-        i === 0 ? (p.costos_cop || 0) : null,
-        inv.valor_a_pagar || 0,
-      ]))
+      // Ingresos/costos DIVIDIDOS por inversionista (desde grupos_totales), no solo
+      // en la primera fila. costos = comercializacion + costos + facturas (con signo).
+      invs.forEach((inv, i) => {
+        const g = inv.grupos_totales || {}
+        const ingInv = g.ingresos || 0
+        const cosInv = (g.comercializacion || 0) + (g.costos || 0) + (g.facturas || 0)
+        rows.push([
+          i === 0 ? p.proyecto : '', inv.cliente_nombre || inv.nombre || '—',
+          inv.porcentaje != null ? inv.porcentaje / 100 : null,
+          ingInv, cosInv, inv.valor_a_pagar || 0,
+        ])
+      })
     }
     const totRow = rows.length
     const r = data.resumen || {}
