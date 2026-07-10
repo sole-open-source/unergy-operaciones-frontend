@@ -11,22 +11,17 @@
           <span class="stat-num">{{ projects.length }}</span>
           <span class="stat-label">en pipeline</span>
         </div>
-        <div
-          class="stat-pill"
-          v-tooltip.bottom="'Tienen frontera asignada o Sun Factory ya los marca \'Próximo a energizar\''"
+        <button
+          type="button"
+          class="stat-pill clickable"
+          :class="{ active: soloProximosAEnergizar }"
+          @click="soloProximosAEnergizar = !soloProximosAEnergizar"
+          v-tooltip.bottom="'Tienen frontera asignada o Sun Factory ya los marca \'Próximo a energizar\'. Clic para ver solo estos.'"
         >
           <span class="stat-num" style="color:#b45309;">{{ proximosAEnergizarCount }}</span>
           <span class="stat-label">próximos a energizar</span>
-        </div>
-        <MultiSelect
-          v-model="filtroEstados"
-          :options="estadosDisponibles"
-          placeholder="Todos los estados"
-          display="chip"
-          class="w-56 text-xs"
-          showClear
-          v-tooltip.bottom="'Filtrar por estado del pipeline de obra'"
-        />
+          <i class="pi" :class="soloProximosAEnergizar ? 'pi-times-circle' : 'pi-filter'" style="font-size:0.65rem; color:#b45309;" />
+        </button>
         <button
           type="button"
           class="stat-pill clickable"
@@ -288,7 +283,6 @@ import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import DatePicker from 'primevue/datepicker'
 import Select from 'primevue/select'
-import MultiSelect from 'primevue/multiselect'
 import { useToast } from 'primevue/usetoast'
 import api from '@/api/client'
 import { useEnergizationProjects } from '@/composables/useEnergizationProjects'
@@ -305,7 +299,7 @@ const vinculandoId = ref(null)
 const restaurandoId = ref(null)
 const expandedRows = ref({})
 const soloConFrontera = ref(false)
-const filtroEstados = ref([])
+const soloProximosAEnergizar = ref(false)
 
 const STATUS_OPTIONS = ['En construcción', 'Pruebas', 'Próximo a energizar', 'Energizado']
 const MESES_CORTOS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
@@ -318,7 +312,7 @@ onMounted(loadProjects)
 const filteredProjects = computed(() => {
   let list = projects.value
   if (soloConFrontera.value) list = list.filter(p => p.tieneFrontera)
-  if (filtroEstados.value.length) list = list.filter(p => filtroEstados.value.includes(p.status))
+  if (soloProximosAEnergizar.value) list = list.filter(p => p.tieneFrontera || p.status === 'Próximo a energizar')
   return list
 })
 
@@ -331,14 +325,6 @@ const conFronteraCount = computed(() => projects.value.filter(p => p.tieneFronte
 const proximosAEnergizarCount = computed(() =>
   projects.value.filter(p => p.tieneFrontera || p.status === 'Próximo a energizar').length
 )
-
-// Solo ofrece los estados que de verdad aparecen en este pipeline -- "Energizado"
-// nunca sale (el proyecto sale de la vista al energizarse), así que no tiene
-// sentido listarlo como opción de filtro.
-const estadosDisponibles = computed(() => {
-  const presentes = new Set(projects.value.map(p => p.status))
-  return STATUS_OPTIONS.filter(s => presentes.has(s))
-})
 
 const lastSyncLabel = computed(() => {
   if (!lastSync.value) return ''
