@@ -51,7 +51,10 @@
                  stripedRows class="p-datatable-sm">
         <Column field="codigo_frontera" header="Código" sortable style="min-width: 140px">
           <template #body="{ data }">
-            <span class="font-mono text-sm font-semibold" style="color: #915BD8;">{{ data.codigo_frontera || '—' }}</span>
+            <RouterLink :to="`/mem/fronteras/${data.id}`"
+                        class="font-mono text-sm font-semibold underline" style="color: #915BD8;">
+              {{ data.codigo_frontera || `#${data.id}` }}
+            </RouterLink>
           </template>
         </Column>
         <Column field="nombre_frontera" header="Nombre" sortable style="min-width: 200px" />
@@ -107,6 +110,20 @@
           </template>
         </Column>
         <Column field="municipio" header="Municipio" sortable style="min-width: 130px" />
+        <Column header="Última Medición" style="min-width: 150px">
+          <template #body="{ data }">
+            <!-- El backend puede adjuntar la última medición en la fila; si no,
+                 se muestra un guion (los datos se ven en el detalle). -->
+            <div v-if="data.fuente_medicion || data.ultima_medicion != null" class="flex items-center gap-1.5">
+              <Tag v-if="data.fuente_medicion" :value="fuenteMeta(data.fuente_medicion).label"
+                   :severity="fuenteMeta(data.fuente_medicion).severity" />
+              <span v-if="data.ultima_medicion != null" class="text-xs font-semibold" style="color:#6b5a8a;">
+                {{ fmtMedicion(data.ultima_medicion) }}
+              </span>
+            </div>
+            <span v-else class="text-xs" style="color:#c4b8d4;">—</span>
+          </template>
+        </Column>
         <Column header="" style="width: 90px">
           <template #body="{ data }">
             <Button icon="pi pi-pencil" text rounded size="small" severity="secondary"
@@ -275,6 +292,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useToast } from 'primevue/usetoast'
 import { useConfirm } from 'primevue/useconfirm'
 import api from '@/api/client'
+import { metaFuente, formatMedicionValor } from '@/services/fronterasService'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import InputText from 'primevue/inputtext'
@@ -499,6 +517,9 @@ function tipoLabel(t) {
   const map = { generacion: 'Generación', consumo: 'Consumo', generacion_consumo: 'Gen+Consumo', consumo_auxiliar: 'Auxiliar', consumo_propio: 'Propio' }
   return map[t] || t
 }
+// Indicador de última medición en la lista (fuente + valor, si el backend los adjunta).
+const fuenteMeta = metaFuente
+const fmtMedicion = formatMedicionValor
 function tipoSeverity(t) {
   if (t === 'generacion') return 'success'
   if (t === 'consumo') return 'info'

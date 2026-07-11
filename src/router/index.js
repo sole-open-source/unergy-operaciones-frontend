@@ -67,6 +67,7 @@ const routes = [
   // ── MEM ──────────────────────────────────────────────────────────
   { path: '/mem/gescon',       name: 'MemGescon',       component: () => import('@/views/MEM/GesconView.vue'),        meta: { roles: ['admin', 'operaciones'] } },
   { path: '/mem/fronteras',    name: 'MemFronteras',    component: () => import('@/views/MEM/FronterasView.vue'),     meta: { roles: ['admin', 'operaciones'] } },
+  { path: '/mem/fronteras/:id', name: 'MemFronteraDetalle', component: () => import('@/views/MEM/FronteraDetailView.vue'), meta: { roles: ['admin', 'operaciones'] } },
   { path: '/mem/reporte-energia', name: 'MemReporteEnergia', component: () => import('@/views/MEM/ReporteEnergiaView.vue'), meta: { roles: ['admin', 'operaciones'] } },
   { path: '/mem/operadores-red', name: 'MemOperadoresRed', component: () => import('@/views/MEM/OperadoresRedView.vue'), meta: { roles: ['admin', 'operaciones'] } },
   { path: '/mem/operadores-red/:id', name: 'MemOperadorRedDetalle', component: () => import('@/views/MEM/OperadorRedDetailView.vue'), meta: { roles: ['admin', 'operaciones'] } },
