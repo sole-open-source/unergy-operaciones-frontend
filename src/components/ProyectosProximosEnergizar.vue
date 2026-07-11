@@ -36,7 +36,7 @@
           size="small"
           :loading="syncing"
           @click="onSync"
-          v-tooltip.bottom="'Trae % de obra y fecha estimada desde Sun Factory (respeta las fechas editadas a mano)'"
+          v-tooltip.bottom="'Trae de nuevo % de obra, estado y fecha estimada desde Sun Factory'"
         />
       </div>
       <p class="text-xs" style="color: #7a6e8a;">
@@ -94,15 +94,10 @@
 
         <Column expander style="width: 44px" />
 
-        <!-- Commercial name (editable) -->
+        <!-- Commercial name (read-only, viene de Sun Factory) -->
         <Column header="Proyecto" frozen style="min-width: 340px;">
           <template #body="{ data }">
-            <InputText
-              :model-value="data.commercialName"
-              @update:model-value="v => persistField(data, 'commercialName', v)"
-              class="w-full proyecto-name-input"
-              v-tooltip.top="data.commercialName"
-            />
+            <span class="text-sm proyecto-name" v-tooltip.top="data.commercialName">{{ data.commercialName }}</span>
           </template>
         </Column>
 
@@ -113,48 +108,17 @@
           </template>
         </Column>
 
-        <!-- Status (editable) -->
+        <!-- Status (read-only, viene de Sun Factory) -->
         <Column header="Estado" style="min-width: 200px;">
           <template #body="{ data }">
-            <div class="flex items-center gap-1.5">
-              <Select
-                :model-value="data.status"
-                @update:model-value="v => persistField(data, 'status', v)"
-                :options="STATUS_OPTIONS"
-                class="w-full"
-              />
-              <i
-                v-if="data.estadoEditadoManual"
-                class="pi pi-lock"
-                style="color:#915BD8; font-size:0.7rem; flex-shrink:0;"
-                v-tooltip.top="'Editado a mano -- Sun Factory no lo sobrescribirá en el próximo sync'"
-              />
-            </div>
+            <span class="text-sm">{{ data.status }}</span>
           </template>
         </Column>
 
-        <!-- Energization date (editable → marca fecha como manual) -->
-        <Column header="Energización" style="min-width: 210px;">
+        <!-- Energization date (read-only, viene de Sun Factory) -->
+        <Column header="Energización" style="min-width: 140px;">
           <template #body="{ data }">
-            <div class="flex items-center gap-1.5">
-              <DatePicker
-                :model-value="data.energizationDate"
-                @update:model-value="v => persistField(data, 'energizationDate', v)"
-                dateFormat="yy-mm-dd"
-                showIcon
-                class="w-full"
-              />
-              <button
-                v-if="data.editadaManual"
-                type="button"
-                class="restore-date-btn"
-                :disabled="restaurandoId === data.id"
-                @click="onRestaurarFecha(data)"
-                v-tooltip.top="'Editada a mano — clic para restaurar la fecha de Sun Factory'"
-              >
-                <i :class="restaurandoId === data.id ? 'pi pi-spin pi-spinner' : 'pi pi-pencil'" style="font-size:0.7rem;" />
-              </button>
-            </div>
+            <span class="text-sm font-mono tabular-nums">{{ formatDate(data.energizationDate) }}</span>
           </template>
         </Column>
 
@@ -192,15 +156,12 @@
           </template>
         </Column>
 
-        <!-- Expected monthly MWh (editable) -->
+        <!-- Expected monthly MWh (read-only, viene de Sun Factory) -->
         <Column header="MWh / mes" style="min-width: 110px;">
           <template #body="{ data }">
-            <InputNumber
-              :model-value="data.monthlyMwh"
-              @update:model-value="v => persistField(data, 'monthlyMwh', v)"
-              :maxFractionDigits="2" :min="0" locale="en-US" class="w-full"
-              :class="{ 'mwh-muted': !data.monthlyMwh }"
-            />
+            <span class="text-sm font-mono tabular-nums" :class="{ 'mwh-muted': !data.monthlyMwh }">
+              {{ Number(data.monthlyMwh).toFixed(2) }}
+            </span>
           </template>
         </Column>
 
@@ -279,30 +240,31 @@ import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
-import InputText from 'primevue/inputtext'
-import InputNumber from 'primevue/inputnumber'
-import DatePicker from 'primevue/datepicker'
-import Select from 'primevue/select'
 import { useToast } from 'primevue/usetoast'
 import api from '@/api/client'
 import { useEnergizationProjects } from '@/composables/useEnergizationProjects'
 
 const {
   projects, loading, warning, syncing, lastSync,
-  loadProjects, persistField, removeProject, syncNow, restaurarFecha,
+  loadProjects, removeProject, syncNow,
 } = useEnergizationProjects()
 
 const toast = useToast()
 const sugerencias = ref([])
 const sugerenciasVisible = ref(false)
 const vinculandoId = ref(null)
-const restaurandoId = ref(null)
 const expandedRows = ref({})
 const soloConFrontera = ref(false)
 const soloProximosAEnergizar = ref(false)
 
-const STATUS_OPTIONS = ['En construcción', 'Pruebas', 'Próximo a energizar', 'Energizado']
 const MESES_CORTOS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+
+function formatDate(d) {
+  if (!d) return '—'
+  const dt = d instanceof Date ? d : new Date(d)
+  if (isNaN(dt.getTime())) return '—'
+  return dt.toISOString().slice(0, 10)
+}
 
 onMounted(loadProjects)
 
@@ -339,7 +301,7 @@ const lastSyncLabel = computed(() => {
 })
 
 async function onSync() {
-  const r = await syncNow(false)
+  const r = await syncNow()
   if (r) {
     const partes = [
       `Actualizados: ${r.actualizados ?? 0}`,
@@ -354,18 +316,6 @@ async function onSync() {
       sugerencias.value = r.sugerencias_vinculo
       sugerenciasVisible.value = true
     }
-  }
-}
-
-async function onRestaurarFecha(project) {
-  restaurandoId.value = project.id
-  try {
-    await restaurarFecha(project.id)
-    toast.add({ severity: 'success', summary: 'Fecha restaurada', detail: `${project.commercialName} vuelve a seguir la fecha de Sun Factory`, life: 3000 })
-  } catch (e) {
-    toast.add({ severity: 'error', summary: 'No se pudo restaurar', detail: e.response?.data?.detail || e.message, life: 5000 })
-  } finally {
-    restaurandoId.value = null
   }
 }
 
@@ -481,10 +431,13 @@ function isProrated(project, year, month) {
 .stat-num { font-size: 15px; font-weight: 800; color: #2C2039; font-variant-numeric: tabular-nums; }
 .stat-label { color: #7a6e8a; white-space: nowrap; }
 
-/* Nombres largos: no cortar sin avisar -- se ve completo con ellipsis, y el
-   tooltip/foco muestran el valor entero para editar. */
-:deep(.proyecto-name-input) {
+/* Nombres largos: no cortar sin avisar -- el tooltip muestra el valor entero. */
+.proyecto-name {
+  display: block;
+  max-width: 320px;
+  overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 :deep(.energ-table .p-datatable-thead th) {
@@ -504,16 +457,6 @@ function isProrated(project, year, month) {
   vertical-align: middle;
 }
 
-/* Restaurar fecha (reemplaza el botón global de "forzar sobrescritura") */
-.restore-date-btn {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 22px; height: 22px; border-radius: 6px; flex-shrink: 0;
-  background: rgba(145,91,216,0.12); color: #915BD8;
-  border: none; cursor: pointer;
-}
-.restore-date-btn:hover:not(:disabled) { background: rgba(145,91,216,0.22); }
-.restore-date-btn:disabled { opacity: 0.6; cursor: default; }
-
 /* Frontera asignada */
 .frontera-badge {
   display: inline-flex; align-items: center; gap: 5px;
@@ -532,9 +475,8 @@ function isProrated(project, year, month) {
 .contract-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(44,32,57,0.25); }
 
 /* MWh/mes apagado cuando es 0 -- se activa visualmente solo si hay dato */
-:deep(.mwh-muted input) {
+.mwh-muted {
   color: rgba(44,32,57,0.3);
-  border-color: rgba(44,32,57,0.08);
 }
 
 /* Proyección mensual expandible */

@@ -5,11 +5,11 @@ import api from '@/api/client'
 // "Proyectos próximos a energizarse" vive 100% en la BD de operaciones. Un job
 // sincroniza el pipeline de TSF (Sun Factory + originabotdb + generación Unergy)
 // hacia la tabla `proyectos` (ver backend app/services/tsf_sync.py). Este
-// composable solo lee/escribe contra esa BD vía la API — SIN localStorage.
+// composable solo lee contra esa BD vía la API — SIN localStorage. Todos los
+// campos son de solo lectura: vienen tal cual de la fuente, sin edición manual.
 //
 //   GET   /proximos-energizar         → lista (pipeline + fechas futuras)
 //   POST  /proximos-energizar/sync    → re-sincroniza con Solenium (force opc.)
-//   PATCH /proximos-energizar/{id}    → persiste ediciones del operador
 // ──────────────────────────────────────────────────────────────────────────────
 
 function rehydrate(p) {
@@ -20,16 +20,6 @@ function rehydrate(p) {
     contracts: Array.isArray(p.contracts) ? p.contracts : [],
     monthlyMwh: Number(p.monthlyMwh) || 0,
   }
-}
-
-function toIsoDate(d) {
-  if (!d) return null
-  const dt = d instanceof Date ? d : new Date(d)
-  if (isNaN(dt.getTime())) return null
-  const y = dt.getFullYear()
-  const m = String(dt.getMonth() + 1).padStart(2, '0')
-  const day = String(dt.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
 }
 
 export function useEnergizationProjects() {
@@ -63,36 +53,6 @@ export function useEnergizationProjects() {
     }
   }
 
-  // Persiste una edición inline del operador (con debounce por proyecto).
-  const _timers = {}
-  function persistField(project, key, value) {
-    project[key] = value
-    const payload = {}
-    if (key === 'commercialName') payload.commercialName = value
-    else if (key === 'status') payload.status = value
-    else if (key === 'monthlyMwh') payload.monthlyMwh = Number(value) || 0
-    else if (key === 'energizationDate') payload.energizationDate = toIsoDate(value)
-    else return // campos no persistibles (p. ej. contracts → se gestionan vía PPA)
-
-    clearTimeout(_timers[project.id])
-    _timers[project.id] = setTimeout(async () => {
-      try {
-        const { data } = await api.patch(`/proximos-energizar/${project.id}`, payload)
-        // Refleja los flags de "editado manual" devueltos por el backend.
-        const idx = projects.value.findIndex(p => p.id === project.id)
-        if (idx >= 0 && data) {
-          projects.value[idx] = {
-            ...projects.value[idx],
-            editadaManual: data.editadaManual,
-            estadoEditadoManual: data.estadoEditadoManual,
-          }
-        }
-      } catch (e) {
-        console.error('Error al guardar la edición del proyecto', e)
-      }
-    }, 600)
-  }
-
   async function removeProject(projectId) {
     try {
       await api.delete(`/proyectos/${projectId}`)
@@ -102,24 +62,11 @@ export function useEnergizationProjects() {
     }
   }
 
-  // Descarta la fecha editada a mano de UN proyecto y trae de nuevo la de Sun
-  // Factory. Reemplaza al botón global de "forzar sobrescritura": más seguro
-  // (un proyecto a la vez) y vive junto al ícono que marca "editada manual".
-  async function restaurarFecha(projectId) {
-    const { data } = await api.post(`/proximos-energizar/${projectId}/restaurar-fecha`)
-    const idx = projects.value.findIndex(p => p.id === projectId)
-    if (idx >= 0 && data) {
-      projects.value[idx] = rehydrate(data)
-    }
-    return data
-  }
-
-  // Re-sincroniza con Solenium. force=true sobrescribe las fechas que el operador
-  // haya editado manualmente (Solenium suele tener la fecha más fresca).
-  async function syncNow(force = false) {
+  // Re-sincroniza con Solenium.
+  async function syncNow() {
     syncing.value = true
     try {
-      const { data } = await api.post(`/proximos-energizar/sync`, null, { params: { force } })
+      const { data } = await api.post(`/proximos-energizar/sync`)
       await loadProjects()
       return data
     } catch (e) {
@@ -133,6 +80,6 @@ export function useEnergizationProjects() {
 
   return {
     projects, loading, error, warning, source, syncing, lastSync,
-    loadProjects, persistField, removeProject, syncNow, restaurarFecha,
+    loadProjects, removeProject, syncNow,
   }
 }
