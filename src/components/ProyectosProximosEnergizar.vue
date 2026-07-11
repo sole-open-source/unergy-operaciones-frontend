@@ -13,7 +13,7 @@
           class="stat-pill clickable"
           :class="{ active: soloProximosAEnergizar }"
           @click="soloProximosAEnergizar = !soloProximosAEnergizar"
-          v-tooltip.bottom="'Tienen frontera asignada o Sun Factory ya los marca \'Próximo a energizar\'. Clic para ver solo estos.'"
+          v-tooltip.bottom="'Tienen frontera asignada o Sun Factory ya los marca \'Próximo a energizar\'.'"
         >
           <span class="stat-num" style="color:#b45309;">{{ proximosAEnergizarCount }}</span>
           <span class="stat-label">próximos a energizar</span>
