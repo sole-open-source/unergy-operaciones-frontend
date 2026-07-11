@@ -153,7 +153,10 @@
           <Column field="fecha_inicio" header="Inicio" />
           <Column field="fecha_fin" header="Fin" />
         </DataTable>
-        <PPAContratoWizard v-model:visible="showPpaWizard" @creado="recargarContratos" @cerrar="showPpaWizard = false" />
+        <PPAContratoWizard v-model:visible="showPpaWizard" :initialData="ppaInitialData"
+                           @creado="recargarContratos" @cerrar="showPpaWizard = false" />
+        <!-- ContratoServicioWizard no expone prop de cliente (solo `tipo` y `proyectoIdDefault`):
+             el cliente se selecciona dentro del wizard. No se precarga aquí para no modificar el wizard compartido. -->
         <ContratoServicioWizard v-model:visible="showRepWizard" tipo="representacion"
                                 @creado="recargarContratos" @cerrar="showRepWizard = false" />
       </TabPanel>
@@ -168,7 +171,7 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
@@ -220,6 +223,15 @@ const showRepWizard = ref(false)
 const estadoGuardado = ref('')
 let saveTimer = null
 
+// Precarga del PPA wizard: el cliente de la oportunidad entra como comprador.
+// El wizard puebla su form con initialData[k] ?? null usando estas llaves
+// (comprador_id/nombre/nit); no están excluidas en modo creación.
+const ppaInitialData = computed(() => op.value ? {
+  comprador_id: op.value.cliente_id,
+  comprador_nombre: op.value.cliente_razon_social,
+  comprador_nit: op.value.cliente_nit ?? null,
+} : null)
+
 watch(op, (v) => { proyectosFilas.value = v?.proyectos ?? [] })
 
 function fmtFecha(v) { return v ? new Date(v).toLocaleDateString('es-CO', { dateStyle: 'medium' }) : '' }
@@ -230,6 +242,9 @@ function aFechaStr(v) {
   const d = new Date(v)
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
+// PrimeVue Calendar espera un Date, no el string ISO del API — sin esto las
+// fechas guardadas se ven vacías al cargar. aFechaStr() las vuelve a string al guardar.
+function aFecha(s) { return s ? new Date(`${s}T00:00:00`) : null }
 
 async function recargar() {
   const { data } = await api.get(`/comercial/oportunidades/${route.params.id}`)
@@ -238,9 +253,9 @@ async function recargar() {
     nombre: data.nombre === data.cliente_razon_social ? '' : data.nombre,
     tipo_servicio: data.tipo_servicio,
     numero_oferta: data.numero_oferta,
-    fecha_estimada_firma: data.fecha_estimada_firma,
-    fecha_tentativa_inicio_representacion: data.fecha_tentativa_inicio_representacion,
-    fecha_tentativa_inicio_compra_energia: data.fecha_tentativa_inicio_compra_energia,
+    fecha_estimada_firma: aFecha(data.fecha_estimada_firma),
+    fecha_tentativa_inicio_representacion: aFecha(data.fecha_tentativa_inicio_representacion),
+    fecha_tentativa_inicio_compra_energia: aFecha(data.fecha_tentativa_inicio_compra_energia),
     notas: data.notas,
   }
 }
@@ -308,7 +323,7 @@ async function crearDoc(tipo, label) {
   try {
     await api.post(`/clientes/${op.value.cliente_id}/documentos`, {
       tipo, nombre: label,
-      numero: tipo === 'oferta' ? (op.value.numero_oferta || null) : null,
+      numero: tipo === 'oferta' ? (seg.value.numero_oferta || op.value.numero_oferta || null) : null,
       oportunidad_id: op.value.id,
     })
     await recargar()
@@ -321,4 +336,7 @@ onMounted(async () => {
   await recargar()
   await Promise.all([cargarCliente(), recargarContratos()])
 })
+
+// Evita que un PATCH de autosave pendiente dispare tras desmontar la vista.
+onBeforeUnmount(() => clearTimeout(saveTimer))
 </script>
