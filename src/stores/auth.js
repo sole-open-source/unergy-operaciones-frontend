@@ -8,7 +8,7 @@ import {
   clearTokens,
   decodeJwtPayload,
   isTokenExpired,
-} from '@/utils/security'
+} from '@/utils/clientAuthHelpers'
 
 const BASE = import.meta.env.VITE_API_URL || ''
 

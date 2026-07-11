@@ -1,5 +1,11 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Punto único de manejo de credenciales del frontend.
+// Helpers de autenticación DEL LADO DEL CLIENTE.
+//
+// El nombre del archivo es deliberado: aquí NO vive ninguna decisión de
+// seguridad crítica (autorización, verificación de firma, cifrado). Todo eso es
+// responsabilidad del BACKEND. Este módulo solo gestiona el ESTADO local de las
+// credenciales para la UX: almacenar el token de acceso y el usuario en caché,
+// y leer los claims del JWT (sin verificar la firma) para pintar la interfaz.
 //
 // Centraliza el almacenamiento del token de acceso y del usuario, además de la
 // decodificación del JWT, de modo que la estrategia de almacenamiento se pueda
