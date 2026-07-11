@@ -6,6 +6,13 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   return {
     plugins: [vue()],
+    // Configuración de pruebas (Vitest). jsdom permite probar las utilidades de
+    // accesibilidad que operan sobre el DOM sin un navegador real.
+    test: {
+      environment: 'jsdom',
+      globals: true,
+      include: ['test/**/*.spec.js'],
+    },
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url)),

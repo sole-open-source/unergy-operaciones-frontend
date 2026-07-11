@@ -26,7 +26,7 @@
         <label class="field-label">Buscar</label>
         <IconField>
           <InputIcon class="pi pi-search" />
-          <InputText v-model="filters.q" placeholder="Nombre comercial…" class="w-56" />
+          <InputText v-model="filters.q" placeholder="Nombre comercial…" class="w-56" aria-label="Buscar proyectos por nombre comercial" />
         </IconField>
       </div>
       <div>

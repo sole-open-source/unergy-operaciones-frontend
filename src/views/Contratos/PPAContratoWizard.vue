@@ -4,27 +4,34 @@
 
     <!-- Step indicator -->
     <div class="px-6 pt-5 pb-4 border-b border-gray-100">
-      <div class="flex items-start">
+      <ol class="flex items-start m-0 p-0" role="list" aria-label="Progreso del asistente">
         <template v-for="(s, i) in STEPS" :key="i">
-          <div class="flex flex-col items-center gap-1.5" style="flex:1">
+          <li class="flex flex-col items-center gap-1.5" style="flex:1"
+            :aria-current="step === i ? 'step' : undefined">
             <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all"
               :class="{
                 'bg-amber-500 text-white shadow-sm shadow-amber-200': step === i,
                 'bg-amber-400 text-white': step > i,
                 'bg-gray-100 text-gray-400': step < i,
               }">
-              <i v-if="step > i" class="pi pi-check text-xs" />
-              <span v-else>{{ i + 1 }}</span>
+              <i v-if="step > i" class="pi pi-check text-xs" aria-hidden="true" />
+              <span v-else aria-hidden="true">{{ i + 1 }}</span>
             </div>
             <span class="text-[10px] text-center leading-tight px-0.5"
-              :class="step === i ? 'text-amber-600 font-semibold' : step > i ? 'text-gray-500' : 'text-gray-300'">
+              :class="step === i ? 'text-amber-600 font-semibold' : step > i ? 'text-gray-600' : 'text-gray-500'">
               {{ s.label }}
             </span>
-          </div>
-          <div v-if="i < STEPS.length - 1" class="h-0.5 mt-3.5 mx-0.5 transition-all" style="flex:1"
+            <span class="sr-only">
+              Paso {{ i + 1 }} de {{ STEPS.length }}: {{ s.label }}.
+              {{ step > i ? 'Completado.' : step === i ? 'Paso actual.' : 'Pendiente.' }}
+            </span>
+          </li>
+          <li v-if="i < STEPS.length - 1" aria-hidden="true" class="h-0.5 mt-3.5 mx-0.5 transition-all" style="flex:1"
             :class="step > i ? 'bg-amber-400' : 'bg-gray-100'" />
         </template>
-      </div>
+      </ol>
+      <!-- A11y: anuncia el cambio de paso -->
+      <span class="sr-only" role="status" aria-live="polite">{{ pasoActualTexto }}</span>
     </div>
 
     <!-- Contenido -->
@@ -429,6 +436,10 @@ const MESES_ES = {
 }
 
 const step = ref(0)
+// A11y: texto anunciado a lectores de pantalla al cambiar de paso.
+const pasoActualTexto = computed(
+  () => `Paso ${step.value + 1} de ${STEPS.length}: ${STEPS[step.value]?.label ?? ''}`,
+)
 const guardando = ref(false)
 const todosProyectos = ref([])
 const proyectosSeleccionados = ref([])

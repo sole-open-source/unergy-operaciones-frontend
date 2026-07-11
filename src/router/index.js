@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { announce, focusElement } from '@/composables/useA11yFocus'
 
 const routes = [
   // ── Públicas ─────────────────────────────────────────────────────
@@ -142,6 +143,40 @@ router.beforeEach((to) => {
 
   // Verificación de email específico (rutas admin restringidas)
   if (to.meta.requireEmail && auth.user?.email !== to.meta.requireEmail) return '/dashboard'
+})
+
+// ── Accesibilidad: título de página + anuncio + foco al navegar ────────────
+// Títulos legibles por ruta (fallback: meta.title → route.name).
+const TITULOS = {
+  Login: 'Ingresar', Dashboard: 'Panel principal', Clientes: 'Clientes',
+  ClienteDetalle: 'Detalle de cliente', Proyectos: 'Proyectos',
+  ProyectoDetalle: 'Detalle de proyecto', Servicios: 'Contratos',
+  ContratoDetalle: 'Detalle de contrato', Comercial: 'Comercial',
+  OportunidadDetalle: 'Detalle de oportunidad', Fallas: 'Monitoreo de fallas',
+  SolarLive: 'Solar en vivo', Alertas: 'Alertas', Liquidaciones: 'Liquidaciones',
+  ValidadorMandatos: 'Validador de mandatos', PanelContable: 'Panel contable',
+  Garantias: 'Garantías', AdminUsuarios: 'Usuarios',
+}
+
+function tituloDe(to) {
+  return to.meta?.title || TITULOS[to.name] || (typeof to.name === 'string' ? to.name : 'Operaciones')
+}
+
+router.afterEach((to, from) => {
+  const titulo = tituloDe(to)
+  document.title = `${titulo} · Unergy Operaciones`
+
+  // No robar el foco en la carga inicial (from sin nombre = arranque de la app).
+  const esArranque = !from?.name
+  window.requestAnimationFrame(() => {
+    announce(`Navegando a ${titulo}`)
+    if (esArranque) return
+    const main = document.getElementById('main-content')
+    if (main) {
+      focusElement(main)
+      main.scrollTo?.(0, 0)
+    }
+  })
 })
 
 export default router

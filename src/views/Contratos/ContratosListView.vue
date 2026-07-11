@@ -31,7 +31,7 @@
         <IconField class="flex-1 max-w-sm">
           <InputIcon class="pi pi-search" />
           <InputText v-model="filtroQ" placeholder="Buscar por proyecto, nombre, comprador…"
-            class="w-full" @input="buscar" />
+            class="w-full" @input="buscar" aria-label="Buscar contratos PPA por proyecto, nombre o comprador" />
         </IconField>
       </div>
 
@@ -132,7 +132,7 @@
         <IconField class="flex-1 max-w-sm">
           <InputIcon class="pi pi-search" />
           <InputText v-model="filtroRepresentacion" placeholder="Buscar por planta, representante, comercializador…"
-            class="w-full" />
+            class="w-full" aria-label="Buscar representación por planta, representante o comercializador" />
         </IconField>
       </div>
 
@@ -210,7 +210,7 @@
         <IconField class="flex-1 max-w-sm">
           <InputIcon class="pi pi-search" />
           <InputText v-model="filtroServicio" placeholder="Buscar por número, contratante, prestador…"
-            class="w-full" @input="buscarServicio" />
+            class="w-full" @input="buscarServicio" aria-label="Buscar servicios por número, contratante o prestador" />
         </IconField>
       </div>
 

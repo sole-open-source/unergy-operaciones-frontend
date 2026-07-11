@@ -9,7 +9,7 @@
         </p>
       </div>
     </div>
-    <div v-if="$slots.actions" class="ph-actions">
+    <div v-if="$slots.actions" class="ph-actions" role="toolbar" :aria-label="`Acciones: ${title}`">
       <slot name="actions" />
     </div>
   </div>
@@ -47,7 +47,7 @@ defineProps({
 }
 .ph-subtitle {
   font-size: 12px;
-  color: #9b8fb0;
+  color: #6b5a8a; /* A11y: contraste AA (5.85:1) sobre fondo avena */
   margin-top: 1px;
 }
 .ph-actions {

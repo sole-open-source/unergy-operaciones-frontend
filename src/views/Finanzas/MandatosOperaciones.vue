@@ -51,16 +51,17 @@
           placeholder="Estado" showClear class="mand-filtro-sel" />
         <Select v-model="filtroTercero" :options="tercerosOpciones" placeholder="Tercero / inversionista"
           showClear filter class="mand-filtro-sel" />
-        <span class="mand-buscar"><i class="pi pi-search" /><input v-model="buscarCmu" type="text" placeholder="Buscar CMU…" /></span>
+        <span class="mand-buscar"><i class="pi pi-search" aria-hidden="true" /><input v-model="buscarCmu" type="text" placeholder="Buscar CMU…" aria-label="Buscar por CMU" /></span>
       </div>
 
       <!-- G. Tabla principal -->
       <div class="mand-tabla-wrap">
         <table class="mand-tabla">
+          <caption class="sr-only">Mandatos de operaciones: certificados por tercero, período y estado</caption>
           <thead>
             <tr>
-              <th>Certificado</th><th>Tercero / proyecto</th><th>Período</th><th>Estado</th>
-              <th>Observación</th><th>Doc. firmado</th><th>Enviado inv.</th><th>Adj.</th>
+              <th scope="col">Certificado</th><th scope="col">Tercero / proyecto</th><th scope="col">Período</th><th scope="col">Estado</th>
+              <th scope="col">Observación</th><th scope="col">Doc. firmado</th><th scope="col">Enviado inv.</th><th scope="col">Adj.</th>
             </tr>
           </thead>
           <tbody>

@@ -24,11 +24,13 @@
           Potencia en tiempo real por proyecto
           <span v-if="lastUpdated" class="sl-ts">· {{ lastUpdated }}</span>
         </p>
+        <!-- A11y: anuncio de actualizaciones en tiempo real a lectores de pantalla -->
+        <span class="sr-only" role="status" aria-live="polite">{{ liveStatus }}</span>
       </div>
       <div class="sl-header-right">
         <!-- Filtro por proyecto -->
         <div class="sl-filter-wrap">
-          <i class="pi pi-search sl-filter-icon" />
+          <i class="pi pi-search sl-filter-icon" aria-hidden="true" />
           <AutoComplete
             v-model="filtro"
             :suggestions="projectSuggestions"
@@ -37,10 +39,13 @@
             :delay="0"
             scrollHeight="280px"
             placeholder="Buscar o seleccionar proyecto..."
+            aria-label="Buscar o seleccionar proyecto"
             class="sl-filter-ac"
             inputClass="sl-filter-input"
           />
-          <i v-if="filtro" class="pi pi-times sl-filter-clear" @click="filtro = ''" />
+          <button v-if="filtro" type="button" class="pi pi-times sl-filter-clear"
+            style="background:none;border:none;padding:0;cursor:pointer"
+            aria-label="Limpiar filtro de proyecto" @click="filtro = ''"></button>
         </div>
         <!-- Toggle columnas -->
         <div class="sl-cols-toggle">
@@ -265,6 +270,13 @@ const detailMap   = reactive({})
 const lastUpdated = ref('')
 const cols        = ref(1)
 let refreshTimer  = null
+
+// A11y: mensaje leído por lectores de pantalla cuando llegan datos nuevos.
+const liveStatus = computed(() => {
+  if (!lastUpdated.value) return ''
+  const n = proyectos.value.length
+  return `Datos actualizados a las ${lastUpdated.value}. ${n} proyecto${n === 1 ? '' : 's'} en monitoreo.`
+})
 
 // ── Filtro por proyecto ────────────────────────────────────────────────────
 const filtro = ref('')

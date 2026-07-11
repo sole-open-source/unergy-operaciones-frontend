@@ -4,25 +4,28 @@
       <template #actions>
         <IconField class="flex-1 sm:flex-none">
           <InputIcon class="pi pi-search" />
-          <InputText v-model="q" placeholder="Buscar razón social o NIT..." class="w-full sm:w-64" />
+          <InputText v-model="q" placeholder="Buscar razón social o NIT..." class="w-full sm:w-64"
+            aria-label="Buscar clientes por razón social o NIT" />
         </IconField>
         <Button label="Nuevo cliente" icon="pi pi-plus" size="small" @click="openNew" />
       </template>
     </PageHeader>
 
     <!-- Filtros dinámicos: actualizan la tabla al instante -->
-    <div class="flex flex-wrap items-center gap-3">
+    <div class="flex flex-wrap items-center gap-3" role="group" aria-label="Filtros de clientes">
       <MultiSelect v-model="filtroServicios" :options="opcionesServicio" optionLabel="label" optionValue="value"
-        placeholder="Filtrar por servicio" display="chip" class="w-72" showClear />
+        placeholder="Filtrar por servicio" display="chip" class="w-72" showClear
+        aria-label="Filtrar por servicio" />
       <SelectButton v-model="filtroEstado" :options="opcionesEstado" optionLabel="label" optionValue="value"
-        :allowEmpty="false" />
+        :allowEmpty="false" aria-label="Filtrar por estado del contrato" />
     </div>
 
     <div class="bg-white rounded-xl shadow-sm overflow-hidden border" style="border-color:#ECE7F2">
-      <DataTable :value="filtrados" :loading="loading" paginator :rows="25"
-        :rowsPerPageOptions="[25, 50, 100]" rowHover
+      <AccessibleTable caption="Listado de clientes" :value="filtrados" :loading="loading" paginator :rows="25"
+        :rowsPerPageOptions="[25, 50, 100]" rowHover selectionMode="single" dataKey="id"
+        v-model:selection="seleccion" :metaKeySelection="false"
         sortField="razon_social_nombre" :sortOrder="1" :rowClass="rowClass"
-        @row-click="abrirCliente" class="text-sm clientes-tabla">
+        @row-select="abrirCliente" class="text-sm clientes-tabla">
         <Column field="razon_social_nombre" header="Razón social" sortable>
           <template #body="{ data }">
             <div class="flex items-center gap-2">
@@ -68,28 +71,29 @@
         <Column field="contacto_comercial_correo" header="Correo comercial" sortable>
           <template #body="{ data }">{{ fmt(data.contacto_comercial_correo) }}</template>
         </Column>
-        <Column header="" style="width:44px">
+        <Column header="Ver" style="width:44px">
           <template #body>
-            <i class="pi pi-chevron-right text-xs" style="color:#c5b9db" />
+            <i class="pi pi-chevron-right text-xs" style="color:#8a7aa8" aria-hidden="true" />
           </template>
         </Column>
-      </DataTable>
+      </AccessibleTable>
     </div>
 
-    <Dialog v-model:visible="dialogVisible" header="Nuevo cliente" modal class="w-full max-w-lg">
+    <AccessibleModal v-model:visible="dialogVisible" header="Nuevo cliente"
+      :dialogStyle="{ width: '100%', maxWidth: '32rem' }" announceOnOpen="Formulario para crear un nuevo cliente">
       <ClienteForm :initial="{}" @save="onSave" @cancel="dialogVisible = false" />
-    </Dialog>
+    </AccessibleModal>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Button from 'primevue/button'
-import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
+import AccessibleTable from '@/components/common/AccessibleTable.vue'
+import AccessibleModal from '@/components/common/AccessibleModal.vue'
 import IconField from 'primevue/iconfield'
 import InputIcon from 'primevue/inputicon'
 import MultiSelect from 'primevue/multiselect'
@@ -104,6 +108,7 @@ const toast = useToast()
 const items = ref([])
 const loading = ref(false)
 const dialogVisible = ref(false)
+const seleccion = ref(null)
 
 const q = ref('')
 const filtroServicios = ref([])

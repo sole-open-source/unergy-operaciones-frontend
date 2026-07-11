@@ -24,11 +24,12 @@
         :to="mod.to"
         class="flex flex-col items-center gap-4 rounded-2xl p-8 cursor-pointer transition-all hover:shadow-lg hover:-translate-y-0.5 select-none text-center bg-white shadow-sm"
         :style="`border: 2px solid ${mod.count > 0 ? mod.color + '40' : '#e8e0f0'};`"
+        :aria-label="`${mod.label}: ${mod.count} alerta${mod.count === 1 ? '' : 's'}. ${mod.desc}`"
       >
         <div class="w-16 h-16 rounded-full flex items-center justify-center relative"
           :style="`background: ${mod.color}18`">
-          <i :class="mod.icon" class="text-3xl" :style="`color: ${mod.color}`" />
-          <span v-if="mod.count > 0"
+          <i :class="mod.icon" class="text-3xl" :style="`color: ${mod.color}`" aria-hidden="true" />
+          <span v-if="mod.count > 0" aria-hidden="true"
                 class="absolute -top-1 -right-1 w-6 h-6 rounded-full text-white text-xs font-bold flex items-center justify-center"
                 :style="`background: ${mod.color};`">
             {{ mod.count > 99 ? '99+' : mod.count }}

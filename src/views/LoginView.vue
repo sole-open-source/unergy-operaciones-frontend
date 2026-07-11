@@ -16,15 +16,21 @@
         </div>
 
         <!-- Form -->
-        <div class="px-10 pb-10">
-          <form @submit.prevent="submit" class="space-y-4">
+        <main id="main-content" tabindex="-1" class="px-10 pb-10">
+          <h1 class="sr-only">Ingresar a la Plataforma de Operaciones de Unergy</h1>
+          <form @submit.prevent="submit" class="space-y-4" aria-describedby="login-error">
             <div>
-              <label class="block text-xs font-semibold mb-1.5 uppercase tracking-wide" style="color: #2C2039;">Correo</label>
+              <label for="login-email" class="block text-xs font-semibold mb-1.5 uppercase tracking-wide" style="color: #2C2039;">Correo</label>
               <input
+                id="login-email"
                 v-model="email"
                 type="email"
+                name="email"
+                autocomplete="email"
                 placeholder="tu@unergy.io"
                 required
+                :aria-invalid="error ? 'true' : undefined"
+                aria-describedby="login-error"
                 class="w-full px-4 py-2.5 rounded-lg text-sm outline-none transition-all"
                 style="border: 1.5px solid #d4c8e8; background: white; color: #2C2039;"
                 onfocus="this.style.borderColor='#915BD8'"
@@ -33,12 +39,17 @@
             </div>
 
             <div>
-              <label class="block text-xs font-semibold mb-1.5 uppercase tracking-wide" style="color: #2C2039;">Contraseña</label>
+              <label for="login-password" class="block text-xs font-semibold mb-1.5 uppercase tracking-wide" style="color: #2C2039;">Contraseña</label>
               <input
+                id="login-password"
                 v-model="password"
                 type="password"
+                name="password"
+                autocomplete="current-password"
                 placeholder="••••••••"
                 required
+                :aria-invalid="error ? 'true' : undefined"
+                aria-describedby="login-error"
                 class="w-full px-4 py-2.5 rounded-lg text-sm outline-none transition-all"
                 style="border: 1.5px solid #d4c8e8; background: white; color: #2C2039;"
                 onfocus="this.style.borderColor='#915BD8'"
@@ -46,13 +57,16 @@
               />
             </div>
 
-            <div v-if="error" class="text-xs px-3 py-2 rounded-lg" style="background: #fde8e8; color: #c0392b;">
-              {{ error }}
+            <div id="login-error" role="alert" aria-live="assertive">
+              <div v-if="error" class="text-xs px-3 py-2 rounded-lg" style="background: #fde8e8; color: #b3261e;">
+                {{ error }}
+              </div>
             </div>
 
             <button
               type="submit"
               :disabled="loading"
+              :aria-busy="loading ? 'true' : undefined"
               class="w-full py-3 rounded-lg text-sm font-bold tracking-wide transition-all mt-2"
               style="background-color: #915BD8; color: #FDFAF7;"
               onmouseover="if(!this.disabled) this.style.backgroundColor='#7a46c0'"
@@ -71,7 +85,7 @@
               ¿Olvidaste tu contraseña?
             </RouterLink>
           </div>
-        </div>
+        </main>
       </div>
 
       <p class="text-center text-xs mt-6" style="color: rgba(253,250,247,0.35);">

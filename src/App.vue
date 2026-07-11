@@ -1,4 +1,7 @@
 <template>
+  <!-- Skip link: primer elemento tabulable; salta la navegación e ir al contenido -->
+  <a href="#main-content" class="skip-link" @click="skipToMain">Saltar al contenido principal</a>
+
   <!-- App móvil (PWA) y páginas de login: pantalla completa, sin chrome de la plataforma -->
   <div v-if="isLoginPage || isMobileApp" class="h-screen">
     <RouterView />
@@ -18,7 +21,8 @@
         class="hidden lg:flex sb-reopen" title="Mostrar barra lateral">
         <i class="pi pi-angle-double-right" />
       </button>
-      <main :class="isSolar ? 'flex-1 overflow-hidden p-0' : 'flex-1 overflow-y-auto p-4 pt-14 sm:p-5 sm:pt-14 lg:p-6 lg:pt-6'">
+      <main id="main-content" tabindex="-1" role="main"
+        :class="isSolar ? 'flex-1 overflow-hidden p-0' : 'flex-1 overflow-y-auto p-4 pt-14 sm:p-5 sm:pt-14 lg:p-6 lg:pt-6'">
         <RouterView />
       </main>
     </div>
@@ -35,9 +39,20 @@ import Toast from 'primevue/toast'
 import ConfirmDialog from 'primevue/confirmdialog'
 import AppSidebar from '@/components/AppSidebar.vue'
 import { useSidebar } from '@/composables/useSidebar'
+import { focusElement } from '@/composables/useA11yFocus'
 
 const route = useRoute()
 const toast = useToast()
+
+// Skip link → mueve el foco (no solo el scroll) al contenido principal.
+function skipToMain(e) {
+  const main = document.getElementById('main-content')
+  if (main) {
+    e.preventDefault()
+    focusElement(main)
+    main.scrollIntoView()
+  }
+}
 const { mobileOpen, toggle, collapsed, toggleCollapsed } = useSidebar()
 const routeReady = computed(() => !!route.name)
 const isLoginPage = computed(() => ['Login', 'ForgotPassword', 'ResetPassword'].includes(route.name))

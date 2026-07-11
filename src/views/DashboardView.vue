@@ -3,10 +3,14 @@
     <!-- Page header -->
     <PageHeader title="Dashboard" subtitle="Resumen operativo de la plataforma" />
 
+    <!-- A11y: estado de carga para lectores de pantalla -->
+    <p class="sr-only" role="status" aria-live="polite">{{ estadoCarga }}</p>
+
     <!-- Critical Alerts Banner -->
-    <div v-if="criticalAlerts.length" class="rounded-xl overflow-hidden" style="border: 2px solid #D64455;">
+    <section v-if="criticalAlerts.length" class="rounded-xl overflow-hidden" style="border: 2px solid #D64455;"
+      role="region" aria-label="Alertas operacionales">
       <div class="px-4 py-2.5 flex items-center gap-2" style="background-color: #D64455;">
-        <i class="pi pi-exclamation-triangle text-white" />
+        <i class="pi pi-exclamation-triangle text-white" aria-hidden="true" />
         <span class="text-sm font-bold text-white">Alertas Operacionales</span>
         <span class="ml-auto text-xs font-semibold px-2 py-0.5 rounded-full" style="background: rgba(255,255,255,0.2); color: white;">
           {{ criticalAlerts.length }}
@@ -23,10 +27,10 @@
             <p class="text-sm font-semibold" style="color: #2C2039;">{{ alert.title }}</p>
             <p class="text-xs" style="color: #6b5a8a;">{{ alert.detail }}</p>
           </div>
-          <i class="pi pi-angle-right text-sm" style="color: #D64455;" />
+          <i class="pi pi-angle-right text-sm" style="color: #D64455;" aria-hidden="true" />
         </RouterLink>
       </div>
-    </div>
+    </section>
 
     <!-- KPI Cards Row 1 -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -242,6 +246,8 @@ const data = ref({})
 const pipeline = ref({})
 const cumplimiento = ref(null)
 const cumplimientoLoading = ref(false)
+// A11y: estado de carga anunciado a lectores de pantalla.
+const estadoCarga = ref('Cargando indicadores del panel…')
 
 const STAGE_CONFIG = {
   operation:     { label: 'Operación',     color: '#10B981', bg: 'rgba(16,185,129,0.1)' },
@@ -435,8 +441,10 @@ onMounted(async () => {
     ])
     if (kpiRes?.data) data.value = kpiRes.data
     if (pipeRes?.data?.available) pipeline.value = pipeRes.data
+    estadoCarga.value = 'Indicadores del panel actualizados.'
   } catch {
     // degrade gracefully
+    estadoCarga.value = 'No se pudieron cargar algunos indicadores del panel.'
   }
 
   // Load cumplimiento in background (calls Unergy API, slower)

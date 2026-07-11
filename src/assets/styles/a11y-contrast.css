@@ -1,0 +1,143 @@
+/* ──────────────────────────────────────────────────────────────────────────
+   Accesibilidad global (A11y)
+   - Indicadores de foco visibles y consistentes (WCAG 2.4.7)
+   - Skip link para saltar navegación (WCAG 2.4.1)
+   - Contenido "solo lectores de pantalla" (.sr-only)
+   - Preferencia de movimiento reducido (WCAG 2.3.3)
+   - Modo de alto contraste opcional (clase .a11y-high-contrast en <html>)
+   Va sin @layer para ganarle a los estilos unlayered de PrimeVue (cssLayer:false).
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* ── Contenido solo para lectores de pantalla ───────────────────────────── */
+.sr-only {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Variante que se revela al recibir foco (para skip links, etc.) */
+.sr-only-focusable:focus,
+.sr-only-focusable:focus-within {
+  position: static !important;
+  width: auto;
+  height: auto;
+  margin: 0;
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
+}
+
+/* ── Skip link ──────────────────────────────────────────────────────────── */
+.skip-link {
+  position: fixed;
+  top: -60px;
+  left: 12px;
+  z-index: 1000;
+  padding: 10px 16px;
+  border-radius: 0 0 8px 8px;
+  background-color: #4C1D95;
+  color: #FDFAF7;
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+  box-shadow: 0 4px 14px rgba(76, 29, 149, 0.35);
+  transition: top 0.15s ease;
+}
+.skip-link:focus {
+  top: 0;
+  outline: 3px solid #F6FF72;
+  outline-offset: 2px;
+}
+
+/* ── Indicadores de foco visibles ───────────────────────────────────────────
+   Solo con navegación por teclado (:focus-visible) para no molestar al ratón.
+   Cubre controles nativos y los de PrimeVue (que renderizan botones/inputs). */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible,
+[role="button"]:focus-visible,
+[role="tab"]:focus-visible,
+[role="menuitem"]:focus-visible,
+.p-button:focus-visible,
+.p-inputtext:focus-visible,
+.p-checkbox-box:focus-visible,
+.p-radiobutton-box:focus-visible {
+  outline: 3px solid #915BD8 !important;
+  outline-offset: 2px !important;
+  border-radius: 4px;
+}
+
+/* Componentes PrimeVue cuyo foco vive en un hijo interno */
+.p-select:focus-within,
+.p-multiselect:focus-within,
+.p-datepicker-input:focus-visible,
+.p-inputnumber:focus-within {
+  outline: 3px solid #915BD8 !important;
+  outline-offset: 2px !important;
+  border-radius: 6px;
+}
+
+/* Filas de tabla enfocables por teclado */
+.p-datatable-tbody > tr:focus-visible {
+  outline: 2px solid #915BD8 !important;
+  outline-offset: -2px;
+}
+
+/* ── Objetivos táctiles mínimos (WCAG 2.5.5 AAA, buena práctica) ─────────── */
+.a11y-touch-target {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+/* ── Modo de alto contraste (opt-in) ────────────────────────────────────────
+   Se activa añadiendo la clase .a11y-high-contrast al elemento <html>.
+   Sube el contraste de texto, bordes y estados de foco. */
+html.a11y-high-contrast body {
+  color: #14101c;
+  background-color: #ffffff;
+}
+html.a11y-high-contrast a:not(.p-button) {
+  color: #4a2878;
+  text-decoration: underline;
+}
+html.a11y-high-contrast .p-datatable-thead > tr > th {
+  color: #14101c !important;
+  border-bottom: 2px solid #14101c !important;
+}
+html.a11y-high-contrast .field-label,
+html.a11y-high-contrast label {
+  color: #14101c !important;
+}
+html.a11y-high-contrast *:focus-visible {
+  outline: 3px solid #14101c !important;
+  outline-offset: 2px !important;
+}
+
+/* ── Movimiento reducido (WCAG 2.3.3) ───────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── Marca de campo obligatorio ──────────────────────────────────────────────
+   La app usa la clase .field-label en muchos formularios (con su propio estilo
+   por componente). Añadimos solo un color accesible para el asterisco requerido. */
+.field-required {
+  color: #b3261e;
+  margin-left: 2px;
+}
