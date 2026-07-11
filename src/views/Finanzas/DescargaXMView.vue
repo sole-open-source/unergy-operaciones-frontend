@@ -6,6 +6,62 @@
     </div>
 
     <div class="max-w-3xl mx-auto mt-4 space-y-4">
+      <!-- Estado de carga de datos XM (se abre desde el Centro de Alertas) -->
+      <div v-if="mostrarEstadoXM" class="rounded-xl border bg-white p-5 space-y-3" style="border-color:#ECE7F2">
+        <div class="flex items-center justify-between gap-3">
+          <div class="flex items-center gap-2">
+            <i class="pi pi-database text-sm" style="color:#915BD8" />
+            <span class="text-sm font-bold text-gray-800">Estado de Carga de Datos XM</span>
+          </div>
+          <Tag v-if="estadoXM?.status" :value="estadoXM.status" :severity="estadoSeverity" />
+        </div>
+
+        <div v-if="cargandoEstadoXM" class="text-sm text-gray-500">
+          <i class="pi pi-spin pi-spinner mr-2" style="color:#915BD8" />
+          Consultando estado…
+        </div>
+
+        <Message v-else-if="errorEstadoXM" severity="error" :closable="false">
+          {{ errorEstadoXM }}
+        </Message>
+
+        <template v-else-if="estadoXM">
+          <div class="grid grid-cols-2 gap-3 text-sm">
+            <div class="flex flex-col gap-0.5">
+              <span class="text-xs font-medium text-gray-500">Periodo</span>
+              <span class="text-gray-800">{{ estadoXM.period || '—' }}</span>
+            </div>
+            <div class="flex flex-col gap-0.5">
+              <span class="text-xs font-medium text-gray-500">Última carga</span>
+              <span class="text-gray-800">{{ formatFecha(estadoXM.last_loaded_at) }}</span>
+            </div>
+            <div class="flex flex-col gap-0.5">
+              <span class="text-xs font-medium text-gray-500">Carga esperada</span>
+              <span class="text-gray-800">{{ formatFecha(estadoXM.expected_load_by) }}</span>
+            </div>
+          </div>
+
+          <Message
+            v-if="estadoXM.message"
+            :severity="estadoSeverity === 'success' ? 'success' : 'warn'"
+            :closable="false"
+          >
+            {{ estadoXM.message }}
+          </Message>
+
+          <div v-if="accionesRecomendadas.length">
+            <p class="text-xs font-semibold text-gray-500 mb-1">Acciones recomendadas</p>
+            <ul class="list-disc list-inside space-y-1 text-sm text-gray-700">
+              <li v-for="(accion, i) in accionesRecomendadas" :key="i">{{ accion }}</li>
+            </ul>
+          </div>
+        </template>
+
+        <div v-else class="text-sm text-gray-500">
+          Sin información de estado para este periodo.
+        </div>
+      </div>
+
       <div class="rounded-xl border p-3 flex items-start gap-2" style="background:#F1EAF9;border-color:#E0D3F5">
         <i class="pi pi-info-circle text-sm flex-shrink-0 mt-0.5" style="color:#6D28D9" />
         <p class="text-xs" style="color:#4C1D95">
@@ -112,10 +168,80 @@
 
 <script setup>
 import { ref, computed, watch, onBeforeUnmount } from 'vue'
+import { useRoute } from 'vue-router'
 import Select from 'primevue/select'
 import Checkbox from 'primevue/checkbox'
 import Button from 'primevue/button'
+import Tag from 'primevue/tag'
+import Message from 'primevue/message'
+import api from '@/api/client'
 import { iniciarDescargaXM, consultarEstadoXM, agenteLocalNoDisponible } from '@/api/xm'
+
+// ── Estado de carga de datos XM (navegación desde el Centro de Alertas) ──
+const route = useRoute()
+const estadoXM = ref(null)
+const cargandoEstadoXM = ref(false)
+const errorEstadoXM = ref('')
+
+const mostrarEstadoXM = computed(() => route.query.tab === 'xm_data_status')
+
+const estadoSeverity = computed(() => {
+  const s = String(estadoXM.value?.status || '').toLowerCase()
+  if (s.includes('cargad') || s.includes('loaded')) return 'success'
+  if (s.includes('ausente') || s.includes('missing') || s.includes('retras') || s.includes('delayed')) return 'danger'
+  return 'info'
+})
+
+// `actions_recommended` puede venir como arreglo de strings o de objetos
+// ({ label } / { description }); lo normalizamos a texto plano.
+const accionesRecomendadas = computed(() => {
+  const acciones = estadoXM.value?.actions_recommended
+  if (!Array.isArray(acciones)) return []
+  return acciones
+    .map((a) => (typeof a === 'string' ? a : a?.label || a?.description || ''))
+    .filter(Boolean)
+})
+
+function formatFecha(valor) {
+  if (!valor) return '—'
+  const d = new Date(valor)
+  if (Number.isNaN(d.getTime())) return String(valor)
+  return d.toLocaleString('es-CO', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+async function cargarEstadoXM(period) {
+  if (!period) {
+    estadoXM.value = null
+    errorEstadoXM.value = 'No se recibió un periodo válido para consultar el estado.'
+    return
+  }
+  cargandoEstadoXM.value = true
+  errorEstadoXM.value = ''
+  try {
+    const { data } = await api.get('/liquidaciones/xm_data_status', { params: { period } })
+    estadoXM.value = data
+  } catch (e) {
+    estadoXM.value = null
+    errorEstadoXM.value =
+      e.response?.data?.detail || 'No se pudo consultar el estado de carga de datos XM.'
+  } finally {
+    cargandoEstadoXM.value = false
+  }
+}
+
+watch(
+  () => [route.query.tab, route.query.period],
+  ([tab, period]) => {
+    if (tab === 'xm_data_status') cargarEstadoXM(period ? String(period) : '')
+  },
+  { immediate: true }
+)
 
 const TIPOS = ['dspcttos', 'aenc', 'BalCttos', 'grip', 'arrpas', 'tgrl', 'trsd', 'cxcsb', 'tserv', 'afac']
 const EXTENSIONES = ['txf', 'txr', 'tx1', 'tx2', 'tx3', 'tx4', 'tx5', 'tx6', 'tx7', 'tx8']
