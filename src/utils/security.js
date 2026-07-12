@@ -97,3 +97,37 @@ export function isTokenExpired(jwt) {
 export function isPreviewToken(jwt) {
   return import.meta.env.DEV && typeof jwt === 'string' && jwt.endsWith('.preview')
 }
+
+// ── Rutas de entradas ZIP (mitigación Zip Slip) ────────────────────────────────
+// Chequeo booleano, por-entrada, de que la ruta de una entrada de un ZIP se
+// mantiene dentro de la raíz del archivo. Complementa a `validateZipEntries`
+// (utils/zipSecurityValidator.js), que hace el gate completo del ZIP incluyendo
+// la allowlist de extensiones; esta función expone el mismo criterio de recorrido
+// como un predicado reutilizable para validar rutas de forma aislada.
+//
+// Devuelve `false` (ruta insegura) cuando:
+//   • la ruta está vacía o es solo espacios,
+//   • es absoluta dentro del archivo (empieza por "/"),
+//   • en algún punto el recorrido con ".." sube por encima de la raíz.
+// Devuelve `true` para rutas relativas que nunca escapan de la raíz.
+export function isValidZipEntryPath(entryPath) {
+  if (typeof entryPath !== 'string' || !entryPath.trim()) return false
+
+  // Normaliza separadores windows → unix y colapsa barras redundantes.
+  const normalized = entryPath.replace(/\\/g, '/').replace(/\/{2,}/g, '/')
+
+  // Ruta absoluta dentro del archivo: bandera roja.
+  if (normalized.startsWith('/')) return false
+
+  let depth = 0
+  for (const seg of normalized.split('/')) {
+    if (seg === '' || seg === '.') continue   // segmento vacío o "actual": no altera la profundidad
+    if (seg === '..') {
+      depth--
+      if (depth < 0) return false             // intenta salir por encima de la raíz
+    } else {
+      depth++
+    }
+  }
+  return true
+}

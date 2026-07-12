@@ -213,6 +213,7 @@ import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist'
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import { uploadCuentaCobro, fetchDocsPeriodo } from '@/composables/useArriendosDocs'
 import { validateZipEntries, getSafeFilePath } from '@/utils/zipSecurityValidator'
+import { isValidZipEntryPath } from '@/utils/security'
 
 GlobalWorkerOptions.workerSrc = pdfWorkerUrl
 
@@ -466,6 +467,21 @@ async function onZipSelected(e) {
 
   try {
     const zip = await JSZip.loadAsync(file)
+
+    // ── Gate por-entrada de Zip Slip antes de tocar cualquier entrada ──────────
+    // Rechaza el ZIP completo si alguna ruta escapa de la raíz del archivo
+    // (rutas absolutas o recorrido con ".."). Es una defensa en capas explícita
+    // que corre antes que `validateZipEntries` (el gate completo con allowlist).
+    const rutaInvalida = Object.keys(zip.files).find(path => !zip.files[path].dir && !isValidZipEntryPath(path))
+    if (rutaInvalida) {
+      toast.add({
+        severity: 'error',
+        summary: 'ZIP rechazado por seguridad',
+        detail: 'El archivo contiene rutas inválidas o maliciosas y no se puede procesar.',
+        life: 8000,
+      })
+      return
+    }
 
     // ── Validación de seguridad (Zip Slip + allowlist de extensiones) ──────────
     const { valid, errors } = validateZipEntries(zip, { allowedExtensions: EXTENSIONES_PERMITIDAS })
