@@ -30,6 +30,13 @@ test('cellThreats detecta inyección de fórmula pero no números', () => {
   assert.equal(FV.cellThreats('Bancolombia').length, 0)
 })
 
+test('cellThreats marca protocolos ejecutables pero NO "data:"/"metadata:" (regresión)', () => {
+  assert.ok(FV.cellThreats('javascript:alert(1)').some((t) => t.code === 'JS_PROTOCOL'))
+  // Texto legítimo de celda que contiene "data:" no debe bloquear el archivo.
+  assert.equal(FV.cellThreats('metadata: cláusula 3').length, 0)
+  assert.equal(FV.cellThreats('Big Data: informe mensual').length, 0)
+})
+
 test('scanRows marca inválida una matriz con payload', () => {
   const res = FV.scanRows([
     ['Planta', 'Inversionista', 'Valor'],

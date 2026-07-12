@@ -53,9 +53,10 @@ function stripControlChars(s) {
   return String(s).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
 }
 
-// Núcleo determinista de saneamiento: quita etiquetas/scripts, decodifica y
-// re-quita hasta estabilizar, y neutraliza protocolos peligrosos y manejadores
-// de eventos inline. No depende del DOM → corre igual en navegador y en Node.
+// Núcleo determinista de saneamiento: quita etiquetas/scripts (y su contenido),
+// decodifica entidades y re-quita hasta estabilizar, y neutraliza los esquemas
+// de URL ejecutables que sobrevivan en texto. No depende del DOM → corre igual
+// en navegador y en Node.
 export function stripHtml(input) {
   let out = stripControlChars(input == null ? '' : String(input))
 
@@ -72,12 +73,19 @@ export function stripHtml(input) {
     pass++
   } while (out !== prev && pass < 6)
 
-  // Última limpieza tras el último decode.
+  // Última limpieza tras el último decode: re-quita cualquier etiqueta/bloque
+  // que el decode de entidades haya vuelto a exponer.
   out = out.replace(BLOCK, '').replace(/<[^>]*>/g, '')
-  // Protocolos peligrosos que puedan quedar en texto suelto.
-  out = out.replace(/(javascript|vbscript|data)\s*:/gi, '')
-  // Manejadores de eventos inline sobrevivientes (onerror=, onclick=…).
-  out = out.replace(/\bon\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+  // Neutraliza esquemas de URL ejecutables (`javascript:`/`vbscript:`) que puedan
+  // sobrevivir en texto suelto y ser reutilizados aguas abajo en un href/PDF.
+  //
+  // IMPORTANTE: a esta altura NO se filtran `data:` ni los manejadores `on…=`
+  // sobre texto plano. Ya no queda contexto de etiqueta/atributo (todas las
+  // etiquetas se quitaron arriba; en navegador DOMPurify además ya actuó), así
+  // que quitarlos aquí NO aporta seguridad y en cambio CORROMPE texto financiero
+  // legítimo: "Big Data: análisis" perdía "Data:", "pago online = X" y "once=11"
+  // se truncaban al matchear `on\w+=`. Regresión cubierta en sanitizer.test.mjs.
+  out = out.replace(/(javascript|vbscript)\s*:/gi, '')
   return out
 }
 

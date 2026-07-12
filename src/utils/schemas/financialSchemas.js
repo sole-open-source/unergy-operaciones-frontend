@@ -29,10 +29,12 @@ export const arriendoSchema = z.object({
   canon_archivo: z.number().nonnegative('El canon no puede ser negativo').nullable().optional(),
 })
 
-// Tasa IPC — es el input editable real de ArriendosOperaciones.vue.
+// Tasa IPC — es el input editable real de ArriendosOperaciones.vue. El usuario
+// escribe un PORCENTAJE (tasaPct) y la vista lo envía como fracción (÷100), así
+// que los mensajes se redactan en la unidad que el usuario ve: porcentaje.
 export const ipcTasaSchema = z.object({
   año: z.number({ message: 'El año es obligatorio' }).int('El año debe ser entero').gte(2000, 'Año inválido').lte(2100, 'Año inválido'),
-  tasa: z.number({ message: 'La tasa es obligatoria' }).gte(0, 'La tasa no puede ser negativa').lte(1, 'La tasa debe expresarse como fracción (0–1)'),
+  tasa: z.number({ message: 'El IPC es obligatorio' }).gte(0, 'El IPC no puede ser negativo').lte(1, 'El IPC debe estar entre 0% y 100%'),
   fuente: textoSaneado(120).optional().default('DANE'),
   confirmado: z.boolean().optional(),
 })

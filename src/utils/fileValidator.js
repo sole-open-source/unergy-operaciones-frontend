@@ -23,7 +23,10 @@ const THREAT_PATTERNS = [
   { code: 'HTML_TAG', re: /<[a-z!/][^>]*>/i, message: 'Contiene marcado HTML' },
   { code: 'SCRIPT', re: /<\s*script/i, message: 'Contiene un bloque <script>' },
   { code: 'EVENT_HANDLER', re: /\bon\w+\s*=\s*["']?[^"'>]+/i, message: 'Contiene un manejador de eventos inline' },
-  { code: 'JS_PROTOCOL', re: /(javascript|vbscript|data)\s*:/i, message: 'Contiene un protocolo peligroso' },
+  // Solo `javascript:`/`vbscript:` son esquemas ejecutables. `data:` se excluyó
+  // a propósito: como substring dispara falsos positivos en texto legítimo de
+  // celda ("metadata:", "Data: ...") y bloquearía el archivo entero sin motivo.
+  { code: 'JS_PROTOCOL', re: /(javascript|vbscript)\s*:/i, message: 'Contiene un protocolo peligroso' },
   { code: 'FORMULA_INJECTION', re: /^[=+@]/, message: 'Posible inyección de fórmula (=, +, @)' },
 ]
 

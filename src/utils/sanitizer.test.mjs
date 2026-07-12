@@ -38,6 +38,26 @@ test('sanitizeString elimina el protocolo javascript:', () => {
   assert.ok(!/javascript:/i.test(out), out)
 })
 
+test('sanitizeString elimina el protocolo vbscript:', () => {
+  const out = S.sanitizeString('vbscript:msgbox(1)')
+  assert.ok(!/vbscript:/i.test(out), out)
+})
+
+test('sanitizeString sigue neutralizando XSS aunque venga en etiqueta abierta', () => {
+  // El stripping de etiquetas (no la pasada de texto plano) es la defensa real.
+  const out = S.sanitizeString('<img src=x onerror=alert(1)>')
+  assert.ok(!/onerror/i.test(out), `no debe quedar onerror: ${out}`)
+})
+
+test('sanitizeString PRESERVA texto financiero legítimo (regresión: sin corromper)', () => {
+  // Antes, las pasadas de `data:`/`on\w+=` sobre texto plano borraban palabras
+  // legítimas. Estos casos DEBEN conservarse intactos.
+  assert.equal(S.sanitizeString('Big Data: análisis de cartera'), 'Big Data: análisis de cartera')
+  assert.equal(S.sanitizeString('el pago se hará online = transferencia'), 'el pago se hará online = transferencia')
+  assert.equal(S.sanitizeString('once=11 unidades'), 'once=11 unidades')
+  assert.equal(S.sanitizeString('metadata: cláusula tercera'), 'metadata: cláusula tercera')
+})
+
 test('sanitizeString recorta espacios y preserva texto normal', () => {
   assert.equal(S.sanitizeString('  Empresa S.A.S  '), 'Empresa S.A.S')
 })
