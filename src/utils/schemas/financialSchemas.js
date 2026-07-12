@@ -2,9 +2,9 @@
 // Esquemas Zod para los formularios financieros.
 //
 // Refuerzan el tipado estricto (números positivos, fechas, períodos YYYY-MM) y
-// auto-sanean los campos de texto con `.transform(sanitizeString)` para que
-// ningún payload HTML/XSS llegue al backend. El esquema de Mandatos vive en
-// `mandatoSchemas.js` y se re-exporta aquí por conveniencia.
+// limpian el texto de forma NO destructiva (control-chars + trim): el texto que
+// viaja al backend no se mutila; la defensa XSS vive en el render. El esquema
+// de Mandatos vive en `mandatoSchemas.js` y se re-exporta aquí por conveniencia.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { z } from 'zod'
@@ -13,7 +13,7 @@ import { mandatoSchema } from './mandatoSchemas.js'
 
 // Texto libre saneado (se limpia SIEMPRE, aunque venga vacío).
 const textoSaneado = (max = 255) =>
-  z.string().max(max, `Máximo ${max} caracteres`).transform((v) => sanitizeString(v))
+  z.string().max(max, `Máximo ${max} caracteres`).transform((v) => sanitizeString(v, { stripMarkup: false }))
 
 // Período contable en formato YYYY-MM.
 export const periodoSchema = z

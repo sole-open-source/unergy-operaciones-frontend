@@ -27,8 +27,8 @@ const financial = loadModule(join(here, 'financialSchemas.js'), {
 const client = loadModule(join(here, 'clientSchemas.js'), { z, sanitizeString })
 
 // ── Financial: IPC ─────────────────────────────────────────────────────────
-test('ipcTasaSchema acepta datos válidos y sanea la fuente', () => {
-  const r = financial.ipcTasaSchema.safeParse({ año: 2024, tasa: 0.092, fuente: '<b>DANE</b>' })
+test('ipcTasaSchema acepta datos válidos sin mutilar la fuente', () => {
+  const r = financial.ipcTasaSchema.safeParse({ año: 2024, tasa: 0.092, fuente: ' DANE ' })
   assert.ok(r.success, JSON.stringify(r.error?.issues))
   assert.equal(r.data.fuente, 'DANE')
 })
@@ -53,11 +53,11 @@ test('arriendoSchema rechaza período mal formado', () => {
 })
 
 // ── Financial: Costos ───────────────────────────────────────────────────────
-test('costoSchema rechaza monto no positivo y sanea tipo_accion', () => {
+test('costoSchema rechaza monto no positivo y no mutila tipo_accion', () => {
   assert.ok(!financial.costoSchema.safeParse({ monto: 0, fecha: '2024-01-01', tipo_accion: 'x' }).success)
-  const ok = financial.costoSchema.safeParse({ monto: 10, fecha: '2024-01-01', tipo_accion: '<i>pago</i>' })
+  const ok = financial.costoSchema.safeParse({ monto: 10, fecha: '2024-01-01', tipo_accion: ' pago parcial ' })
   assert.ok(ok.success, JSON.stringify(ok.error?.issues))
-  assert.equal(ok.data.tipo_accion, 'pago')
+  assert.equal(ok.data.tipo_accion, 'pago parcial')
 })
 
 // ── Mandato ──────────────────────────────────────────────────────────────────
@@ -67,14 +67,14 @@ test('mandatoSchema valida cmu no negativo e inversionista', () => {
 })
 
 // ── Client ─────────────────────────────────────────────────────────────────
-test('clienteSchema sanea razón social con HTML', () => {
-  const r = client.clienteSchema.safeParse({ razon_social_nombre: '<script>alert(1)</script>ACME S.A.S' })
+test('clienteSchema NO mutila la razón social (defensa XSS en el render)', () => {
+  const r = client.clienteSchema.safeParse({ razon_social_nombre: 'ACME <Colombia> S.A.S' })
   assert.ok(r.success, JSON.stringify(r.error?.issues))
-  assert.equal(r.data.razon_social_nombre, 'ACME S.A.S')
+  assert.equal(r.data.razon_social_nombre, 'ACME <Colombia> S.A.S')
 })
 
-test('clienteSchema rechaza razón social vacía tras sanear', () => {
-  const r = client.clienteSchema.safeParse({ razon_social_nombre: '<script></script>' })
+test('clienteSchema rechaza razón social vacía tras limpiar', () => {
+  const r = client.clienteSchema.safeParse({ razon_social_nombre: '   ' })
   assert.ok(!r.success)
 })
 
@@ -104,8 +104,8 @@ test('clienteSchema con passthrough conserva campos no modelados', () => {
   assert.equal(r.data.campo_extra, 'x')
 })
 
-test('sanitizeEmailList filtra correos inválidos y sanea', () => {
-  const out = client.sanitizeEmailList('a@b.com; <b>c@d.com</b>, malo')
+test('sanitizeEmailList filtra correos inválidos y recorta', () => {
+  const out = client.sanitizeEmailList('a@b.com;  c@d.com , malo')
   assert.deepEqual(out, ['a@b.com', 'c@d.com'])
 })
 
@@ -113,4 +113,24 @@ test('validateCliente devuelve estructura sin lanzar', () => {
   const bad = client.validateCliente({ razon_social_nombre: '' })
   assert.equal(bad.success, false)
   assert.ok(Array.isArray(bad.errors) && bad.errors.length > 0)
+})
+
+// ── Flujo compuesto de submit: la limpieza de la vista NO la deshace el esquema ──
+// Regresión: los .transform(sanitizeString) de los esquemas usaban el strip
+// destructivo por defecto y mutilaban el texto DESPUÉS de que la vista lo
+// limpiara con stripMarkup:false — el backend recibía datos corruptos.
+test('flujo submit: sanitizeObject + clienteSchema no mutila texto legítimo', () => {
+  const payload = {
+    razon_social_nombre: 'Bodega <norte> lote 2',
+    direccion: 'a < b y c > d',
+    origen_detalle: 'Entrega de data: mensual',
+    representante_legal: 'once=1 dato',
+  }
+  const limpio = sanitizer.sanitizeObject(payload, { stripMarkup: false })
+  const result = client.clienteSchema.safeParse(limpio)
+  assert.equal(result.success, true)
+  assert.equal(result.data.razon_social_nombre, 'Bodega <norte> lote 2')
+  assert.equal(result.data.direccion, 'a < b y c > d')
+  assert.equal(result.data.origen_detalle, 'Entrega de data: mensual')
+  assert.equal(result.data.representante_legal, 'once=1 dato')
 })

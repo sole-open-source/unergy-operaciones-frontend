@@ -12,7 +12,7 @@ import { sanitizeString } from '../sanitizer.js'
 
 // Texto libre saneado y opcional (el formulario omite los vacíos al enviar).
 const textoOpc = (max = 255) =>
-  z.string().max(max, `Máximo ${max} caracteres`).transform((v) => sanitizeString(v)).optional()
+  z.string().max(max, `Máximo ${max} caracteres`).transform((v) => sanitizeString(v, { stripMarkup: false })).optional()
 
 // Porcentaje 0–100 opcional.
 const pctOpc = z.number().min(0, 'No puede ser negativo').max(100, 'No puede superar 100').optional()
@@ -20,14 +20,14 @@ const pctOpc = z.number().min(0, 'No puede ser negativo').max(100, 'No puede sup
 // NIT/Cédula: solo dígitos, puntos o guion (p. ej. "900.123.456-7" o cédula).
 const nitCedula = z
   .string()
-  .transform((v) => sanitizeString(v))
+  .transform((v) => sanitizeString(v, { stripMarkup: false }))
   .refine((v) => v === '' || /^[\d.\-\s]{5,20}$/.test(v), 'NIT/Cédula inválido (solo dígitos, punto o guion)')
   .optional()
 
 // Correo saneado y validado. Vacío se trata como ausente.
 const correo = z
   .string()
-  .transform((v) => sanitizeString(v))
+  .transform((v) => sanitizeString(v, { stripMarkup: false }))
   .refine((v) => v === '' || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), 'Correo electrónico inválido')
   .optional()
 
@@ -35,7 +35,7 @@ export const clienteSchema = z
   .object({
     razon_social_nombre: z
       .string({ message: 'La razón social es obligatoria' })
-      .transform((v) => sanitizeString(v))
+      .transform((v) => sanitizeString(v, { stripMarkup: false }))
       .refine((v) => v.length > 0, 'La razón social es obligatoria')
       .refine((v) => v.length <= 255, 'Máximo 255 caracteres'),
     nit_cedula: nitCedula,
@@ -71,6 +71,6 @@ export function sanitizeEmailList(raw) {
   if (!raw) return []
   return String(raw)
     .split(/[;,]/)
-    .map((e) => sanitizeString(e))
+    .map((e) => sanitizeString(e, { stripMarkup: false }))
     .filter((e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))
 }

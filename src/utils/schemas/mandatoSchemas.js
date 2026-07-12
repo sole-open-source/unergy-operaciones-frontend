@@ -10,12 +10,12 @@ import { z } from 'zod'
 import { sanitizeString } from '../sanitizer.js'
 
 const texto = (max = 255) =>
-  z.string().max(max, `Máximo ${max} caracteres`).transform((v) => sanitizeString(v))
+  z.string().max(max, `Máximo ${max} caracteres`).transform((v) => sanitizeString(v, { stripMarkup: false }))
 
 // inversionista_id puede llegar como número (id) o como código/string.
 const inversionistaId = z.union([
   z.number().int().positive('El id de inversionista debe ser positivo'),
-  z.string().min(1, 'El inversionista es obligatorio').transform((v) => sanitizeString(v)),
+  z.string().min(1, 'El inversionista es obligatorio').transform((v) => sanitizeString(v, { stripMarkup: false })),
 ])
 
 export const mandatoSchema = z.object({
