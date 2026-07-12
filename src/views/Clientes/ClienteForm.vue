@@ -132,8 +132,9 @@ function submit() {
   for (const [k, v] of Object.entries(f)) {
     if (v !== null && v !== undefined && v !== '') payload[k] = v
   }
-  // 2) Sanear TODO el payload (elimina HTML/XSS de cualquier texto).
-  const limpio = sanitizeObject(payload)
+  // 2) Limpieza NO destructiva (solo caracteres de control + trim): este texto
+  //    se persiste tal cual; mutilarlo en silencio corrompe datos del cliente.
+  const limpio = sanitizeObject(payload, { stripMarkup: false })
   // 3) Validar contra el esquema de cliente.
   const result = clienteSchema.safeParse(limpio)
   Object.keys(errores).forEach((k) => delete errores[k])

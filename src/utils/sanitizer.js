@@ -83,10 +83,19 @@ export function stripHtml(input) {
 
 // Sanea un valor a texto plano seguro. `null`/`undefined` → ''.
 // opts.trim (por defecto true) recorta espacios en los extremos.
+// opts.stripMarkup (por defecto true) elimina etiquetas/protocolos/handlers.
+// Para texto que VIAJA al backend usar stripMarkup:false — el strip destructivo
+// mutila español legítimo ("Entrega de data: mensual", "Bodega <norte>") sin
+// avisar al usuario; ahí solo se quitan caracteres de control y se recorta.
+// La defensa XSS de lo que se muestra vive en el render (Vue escapa por defecto).
 export function sanitizeString(input, opts = {}) {
-  const { trim = true } = opts
+  const { trim = true, stripMarkup = true } = opts
   if (input == null) return ''
   let str = typeof input === 'string' ? input : String(input)
+  if (!stripMarkup) {
+    str = stripControlChars(str)
+    return trim ? str.trim() : str
+  }
   if (canUseDOMPurify()) {
     // ALLOWED_TAGS/ATTR vacíos + KEEP_CONTENT → solo el texto, sin marcado.
     str = DOMPurify.sanitize(str, { ALLOWED_TAGS: [], ALLOWED_ATTR: [], KEEP_CONTENT: true })
@@ -98,15 +107,15 @@ export function sanitizeString(input, opts = {}) {
 // Recorre un valor y sanea recursivamente todas las cadenas, preservando tipos
 // (números, booleanos, null), fechas, arreglos y objetos. No muta el original ni
 // entra en File/Blob. Pensado para limpiar un payload completo antes de enviarlo.
-export function sanitizeObject(value) {
-  if (typeof value === 'string') return sanitizeString(value)
+export function sanitizeObject(value, opts = {}) {
+  if (typeof value === 'string') return sanitizeString(value, opts)
   if (value == null || typeof value !== 'object') return value
   if (value instanceof Date) return value
   if (typeof File !== 'undefined' && value instanceof File) return value
   if (typeof Blob !== 'undefined' && value instanceof Blob) return value
-  if (Array.isArray(value)) return value.map((v) => sanitizeObject(v))
+  if (Array.isArray(value)) return value.map((v) => sanitizeObject(v, opts))
   const out = {}
-  for (const [k, v] of Object.entries(value)) out[k] = sanitizeObject(v)
+  for (const [k, v] of Object.entries(value)) out[k] = sanitizeObject(v, opts)
   return out
 }
 

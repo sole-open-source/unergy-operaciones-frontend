@@ -321,13 +321,13 @@ const ipcForm       = reactive({ año: new Date().getFullYear() - 1, tasaPct: nu
 
 async function guardarIPC() {
   if (!ipcForm.año || ipcForm.tasaPct == null) return
-  // 1) Sanear + 2) validar el input contra el esquema financiero.
+  // 1) Limpieza no destructiva + 2) validar contra el esquema financiero.
   const candidato = sanitizeObject({
     año: ipcForm.año,
     tasa: ipcForm.tasaPct / 100,
     confirmado: true,
     fuente: ipcForm.fuente || 'DANE',
-  })
+  }, { stripMarkup: false })
   const result = ipcTasaSchema.safeParse(candidato)
   if (!result.success) {
     showZodError(toast, result.error, 'Tasa IPC inválida')

@@ -277,8 +277,12 @@ function initValidador(el) {
         if (!scan.is_valid) {
           const n = scan.errors.length
           const e0 = scan.errors[0]
-          $('xlsxLabel').innerHTML = `<span style="color:var(--err)">❌ Archivo bloqueado: ${n} celda${n!==1?'s':''} con contenido no permitido. ` +
-            `Primera: hoja "${e0.sheet}", fila ${e0.row+1}, col ${e0.col+1} — ${e0.message}.</span>`
+          // e0.sheet/e0.message vienen del ARCHIVO: nunca via innerHTML (XSS).
+          const bloqueo = document.createElement('span')
+          bloqueo.style.color = 'var(--err)'
+          bloqueo.textContent = `❌ Archivo bloqueado: ${n} celda${n!==1?'s':''} con contenido no permitido. ` +
+            `Primera: hoja "${e0.sheet}", fila ${e0.row+1}, col ${e0.col+1} — ${e0.message}.`
+          $('xlsxLabel').replaceChildren(bloqueo)
           $('dzExcel').classList.remove('loaded')
           input.value = ''
           return
@@ -307,7 +311,10 @@ function initValidador(el) {
           : `Periodo: ${detectPeriodo(rows)} · Cuenta 28150505 (neto inversionista) · ${contabilidadData.length} grupos (inversionista + planta)`
         updateConcBtn()
       } catch(err) {
-        $('xlsxLabel').innerHTML = `<span style="color:var(--err)">❌ Error leyendo el archivo: ${err.message}</span>`
+        const fallo = document.createElement('span')
+        fallo.style.color = 'var(--err)'
+        fallo.textContent = `❌ Error leyendo el archivo: ${err.message}`
+        $('xlsxLabel').replaceChildren(fallo)
       }
     }
     reader.readAsArrayBuffer(file)

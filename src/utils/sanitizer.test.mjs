@@ -90,3 +90,47 @@ test('sanitizeFileContent elimina CDATA, DOCTYPE y ENTITY (XXE)', () => {
 test('stripHtml elimina caracteres de control y NUL', () => {
   assert.equal(S.stripHtml('a\u0000b\u0007c'), 'abc')
 })
+
+// stripMarkup:false — texto destinado al backend NO se mutila.
+// Regresión: el strip destructivo corrompía español de negocios legítimo en
+// silencio antes de persistirlo (razón social, direcciones, observaciones).
+
+test('stripMarkup:false preserva "data:" en texto de negocio', () => {
+  assert.equal(
+    S.sanitizeString('Entrega de data: mensual', { stripMarkup: false }),
+    'Entrega de data: mensual',
+  )
+})
+
+test('stripMarkup:false preserva pseudo-etiquetas y comparaciones', () => {
+  assert.equal(
+    S.sanitizeString('Bodega <norte> lote 2', { stripMarkup: false }),
+    'Bodega <norte> lote 2',
+  )
+  assert.equal(
+    S.sanitizeString('a < b y c > d', { stripMarkup: false }),
+    'a < b y c > d',
+  )
+})
+
+test('stripMarkup:false preserva palabras que parecen handlers', () => {
+  assert.equal(
+    S.sanitizeString('once=1 dato', { stripMarkup: false }),
+    'once=1 dato',
+  )
+})
+
+test('stripMarkup:false SÍ quita caracteres de control y recorta', () => {
+  assert.equal(
+    S.sanitizeString('  hola\u0000mundo\u0007  ', { stripMarkup: false }),
+    'holamundo',
+  )
+})
+
+test('sanitizeObject propaga stripMarkup:false a strings anidados', () => {
+  const out = S.sanitizeObject(
+    { obs: 'Entrega de data: mensual', arr: ['a < b'], n: 3 },
+    { stripMarkup: false },
+  )
+  assert.deepEqual(out, { obs: 'Entrega de data: mensual', arr: ['a < b'], n: 3 })
+})
