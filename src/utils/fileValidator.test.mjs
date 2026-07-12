@@ -24,10 +24,33 @@ test('cellThreats detecta <script>', () => {
   assert.ok(FV.cellThreats('<script>alert(1)</script>').some((t) => t.code === 'SCRIPT'))
 })
 
-test('cellThreats detecta inyección de fórmula pero no números', () => {
-  assert.ok(FV.cellThreats('=1+1').some((t) => t.code === 'FORMULA_INJECTION'))
-  assert.equal(FV.cellThreats('-1500.50').length, 0)
-  assert.equal(FV.cellThreats('Bancolombia').length, 0)
+test('cellThreats detecta payloads ejecutables reales', () => {
+  assert.ok(FV.cellThreats('<img src=x onerror=alert(1)>').some((t) => t.code === 'EVENT_HANDLER'))
+  assert.ok(FV.cellThreats('<a href="javascript:alert(1)">x</a>').some((t) => t.code === 'JS_PROTOCOL'))
+})
+
+// REGRESIÓN — el escaneo bloqueaba el archivo ENTERO (aborta la conciliación)
+// por contenido corriente de un Excel contable. Nada de esto es un ataque:
+// las fórmulas son amenaza al EXPORTAR, no al importar, y el marcado suelto se
+// neutraliza al pintar (escapeHtml), no rechazando el archivo del usuario.
+test('cellThreats NO bloquea contenido legítimo de un Excel contable', () => {
+  const legitimos = [
+    '+57 300 123 4567',   // teléfono colombiano
+    '+573001234567',
+    '@hillary',           // handle
+    '=SUM(A1:A5)',        // fórmula real de la hoja
+    '=1+1',
+    'Big Data: análisis', // "data:" en español
+    'metadata: v2',
+    'Bodega <norte>',     // marcado suelto, inofensivo
+    'once=11 unidades',   // matcheaba \bon\w+=
+    'pago online = transferencia',
+    '-1500.50',
+    'Bancolombia',
+  ]
+  for (const v of legitimos) {
+    assert.deepEqual(FV.cellThreats(v), [], `no debe bloquear: ${v}`)
+  }
 })
 
 test('scanRows marca inválida una matriz con payload', () => {
@@ -49,13 +72,21 @@ test('scanRows acepta una matriz limpia', () => {
   assert.equal(res.is_valid, true)
 })
 
-test('sanitizeRows limpia HTML y neutraliza fórmulas sin mutar', () => {
-  const input = [['<b>ACME</b>', '=cmd', 500]]
+// El dato importado se CONSERVA: si el usuario concilia un teléfono "+57 300…",
+// ese debe seguir siendo el valor. Antes se le anteponía un apóstrofo (y se le
+// quitaba el marcado), corrompiendo silenciosamente lo que se conciliaba.
+test('sanitizeRows normaliza sin reescribir el dato ni mutar la entrada', () => {
+  const input = [['<b>ACME</b>', '=SUM(A1:A5)', '+57 300 123 4567', 500]]
   const out = FV.sanitizeRows(input)
-  assert.equal(out[0][0], 'ACME')
-  assert.equal(out[0][1], "'=cmd")
-  assert.equal(out[0][2], 500)
+  assert.equal(out[0][0], '<b>ACME</b>')
+  assert.equal(out[0][1], '=SUM(A1:A5)')
+  assert.equal(out[0][2], '+57 300 123 4567')
+  assert.equal(out[0][3], 500)
   assert.equal(input[0][0], '<b>ACME</b>') // original intacto
+})
+
+test('sanitizeRows sí quita caracteres de control', () => {
+  assert.equal(FV.sanitizeRows([['ACME\u0000 S.A.']])[0][0], 'ACME S.A.')
 })
 
 test('validateExcelBuffer BLOQUEA un Excel con celda maliciosa', () => {

@@ -72,13 +72,37 @@ export function stripHtml(input) {
     pass++
   } while (out !== prev && pass < 6)
 
-  // Última limpieza tras el último decode.
+  // Última limpieza tras el último decode: re-quita cualquier etiqueta/bloque
+  // que el decode de entidades haya vuelto a exponer.
   out = out.replace(BLOCK, '').replace(/<[^>]*>/g, '')
-  // Protocolos peligrosos que puedan quedar en texto suelto.
-  out = out.replace(/(javascript|vbscript|data)\s*:/gi, '')
-  // Manejadores de eventos inline sobrevivientes (onerror=, onclick=…).
-  out = out.replace(/\bon\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+  // Neutraliza los esquemas de URL ejecutables que sobrevivan en texto suelto
+  // (podrían reutilizarse aguas abajo en un href o en un PDF).
+  //
+  // A esta altura NO se filtran `data:` ni los manejadores `on…=`: ya no queda
+  // contexto de etiqueta ni de atributo (todas las etiquetas se quitaron arriba),
+  // así que borrarlos NO aporta seguridad y en cambio mutila español legítimo:
+  //   "Big Data: análisis"          → "Big  análisis"
+  //   "once=11 unidades"            → "unidades"
+  //   "pago online = transferencia" → se trunca en "pago "
+  // Cubierto por regresiones en sanitizer.test.mjs.
+  out = out.replace(/(javascript|vbscript)\s*:/gi, '')
   return out
+}
+
+// Escapa un valor para interpolarlo con seguridad en HTML (innerHTML).
+//
+// Esta es la defensa REAL contra XSS de datos que vienen de un archivo: no se
+// mutila el dato (se conserva "Bodega <norte>" tal cual), se neutraliza en el
+// punto donde se pinta. Vue escapa `{{ }}` por defecto; este helper cubre los
+// pocos sitios que construyen HTML a mano.
+export function escapeHtml(value) {
+  if (value == null) return ''
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
 }
 
 // Sanea un valor a texto plano seguro. `null`/`undefined` → ''.

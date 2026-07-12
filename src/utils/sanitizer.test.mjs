@@ -134,3 +134,32 @@ test('sanitizeObject propaga stripMarkup:false a strings anidados', () => {
   )
   assert.deepEqual(out, { obs: 'Entrega de data: mensual', arr: ['a < b'], n: 3 })
 })
+
+// ── Defensa XSS en el RENDER ──────────────────────────────────────────────────
+// escapeHtml es lo que hace seguro pintar datos de archivo sin tener que
+// mutilarlos ni rechazar el archivo del usuario.
+test('escapeHtml neutraliza el payload sin destruir el dato', () => {
+  assert.equal(
+    S.escapeHtml('<img src=x onerror=alert(1)>'),
+    '&lt;img src=x onerror=alert(1)&gt;',
+  )
+  assert.equal(S.escapeHtml('Bodega <norte>'), 'Bodega &lt;norte&gt;')
+  assert.equal(S.escapeHtml('a "b" & \'c\''), 'a &quot;b&quot; &amp; &#39;c&#39;')
+  assert.equal(S.escapeHtml(null), '')
+  assert.equal(S.escapeHtml(1500), '1500')
+})
+
+// REGRESIÓN — el strip por defecto corría regexes de `data:` y `on\w+=` sobre
+// texto YA sin etiquetas: cero seguridad, y mutilaba español legítimo.
+test('stripHtml no mutila texto plano legítimo', () => {
+  assert.equal(S.stripHtml('Big Data: análisis'), 'Big Data: análisis')
+  assert.equal(S.stripHtml('metadata: v2'), 'metadata: v2')
+  assert.equal(S.stripHtml('once=11 unidades'), 'once=11 unidades')
+  assert.equal(S.stripHtml('pago online = transferencia'), 'pago online = transferencia')
+})
+
+test('stripHtml sigue quitando etiquetas y protocolos ejecutables', () => {
+  assert.equal(S.stripHtml('<script>alert(1)</script>hola'), 'hola')
+  assert.equal(S.stripHtml('<b>ACME</b>'), 'ACME')
+  assert.ok(!S.stripHtml('<a href="javascript:alert(1)">x</a>').includes('javascript:'))
+})

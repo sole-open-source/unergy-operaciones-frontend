@@ -16,15 +16,32 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import * as XLSX from 'xlsx'
-import { sanitizeString, neutralizeFormulaInjection } from './sanitizer.js'
+import { sanitizeString } from './sanitizer.js'
 
-// Patrones que NO deben aparecer en una celda de datos legítima.
+// Patrones que bloquean la carga de un archivo.
+//
+// Criterio: solo se bloquea lo que es INEQUÍVOCAMENTE ejecutable. Bloquear un
+// archivo aborta una conciliación completa, así que un falso positivo aquí es
+// una caída del producto, no una molestia. Un Excel contable real trae teléfonos
+// ("+57 300 123 4567"), handles ("@hillary"), notas ("Bodega <norte>",
+// "metadata: v2") y fórmulas ("=SUM(A1:A5)"): NADA de eso es un ataque contra
+// esta app y ninguno vuelve a bloquear la carga.
+//
+// Lo que NO se filtra aquí y por qué:
+//   • Marcado HTML genérico (`<norte>`): inofensivo. Los datos del archivo se
+//     pintan escapados (Vue `{{ }}` y `escapeHtml` en los sitios que arman HTML
+//     a mano) — la defensa XSS vive en el RENDER, no en la puerta de entrada.
+//   • `=`/`+`/`@` al inicio de celda: la inyección de fórmula es una amenaza de
+//     ESCRITURA (un CSV/XLSX que NOSOTROS generamos y el usuario abre en Excel),
+//     no de lectura. Se neutraliza al exportar, no al importar.
+//   • `data:`: aparece en español legítimo ("Big Data:", "metadata:").
 const THREAT_PATTERNS = [
-  { code: 'HTML_TAG', re: /<[a-z!/][^>]*>/i, message: 'Contiene marcado HTML' },
   { code: 'SCRIPT', re: /<\s*script/i, message: 'Contiene un bloque <script>' },
-  { code: 'EVENT_HANDLER', re: /\bon\w+\s*=\s*["']?[^"'>]+/i, message: 'Contiene un manejador de eventos inline' },
-  { code: 'JS_PROTOCOL', re: /(javascript|vbscript|data)\s*:/i, message: 'Contiene un protocolo peligroso' },
-  { code: 'FORMULA_INJECTION', re: /^[=+@]/, message: 'Posible inyección de fórmula (=, +, @)' },
+  // Manejador inline: solo dentro de una etiqueta (`<img … onerror=`). Sin el
+  // contexto de etiqueta, `on\w+=` matchea español corriente ("once=11",
+  // "pago online = transferencia") y tumbaba el archivo entero.
+  { code: 'EVENT_HANDLER', re: /<[^>]+\bon\w+\s*=/i, message: 'Contiene un manejador de eventos inline' },
+  { code: 'JS_PROTOCOL', re: /(javascript|vbscript)\s*:/i, message: 'Contiene un protocolo ejecutable' },
 ]
 
 // Amenazas detectadas en una celda (solo aplica a valores de texto).
@@ -34,8 +51,6 @@ export function cellThreats(value) {
   if (v === '') return []
   const found = []
   for (const p of THREAT_PATTERNS) {
-    // La inyección de fórmula no aplica a números legítimos.
-    if (p.code === 'FORMULA_INJECTION' && /^-?\d+([.,]\d+)*$/.test(v)) continue
     if (p.re.test(v)) found.push({ code: p.code, message: p.message })
   }
   return found
@@ -56,18 +71,22 @@ export function scanRows(rows) {
   return { is_valid: errors.length === 0, errors }
 }
 
-// Devuelve una copia de la matriz con las cadenas saneadas y las fórmulas
-// neutralizadas. No muta la entrada.
+// Devuelve una copia de la matriz con el texto normalizado (sin caracteres de
+// control, recortado). No muta la entrada.
+//
+// NO reescribe el dato: no quita marcado ni antepone apóstrofo a las celdas que
+// empiezan por `=`/`+`/`@`. Al importar, el dato del usuario se conserva tal cual
+// (un teléfono "+57 300 123 4567" debe seguir siendo ese teléfono al conciliar).
+// La neutralización de fórmulas es una defensa de EXPORTACIÓN y se aplica al
+// ESCRIBIR el CSV (ver csvText → neutralizeFormulaInjection en
+// ValidadorMandatosView.vue), que es el sink real donde la fórmula se ejecuta.
 export function sanitizeRows(rows) {
   const matrix = Array.isArray(rows) ? rows : []
+  const clean = (v) => (typeof v === 'string' ? sanitizeString(v, { stripMarkup: false }) : v)
   return matrix.map((row) => {
-    if (Array.isArray(row)) {
-      return row.map((v) => (typeof v === 'string' ? neutralizeFormulaInjection(sanitizeString(v)) : v))
-    }
+    if (Array.isArray(row)) return row.map(clean)
     const out = {}
-    for (const [k, v] of Object.entries(row || {})) {
-      out[k] = typeof v === 'string' ? neutralizeFormulaInjection(sanitizeString(v)) : v
-    }
+    for (const [k, v] of Object.entries(row || {})) out[k] = clean(v)
     return out
   })
 }

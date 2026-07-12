@@ -20,6 +20,11 @@ import {
   parseIngresos, matchIngresoContab, normalizarCifra,
 } from '@/utils/conciliacionMandatos.js'
 import { validateWorkbook } from '@/utils/fileValidator.js'
+// Defensa XSS del RENDER: esta vista arma HTML a mano (innerHTML) con datos que
+// vienen del Excel, de los PDF y del nombre de archivo. Todo valor de esos
+// orígenes se interpola con esc(). Así el dato se conserva intacto (no se mutila
+// "Bodega <norte>") y aun así no puede ejecutarse.
+import { escapeHtml as esc, neutralizeFormulaInjection } from '@/utils/sanitizer.js'
 
 const root = ref(null)
 
@@ -304,7 +309,7 @@ function initValidador(el) {
         const label = $('xlsxLabel')
         const esCostos = currentConcMode === 'costos'
         const cuenta = esCostos ? asientosDetalle.length : contabilidadData.length
-        label.innerHTML = `<b style="color:var(--ok)">✅ ${file.name}</b> — <span style="color:#64748b">${cuenta} ${esCostos ? 'líneas de detalle' : 'grupos inversionista+planta'} cargados</span>`
+        label.innerHTML = `<b style="color:var(--ok)">✅ ${esc(file.name)}</b> — <span style="color:#64748b">${cuenta} ${esCostos ? 'líneas de detalle' : 'grupos inversionista+planta'} cargados</span>`
         $('dzExcel').classList.add('loaded')
         $('xlsxStatus').textContent = esCostos
           ? `Periodo: ${detectPeriodo(rows)} · ${asientosDetalle.length} líneas · ${tagsAnaliticos.length} proyectos (etiquetas analíticas)`
@@ -512,17 +517,17 @@ function initValidador(el) {
       const idx = costosResults.indexOf(r)
       let tagControl
       if (r.tag && (r.sugStatus === 'recordado' || r.sugStatus === 'auto')) {
-        tagControl = `<span style="color:#64748b;font-size:12px">Etiqueta analítica: <b>${r.tag}</b> <small>(${r.sugStatus})</small></span>`
+        tagControl = `<span style="color:#64748b;font-size:12px">Etiqueta analítica: <b>${esc(r.tag)}</b> <small>(${esc(r.sugStatus)})</small></span>`
       } else {
         const opts = ['<option value="">— elegir etiqueta —</option>']
-          .concat(tagsAnaliticos.map(t => `<option value="${t}" ${t === r.tag ? 'selected' : ''}>${t}</option>`)).join('')
+          .concat(tagsAnaliticos.map(t => `<option value="${esc(t)}" ${t === r.tag ? 'selected' : ''}>${esc(t)}</option>`)).join('')
         tagControl = `<span style="color:#64748b;font-size:12px">Etiqueta analítica: </span><select class="tol-input" style="width:auto;min-width:220px" onchange="setCostoTag(${idx}, this.value)">${opts}</select>`
       }
-      const flagsHtml = r.flags.map(f => `<li style="color:${lvlColor[f.lvl]};font-size:12px;margin:2px 0">${f.txt}</li>`).join('')
+      const flagsHtml = r.flags.map(f => `<li style="color:${lvlColor[f.lvl]};font-size:12px;margin:2px 0">${esc(f.txt)}</li>`).join('')
       return `<div style="border:1px solid #e2e8f0;border-radius:10px;padding:12px;margin-bottom:10px">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:6px">
-          <div><b style="color:var(--accent)">${r.mandato.cmu || '-'}</b>
-            <span style="font-size:12px;margin-left:8px">${r.mandato.mandante || '<span style="color:var(--warn)">mandante no detectado</span>'}</span></div>
+          <div><b style="color:var(--accent)">${esc(r.mandato.cmu) || '-'}</b>
+            <span style="font-size:12px;margin-left:8px">${esc(r.mandato.mandante) || '<span style="color:var(--warn)">mandante no detectado</span>'}</span></div>
           ${stBadge(r.status)}
         </div>
         <div style="margin-bottom:6px">${tagControl}</div>
@@ -542,15 +547,22 @@ function initValidador(el) {
     renderConcCostos()
   }
 
+  // Celda de texto para CSV: neutraliza la inyección de fórmula (una celda que
+  // empieza por =/+/-/@ se ejecuta al abrir el archivo en Excel — ESTE es el
+  // sink real de la fórmula, la escritura, no la lectura) y escapa comillas.
+  function csvText(v) {
+    return `"${neutralizeFormulaInjection(String(v ?? '')).replace(/"/g, '""')}"`
+  }
+
   function exportConcCostosCSV() {
     if (!costosResults.length) return
     let csv = '﻿CMU,Mandante,Etiqueta,Estado,Nivel,Codigo,Detalle,Archivo\n'
     for (const r of costosResults) {
-      const base = [r.mandato.cmu || '', `"${(r.mandato.mandante || '').replace(/"/g, '""')}"`, `"${r.tag || ''}"`, r.status]
+      const base = [csvText(r.mandato.cmu || ''), csvText(r.mandato.mandante || ''), csvText(r.tag || ''), r.status]
       if (r.flags.length) {
-        for (const f of r.flags) csv += base.concat([f.lvl, f.code, `"${f.txt.replace(/"/g, '""')}"`, `"${r.fileName}"`]).join(',') + '\n'
+        for (const f of r.flags) csv += base.concat([f.lvl, f.code, csvText(f.txt), csvText(r.fileName)]).join(',') + '\n'
       } else {
-        csv += base.concat(['', '', '', `"${r.fileName}"`]).join(',') + '\n'
+        csv += base.concat(['', '', '', csvText(r.fileName)]).join(',') + '\n'
       }
     }
     const a = Object.assign(document.createElement('a'), {
@@ -656,7 +668,7 @@ function initValidador(el) {
           })
           if (relRows.length > 1) {
             detalle = relRows.map(cr =>
-              `<div style="white-space:nowrap;font-size:10px;color:#475569">${cr.planta.replace(/^(MINIGRANJA SOLAR |GD )/,'')}: <b>$${Math.round(Math.abs(cr.valor_contabilidad)).toLocaleString('es-CO')}</b></div>`
+              `<div style="white-space:nowrap;font-size:10px;color:#475569">${esc(cr.planta.replace(/^(MINIGRANJA SOLAR |GD )/,''))}: <b>$${Math.round(Math.abs(cr.valor_contabilidad)).toLocaleString('es-CO')}</b></div>`
             ).join('')
           } else {
             // Intentar identificar si es diferencia de redondeo, comercialización, etc.
@@ -665,13 +677,13 @@ function initValidador(el) {
             else detalle = `<span style="font-size:10px;color:var(--err)">Dif: $${dAbs.toLocaleString('es-CO')}</span>`
           }
         } else if (r.estado === 'SIN_CONTAB') {
-          detalle = `<span style="font-size:10px;color:var(--warn)">Planta: "${r.planta||'?'}"</span>`
+          detalle = `<span style="font-size:10px;color:var(--warn)">Planta: "${esc(r.planta)||'?'}"</span>`
         }
 
         tbody.innerHTML += `<tr>
-          <td class="mono" style="color:var(--accent);font-weight:600">${r.cmu||'-'}</td>
-          <td style="font-size:12px;max-width:180px;word-break:break-word">${r.inversionista||'<span style="color:var(--warn)">No detectado</span>'}</td>
-          <td style="font-size:12px;max-width:160px;word-break:break-word">${r.planta||'<span style="color:var(--warn)">No detectado</span>'}</td>
+          <td class="mono" style="color:var(--accent);font-weight:600">${esc(r.cmu)||'-'}</td>
+          <td style="font-size:12px;max-width:180px;word-break:break-word">${esc(r.inversionista)||'<span style="color:var(--warn)">No detectado</span>'}</td>
+          <td style="font-size:12px;max-width:160px;word-break:break-word">${esc(r.planta)||'<span style="color:var(--warn)">No detectado</span>'}</td>
           <td class="mono" style="text-align:right">$${Math.round(r.valorPagar).toLocaleString('es-CO')}</td>
           <td class="mono" style="text-align:right">${r.contVal!==null?'$'+Math.round(r.contVal).toLocaleString('es-CO'):'<span style="color:var(--warn)">—</span>'}</td>
           <td class="mono" style="text-align:right">${difStr}</td>
@@ -691,8 +703,8 @@ function initValidador(el) {
     if (sinPdf.length && !onlyDiff) {
       sinPdfSection.style.display = 'block'
       sinPdfBody.innerHTML = sinPdf.map(r => `<tr>
-        <td style="font-size:12px">${r.asociado}</td>
-        <td style="font-size:12px">${r.planta}</td>
+        <td style="font-size:12px">${esc(r.asociado)}</td>
+        <td style="font-size:12px">${esc(r.planta)}</td>
         <td class="mono" style="text-align:right;color:var(--warn)">$${Math.round(Math.abs(r.valor_contabilidad)).toLocaleString('es-CO')}</td>
       </tr>`).join('')
     } else {
@@ -710,21 +722,21 @@ function initValidador(el) {
       const estado = r.contVal!==null
         ? (Math.abs(r.diferencia)<=tol ? 'OK' : 'DIFERENCIA') : r.estado
       csv += [
-        r.cmu,
-        `"${r.inversionista}"`,
-        `"${r.planta}"`,
+        csvText(r.cmu),
+        csvText(r.inversionista),
+        csvText(r.planta),
         Math.round(r.valorPagar),
         r.contVal!==null ? Math.round(r.contVal) : '',
         r.diferencia!==null ? r.diferencia : '',
         estado,
-        `"${r.fileName}"`
+        csvText(r.fileName)
       ].join(',') + '\n'
     }
     // Registros sin PDF
     const sinPdf = contabilidadData.filter(r =>
       !concResults.find(cr => cr.recKey === r.asociado+'|||'+r.planta) && r.valor_contabilidad < 0)
     for (const r of sinPdf) {
-      csv += ['',`"${r.asociado}"`,`"${r.planta}"`, '', Math.round(Math.abs(r.valor_contabilidad)), '', 'SIN_PDF', ''].join(',') + '\n'
+      csv += ['',csvText(r.asociado),csvText(r.planta), '', Math.round(Math.abs(r.valor_contabilidad)), '', 'SIN_PDF', ''].join(',') + '\n'
     }
     const a = Object.assign(document.createElement('a'), {
       href: URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8'})),
@@ -749,7 +761,7 @@ function initValidador(el) {
     for (const file of files) {
       const card = document.createElement('div')
       card.className = 'card'
-      card.innerHTML = `<b style="font-size:12px">${file.name}</b><div class="spinner" style="margin-top:8px"></div>`
+      card.innerHTML = `<b style="font-size:12px">${esc(file.name)}</b><div class="spinner" style="margin-top:8px"></div>`
       container.appendChild(card)
 
       const res = await processPdf(file)
@@ -767,7 +779,7 @@ function initValidador(el) {
         err++
         reportContainer.style.display = 'block'
         reportBody.innerHTML += `<tr>
-          <td>${cmuInName||'S/N'}<br><small style="color:#94a3b8;font-size:10px">${file.name}</small></td>
+          <td>${esc(cmuInName)||'S/N'}<br><small style="color:#94a3b8;font-size:10px">${esc(file.name)}</small></td>
           <td class="mono">$${res.reported.toLocaleString()}</td>
           <td class="mono">$${res.expected.toLocaleString()}</td>
           <td class="txt-err">${res.msg}</td>
@@ -776,8 +788,8 @@ function initValidador(el) {
 
       card.innerHTML = `
         <span class="pill ${res.approved?'pill-ok':'pill-err'}">${res.approved?'CUMPLE':'RECHAZADO'}</span>
-        <b style="font-size:12px;display:block;margin-right:65px;color:var(--accent)">${cmuInName||'Sin CMU'}</b>
-        <div style="font-size:11px;color:#64748b;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${file.name}</div>
+        <b style="font-size:12px;display:block;margin-right:65px;color:var(--accent)">${esc(cmuInName)||'Sin CMU'}</b>
+        <div style="font-size:11px;color:#64748b;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(file.name)}</div>
         <div style="font-size:12px;margin-top:10px;display:grid;grid-template-columns:1fr 1fr;border-top:1px solid #f1f5f9;padding-top:8px">
           <div>Matemática: ${res.mathOk?'✅':'❌'}</div>
           ${(currentMode==='ingresos'||currentMode==='autoconsumo')?`<div>Marca (**): ${res.starOk?'✅':'❌'}</div>`:'<div></div>'}
