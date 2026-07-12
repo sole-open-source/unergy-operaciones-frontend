@@ -14,11 +14,14 @@
       </div>
     </div>
 
-    <div v-if="loading" class="flex justify-center py-20">
-      <ProgressSpinner />
-    </div>
+    <TabView v-model:activeIndex="tabActivo">
+      <!-- ═══ Tab 1: Integridad de contratos (huérfanos / duplicados) ═══ -->
+      <TabPanel header="Integridad de contratos">
+        <div v-if="loading" class="flex justify-center py-20">
+          <ProgressSpinner />
+        </div>
 
-    <template v-else>
+        <div v-else class="space-y-6 pt-2">
       <!-- Resumen -->
       <div class="grid grid-cols-2 gap-4">
         <div class="rounded-xl border border-orange-100 bg-orange-50 p-5 flex items-center gap-4">
@@ -156,8 +159,28 @@
             </DataTable>
           </div>
         </div>
-      </div>
-    </template>
+          </div>
+        </div>
+      </TabPanel>
+
+      <!-- ═══ Tab 2: Alertas de desviación de generación ═══ -->
+      <TabPanel header="Desviación de generación">
+        <div class="space-y-6 pt-2">
+          <p class="text-xs text-gray-400">
+            Reglas que comparan la generación real de cada proyecto contra el compromiso
+            de su contrato PPA y disparan una alerta cuando la desviación supera el umbral
+            configurado dentro del período de comparación.
+          </p>
+
+          <PPAAlertDeviationConfig :ppas="ppas" :proyectos="proyectos"
+            @rules-changed="onRulesChanged" />
+
+          <Divider />
+
+          <PPAAlertDeviationList ref="listaAlertas" />
+        </div>
+      </TabPanel>
+    </TabView>
   </div>
 </template>
 
@@ -170,12 +193,27 @@ import Tag from 'primevue/tag'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Divider from 'primevue/divider'
+import TabView from 'primevue/tabview'
+import TabPanel from 'primevue/tabpanel'
+import PPAAlertDeviationConfig from '@/components/Alerts/PPA/PPAAlertDeviationConfig.vue'
+import PPAAlertDeviationList from '@/components/Alerts/PPA/PPAAlertDeviationList.vue'
 import api from '@/api/client'
 
 const loading = ref(true)
 const fechaConsulta = ref('')
 const huerfanos = ref([])
 const duplicados = ref([])
+
+// --- Tabs y datos para la pestaña de desviación de generación ---
+const tabActivo = ref(0)
+const ppas = ref([])
+const proyectos = ref([])
+const listaAlertas = ref(null)
+
+function onRulesChanged() {
+  // Al cambiar una regla, refrescamos la lista de alertas activas.
+  listaAlertas.value?.cargar?.()
+}
 
 // Tabla de huérfanos como ref plano (evita bug PrimeVue 4 con computed)
 const huerfanosTabla = ref([])
@@ -199,6 +237,18 @@ onMounted(async () => {
     console.error('Error cargando alertas:', e)
   } finally {
     loading.value = false
+  }
+
+  // Datos para los selectores de la pestaña de desviación (no bloquean la vista).
+  try {
+    const [ppaRes, proyRes] = await Promise.all([
+      api.get('/ppa').catch(() => ({ data: [] })),
+      api.get('/proyectos', { params: { size: 500 } }).catch(() => ({ data: { items: [] } })),
+    ])
+    ppas.value = Array.isArray(ppaRes.data) ? ppaRes.data : (ppaRes.data.items ?? [])
+    proyectos.value = Array.isArray(proyRes.data) ? proyRes.data : (proyRes.data.items ?? [])
+  } catch (e) {
+    console.error('Error cargando PPAs/proyectos para desviación:', e)
   }
 })
 </script>
