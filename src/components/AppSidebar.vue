@@ -319,6 +319,7 @@ const ALL_GROUPS = [
       { to: '/finanzas/costos', label: 'Costos', icon: 'pi pi-credit-card', roles: ['admin', 'liquidaciones'] },
       { to: '/validador-mandatos', label: 'Validador de Mandatos', icon: 'pi pi-file-check', roles: ['admin', 'liquidaciones'] },
       { to: '/finanzas/descarga-xm', label: 'Descarga de XM', icon: 'pi pi-cloud-download', roles: ['admin', 'liquidaciones'] },
+      { to: '/finanzas/liquidaciones-automatizadas', label: 'Liquidaciones Automatizadas', icon: 'pi pi-bolt', roles: ['admin', 'liquidaciones'] },
     ],
   },
   {
