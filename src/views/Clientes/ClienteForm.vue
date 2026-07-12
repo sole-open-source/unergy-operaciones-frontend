@@ -3,11 +3,13 @@
     <div class="grid grid-cols-2 gap-4">
       <div class="col-span-2">
         <label class="field-label">Razón social / Nombre *</label>
-        <InputText v-model="f.razon_social_nombre" class="w-full" required />
+        <InputText v-model="f.razon_social_nombre" class="w-full" :invalid="!!errores.razon_social_nombre" required />
+        <small v-if="errores.razon_social_nombre" class="text-red-500 text-xs">{{ errores.razon_social_nombre }}</small>
       </div>
       <div>
         <label class="field-label">NIT / Cédula</label>
-        <InputText v-model="f.nit_cedula" class="w-full" />
+        <InputText v-model="f.nit_cedula" class="w-full" :invalid="!!errores.nit_cedula" />
+        <small v-if="errores.nit_cedula" class="text-red-500 text-xs">{{ errores.nit_cedula }}</small>
       </div>
       <div>
         <label class="field-label">Tipo de persona</label>
@@ -19,7 +21,8 @@
       </div>
       <div>
         <label class="field-label">Correo</label>
-        <InputText v-model="f.correo_electronico" type="email" class="w-full" />
+        <InputText v-model="f.correo_electronico" type="email" class="w-full" :invalid="!!errores.correo_electronico" />
+        <small v-if="errores.correo_electronico" class="text-red-500 text-xs">{{ errores.correo_electronico }}</small>
       </div>
       <div>
         <label class="field-label">Teléfono</label>
@@ -100,6 +103,12 @@ import InputNumber from 'primevue/inputnumber'
 import Select from 'primevue/select'
 import Dropdown from 'primevue/dropdown'
 import Button from 'primevue/button'
+import { useToast } from 'primevue/usetoast'
+import { sanitizeObject } from '@/utils/sanitizer'
+import { clienteSchema } from '@/utils/schemas/clientSchemas'
+import { zodErrorsByField, showZodError } from '@/utils/schemas/validationError'
+
+const toast = useToast()
 
 const ORIGENES = [
   { label: 'Prospección propia', value: 'prospeccion_propia' },
@@ -114,12 +123,27 @@ const emit = defineEmits(['save', 'cancel'])
 const f = reactive({ origen_tipo: null, origen_detalle: '', ...props.initial })
 watch(() => props.initial, (v) => { Object.assign(f, v) }, { deep: true })
 
+// Errores de validación por campo (se pintan bajo cada Input).
+const errores = reactive({})
+
 function submit() {
+  // 1) Armar payload omitiendo vacíos (comportamiento previo).
   const payload = {}
   for (const [k, v] of Object.entries(f)) {
     if (v !== null && v !== undefined && v !== '') payload[k] = v
   }
-  emit('save', payload)
+  // 2) Sanear TODO el payload (elimina HTML/XSS de cualquier texto).
+  const limpio = sanitizeObject(payload)
+  // 3) Validar contra el esquema de cliente.
+  const result = clienteSchema.safeParse(limpio)
+  Object.keys(errores).forEach((k) => delete errores[k])
+  if (!result.success) {
+    Object.assign(errores, zodErrorsByField(result.error))
+    showZodError(toast, result.error, 'Revisa los datos del cliente')
+    return
+  }
+  // 4) Emitir los datos ya saneados y validados.
+  emit('save', result.data)
 }
 </script>
 

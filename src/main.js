@@ -31,8 +31,21 @@ import App from './App.vue'
 import router from './router'
 import InfoField from './components/InfoField.vue'
 import PageHeader from './components/PageHeader.vue'
+import { isZodError, zodIssuesToText } from './utils/schemas/validationError'
 
 const app = createApp(App)
+
+// Manejador global de errores: distingue los errores de VALIDACIÓN (Zod), que
+// nacen de datos del usuario, de los errores del BACKEND / la app. Las vistas ya
+// muestran un Toast al validar en el submit; este es la red de seguridad para un
+// ZodError que se escape sin capturar (se registra distinto, no como fallo app).
+app.config.errorHandler = (err, _instance, info) => {
+  if (isZodError(err)) {
+    console.warn('[Validación] Error de esquema no capturado:', zodIssuesToText(err), `(${info})`)
+  } else {
+    console.error('[App] Error no capturado:', err, `(${info})`)
+  }
+}
 
 app.use(createPinia())
 app.use(router)

@@ -6,15 +6,20 @@
  * quita los `export` (que node no interpreta en .js bajo package CommonJS) y corre
  * aserciones. Mismo patrón que conciliacionMandatos.test.mjs.
  */
-import fs from 'fs'
+import { z } from 'zod'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
+import { loadModule } from './_esmLoader.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
-let src = fs.readFileSync(join(here, 'validacionContratos.js'), 'utf8')
-src = src.replace(/export const /g, 'const ').replace(/export function /g, 'function ')
-const api = new Function(src + '\nreturn { toIsoDate, contratoActivo, checkDateOverlap, findReplacementContract, validateContractUniqueness, conflictosAtribucion, finEfectivoIso };')()
-const { toIsoDate, checkDateOverlap, findReplacementContract, validateContractUniqueness, conflictosAtribucion, finEfectivoIso } = api
+// El módulo ahora importa zod y el saneador → se cargan con el loader de pruebas
+// inyectando esas dependencias (el saneador con su núcleo, sin DOMPurify).
+const sanitizer = loadModule(join(here, 'sanitizer.js'), { DOMPurify: undefined })
+const api = loadModule(join(here, 'validacionContratos.js'), { z, sanitizeString: sanitizer.sanitizeString })
+const {
+  toIsoDate, checkDateOverlap, findReplacementContract, validateContractUniqueness,
+  conflictosAtribucion, finEfectivoIso, sanitizeContrato, validateContratoMetadata,
+} = api
 
 let ok = true
 const assert = (cond, msg) => { console.log((cond ? '✅' : '❌') + ' ' + msg); if (!cond) ok = false }
@@ -124,6 +129,23 @@ assert(conflictosAtribucion(
      fecha_inicio: '2026-02-07', fecha_fin: '2039-12-31', fecha_fin_efectiva: '2039-12-31' }],
   ).length === 0,
   'Editar la fila recortada respeta su corte: no alarma contra el nuevo hogar de la planta')
+
+// ── Saneamiento y validación de metadatos (nuevo) ──────────────────
+const contratoSucio = sanitizeContrato({
+  codigo_sic_contrato: '<b>88806</b>',
+  observaciones: '<script>alert(1)</script>ok',
+  proyecto_id: 10,
+})
+assert(contratoSucio.codigo_sic_contrato === '88806', 'sanitizeContrato limpia el código SIC')
+assert(contratoSucio.observaciones === 'ok', 'sanitizeContrato limpia observaciones (XSS)')
+assert(contratoSucio.proyecto_id === 10, 'sanitizeContrato preserva campos no textuales')
+
+assert(validateContratoMetadata({ fecha_inicio: '2026-01-01', fecha_fin: '2026-12-31', valor: 1000 }).success,
+  'validateContratoMetadata acepta metadatos coherentes')
+assert(!validateContratoMetadata({ fecha_inicio: '2026-12-31', fecha_fin: '2026-01-01' }).success,
+  'validateContratoMetadata rechaza fecha_fin anterior a fecha_inicio')
+assert(!validateContratoMetadata({ valor: -5 }).success,
+  'validateContratoMetadata rechaza importe negativo')
 
 console.log(ok ? '\n✅ TODO OK' : '\n❌ HAY FALLOS')
 process.exit(ok ? 0 : 1)

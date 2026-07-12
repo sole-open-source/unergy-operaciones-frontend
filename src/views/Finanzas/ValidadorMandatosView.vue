@@ -19,6 +19,7 @@ import {
   parseAsientos, extractMandate, suggestTag, reconciliar, fmt, norm as normNombre,
   parseIngresos, matchIngresoContab, normalizarCifra,
 } from '@/utils/conciliacionMandatos.js'
+import { validateWorkbook } from '@/utils/fileValidator.js'
 
 const root = ref(null)
 
@@ -268,6 +269,21 @@ function initValidador(el) {
     reader.onload = e => {
       try {
         const wb = XLSX.read(e.target.result, {type:'array'})
+
+        // Seguridad: escanear todas las celdas antes de procesar. Un .xlsx puede
+        // traer payloads XSS o inyección de fórmula en cualquier celda; si los
+        // hay, se BLOQUEA la carga (no se concilia con datos manipulados).
+        const scan = validateWorkbook(wb)
+        if (!scan.is_valid) {
+          const n = scan.errors.length
+          const e0 = scan.errors[0]
+          $('xlsxLabel').innerHTML = `<span style="color:var(--err)">❌ Archivo bloqueado: ${n} celda${n!==1?'s':''} con contenido no permitido. ` +
+            `Primera: hoja "${e0.sheet}", fila ${e0.row+1}, col ${e0.col+1} — ${e0.message}.</span>`
+          $('dzExcel').classList.remove('loaded')
+          input.value = ''
+          return
+        }
+
         const ws = wb.Sheets[wb.SheetNames[0]]
         const rows = XLSX.utils.sheet_to_json(ws, {defval:''})
         // Matriz (con cabecera) para los motores de conciliacionMandatos.js:

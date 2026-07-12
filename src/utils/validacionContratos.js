@@ -11,9 +11,13 @@
  *                            contrato; el suministro cuenta pero su origen es bolsa.
  *   Un cruce SIN ninguna de las dos banderas es un conflicto de atribución.
  *
- * Este módulo son funciones puras (sin dependencias de Vue ni de red) para poder
+ * Este módulo son funciones (sin dependencias de Vue ni de red) para poder
  * usarlas en la vista y probarlas con node (ver validacionContratos.test.mjs).
+ * Depende solo de zod (validación) y del saneador central.
  */
+
+import { z } from 'zod'
+import { sanitizeString } from './sanitizer.js'
 
 // Estados que ya no aportan energía: no cuentan para el solapamiento.
 export const ESTADOS_INACTIVOS = ['rechazado', 'desistido', 'terminado']
@@ -162,4 +166,49 @@ export function conflictosAtribucion(contract = {}, existingContracts = []) {
   }
 
   return checkDateOverlap(contract.fecha_inicio, finPropuesto, mismaPlanta)
+}
+
+// ── Saneamiento y validación de metadatos del contrato ──────────────────────
+// Campos de texto libre que un usuario puede escribir y que, sin limpiar,
+// podrían transportar HTML/XSS hasta la base de datos y otros consumidores.
+const CAMPOS_TEXTO_CONTRATO = [
+  'observaciones', 'observacion', 'clausulas', 'clausula', 'nota', 'notas', 'descripcion',
+  'codigo_sic_contrato', 'objeto',
+]
+
+/**
+ * Devuelve una copia del contrato con sus campos de texto libre saneados
+ * (sin etiquetas/scripts). No muta el objeto original ni toca fechas/importes.
+ */
+export function sanitizeContrato(contract = {}) {
+  const out = { ...contract }
+  for (const campo of CAMPOS_TEXTO_CONTRATO) {
+    if (typeof out[campo] === 'string') out[campo] = sanitizeString(out[campo])
+  }
+  return out
+}
+
+// Metadatos verificables del contrato: fechas coherentes e importes no
+// negativos. `passthrough` conserva el resto de campos del payload.
+export const contratoMetadataSchema = z
+  .object({
+    fecha_inicio: z.coerce.date({ message: 'Fecha de inicio inválida' }).optional(),
+    fecha_fin: z.coerce.date({ message: 'Fecha de fin inválida' }).optional().nullable(),
+    valor: z.number().nonnegative('El valor no puede ser negativo').optional(),
+    monto: z.number().nonnegative('El monto no puede ser negativo').optional(),
+  })
+  .passthrough()
+  .refine(
+    (c) => !(c.fecha_inicio && c.fecha_fin) || c.fecha_fin >= c.fecha_inicio,
+    { message: 'La fecha de fin no puede ser anterior a la de inicio', path: ['fecha_fin'] },
+  )
+
+/**
+ * Valida los metadatos del contrato SIN lanzar. Devuelve { success, data, errors }.
+ * Pensado para correr antes de persistir y evitar corrupción de datos.
+ */
+export function validateContratoMetadata(contract = {}) {
+  const result = contratoMetadataSchema.safeParse(contract)
+  if (result.success) return { success: true, data: result.data, errors: [] }
+  return { success: false, data: null, errors: result.error.issues }
 }

@@ -258,6 +258,9 @@ import ArriendosZipUpload from './ArriendosZipUpload.vue'
 import CalculoIpcPopover from '@/components/CalculoIpcPopover.vue'
 import { docsPorProyecto, loadDocs, downloadDoc } from '@/composables/useArriendosDocs'
 import DocumentoIcon from '@/components/DocumentoIcon.vue'
+import { sanitizeObject } from '@/utils/sanitizer'
+import { ipcTasaSchema } from '@/utils/schemas/financialSchemas'
+import { showZodError } from '@/utils/schemas/validationError'
 
 const toast = useToast()
 
@@ -318,12 +321,21 @@ const ipcForm       = reactive({ año: new Date().getFullYear() - 1, tasaPct: nu
 
 async function guardarIPC() {
   if (!ipcForm.año || ipcForm.tasaPct == null) return
+  // 1) Sanear + 2) validar el input contra el esquema financiero.
+  const candidato = sanitizeObject({
+    año: ipcForm.año,
+    tasa: ipcForm.tasaPct / 100,
+    confirmado: true,
+    fuente: ipcForm.fuente || 'DANE',
+  })
+  const result = ipcTasaSchema.safeParse(candidato)
+  if (!result.success) {
+    showZodError(toast, result.error, 'Tasa IPC inválida')
+    return
+  }
+  const { año, tasa, confirmado, fuente } = result.data
   try {
-    await api.put(`/arriendos/ipc/${ipcForm.año}`, {
-      tasa: ipcForm.tasaPct / 100,
-      confirmado: true,
-      fuente: ipcForm.fuente || 'DANE',
-    })
+    await api.put(`/arriendos/ipc/${año}`, { tasa, confirmado, fuente })
     toast.add({ severity: 'success', summary: 'Tasa IPC guardada', life: 2500 })
     await cargarDatos()
   } catch {
