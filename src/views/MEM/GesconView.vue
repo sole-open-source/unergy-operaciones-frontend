@@ -120,11 +120,14 @@
           </template>
         </Column>
 
-        <Column header="Bolsa" style="width:60px;">
+        <Column header="Modalidad" style="width:88px;">
           <template #body="{ data }">
-            <span v-if="data.es_duplicado" class="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded"
+            <span v-if="data.uso_del_recurso" class="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded"
+              style="background: rgba(2,132,199,0.14); color: #0369a1;"
+              v-tooltip.top="'Uso del recurso — planta en bolsa; se le paga al cliente a precio bolsa. No genera garantías.'"><i class="pi pi-sync" style="font-size:9px;" />Uso recurso</span>
+            <span v-else-if="data.es_duplicado" class="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded"
               style="background: rgba(240,192,64,0.22); color: #9a6700;"
-              v-tooltip.top="'Compra en bolsa — cuenta para el contrato, origen bolsa'"><i class="pi pi-shopping-cart" style="font-size:9px;" />Bolsa</span>
+              v-tooltip.top="'Compra en bolsa (duplicado) — cuenta para el contrato, origen bolsa. Genera garantías.'"><i class="pi pi-shopping-cart" style="font-size:9px;" />Bolsa</span>
           </template>
         </Column>
 
@@ -291,13 +294,21 @@
             <i class="pi pi-info-circle text-xs cursor-help" style="color:#9b89b5;"
               v-tooltip.top="'Activado: esta planta reemplaza la anterior en este SIC. Desactivado: coexiste con las demás plantas del mismo SIC.'" />
           </div>
-          <div class="flex items-center gap-2 pb-1">
-            <Checkbox v-model="form.es_duplicado" :binary="true" inputId="es_duplicado" />
-            <label for="es_duplicado" class="text-xs font-medium cursor-pointer" style="color:#9a6700;">
-              Compra en bolsa
-            </label>
-            <i class="pi pi-info-circle text-xs cursor-help" style="color:#9b89b5;"
-              v-tooltip.top="'Marcar si esta planta ya está en otro contrato. El suministro SÍ cuenta para el cumplimiento de este contrato; su origen se marca como compra en bolsa.'" />
+          <div class="flex flex-col gap-1 pb-1">
+            <div class="flex items-center gap-2">
+              <label class="text-xs font-medium" style="color:#6b5a8a;">Modalidad de suministro</label>
+              <i class="pi pi-info-circle text-xs cursor-help" style="color:#9b89b5;"
+                v-tooltip.top="'Normal: suministro propio de la planta. Compra en bolsa (duplicado): la planta ya está comprometida en otro contrato; aquí su aporte cuenta pero se compra en bolsa (genera garantías). Uso del recurso: la planta está en bolsa y se mete al contrato pagándole al cliente su generación a precio bolsa (sin garantías).'" />
+            </div>
+            <SelectButton v-model="modalidadSuministro" :options="MODALIDADES_SUMINISTRO"
+              optionLabel="label" optionValue="value" :allowEmpty="false"
+              :pt="{ button: { style: 'font-size:12px; padding:5px 12px;' } }" />
+            <span v-if="modalidadSuministro === 'uso_recurso'" class="text-[11px]" style="color:#0369a1;">
+              Uso del recurso: se le paga al cliente su generación a precio bolsa. No genera compra en bolsa ni garantías.
+            </span>
+            <span v-else-if="modalidadSuministro === 'duplicado'" class="text-[11px]" style="color:#9a6700;">
+              Compra en bolsa: la planta ya está en otro contrato; su aporte aquí se cubre comprando en bolsa (genera garantías).
+            </span>
           </div>
         </div>
 
@@ -340,12 +351,14 @@
               </ul>
               <p v-if="conflictoNoResuelto" class="mt-1.5">
                 Para no duplicar la generación en Cumplimiento: marca
-                <b>Reemplaza anterior</b> si sustituye al registro previo, o
-                <b>Compra en bolsa</b> si coexiste con origen bolsa.
+                <b>Reemplaza anterior</b> si sustituye al registro previo, o define la
+                <b>Modalidad de suministro</b> (Compra en bolsa / Uso del recurso) si coexiste.
               </p>
               <p v-else class="mt-1.5">
                 Resuelto —
-                {{ form.reemplaza_anterior ? 'reemplaza al registro anterior en este SIC.' : 'marcado como compra en bolsa.' }}
+                {{ form.reemplaza_anterior ? 'reemplaza al registro anterior en este SIC.'
+                   : form.uso_del_recurso ? 'marcado como uso del recurso.'
+                   : 'marcado como compra en bolsa.' }}
               </p>
             </div>
           </div>
@@ -550,7 +563,7 @@ async function descargarGesconExcel() {
     const XLSX = await import('xlsx-js-style')
 
     // Paleta de marca Unergy
-    const C = { morado: '915BD8', oscuro: '2C2039', lila: 'F4F1FA', blanco: 'FFFFFF', gris: '6B5A8A', borde: 'ECE4F5', rojo: 'D64455', rojoBg: 'FBE9EC' }
+    const C = { morado: '915BD8', oscuro: '2C2039', lila: 'F4F1FA', blanco: 'FFFFFF', gris: '6B5A8A', borde: 'ECE4F5', rojo: 'D64455', rojoBg: 'FBE9EC', dorado: '9A6700', doradoBg: 'FBF3DB', azul: '0369A1', azulBg: 'E1F0FA' }
     const bf = { style: 'thin', color: { rgb: C.borde } }
     const bAll = { top: bf, bottom: bf, left: bf, right: bf }
     const siNo = v => (v ? 'Sí' : 'No')
@@ -581,7 +594,7 @@ async function descargarGesconExcel() {
       { h: 'Req. ASIC', w: 15, get: r => r.requerimiento_asic || '' },
       { h: 'Contacto solicitante', w: 22, get: r => r.nombre_contacto_solicitante || '' },
       { h: 'Coexiste', w: 9, get: r => siNo(!r.reemplaza_anterior), align: 'center' },
-      { h: 'Duplicado', w: 10, get: r => siNo(r.es_duplicado), align: 'center', dup: true },
+      { h: 'Modalidad', w: 14, get: r => r.uso_del_recurso ? 'Uso del recurso' : r.es_duplicado ? 'Compra en bolsa' : 'Normal', align: 'center', dup: true },
       { h: 'Link archivo', w: 32, get: r => r.link_archivo || '' },
       { h: 'Observaciones', w: 40, get: r => r.observaciones || '' },
     ]
@@ -634,9 +647,12 @@ async function descargarGesconExcel() {
         if (c.pct) style.numFmt = '0.##"%"'
         if (c.venc && r.fecha_fin && String(r.fecha_fin).slice(0, 10) < hoy)
           style.font = { sz: 10, bold: true, color: { rgb: C.rojo } }
-        if (c.dup && r.es_duplicado) {
-          style.font = { sz: 10, bold: true, color: { rgb: C.rojo } }
-          style.fill = { fgColor: { rgb: C.rojoBg } }
+        if (c.dup && r.uso_del_recurso) {
+          style.font = { sz: 10, bold: true, color: { rgb: C.azul } }
+          style.fill = { fgColor: { rgb: C.azulBg } }
+        } else if (c.dup && r.es_duplicado) {
+          style.font = { sz: 10, bold: true, color: { rgb: C.dorado } }
+          style.fill = { fgColor: { rgb: C.doradoBg } }
         }
         setStyle(rowIdx, ci, style)
       })
@@ -754,8 +770,29 @@ const FORM_INICIAL = () => ({
   observaciones: '',
   reemplaza_anterior: true,
   es_duplicado: false,
+  uso_del_recurso: false,
 })
 const form = ref(FORM_INICIAL())
+
+// Modalidad de suministro: es_duplicado y uso_del_recurso son mutuamente
+// excluyentes (el backend rechaza ambos con 422). Un solo control de 3 estados
+// traduce a los dos flags, así es imposible marcarlos juntos por error.
+const MODALIDADES_SUMINISTRO = [
+  { label: 'Normal', value: 'normal' },
+  { label: 'Compra en bolsa', value: 'duplicado' },
+  { label: 'Uso del recurso', value: 'uso_recurso' },
+]
+const modalidadSuministro = computed({
+  get() {
+    if (form.value.uso_del_recurso) return 'uso_recurso'
+    if (form.value.es_duplicado) return 'duplicado'
+    return 'normal'
+  },
+  set(v) {
+    form.value.es_duplicado = v === 'duplicado'
+    form.value.uso_del_recurso = v === 'uso_recurso'
+  },
+})
 
 // Una terminación solo necesita: SIC del contrato a terminar, fecha de terminación,
 // cédulas de los agentes y el link del archivo. El resto de campos se ocultan.
@@ -773,12 +810,14 @@ const conflictosSolapamiento = computed(() => {
     rows.value,
   )
 })
-// El cruce queda resuelto si la planta reemplaza a la anterior o se marca como
-// compra en bolsa (es_duplicado). Si no, es un conflicto bloqueante.
+// El cruce queda resuelto si la planta reemplaza a la anterior, se marca como
+// compra en bolsa (es_duplicado) o como uso del recurso (uso_del_recurso): en
+// las tres la coexistencia es legítima. Si no, es un conflicto bloqueante.
 const conflictoNoResuelto = computed(() =>
   conflictosSolapamiento.value.length > 0 &&
   !form.value.reemplaza_anterior &&
-  !form.value.es_duplicado,
+  !form.value.es_duplicado &&
+  !form.value.uso_del_recurso,
 )
 
 const opcionesEstadoForm = [
@@ -829,6 +868,7 @@ function abrirEditar(row) {
     observaciones: row.observaciones || '',
     reemplaza_anterior: row.reemplaza_anterior ?? true,
     es_duplicado: row.es_duplicado ?? false,
+    uso_del_recurso: row.uso_del_recurso ?? false,
   }
   errores.value = {}
   dialogVisible.value = true
@@ -858,7 +898,7 @@ async function guardar() {
     toast.add({
       severity: 'warn',
       summary: 'Solapamiento sin resolver',
-      detail: 'Otra planta igual tiene fechas que se cruzan. Marca "Reemplaza anterior" si la sustituye, o "Compra en bolsa" si coexiste con origen bolsa.',
+      detail: 'Otra planta igual tiene fechas que se cruzan. Marca "Reemplaza anterior" si la sustituye, o define la modalidad ("Compra en bolsa" o "Uso del recurso") si coexiste.',
       life: 6000,
     })
     return
@@ -908,6 +948,7 @@ async function guardar() {
         observaciones: null,
         reemplaza_anterior: true,
         es_duplicado: false,
+        uso_del_recurso: false,
       })
     }
 

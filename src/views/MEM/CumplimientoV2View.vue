@@ -716,15 +716,21 @@
 
         <!-- a. PPA Venta (UNGG) -->
         <template v-if="pcMode === 'ppa_venta_ungg'">
-          <!-- Resumen de duplicados: cuántas de las plantas de venta son compra en bolsa -->
-          <div v-if="pcVentaDupInfo.dup" class="flex items-start gap-2 px-4 py-2.5 rounded-lg text-xs"
-            style="background: rgba(240,192,64,0.10); border: 1px solid rgba(240,192,64,0.35); color: #9a6700;">
-            <i class="pi pi-shopping-cart mt-0.5" style="font-size: 12px;" />
-            <span>
-              <b>{{ pcVentaDupInfo.dup }} de {{ pcVentaDupInfo.total }}</b> plantas son
-              <b>duplicados (compra en bolsa)</b> — resaltadas en dorado con el badge «Duplicado».
-              También aparecen en «Compra en bolsa (UNGG)». El resto ({{ pcVentaDupInfo.total - pcVentaDupInfo.dup }})
-              no son duplicados.
+          <!-- Resumen de modalidades: duplicados (compra en bolsa) y uso del recurso -->
+          <div v-if="pcVentaDupInfo.dup || pcVentaDupInfo.ur" class="flex flex-col gap-1 px-4 py-2.5 rounded-lg text-xs"
+            style="background: rgba(44,32,57,0.03); border: 1px solid rgba(44,32,57,0.12); color: #2C2039;">
+            <div class="flex items-center flex-wrap gap-x-3 gap-y-1">
+              <span><b>{{ pcVentaDupInfo.total }}</b> plantas en total.</span>
+              <span v-if="pcVentaDupInfo.dup" class="inline-flex items-center gap-1" style="color: #9a6700;">
+                <i class="pi pi-shopping-cart" style="font-size: 10px;" /><b>{{ pcVentaDupInfo.dup }}</b> duplicados (compra en bolsa)
+              </span>
+              <span v-if="pcVentaDupInfo.ur" class="inline-flex items-center gap-1" style="color: #0369a1;">
+                <i class="pi pi-sync" style="font-size: 10px;" /><b>{{ pcVentaDupInfo.ur }}</b> uso del recurso
+              </span>
+              <span style="color: #7a6e8a;">· resto suministro propio.</span>
+            </div>
+            <span style="color: #7a6e8a;">
+              Duplicados y uso del recurso también aparecen en «Compra en bolsa (UNGG)» — el duplicado se compra en bolsa (genera garantías); el uso del recurso se le paga al cliente a precio bolsa (sin garantías).
             </span>
           </div>
           <div v-for="c in pcPools.ppa_venta_ungg" :key="c.id" class="cv-card">
@@ -742,11 +748,17 @@
                   style="background: rgba(145,91,216,0.10); color: #915BD8;">
                   {{ c.plantas.length }} plantas
                 </span>
-                <span v-if="c.plantas.filter(p => p.es_duplicado).length"
+                <span v-if="c.plantas.filter(p => p.es_duplicado && !p.uso_del_recurso).length"
                   class="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded"
                   style="background: rgba(240,192,64,0.22); color: #9a6700;"
                   v-tooltip.bottom="'Plantas de este contrato que son compra en bolsa (duplicados)'">
-                  <i class="pi pi-shopping-cart" style="font-size: 9px;" />{{ c.plantas.filter(p => p.es_duplicado).length }} duplicadas
+                  <i class="pi pi-shopping-cart" style="font-size: 9px;" />{{ c.plantas.filter(p => p.es_duplicado && !p.uso_del_recurso).length }} duplicadas
+                </span>
+                <span v-if="c.plantas.filter(p => p.uso_del_recurso).length"
+                  class="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded"
+                  style="background: rgba(2,132,199,0.14); color: #0369a1;"
+                  v-tooltip.bottom="'Plantas de este contrato marcadas como uso del recurso'">
+                  <i class="pi pi-sync" style="font-size: 9px;" />{{ c.plantas.filter(p => p.uso_del_recurso).length }} uso recurso
                 </span>
                 <button
                   @click.stop="copiarImagenVenta(c)"
@@ -761,14 +773,17 @@
             </div>
             <div v-if="c.plantas.length" class="divide-y" style="border-color: rgba(44,32,57,0.05);">
               <div v-for="p in c.plantas" :key="p.id" class="px-4 py-2.5 flex items-center justify-between text-sm cv-row-click"
-                :style="p.es_duplicado ? 'background: rgba(240,192,64,0.08);' : ''"
+                :style="p.uso_del_recurso ? 'background: rgba(2,132,199,0.06);' : p.es_duplicado ? 'background: rgba(240,192,64,0.08);' : ''"
                 @click="abrirDetalleContrato(c, 'ppa_venta_ungg')"
                 v-tooltip.left="'Ver detalle del contrato (PPA + GESCON)'">
                 <div class="flex items-center gap-2">
                   <span class="font-medium" style="color: #2C2039;">{{ p.nombre }}</span>
-                  <span v-if="p.es_duplicado" class="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded"
+                  <span v-if="p.uso_del_recurso" class="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded"
+                    style="background: rgba(2,132,199,0.14); color: #0369a1;"
+                    v-tooltip="'Uso del recurso: la planta está en bolsa y se le paga al cliente su generación a precio bolsa — también listada en c. Compra en Bolsa (UNGG). No genera garantías.'"><i class="pi pi-sync" style="font-size: 9px;" />Uso del recurso</span>
+                  <span v-else-if="p.es_duplicado" class="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded"
                     style="background: rgba(240,192,64,0.22); color: #9a6700;"
-                    v-tooltip="'Duplicado: suministra a este contrato con origen bolsa — también listado en c. Compra en Bolsa (UNGG)'"><i class="pi pi-shopping-cart" style="font-size: 9px;" />Duplicado</span>
+                    v-tooltip="'Duplicado: suministra a este contrato con origen bolsa — también listado en c. Compra en Bolsa (UNGG). Genera garantías.'"><i class="pi pi-shopping-cart" style="font-size: 9px;" />Duplicado</span>
                   <span v-if="p.codigo_sic" class="text-xs font-mono px-1.5 py-0.5 rounded" style="background: rgba(44,32,57,0.06); color: #7a6e8a;">{{ p.codigo_sic }}</span>
                   <span v-if="p.pct_despacho != null" class="text-xs font-mono" style="color: #915BD8;">{{ (p.pct_despacho * 100).toFixed(0) }}%</span>
                 </div>
@@ -887,18 +902,24 @@
           <div v-if="!pcPools.bolsa_compra_ungg.length" class="cv-card">
             <div class="px-4 py-8 text-xs text-center" style="color: rgba(44,32,57,0.35);">
               Sin compras en bolsa de UNGG en {{ MESES[pcMonth - 1] }} {{ pcYear }}.<br/>
-              Aquí aparecen las plantas duplicadas (origen bolsa) que aportan a un contrato de venta.
+              Aquí aparecen las plantas duplicadas (origen bolsa) y las de uso del recurso que aportan a un contrato de venta.
               Los contratos PLC entrarán cuando se liquiden en plataforma.
             </div>
           </div>
-          <div v-if="pcPools.bolsa_compra_ungg.length" class="flex items-start gap-2 px-4 py-2.5 rounded-lg text-xs"
-            style="background: rgba(240,192,64,0.10); border: 1px solid rgba(240,192,64,0.35); color: #9a6700;">
-            <i class="pi pi-shopping-cart mt-0.5" style="font-size: 12px;" />
+          <div v-if="pcPools.bolsa_compra_ungg.length" class="flex flex-col gap-1.5 px-4 py-2.5 rounded-lg text-xs"
+            style="background: rgba(44,32,57,0.03); border: 1px solid rgba(44,32,57,0.12); color: #2C2039;">
             <span>
-              <b>Todas estas plantas son duplicados.</b> La misma planta suministra a un contrato de
-              venta, pero su energía se compra en bolsa. También aparecen (con el badge «Duplicado») en
-              «Venta · UNGG», agrupadas aquí por el contrato al que aportan.
+              La misma planta también suministra a un contrato de venta (aparece en «Venta · UNGG»);
+              aquí se agrupa por el contrato al que aporta. Hay <b>dos modalidades</b>:
             </span>
+            <div class="flex flex-wrap gap-x-4 gap-y-1">
+              <span class="inline-flex items-center gap-1" style="color: #9a6700;">
+                <i class="pi pi-shopping-cart" style="font-size: 10px;" /><b>Duplicado</b> — su energía se compra en bolsa (genera garantías).
+              </span>
+              <span class="inline-flex items-center gap-1" style="color: #0369a1;">
+                <i class="pi pi-sync" style="font-size: 10px;" /><b>Uso del recurso</b> — se le paga al cliente a precio bolsa (sin garantías).
+              </span>
+            </div>
           </div>
           <div v-for="c in pcPools.bolsa_compra_ungg" :key="c.id" class="cv-card-gold">
             <div class="px-4 py-3 flex items-center justify-between cv-row-click"
@@ -919,11 +940,15 @@
                 @click="abrirDetalleContrato(c, 'bolsa_compra_ungg')"
                 v-tooltip.left="'Ver detalle del contrato (PPA + GESCON)'">
                 <div class="flex items-center gap-2">
-                  <i class="pi pi-shopping-cart" style="font-size: 10px; color: #9a6700;" />
+                  <i class="pi" :class="p.uso_del_recurso ? 'pi-sync' : 'pi-shopping-cart'"
+                    :style="`font-size: 10px; color: ${p.uso_del_recurso ? '#0369a1' : '#9a6700'};`" />
                   <span class="font-medium" style="color: #2C2039;">{{ p.nombre }}</span>
-                  <span class="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded"
+                  <span v-if="p.uso_del_recurso" class="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded"
+                    style="background: rgba(2,132,199,0.14); color: #0369a1;"
+                    v-tooltip="'Uso del recurso: la planta está en bolsa y también suministra a un contrato de venta (Venta · UNGG); se le paga al cliente a precio bolsa. No genera garantías.'">Uso del recurso</span>
+                  <span v-else class="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded"
                     style="background: rgba(240,192,64,0.22); color: #9a6700;"
-                    v-tooltip="'Duplicado: esta planta también suministra a un contrato de venta (Venta · UNGG); su energía a este contrato se compra en bolsa'">Duplicado</span>
+                    v-tooltip="'Duplicado: esta planta también suministra a un contrato de venta (Venta · UNGG); su energía a este contrato se compra en bolsa. Genera garantías.'">Duplicado</span>
                   <span v-if="p.codigo_sic" class="text-xs font-mono px-1.5 py-0.5 rounded" style="background: rgba(44,32,57,0.06); color: #7a6e8a;">{{ p.codigo_sic }}</span>
                 </div>
                 <div class="text-xs font-mono" style="color: #7a6e8a;">
@@ -1845,14 +1870,19 @@ const pcPools = computed(() => {
     ppa_compra_externa: d.compra_externa || [],
   }
 })
-// Resumen de duplicados en Venta·UNGG (flag es_duplicado): total de plantas vs
-// cuántas son compra en bolsa. Alimenta el banner de la piscina de venta.
+// Resumen de modalidades en Venta·UNGG: total de plantas vs cuántas son compra
+// en bolsa (duplicado) y cuántas uso del recurso. Alimenta el banner y los chips
+// de la piscina de venta. uso_del_recurso y es_duplicado son excluyentes.
 const pcVentaDupInfo = computed(() => {
-  let total = 0, dup = 0
+  let total = 0, dup = 0, ur = 0
   for (const c of (pcPools.value.ppa_venta_ungg || [])) {
-    for (const p of (c.plantas || [])) { total++; if (p.es_duplicado) dup++ }
+    for (const p of (c.plantas || [])) {
+      total++
+      if (p.uso_del_recurso) ur++
+      else if (p.es_duplicado) dup++
+    }
   }
-  return { total, dup }
+  return { total, dup, ur }
 })
 
 // Contratos de compra externa sin plantas vinculadas: no sabemos a qué planta
