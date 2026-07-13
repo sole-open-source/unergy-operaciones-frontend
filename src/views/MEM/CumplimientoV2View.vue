@@ -716,6 +716,17 @@
 
         <!-- a. PPA Venta (UNGG) -->
         <template v-if="pcMode === 'ppa_venta_ungg'">
+          <!-- Resumen de duplicados: cuántas de las plantas de venta son compra en bolsa -->
+          <div v-if="pcVentaDupInfo.dup" class="flex items-start gap-2 px-4 py-2.5 rounded-lg text-xs"
+            style="background: rgba(240,192,64,0.10); border: 1px solid rgba(240,192,64,0.35); color: #9a6700;">
+            <i class="pi pi-shopping-cart mt-0.5" style="font-size: 12px;" />
+            <span>
+              <b>{{ pcVentaDupInfo.dup }} de {{ pcVentaDupInfo.total }}</b> plantas son
+              <b>duplicados (compra en bolsa)</b> — resaltadas en dorado con el badge «Duplicado».
+              También aparecen en «Compra en bolsa (UNGG)». El resto ({{ pcVentaDupInfo.total - pcVentaDupInfo.dup }})
+              no son duplicados.
+            </span>
+          </div>
           <div v-for="c in pcPools.ppa_venta_ungg" :key="c.id" class="cv-card">
             <div class="px-4 py-3 flex items-center justify-between cv-row-click"
               style="background: rgba(145,91,216,0.04); border-bottom: 1px solid rgba(44,32,57,0.07);"
@@ -730,6 +741,12 @@
                 <span class="text-xs font-mono px-2 py-0.5 rounded"
                   style="background: rgba(145,91,216,0.10); color: #915BD8;">
                   {{ c.plantas.length }} plantas
+                </span>
+                <span v-if="c.plantas.filter(p => p.es_duplicado).length"
+                  class="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded"
+                  style="background: rgba(240,192,64,0.22); color: #9a6700;"
+                  v-tooltip.bottom="'Plantas de este contrato que son compra en bolsa (duplicados)'">
+                  <i class="pi pi-shopping-cart" style="font-size: 9px;" />{{ c.plantas.filter(p => p.es_duplicado).length }} duplicadas
                 </span>
                 <button
                   @click.stop="copiarImagenVenta(c)"
@@ -874,6 +891,15 @@
               Los contratos PLC entrarán cuando se liquiden en plataforma.
             </div>
           </div>
+          <div v-if="pcPools.bolsa_compra_ungg.length" class="flex items-start gap-2 px-4 py-2.5 rounded-lg text-xs"
+            style="background: rgba(240,192,64,0.10); border: 1px solid rgba(240,192,64,0.35); color: #9a6700;">
+            <i class="pi pi-shopping-cart mt-0.5" style="font-size: 12px;" />
+            <span>
+              <b>Todas estas plantas son duplicados.</b> La misma planta suministra a un contrato de
+              venta, pero su energía se compra en bolsa. También aparecen (con el badge «Duplicado») en
+              «Venta · UNGG», agrupadas aquí por el contrato al que aportan.
+            </span>
+          </div>
           <div v-for="c in pcPools.bolsa_compra_ungg" :key="c.id" class="cv-card-gold">
             <div class="px-4 py-3 flex items-center justify-between cv-row-click"
               style="background: rgba(240,192,64,0.08); border-bottom: 1px solid rgba(240,192,64,0.2);"
@@ -895,6 +921,9 @@
                 <div class="flex items-center gap-2">
                   <i class="pi pi-shopping-cart" style="font-size: 10px; color: #9a6700;" />
                   <span class="font-medium" style="color: #2C2039;">{{ p.nombre }}</span>
+                  <span class="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded"
+                    style="background: rgba(240,192,64,0.22); color: #9a6700;"
+                    v-tooltip="'Duplicado: esta planta también suministra a un contrato de venta (Venta · UNGG); su energía a este contrato se compra en bolsa'">Duplicado</span>
                   <span v-if="p.codigo_sic" class="text-xs font-mono px-1.5 py-0.5 rounded" style="background: rgba(44,32,57,0.06); color: #7a6e8a;">{{ p.codigo_sic }}</span>
                 </div>
                 <div class="text-xs font-mono" style="color: #7a6e8a;">
@@ -1816,6 +1845,16 @@ const pcPools = computed(() => {
     ppa_compra_externa: d.compra_externa || [],
   }
 })
+// Resumen de duplicados en Venta·UNGG (flag es_duplicado): total de plantas vs
+// cuántas son compra en bolsa. Alimenta el banner de la piscina de venta.
+const pcVentaDupInfo = computed(() => {
+  let total = 0, dup = 0
+  for (const c of (pcPools.value.ppa_venta_ungg || [])) {
+    for (const p of (c.plantas || [])) { total++; if (p.es_duplicado) dup++ }
+  }
+  return { total, dup }
+})
+
 // Contratos de compra externa sin plantas vinculadas: no sabemos a qué planta
 // le compramos — se alerta arriba de las tarjetas (g).
 const externasSinPlantas = computed(() =>
