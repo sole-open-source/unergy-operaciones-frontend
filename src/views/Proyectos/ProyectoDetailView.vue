@@ -43,6 +43,14 @@
               label="Inicio de comercialización"
               :value="proyecto.fecha_inicio_comercializacion ? (fmtFecha(proyecto.fecha_inicio_comercializacion) + (proyecto.fecha_comercializacion_editada_manual ? ' (manual)' : ' (auto)')) : '—'" />
             <InfoField label="Fecha fin de representación" :value="proyecto.fecha_fin_representacion ? fmtFecha(proyecto.fecha_fin_representacion) : '—'" />
+            <div class="flex flex-col gap-1">
+              <label class="field-label">Comunidad energética</label>
+              <div>
+                <Tag v-if="proyecto.es_comunidad_energetica" severity="success"
+                     :value="proyecto.nombre_comunidad ? ('🏘 ' + proyecto.nombre_comunidad) : '🏘 Sí'" />
+                <span v-else class="text-gray-400">—</span>
+              </div>
+            </div>
           </template>
           <template v-else>
             <div class="flex flex-col gap-1">
@@ -99,6 +107,17 @@
             <div class="flex flex-col gap-1">
               <label class="field-label">Fecha fin de representación</label>
               <DatePicker v-model="editFechaFinRep" dateFormat="yy-mm-dd" showIcon showClear class="w-full" placeholder="Vigente" />
+            </div>
+            <div class="flex flex-col gap-1">
+              <label class="field-label">Comunidad energética</label>
+              <div class="flex items-center gap-2 h-full">
+                <ToggleSwitch v-model="editForm.es_comunidad_energetica" />
+                <span class="text-sm text-gray-500">{{ editForm.es_comunidad_energetica ? 'Sí' : 'No' }}</span>
+              </div>
+            </div>
+            <div v-if="editForm.es_comunidad_energetica" class="flex flex-col gap-1">
+              <label class="field-label">Nombre de la comunidad</label>
+              <InputText v-model="editForm.nombre_comunidad" class="w-full" placeholder="Opcional" />
             </div>
           </template>
         </div>
@@ -856,6 +875,8 @@ const editForm = reactive({
   codigo_tsf: null,
   cantidad_total_paneles: null,
   produccion_especifica_kwh_kwp: null,
+  es_comunidad_energetica: false,
+  nombre_comunidad: '',
 })
 
 const editInfoTecnica = reactive({
@@ -1038,6 +1059,9 @@ async function saveEdit() {
     const comercNueva = formatFecha(editFechaComerc.value)
     const comercActual = proyecto.value?.fecha_inicio_comercializacion || null
     if (comercNueva !== comercActual) payload.fecha_inicio_comercializacion = comercNueva
+    // Comunidad energética: enviar siempre el flag y el nombre (permite limpiarlo).
+    payload.es_comunidad_energetica = !!editForm.es_comunidad_energetica
+    payload.nombre_comunidad = editForm.es_comunidad_energetica ? (editForm.nombre_comunidad || null) : null
 
     await api.patch(`/proyectos/${route.params.id}`, payload)
     const itPayload = {}

@@ -107,6 +107,11 @@
         </div>
       </TabPanel>
 
+      <!-- Ofertas (sub-ofertas planta × servicio) -->
+      <TabPanel header="Ofertas">
+        <OfertasPanel :oportunidad-id="op.id" :ofertas="op.ofertas || []" @changed="recargar" />
+      </TabPanel>
+
       <!-- Proyectos (visible en todos los estados) -->
       <TabPanel header="Proyectos">
         <div class="flex items-center justify-between mb-3">
@@ -191,6 +196,7 @@ import PPAContratoWizard from '@/views/Contratos/PPAContratoWizard.vue'
 import ContratoServicioWizard from '@/views/Contratos/ContratoServicioWizard.vue'
 import AgregarProyectoDialog from './AgregarProyectoDialog.vue'
 import BitacoraPanel from './BitacoraPanel.vue'
+import OfertasPanel from './OfertasPanel.vue'
 
 const route = useRoute()
 const toast = useToast()
@@ -199,10 +205,11 @@ const ESTADOS = [
   { label: 'Prospección', value: 'prospeccion' },
   { label: 'Oferta', value: 'oferta' },
   { label: 'Negociación', value: 'negociacion' },
-  { label: 'Fin', value: 'fin' },
+  { label: 'Servicio operativo', value: 'servicio_operativo' },
 ]
 const TIPOS_SERVICIO = [
-  { label: 'Representación', value: 'representacion' },
+  { label: 'Servicios operacionales', value: 'servicios_operacionales' },
+  { label: 'Compra de energía', value: 'compra_energia' },
   { label: 'Comunidad energética', value: 'comunidad_energetica' },
 ]
 const TIPOS_DOC_OFERTA = [

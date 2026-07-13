@@ -42,10 +42,12 @@
             <span class="font-medium text-sm">{{ op.nombre }}</span>
             <Tag v-if="op.alerta" severity="danger" :value="`⚠ ${op.dias_sin_respuesta}d`" class="shrink-0" />
           </div>
-          <div class="text-xs text-gray-500 mt-1 flex flex-wrap gap-x-3">
-            <span v-if="op.tipo_servicio">{{ labelServicio(op.tipo_servicio) }}</span>
-            <span v-if="op.numero_oferta">Oferta {{ op.numero_oferta }}</span>
-            <span>{{ op.num_proyectos }} proy. · {{ fmtKwp(op.capacidad_total_kwp) }}</span>
+          <div class="text-xs text-gray-500 mt-1 flex flex-wrap gap-1">
+            <span v-for="c in chipsResumen(op)" :key="c"
+                  class="inline-block bg-gray-100 rounded px-1.5 py-0.5">{{ c }}</span>
+          </div>
+          <div class="text-xs text-gray-400 mt-1">
+            {{ op.num_proyectos }} proy. · {{ fmtKwp(op.capacidad_total_kwp) }}
           </div>
         </div>
         <button v-if="ocultasEnColumna(col.value) > 0" class="text-xs text-primary underline px-2"
@@ -65,10 +67,13 @@
           <Tag :value="labelEstado(data.estado)" :severity="severidadEstado(data.estado)" />
         </template>
       </Column>
-      <Column header="Servicio" field="tipo_servicio">
-        <template #body="{ data }">{{ labelServicio(data.tipo_servicio) || '—' }}</template>
+      <Column header="Ofertas">
+        <template #body="{ data }">
+          <span v-for="c in chipsResumen(data)" :key="c"
+                class="inline-block bg-gray-100 rounded px-1.5 py-0.5 mr-1 text-xs">{{ c }}</span>
+          <span v-if="!chipsResumen(data).length">—</span>
+        </template>
       </Column>
-      <Column field="numero_oferta" header="Nº oferta" />
       <Column field="num_proyectos" header="Proy." sortable />
       <Column header="Capacidad" field="capacidad_total_kwp" sortable>
         <template #body="{ data }">{{ fmtKwp(data.capacidad_total_kwp) }}</template>
@@ -112,12 +117,23 @@ const ESTADOS = [
   { label: 'Prospección', value: 'prospeccion', clase: 'text-blue-700' },
   { label: 'Oferta', value: 'oferta', clase: 'text-amber-700' },
   { label: 'Negociación', value: 'negociacion', clase: 'text-purple-700' },
-  { label: 'Fin', value: 'fin', clase: 'text-green-700' },
+  { label: 'Servicio operativo', value: 'servicio_operativo', clase: 'text-green-700' },
 ]
 const TIPOS_SERVICIO = [
-  { label: 'Representación', value: 'representacion' },
+  { label: 'Servicios operacionales', value: 'servicios_operacionales' },
+  { label: 'Compra de energía', value: 'compra_energia' },
   { label: 'Comunidad energética', value: 'comunidad_energetica' },
 ]
+// Etiquetas cortas para los chips-resumen de oferta en la tarjeta.
+const TIPO_OFERTA_CORTO = {
+  servicios_operacionales: 'Servicios',
+  compra_energia: 'Energía',
+  comunidad_energetica: 'Comunidad',
+}
+function chipsResumen(op) {
+  const r = op.resumen_ofertas || {}
+  return Object.keys(r).map(t => `${TIPO_OFERTA_CORTO[t] || t} ${r[t]}`)
+}
 // Tarjetas visibles por columna antes del "+N más" (solo afecta a Fin en la práctica).
 const MAX_TARJETAS_COL = 15
 
@@ -138,7 +154,7 @@ function filtradas() {
   const q = filtroTexto.value.toLowerCase()
   return oportunidades.value.filter(o => {
     if (q && !(`${o.nombre} ${o.cliente_razon_social}`.toLowerCase().includes(q))) return false
-    if (filtroServicio.value && o.tipo_servicio !== filtroServicio.value) return false
+    if (filtroServicio.value && !(o.resumen_ofertas && o.resumen_ofertas[filtroServicio.value])) return false
     if (soloAlerta.value && !o.alerta) return false
     return true
   })
@@ -155,7 +171,7 @@ watch([oportunidades, filtroTexto, filtroServicio, filtroEstados, soloAlerta], (
 
 function labelEstado(v) { return ESTADOS.find(e => e.value === v)?.label ?? v }
 function severidadEstado(v) {
-  return { prospeccion: 'info', oferta: 'warn', negociacion: 'secondary', fin: 'success' }[v] ?? 'info'
+  return { prospeccion: 'info', oferta: 'warn', negociacion: 'secondary', servicio_operativo: 'success' }[v] ?? 'info'
 }
 function labelServicio(v) { return TIPOS_SERVICIO.find(t => t.value === v)?.label }
 function fmtKwp(v) { return v ? `${Number(v).toLocaleString('es-CO')} kWp` : '0 kWp' }

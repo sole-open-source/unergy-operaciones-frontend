@@ -93,7 +93,8 @@ const MODOS = [
   { label: 'Cliente nuevo', value: 'nuevo' },
 ]
 const TIPOS_SERVICIO = [
-  { label: 'Representación', value: 'representacion' },
+  { label: 'Servicios operacionales', value: 'servicios_operacionales' },
+  { label: 'Compra de energía', value: 'compra_energia' },
   { label: 'Comunidad energética', value: 'comunidad_energetica' },
 ]
 const ORIGENES = [
