@@ -139,8 +139,48 @@
       </template>
     </template>
 
-    <!-- ═══ TAB 1: Clima / Pronóstico ═══ -->
-    <template v-if="!loading && activeTab === 1">
+    <!-- ═══ TAB 1: Correlación Unergy (P&L) ═══ -->
+    <template v-if="activeTab === 1">
+      <!-- Selector de fecha -->
+      <div class="rounded-xl border border-gray-100 bg-white p-4 flex items-end gap-3 flex-wrap">
+        <div class="flex flex-col gap-1">
+          <label class="text-xs font-medium text-gray-500">Fecha</label>
+          <DatePicker v-model="corrFecha" dateFormat="yy-mm-dd" showIcon size="small"
+            :maxDate="hoy" class="w-44" />
+        </div>
+        <Button label="Actualizar" icon="pi pi-refresh" size="small" outlined
+          :loading="corrLoading" @click="cargarCorrelacion" />
+        <span v-if="proyectosConsultados" class="ml-auto text-[11px] text-gray-400">
+          {{ proyectosConDato }} de {{ proyectosConsultados }} proyectos en operación con datos
+        </span>
+      </div>
+
+      <div v-if="corrLoading" class="flex flex-col items-center py-16 gap-2">
+        <ProgressSpinner />
+        <p class="text-xs text-gray-400">Consultando generación proyecto por proyecto…</p>
+      </div>
+
+      <div v-else-if="corrError" class="flex flex-col items-center py-12 gap-2 text-gray-400">
+        <i class="pi pi-exclamation-triangle text-3xl" />
+        <p class="text-sm">{{ corrError }}</p>
+      </div>
+
+      <template v-else>
+        <!-- KPIs de P&L -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div v-for="kpi in corrKpis" :key="kpi.label"
+            class="rounded-xl border p-3" :style="`border-color:${kpi.color}33; background:${kpi.color}08`">
+            <p class="text-2xl font-bold" :style="`color:${kpi.color}`">{{ kpi.value }}</p>
+            <p class="text-xs font-medium mt-0.5" :style="`color:${kpi.color}cc`">{{ kpi.label }}</p>
+          </div>
+        </div>
+
+        <UnergyGenerationCorrelationChart :rows="corrRows" :fecha="corrFechaStr" />
+      </template>
+    </template>
+
+    <!-- ═══ TAB 2: Clima / Pronóstico ═══ -->
+    <template v-if="!loading && activeTab === 2">
       <div v-if="!clima || !clima.models_available" class="flex flex-col items-center py-12 gap-2 text-gray-400">
         <i class="pi pi-cloud text-3xl" />
         <p class="text-sm">Modelos de pronóstico no disponibles.</p>
@@ -211,8 +251,8 @@
       </template>
     </template>
 
-    <!-- ═══ TAB 2: Histórico ═══ -->
-    <template v-if="!loading && activeTab === 2">
+    <!-- ═══ TAB 3: Histórico ═══ -->
+    <template v-if="!loading && activeTab === 3">
       <div v-if="!histPrices.length" class="flex flex-col items-center py-12 gap-2 text-gray-400">
         <i class="pi pi-database text-3xl" />
         <p class="text-sm">Sin datos históricos.</p>
@@ -283,14 +323,18 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import Button from 'primevue/button'
 import ProgressSpinner from 'primevue/progressspinner'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
+import DatePicker from 'primevue/datepicker'
 import api from '@/api/client'
+import { fmtCompact } from '@/utils/liquidaciones'
+import UnergyGenerationCorrelationChart from './components/UnergyGenerationCorrelationChart.vue'
+import { useGenerationCorrelation } from './composables/useGenerationCorrelation'
 
-const TABS = ['Precios de Bolsa', 'Clima / Pronóstico', 'Histórico']
+const TABS = ['Precios de Bolsa', 'Correlación Unergy', 'Clima / Pronóstico', 'Histórico']
 const activeTab = ref(0)
 const loading = ref(true)
 const spot = ref(null)
@@ -325,6 +369,55 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
+})
+
+// ─── Correlación precio ↔ generación Unergy (P&L) ───────
+const {
+  loading: corrLoading,
+  error: corrError,
+  rows: corrRows,
+  fecha: corrFechaStr,
+  hayGeneracion,
+  proyectosConDato,
+  proyectosConsultados,
+  fetchCorrelationData,
+  ingresoBruto,
+  generacionTotalKwh,
+  precioPromedioPonderado,
+  horaPico,
+} = useGenerationCorrelation()
+
+const hoy = new Date()
+const corrFecha = ref(new Date())
+const corrCargado = ref(false)
+
+function ymd(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function cargarCorrelacion() {
+  if (!corrFecha.value) return
+  corrCargado.value = true
+  fetchCorrelationData(ymd(corrFecha.value))
+}
+
+// La correlación lanza una petición por proyecto: solo la disparamos al abrir la pestaña.
+watch(activeTab, (t) => {
+  if (t === 1 && !corrCargado.value) cargarCorrelacion()
+})
+watch(corrFecha, () => {
+  if (activeTab.value === 1) cargarCorrelacion()
+})
+
+const corrKpis = computed(() => {
+  const gen = generacionTotalKwh.value
+  const ppp = precioPromedioPonderado.value
+  return [
+    { label: 'Ingreso bruto estimado', value: fmtCompact(ingresoBruto.value), color: '#10B981' },
+    { label: 'Generación total', value: gen > 0 ? `${(gen / 1000).toFixed(2)} MWh` : '—', color: '#3B82F6' },
+    { label: 'Precio prom. ponderado', value: ppp != null ? `$${ppp.toFixed(1)}` : '—', color: '#E8833A' },
+    { label: 'Hora pico de generación', value: hayGeneracion.value ? horaPico.value.hora_label : '—', color: '#915BD8' },
+  ]
 })
 
 const spotKpis = computed(() => {
