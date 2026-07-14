@@ -107,7 +107,14 @@ const CONCURRENCIA_MOVIMIENTOS = 6
  * @returns {number} Cuántas garantías quedaron sin saldo verificado.
  */
 async function hidratarSaldosVivos(items) {
-  const relevantes = items.filter((g) => g?.id != null && ESTADOS_QUE_RESPALDAN.has(g.estado))
+  // Si el backend ya trae saldo_vivo_cop en el list (rama garantias-saldo-vivo),
+  // no hay nada que hidratar: mismo criterio de último movimiento, cero
+  // peticiones extra. Este camino cliente queda de fallback.
+  const relevantes = items.filter((g) =>
+    g?.id != null &&
+    ESTADOS_QUE_RESPALDAN.has(g.estado) &&
+    !(g.saldo_vivo_cop != null && Number.isFinite(Number(g.saldo_vivo_cop)))
+  )
   let noVerificados = 0
   for (let i = 0; i < relevantes.length; i += CONCURRENCIA_MOVIMIENTOS) {
     const lote = relevantes.slice(i, i + CONCURRENCIA_MOVIMIENTOS)
