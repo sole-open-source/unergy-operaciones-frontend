@@ -43,17 +43,42 @@ export const TIPO_ALERTA = {
 // Estados en los que la garantía EFECTIVAMENTE respalda obligaciones ante XM.
 // `liberada` ya se devolvió, `vencida` no respalda y `en_proceso` aún no se
 // constituye → ninguna aporta saldo.
-const ESTADOS_QUE_RESPALDAN = new Set(['vigente', 'en_renovacion'])
+export const ESTADOS_QUE_RESPALDAN = new Set(['vigente', 'en_renovacion'])
 
 const _num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0)
 
 /**
+ * Saldo VIVO de una garantía a partir de sus movimientos.
+ *
+ * El backend nunca actualiza `valor_cop` con los movimientos: el saldo corriente
+ * vive solo en `saldo_posterior_cop` del ÚLTIMO movimiento (POST /movimientos lo
+ * siembra desde `valor_cop` y lo va arrastrando). El último se elige igual que
+ * el backend: `fecha` desc y, a igual fecha, `id` desc.
+ *
+ * @param {object[]} movimientos  Items de GET /garantias/{id}/movimientos.
+ * @returns {number|null} COP, o `null` si no hay movimientos con saldo (usar `valor_cop`).
+ */
+export function saldoVivoDesdeMovimientos(movimientos) {
+  const conSaldo = (movimientos || []).filter(
+    (m) => m && m.saldo_posterior_cop != null && Number.isFinite(Number(m.saldo_posterior_cop))
+  )
+  if (!conSaldo.length) return null
+  conSaldo.sort((a, b) => {
+    const f = String(b.fecha || '').localeCompare(String(a.fecha || ''))
+    return f !== 0 ? f : (_num(b.id) - _num(a.id))
+  })
+  return Number(conSaldo[0].saldo_posterior_cop)
+}
+
+/**
  * Saldo efectivo de UNA garantía: lo que realmente respalda hoy.
  *
- * Es `valor_cop` cuando la garantía está vigente y no ha vencido; 0 en cualquier
- * otro caso. NO se le restan los movimientos: el backend ya los aplica sobre
- * `valor_cop` (cada movimiento trae su `saldo_posterior_cop`), así que restarlos
- * otra vez los contaría doble y subestimaría la cobertura.
+ * Prefiere `saldo_vivo_cop` (el saldo tras los movimientos, que el composable
+ * inyecta desde GET /garantias/{id}/movimientos). Solo sin movimientos cae a
+ * `valor_cop`, que es el valor CONSTITUIDO: el backend jamás lo actualiza al
+ * registrar una ejecución de XM, así que usarlo con movimientos encima
+ * sobreestimaría la cobertura y escondería proyectos críticos.
+ * 0 si la garantía no respalda (estado o vencimiento).
  *
  * @returns {number} COP (≥ 0).
  */
@@ -62,7 +87,8 @@ export function saldoEfectivoGarantia(garantia, hoy = new Date()) {
   if (!ESTADOS_QUE_RESPALDAN.has(garantia.estado)) return 0
   const dias = diasHastaVencimiento(garantia.fecha_vencimiento, hoy)
   if (dias != null && dias < 0) return 0   // venció, aunque el estado no se haya actualizado
-  const valor = _num(garantia.valor_cop)
+  const vivo = garantia.saldo_vivo_cop
+  const valor = (vivo != null && Number.isFinite(Number(vivo))) ? Number(vivo) : _num(garantia.valor_cop)
   return valor > 0 ? valor : 0
 }
 

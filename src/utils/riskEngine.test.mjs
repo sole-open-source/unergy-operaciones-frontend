@@ -23,9 +23,9 @@ const src = [leer('financialCalculations.js'), leer('riskEngine.js')]
 
 const api = new Function(src + `
 return {
-  calculateRisk, saldoEfectivoGarantia, nivelPorCobertura, agruparGarantiasPorProyecto,
-  alertasAccionables, calculateExposure, diasHastaVencimiento, formatFechaVencimiento,
-  NIVEL, TIPO_ALERTA, DIAS_VENCIMIENTO_PROXIMO,
+  calculateRisk, saldoEfectivoGarantia, saldoVivoDesdeMovimientos, nivelPorCobertura,
+  agruparGarantiasPorProyecto, alertasAccionables, calculateExposure, diasHastaVencimiento,
+  formatFechaVencimiento, NIVEL, TIPO_ALERTA, DIAS_VENCIMIENTO_PROXIMO, ESTADOS_QUE_RESPALDAN,
 };`)()
 
 const HOY = new Date(2026, 6, 14)   // 2026-07-14, fecha fija → pruebas deterministas
@@ -100,6 +100,60 @@ test('saldoEfectivoGarantia: fecha vencida → 0 aunque el estado siga "vigente"
 
 test('saldoEfectivoGarantia: vence HOY todavía respalda', () => {
   assert.equal(api.saldoEfectivoGarantia(garantia({ fecha_vencimiento: enDias(0) }), HOY), 100_000_000)
+})
+
+// ── Saldo vivo (movimientos aplicados) ──────────────────────────────────────
+
+test('saldoEfectivoGarantia: con saldo_vivo_cop lo usa, NO valor_cop (una ejecución XM baja la cobertura)', () => {
+  const ejecutada = garantia({ saldo_vivo_cop: 30_000_000 })   // valor_cop sigue en 100M
+  assert.equal(api.saldoEfectivoGarantia(ejecutada, HOY), 30_000_000)
+})
+
+test('saldoEfectivoGarantia: saldo_vivo_cop = 0 es 0, no cae a valor_cop (no esconder críticos)', () => {
+  assert.equal(api.saldoEfectivoGarantia(garantia({ saldo_vivo_cop: 0 }), HOY), 0)
+})
+
+test('saldoEfectivoGarantia: saldo_vivo_cop negativo → 0 (no restar cobertura a otros proyectos)', () => {
+  assert.equal(api.saldoEfectivoGarantia(garantia({ saldo_vivo_cop: -5_000_000 }), HOY), 0)
+})
+
+test('saldoEfectivoGarantia: sin saldo_vivo_cop cae a valor_cop (garantía sin movimientos)', () => {
+  assert.equal(api.saldoEfectivoGarantia(garantia({ saldo_vivo_cop: null }), HOY), 100_000_000)
+  assert.equal(api.saldoEfectivoGarantia(garantia({ saldo_vivo_cop: 'no-num' }), HOY), 100_000_000)
+})
+
+test('saldoVivoDesdeMovimientos: toma el saldo del ÚLTIMO movimiento (fecha desc, id desc como el backend)', () => {
+  const movs = [
+    { id: 1, fecha: '2026-07-01', saldo_posterior_cop: 80_000_000 },
+    { id: 3, fecha: '2026-07-10', saldo_posterior_cop: 30_000_000 },
+    { id: 2, fecha: '2026-07-05', saldo_posterior_cop: 55_000_000 },
+  ]
+  assert.equal(api.saldoVivoDesdeMovimientos(movs), 30_000_000)
+  // Empate de fecha → decide el id más alto (mismo criterio del backend al crear).
+  const empate = [
+    { id: 7, fecha: '2026-07-10', saldo_posterior_cop: 10_000_000 },
+    { id: 9, fecha: '2026-07-10', saldo_posterior_cop: 5_000_000 },
+  ]
+  assert.equal(api.saldoVivoDesdeMovimientos(empate), 5_000_000)
+})
+
+test('saldoVivoDesdeMovimientos: sin movimientos con saldo → null (el motor usará valor_cop)', () => {
+  assert.equal(api.saldoVivoDesdeMovimientos([]), null)
+  assert.equal(api.saldoVivoDesdeMovimientos(null), null)
+  assert.equal(api.saldoVivoDesdeMovimientos([{ id: 1, fecha: '2026-07-01', saldo_posterior_cop: null }]), null)
+})
+
+test('calculateRisk: la ejecución de XM aflora el CRÍTICO que valor_cop escondía', () => {
+  const r = api.calculateRisk({
+    garantias: [garantia({ saldo_vivo_cop: 40_000_000 })],   // constituida 100M, ejecutada a 40M
+    paneles: [panel(1, 90_000_000)],
+    hoy: HOY,
+  })
+  const p = r.proyectos[0]
+  assert.equal(p.saldo_efectivo_cop, 40_000_000)
+  assert.equal(p.nivel, api.NIVEL.CRITICO)                   // 44 % < 80 %
+  assert.equal(p.deficit_cop, 50_000_000)
+  assert.equal(p.valor_garantias_cop, 100_000_000)           // el nominal constituido se sigue mostrando
 })
 
 // ── Umbrales del ratio ───────────────────────────────────────────────────────
