@@ -60,6 +60,25 @@
         <Column header="Valor a pagar" style="width:130px">
           <template #body="{ data }"><span class="font-mono text-xs font-semibold" style="color:#915BD8">{{ fmtCompact(data.valor_a_pagar_total) }}</span></template>
         </Column>
+        <!-- Cobertura de garantía: permite ver el riesgo AL MOMENTO de procesar la
+             liquidación, sin salir a la vista de Garantías. -->
+        <Column header="Cobertura garantía" style="width:150px">
+          <template #body="{ data }">
+            <div v-if="riesgoDe(data)" class="flex items-center gap-1.5">
+              <span class="font-mono text-xs" style="color:#2C2039">
+                {{ fmtCompact(riesgoDe(data).saldo_efectivo_cop) }}
+              </span>
+              <i v-if="coberturaInsuficiente(data)" class="pi pi-exclamation-triangle text-xs"
+                 :style="{ color: NIVEL_COLOR[riesgoDe(data).nivel] }"
+                 v-tooltip.top="tooltipCobertura(data)" />
+              <i v-else-if="riesgoDe(data).cobertura_pct != null" class="pi pi-check-circle text-xs"
+                 style="color:#10B981"
+                 v-tooltip.top="`Cobertura ${riesgoDe(data).cobertura_pct.toFixed(0)}% de la exposición ante XM`" />
+            </div>
+            <span v-else-if="riesgoLoading" class="text-xs" style="color:#c4b8d4">…</span>
+            <span v-else class="text-xs" style="color:#9b8fb0">—</span>
+          </template>
+        </Column>
         <Column header="" style="width:56px">
           <template #body="{ data }">
             <Button v-if="data.liquidacion_id" icon="pi pi-eye" text rounded size="small"
@@ -143,6 +162,8 @@ import { useToast } from 'primevue/usetoast'
 import api from '@/api/client'
 import { proyectoActivoEnMes } from '@/utils/proyectoActivo'
 import { fmtCompact, formatPeriodo, estadoFlujoPanel } from '@/utils/liquidaciones'
+import { useRiesgoVivo } from '@/composables/useRiesgoVivo'
+import { NIVEL, NIVEL_COLOR } from '@/utils/riskEngine'
 
 const props = defineProps({
   embedded: { type: Boolean, default: false },
@@ -202,6 +223,37 @@ async function load() {
 }
 
 watch([() => props.periodo, () => props.tipo], load)
+
+// ─── Cobertura de garantía (Riesgo Vivo) ──────────────────────────────────────
+// Cruza cada proyecto del panel con sus garantías para advertir, al procesar la
+// liquidación, si la exposición ante XM del período NO está respaldada.
+const {
+  loading: riesgoLoading,
+  porProyecto: riesgoPorProyecto,
+  cargar: cargarRiesgo,
+} = useRiesgoVivo()
+
+const riesgoDe = (row) => (row?.proyecto_id != null ? riesgoPorProyecto.value.get(row.proyecto_id) || null : null)
+
+/** Insuficiente = la garantía no alcanza a cubrir la exposición (<100%). */
+function coberturaInsuficiente(row) {
+  const r = riesgoDe(row)
+  if (!r || r.cobertura_pct == null) return false
+  return r.nivel === NIVEL.CRITICO || r.nivel === NIVEL.ADVERTENCIA
+}
+
+function tooltipCobertura(row) {
+  const r = riesgoDe(row)
+  if (!r) return ''
+  if (r.sin_garantia) return 'Sin garantía vigente que respalde la exposición ante XM'
+  // A exactamente 100 % la garantía sí alcanza, pero no deja margen: avisar sin
+  // llamarla "insuficiente" (sería contradictorio con el propio número).
+  if (r.cobertura_pct >= 100) return 'Cobertura justa (100%): sin margen ante variaciones de la exposición'
+  return `Cobertura insuficiente (${r.cobertura_pct.toFixed(0)}% < 100%) de la exposición ante XM`
+}
+
+// El riesgo se calcula sobre el MISMO período que muestra la tabla.
+watch(() => props.periodo, (p) => { if (p) cargarRiesgo(p) })
 
 // ─── Nueva liquidación (detalle operativo) ────────────────────────────────────
 const dialogNueva = ref(false)
@@ -281,6 +333,7 @@ async function crearDesdeProyecto(row) {
 onMounted(() => {
   load()
   loadProyectosOpciones()
+  if (props.periodo) cargarRiesgo(props.periodo)
 })
 </script>
 

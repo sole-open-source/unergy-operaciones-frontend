@@ -106,3 +106,78 @@ export function formatMWh(value) {
   if (value == null || !Number.isFinite(Number(value))) return '—'
   return `${Number(value).toLocaleString('es-CO', { maximumFractionDigits: 1 })} MWh`
 }
+
+// ── Exposición ante XM y fechas de vencimiento ──────────────────────────────
+// Usado por el motor de Riesgo Vivo (riskEngine.js) para cruzar garantías
+// contra lo que el proyecto le debe al mercado en el período.
+
+const MS_DIA = 86400000
+
+/**
+ * Parsea una fecha "YYYY-MM-DD" (o Date) a medianoche LOCAL.
+ * `new Date('2026-07-14')` se interpreta como UTC y en Colombia (UTC-5) retrocede
+ * al día anterior, corriendo los "días restantes" en 1. Por eso se parsea a mano.
+ * @returns {Date|null} null si la entrada es vacía o inválida.
+ */
+export function parseFechaLocal(value) {
+  if (!value) return null
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(value))
+  if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+  const d = new Date(value)
+  return Number.isNaN(d.getTime()) ? null : d
+}
+
+/**
+ * Días calendario que faltan para `fecha`, contados desde `hoy` (por defecto, ahora).
+ * Negativo → ya venció. Se comparan días completos, no horas.
+ * @returns {number|null} null si no hay fecha o es inválida.
+ */
+export function diasHastaVencimiento(fecha, hoy = new Date()) {
+  const f = parseFechaLocal(fecha)
+  if (!f) return null
+  const ref = parseFechaLocal(hoy) || new Date()
+  const a = new Date(f.getFullYear(), f.getMonth(), f.getDate())
+  const b = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate())
+  return Math.round((a - b) / MS_DIA)
+}
+
+/** Fecha de vencimiento legible: "14 jul 2026". Null / inválida → "—". */
+export function formatFechaVencimiento(fecha) {
+  const f = parseFechaLocal(fecha)
+  if (!f) return '—'
+  return f.toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })
+}
+
+/**
+ * Exposición ante XM de un proyecto en un período: lo que el proyecto le debe al
+ * mercado y que la garantía respalda.
+ *
+ * Recibe una fila de proyecto de `GET /liquidaciones/resumen-panel` (el mismo
+ * insumo que usan las demás vistas del módulo; no existe un `GET /liquidaciones`
+ * plano). La exposición es el grupo de COMERCIALIZACIÓN — comercialización,
+ * ajuste de comercialización y compras en bolsa (ver TIPOS_COMERCIALIZACION en
+ * constants/liquidaciones.js) —, que es la deuda con el mercado. Los OPEX y las
+ * facturas de servicio se pagan a terceros, NO a XM, y por eso no se incluyen.
+ *
+ * `grupos_totales` solo viene desglosado por inversionista, así que se suma sobre
+ * ellos. Si el panel no trae el desglose, se cae a `costos_cop` (sobreestima la
+ * exposición: es el lado conservador para una alerta de riesgo).
+ *
+ * @param {object} panel Fila de proyecto de /liquidaciones/resumen-panel.
+ * @returns {number} Exposición en COP (siempre ≥ 0; 0 si no hay datos).
+ */
+export function calculateExposure(panel) {
+  if (!panel) return 0
+  const inversionistas = Array.isArray(panel.inversionistas) ? panel.inversionistas : []
+  let xm = 0
+  let hayDesglose = false
+  for (const inv of inversionistas) {
+    const g = inv?.grupos_totales
+    if (!g || g.comercializacion == null) continue
+    hayDesglose = true
+    xm += Math.abs(toNum(g.comercializacion))
+  }
+  if (hayDesglose) return xm
+  return Math.abs(toNum(panel.costos_cop))
+}

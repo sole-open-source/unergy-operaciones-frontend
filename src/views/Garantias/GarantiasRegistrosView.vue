@@ -151,6 +151,25 @@
               <span v-else style="color: #6b5a8a;">—</span>
             </template>
           </Column>
+          <!-- Cobertura XM: CALCULADA contra la liquidación del período (saldo efectivo /
+               exposición). No confundir con "Cobertura", que es la declarada en el contrato. -->
+          <Column style="min-width: 120px; text-align: center;">
+            <template #header>
+              <span class="flex items-center gap-1">
+                Cobertura XM
+                <i class="pi pi-info-circle text-xs" style="color:#9b8fb0;"
+                   v-tooltip.top="'Saldo efectivo de las garantías del proyecto ÷ exposición ante XM del período actual'" />
+              </span>
+            </template>
+            <template #body="{ data: g }">
+              <Tag v-if="riesgoDe(g)?.cobertura_pct != null"
+                   :value="`${riesgoDe(g).cobertura_pct.toFixed(0)}%`"
+                   :severity="nivelSeverity(riesgoDe(g).nivel)" />
+              <span v-else-if="riesgoLoading" style="color: #c4b8d4;">…</span>
+              <span v-else style="color: #6b5a8a;"
+                    v-tooltip.top="'Sin exposición ante XM en el período actual'">n/a</span>
+            </template>
+          </Column>
           <Column field="fecha_vencimiento" header="Vencimiento" style="min-width: 140px">
             <template #body="{ data: g }">
               <template v-if="g.fecha_vencimiento">
@@ -169,9 +188,14 @@
               <Tag :value="ESTADO_LABELS[g.estado] || g.estado" :severity="estadoSeverity(g.estado)" />
             </template>
           </Column>
-          <Column style="width: 80px; text-align: center;">
+          <Column style="width: 110px; text-align: center;">
             <template #body="{ data: g }">
-              <Button icon="pi pi-eye" text rounded size="small" @click="openDetail(g)" />
+              <Button icon="pi pi-eye" text rounded size="small" v-tooltip.left="'Ver garantía'" @click="openDetail(g)" />
+              <Button icon="pi pi-chart-line" text rounded size="small"
+                      :disabled="!riesgoDe(g)"
+                      v-tooltip.left="'Ver detalle de riesgo'"
+                      :style="riesgoDe(g) ? { color: NIVEL_COLOR[riesgoDe(g).nivel] } : null"
+                      @click="openRiesgo(g)" />
             </template>
           </Column>
         </DataTable>
@@ -332,6 +356,9 @@
       </template>
     </Dialog>
 
+    <!-- Detalle de riesgo (compartido con la vista de Riesgo Vivo) -->
+    <RiesgoDetalleDialog v-model:visible="showRiesgo" :riesgo="riesgoSeleccionado" :periodo="riesgoPeriodo" />
+
     <!-- Create/Edit Dialog -->
     <Dialog v-model:visible="showCreate" :header="editingId ? 'Editar Garantía' : 'Nueva Garantía'" modal class="w-full max-w-lg">
       <form @submit.prevent="saveGarantia" class="space-y-4">
@@ -427,6 +454,9 @@ import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import Textarea from 'primevue/textarea'
 import DatePicker from 'primevue/datepicker'
+import RiesgoDetalleDialog from '@/views/Riesgo/RiesgoDetalleDialog.vue'
+import { useRiesgoVivo } from '@/composables/useRiesgoVivo'
+import { nivelSeverity, NIVEL_COLOR } from '@/utils/riskEngine'
 
 const auth = useAuthStore()
 const toast = useToast()
@@ -552,6 +582,29 @@ function openDetail(g) {
   showDetail.value = true
 }
 
+// ── Riesgo Vivo: cobertura de cada garantía frente a la exposición ante XM ───
+// El cruce es a nivel PROYECTO (varias garantías pueden respaldar el mismo), así
+// que todas las filas de un proyecto muestran la misma cobertura.
+const {
+  loading: riesgoLoading,
+  periodo: riesgoPeriodo,
+  porProyecto: riesgoPorProyecto,
+  cargar: cargarRiesgo,
+} = useRiesgoVivo()
+
+const showRiesgo = ref(false)
+const riesgoSeleccionado = ref(null)
+
+function riesgoDe(g) {
+  if (g?.proyecto_id == null) return null
+  return riesgoPorProyecto.value.get(g.proyecto_id) || null
+}
+
+function openRiesgo(g) {
+  riesgoSeleccionado.value = riesgoDe(g)
+  if (riesgoSeleccionado.value) showRiesgo.value = true
+}
+
 function openCreate() {
   editingId.value = null
   form.value = defaultForm()
@@ -675,5 +728,8 @@ watch(showCreate, (v) => {
   if (!v) { editingId.value = null; form.value = defaultForm() }
 })
 
-onMounted(loadData)
+onMounted(() => {
+  loadData()
+  cargarRiesgo()   // en paralelo: la tabla se pinta sin esperar el cruce con XM
+})
 </script>

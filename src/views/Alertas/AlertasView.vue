@@ -17,6 +17,33 @@
       </div>
     </div>
 
+    <!-- Riesgo de liquidez: crítico o por vencer. Cada fila enlaza a su proyecto. -->
+    <div v-if="accionables.length" class="rounded-xl overflow-hidden" style="border: 2px solid #D64455;">
+      <div class="px-4 py-2 flex items-center gap-2" style="background: #D64455;">
+        <i class="pi pi-chart-line text-white text-sm" />
+        <span class="text-sm font-bold text-white">Riesgo de liquidez</span>
+        <span class="text-xs text-white/80 ml-auto">Cobertura crítica o garantía por vencer</span>
+      </div>
+      <div class="divide-y" style="background: #FEF2F2;">
+        <RouterLink v-for="(a, i) in accionables" :key="`${a.tipo}-${a.proyecto_id}-${i}`"
+          :to="linkRiesgo(a)"
+          class="flex items-center justify-between gap-3 px-4 py-3 text-sm transition-colors hover:bg-white/60">
+          <div class="min-w-0">
+            <span class="font-semibold" style="color: #2C2039;">{{ a.proyecto_nombre }}</span>
+            <p class="text-xs" style="color: #6b5a8a;">{{ a.mensaje }}</p>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <Tag v-if="a.tipo === TIPO_ALERTA.VENCIMIENTO_PROXIMO"
+                 :severity="a.dias_para_vencimiento <= 7 ? 'danger' : 'warn'"
+                 :value="`${a.dias_para_vencimiento}d`" />
+            <Tag v-else :severity="nivelSeverity(a.nivel)"
+                 :value="a.deficit_cop > 0 ? `-${formatCurrencyCompact(a.deficit_cop)}` : `${(a.cobertura_pct ?? 0).toFixed(0)}%`" />
+            <i class="pi pi-angle-right text-xs" style="color: #9b8fb0;" />
+          </div>
+        </RouterLink>
+      </div>
+    </div>
+
     <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
       <RouterLink
         v-for="mod in MODULOS"
@@ -46,7 +73,11 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
+import Tag from 'primevue/tag'
 import api from '@/api/client'
+import { useRiesgoVivo } from '@/composables/useRiesgoVivo'
+import { TIPO_ALERTA, nivelSeverity } from '@/utils/riskEngine'
+import { formatCurrencyCompact } from '@/utils/financialCalculations'
 
 const kpis = ref({})
 const ppaAlerts = ref({ huerfanos: [], duplicados: [] })
@@ -86,6 +117,14 @@ const summaryStats = computed(() => {
       valueColor: '#CA8A04',
       labelColor: '#6b5a8a',
     },
+    {
+      label: 'Riesgo de liquidez',
+      value: accionables.value.length,
+      bg: accionables.value.length > 0 ? 'rgba(214,68,85,0.05)' : 'rgba(16,185,129,0.05)',
+      borderColor: accionables.value.length > 0 ? 'rgba(214,68,85,0.2)' : 'rgba(16,185,129,0.2)',
+      valueColor: accionables.value.length > 0 ? '#D64455' : '#10B981',
+      labelColor: '#6b5a8a',
+    },
   ]
 })
 
@@ -122,9 +161,26 @@ const MODULOS = computed(() => [
     color: '#CA8A04',
     count: kpis.value.garantias_por_vencer || 0,
   },
+  {
+    to: '/riesgo',
+    label: 'Riesgo de Liquidez',
+    desc: 'Cobertura de garantías frente a la exposición ante XM',
+    icon: 'pi pi-chart-line',
+    color: '#D64455',
+    count: accionables.value.length,
+  },
 ])
 
+// ── Riesgo de Liquidez ───────────────────────────────────────────────────────
+// Solo lo accionable: cobertura CRÍTICA o garantía por vencer (ver riskEngine).
+// Las de nivel ADVERTENCIA se ven completas en /riesgo, no compiten aquí por atención.
+const { accionables, cargar: cargarRiesgo } = useRiesgoVivo()
+
+/** Enlace directo al proyecto dentro de la vista de Riesgo Vivo. */
+const linkRiesgo = (a) => `/riesgo?proyecto_id=${a.proyecto_id}`
+
 onMounted(async () => {
+  cargarRiesgo()   // en paralelo: el resto del centro de alertas no lo espera
   try {
     const [kpiRes, ppaRes] = await Promise.all([
       api.get('/dashboard/kpis').catch(() => null),

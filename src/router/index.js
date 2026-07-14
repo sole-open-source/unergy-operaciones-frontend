@@ -63,6 +63,7 @@ const routes = [
   { path: '/liquidaciones/:id',           name: 'LiquidacionDetalle',         component: () => import('@/views/Liquidaciones/LiquidacionDetailView.vue'),           meta: { roles: ['admin', 'liquidaciones'] } },
   { path: '/liquidaciones/:id/pdf',       name: 'LiquidacionPdf',             component: () => import('@/views/Liquidaciones/LiquidacionPdfView.vue'),              meta: { roles: ['admin', 'liquidaciones'] } },
   { path: '/garantias',                   name: 'Garantias',                  component: () => import('@/views/Garantias/GarantiasView.vue'),                       meta: { roles: ['admin', 'liquidaciones'] } },
+  { path: '/riesgo',                      name: 'RiesgoLiquidez',             component: () => import('@/views/Riesgo/RiesgoLiquidezView.vue'),                     meta: { roles: ['admin', 'liquidaciones'] } },
 
   // ── MEM ──────────────────────────────────────────────────────────
   { path: '/mem/gescon',       name: 'MemGescon',       component: () => import('@/views/MEM/GesconView.vue'),        meta: { roles: ['admin', 'operaciones'] } },
