@@ -18,10 +18,6 @@
         <InputText v-model="f.representante_legal" class="w-full" />
       </div>
       <div>
-        <label class="field-label">Correo</label>
-        <InputText v-model="f.correo_electronico" type="email" class="w-full" />
-      </div>
-      <div>
         <label class="field-label">Teléfono</label>
         <InputText v-model="f.telefono_contacto" class="w-full" />
       </div>

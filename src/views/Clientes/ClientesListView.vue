@@ -17,7 +17,6 @@
         <Column field="nit_cedula" header="NIT / Cédula" />
         <Column field="tipo_persona" header="Tipo" />
         <Column field="ciudad" header="Ciudad" />
-        <Column field="correo_electronico" header="Correo" />
         <Column header="Acciones" style="width: 120px">
           <template #body="{ data }">
             <Button icon="pi pi-eye" text rounded size="small" v-tooltip.top="'Ver detalle'" @click="$router.push(`/clientes/${data.id}`)" />
