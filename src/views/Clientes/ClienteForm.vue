@@ -22,12 +22,13 @@
         <InputText v-model="f.telefono_contacto" class="w-full" />
       </div>
       <div>
-        <label class="field-label">Ciudad</label>
-        <InputText v-model="f.ciudad" class="w-full" />
+        <label class="field-label">Departamento</label>
+        <Select v-model="f.departamento" :options="departamentos" class="w-full" placeholder="Seleccionar" showClear filter />
       </div>
       <div>
-        <label class="field-label">Departamento</label>
-        <InputText v-model="f.departamento" class="w-full" />
+        <label class="field-label">Ciudad</label>
+        <Select v-model="f.ciudad" :options="ciudadesDisponibles" class="w-full" placeholder="Seleccionar" showClear filter
+          :disabled="!f.departamento" />
       </div>
       <div class="col-span-2">
         <label class="field-label">Dirección</label>
@@ -84,32 +85,28 @@
       <!-- ── Contactos y Servicios (solo al crear) ── -->
       <div v-if="esNuevo" class="col-span-2">
         <div class="border-t pt-4 mt-1">
-          <p class="text-xs font-semibold uppercase tracking-wide mb-3" style="color: #915BD8;">Contactos</p>
+          <div class="flex items-center justify-between mb-3">
+            <p class="text-xs font-semibold uppercase tracking-wide" style="color: #915BD8;">Contactos</p>
+            <button type="button" @click="agregarContacto"
+              class="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
+              style="background:#915BD8;color:#fff;">
+              <i class="pi pi-plus text-xs" /> Agregar
+            </button>
+          </div>
           <div class="rounded-xl p-4 space-y-3" style="background:#f9f7ff;border:1.5px solid #e8e0f0;">
-            <div class="flex items-center justify-between">
-              <p class="text-xs" style="color:#9b89b5;">Al menos un contacto con correo (opcional, se puede agregar después).</p>
-              <button type="button" @click="agregarContacto"
-                class="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
-                style="background:#915BD8;color:#fff;">
-                <i class="pi pi-plus text-xs" /> Agregar
-              </button>
-            </div>
-
             <div v-if="!f.contactos.length" class="text-xs italic py-1" style="color:#c4b3df;">
               Sin contactos agregados
             </div>
 
-            <div v-for="(c, idx) in f.contactos" :key="idx" class="grid grid-cols-4 gap-2 items-start">
-              <InputText v-model="c.nombre" placeholder="Nombre" class="w-full" size="small" />
-              <InputText v-model="c.telefono" placeholder="Teléfono" class="w-full" size="small" />
-              <InputText v-model="c.email" type="email" placeholder="Correo *" class="w-full" size="small" />
-              <div class="flex items-center gap-1">
-                <Select v-model="c.tipo" :options="TIPOS_CONTACTO" optionLabel="label" optionValue="value"
-                  class="w-full" size="small" />
-                <button type="button" @click="eliminarContacto(idx)" class="p-1.5 rounded-lg hover:bg-red-50">
-                  <i class="pi pi-trash text-xs" style="color:#ef4444;" />
-                </button>
-              </div>
+            <div v-for="(c, idx) in f.contactos" :key="idx" class="flex items-center gap-2">
+              <InputText v-model="c.nombre" placeholder="Nombre" class="flex-1 min-w-0" size="small" />
+              <InputText v-model="c.telefono" placeholder="Teléfono" class="flex-1 min-w-0" size="small" />
+              <InputText v-model="c.email" type="email" placeholder="Correo *" class="flex-1 min-w-0" size="small" />
+              <Select v-model="c.tipo" :options="TIPOS_CONTACTO" optionLabel="label" optionValue="value"
+                class="w-40 shrink-0" size="small" />
+              <button type="button" @click="eliminarContacto(idx)" class="p-1.5 rounded-lg hover:bg-red-50 shrink-0">
+                <i class="pi pi-trash text-xs" style="color:#ef4444;" />
+              </button>
             </div>
           </div>
         </div>
@@ -139,6 +136,7 @@ import Select from 'primevue/select'
 import MultiSelect from 'primevue/multiselect'
 import Dropdown from 'primevue/dropdown'
 import Button from 'primevue/button'
+import divipola from '@/data/colombia-divipola.json'
 
 const ORIGENES = [
   { label: 'Prospección propia', value: 'prospeccion_propia' },
@@ -174,6 +172,16 @@ function emailValido(e) { return !e || EMAIL_RE.test(e.trim()) }
 
 const f = reactive({ origen_tipo: null, origen_detalle: '', ...props.initial, contactos: [] })
 const serviciosSeleccionados = ref([])
+
+// Departamento/ciudad -- select en vez de texto libre (DIVIPOLA), mismo
+// patrón que ProyectoForm, para evitar variantes de escritura.
+const departamentos = Object.keys(divipola).sort()
+const ciudadesDisponibles = computed(() => f.departamento ? (divipola[f.departamento] || []) : [])
+watch(() => f.departamento, (nuevo, anterior) => {
+  if (nuevo !== anterior && f.ciudad && !(divipola[nuevo] || []).includes(f.ciudad)) {
+    f.ciudad = null
+  }
+})
 watch(() => props.initial, (v) => { Object.assign(f, v) }, { deep: true })
 
 function agregarContacto()   { f.contactos = [...f.contactos, { nombre: '', telefono: '', email: '', tipo: 'comercial' }] }
