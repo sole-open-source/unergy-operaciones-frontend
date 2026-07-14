@@ -12,6 +12,16 @@
       <Column header="Tipo">
         <template #body="{ data }">{{ labelTipo(data.tipo) }}</template>
       </Column>
+      <Column header="Servicios buscados">
+        <template #body="{ data }">
+          <template v-if="data.detalle && data.detalle.servicios && data.detalle.servicios.length">
+            <span v-for="s in data.detalle.servicios" :key="s"
+                  class="inline-block bg-blue-50 text-blue-700 rounded px-1.5 py-0.5 mr-1 mb-1 text-xs">{{ s }}</span>
+          </template>
+          <span v-else class="text-gray-400">—</span>
+          <div v-if="data.detalle && data.detalle.fpo" class="text-xs text-gray-400 mt-1">FPO: {{ data.detalle.fpo }}</div>
+        </template>
+      </Column>
       <Column field="numero_oferta" header="Nº oferta">
         <template #body="{ data }">{{ data.numero_oferta || '—' }}</template>
       </Column>
