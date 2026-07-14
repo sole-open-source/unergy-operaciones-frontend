@@ -50,12 +50,17 @@
               <Tag :value="TIPO_LABELS[g.tipo] || g.tipo" severity="secondary" />
               <span class="truncate" style="color: #6b5a8a;">{{ g.entidad || 'Sin entidad' }}</span>
               <Tag v-if="!respalda(g)" value="No respalda" severity="danger"
-                   v-tooltip.top="'Vencida, liberada o aún en proceso: no suma al saldo efectivo'" />
+                   v-tooltip.top="'Vencida, liberada, aún en proceso o ejecutada por completo: no suma al saldo efectivo'" />
             </div>
             <div class="text-right shrink-0">
               <span class="font-semibold tabular-nums" :style="{ color: respalda(g) ? '#2C2039' : '#9b8fb0' }">
-                {{ formatCurrency(g.valor_cop) }}
+                {{ formatCurrency(g.saldo_vivo_cop ?? g.valor_cop) }}
               </span>
+              <p v-if="g.saldo_vivo_cop != null && Number(g.saldo_vivo_cop) !== Number(g.valor_cop)"
+                 class="text-[11px]" style="color: #9b8fb0;"
+                 v-tooltip.left="'Saldo tras los movimientos (ejecuciones, depósitos); la garantía se constituyó por el valor indicado'">
+                constituida {{ formatCurrency(g.valor_cop) }}
+              </p>
               <p class="text-[11px]" style="color: #6b5a8a;">
                 Vence {{ formatFechaVencimiento(g.fecha_vencimiento) }}
               </p>

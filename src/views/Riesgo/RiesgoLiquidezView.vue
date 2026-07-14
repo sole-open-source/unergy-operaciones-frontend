@@ -26,6 +26,13 @@
       <i class="pi pi-exclamation-triangle mr-2" />{{ error }}
     </div>
 
+    <div v-if="!loading && saldosNoVerificados > 0" class="rounded-xl p-4 text-sm"
+         style="background:#FFFBEB; border:1px solid rgba(202,138,4,0.35); color:#92700A;">
+      <i class="pi pi-exclamation-triangle mr-2" />No se pudo verificar el saldo vivo de
+      {{ saldosNoVerificados }} garantía(s): se muestra su valor constituido y la cobertura
+      puede estar sobreestimada. Recarga para reintentar.
+    </div>
+
     <ProgressSpinner v-if="loading" class="block mx-auto my-10" />
 
     <template v-else>
@@ -109,12 +116,12 @@
             </template>
           </Column>
 
-          <Column field="saldo_efectivo_cop" header="Valor garantía" sortable style="min-width: 140px">
+          <Column field="saldo_efectivo_cop" header="Saldo efectivo" sortable style="min-width: 140px">
             <template #body="{ data: p }">
               <span class="font-semibold tabular-nums" style="color: #2C2039;">{{ formatCurrency(p.saldo_efectivo_cop) }}</span>
               <p v-if="p.valor_garantias_cop > p.saldo_efectivo_cop" class="text-[10px]" style="color: #9b8fb0;"
-                 v-tooltip.bottom="'Incluye garantías vencidas o liberadas que ya no respaldan'">
-                nominal {{ formatCurrencyCompact(p.valor_garantias_cop) }}
+                 v-tooltip.bottom="'Valor constituido: el saldo efectivo descuenta ejecuciones y movimientos, y excluye garantías vencidas o liberadas'">
+                constituido {{ formatCurrencyCompact(p.valor_garantias_cop) }}
               </p>
             </template>
           </Column>
@@ -198,7 +205,7 @@ import { formatPeriodo, mesActualISO } from '@/utils/liquidaciones'
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 
 const route = useRoute()
-const { periodo, loading, error, proyectos, totales, cargar } = useRiesgoVivo()
+const { periodo, loading, error, saldosNoVerificados, proyectos, totales, cargar } = useRiesgoVivo()
 
 // ── Filtros por estado de alerta ─────────────────────────────────────────────
 const FILTROS = [
