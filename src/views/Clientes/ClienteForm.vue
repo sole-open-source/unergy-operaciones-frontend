@@ -147,6 +147,48 @@
           </div>
         </div>
       </div>
+
+      <!-- ── Contactos y Servicios (solo al crear) ── -->
+      <div v-if="esNuevo" class="col-span-2">
+        <div class="border-t pt-4 mt-1">
+          <p class="text-xs font-semibold uppercase tracking-wide mb-3" style="color: #915BD8;">Contactos</p>
+          <div class="rounded-xl p-4 space-y-3" style="background:#f9f7ff;border:1.5px solid #e8e0f0;">
+            <div class="flex items-center justify-between">
+              <p class="text-xs" style="color:#9b89b5;">Al menos un contacto con correo (opcional, se puede agregar después).</p>
+              <button type="button" @click="agregarContacto"
+                class="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
+                style="background:#915BD8;color:#fff;">
+                <i class="pi pi-plus text-xs" /> Agregar
+              </button>
+            </div>
+
+            <div v-if="!f.contactos.length" class="text-xs italic py-1" style="color:#c4b3df;">
+              Sin contactos agregados
+            </div>
+
+            <div v-for="(c, idx) in f.contactos" :key="idx" class="grid grid-cols-4 gap-2 items-start">
+              <InputText v-model="c.nombre" placeholder="Nombre" class="w-full" size="small" />
+              <InputText v-model="c.telefono" placeholder="Teléfono" class="w-full" size="small" />
+              <InputText v-model="c.email" type="email" placeholder="Correo *" class="w-full" size="small" />
+              <div class="flex items-center gap-1">
+                <Select v-model="c.tipo" :options="TIPOS_CONTACTO" optionLabel="label" optionValue="value"
+                  class="w-full" size="small" />
+                <button type="button" @click="eliminarContacto(idx)" class="p-1.5 rounded-lg hover:bg-red-50">
+                  <i class="pi pi-trash text-xs" style="color:#ef4444;" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="esNuevo" class="col-span-2">
+        <div class="border-t pt-4 mt-1">
+          <p class="text-xs font-semibold uppercase tracking-wide mb-3" style="color: #915BD8;">Servicios</p>
+          <MultiSelect v-model="serviciosSeleccionados" :options="TIPOS_SERVICIO" optionLabel="label" optionValue="value"
+            class="w-full" placeholder="Seleccionar servicios (opcional)" display="chip" />
+        </div>
+      </div>
     </div>
 
     <div class="flex justify-end gap-2 pt-2">
@@ -157,14 +199,34 @@
 </template>
 
 <script setup>
-import { reactive, watch } from 'vue'
+import { reactive, ref, computed, watch } from 'vue'
 import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import Select from 'primevue/select'
+import MultiSelect from 'primevue/multiselect'
 import Button from 'primevue/button'
 
 const props = defineProps({ initial: Object })
 const emit = defineEmits(['save', 'cancel', 'test-correo'])
+
+// Contactos y servicios solo se pueden cargar al CREAR -- al editar, se
+// gestionan desde sus propias pestañas en la ficha del cliente (evita mandar
+// de vuelta objetos ya existentes con forma distinta a la de creación).
+const esNuevo = computed(() => !props.initial?.id)
+
+const TIPOS_CONTACTO = [
+  { label: 'Comercial', value: 'comercial' },
+  { label: 'Operacional', value: 'operacional' },
+  { label: 'CGM', value: 'cgm' },
+  { label: 'Liquidación', value: 'liquidacion' },
+  { label: 'Contable', value: 'contable' },
+]
+const TIPOS_SERVICIO = [
+  { label: 'Operación', value: 'operacion' },
+  { label: 'Representación', value: 'representacion' },
+  { label: 'CGM', value: 'cgm' },
+  { label: 'Promotor', value: 'promotor' },
+]
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 function emailValido(e) { return !e || EMAIL_RE.test(e.trim()) }
@@ -174,7 +236,9 @@ const f = reactive({
   correos_operacionales: Array.isArray(props.initial?.correos_operacionales)
     ? [...props.initial.correos_operacionales]
     : [],
+  contactos: [],
 })
+const serviciosSeleccionados = ref([])
 watch(() => props.initial, (v) => {
   Object.assign(f, v)
   if (Array.isArray(v?.correos_operacionales)) {
@@ -186,15 +250,24 @@ function agregarCorreo()               { f.correos_operacionales = [...(f.correo
 function eliminarCorreo(idx)           { f.correos_operacionales = f.correos_operacionales.filter((_, i) => i !== idx) }
 function actualizarCorreo(idx, val)    { f.correos_operacionales = f.correos_operacionales.map((e, i) => i === idx ? val : e) }
 
+function agregarContacto()   { f.contactos = [...f.contactos, { nombre: '', telefono: '', email: '', tipo: 'comercial' }] }
+function eliminarContacto(idx) { f.contactos = f.contactos.filter((_, i) => i !== idx) }
+
 function submit() {
   const payload = {}
   for (const [k, v] of Object.entries(f)) {
+    if (k === 'contactos' || k === 'servicios') continue
     if (v !== null && v !== undefined && v !== '') payload[k] = v
   }
   // Limpiar correos vacíos o inválidos antes de guardar
   payload.correos_operacionales = (f.correos_operacionales || [])
     .map(e => e.trim().toLowerCase())
     .filter(e => e && emailValido(e))
+
+  if (esNuevo.value) {
+    payload.contactos = (f.contactos || []).filter(c => c.email && emailValido(c.email))
+    payload.servicios = serviciosSeleccionados.value.map(tipo => ({ tipo }))
+  }
   emit('save', payload)
 }
 </script>
