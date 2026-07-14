@@ -673,7 +673,7 @@ async function loadProyectos() {
 
 async function loadInternos() {
   try {
-    const { data } = await api.get('/proyectos', { params: { size: 200, page: 1 } })
+    const { data } = await api.get('/proyectos', { params: { size: 500, page: 1 } })
     const items = data.items ?? data
     internosOpts.value = items.map(p => ({ label: p.nombre_comercial, value: p.id }))
   } catch { /* silencioso */ }

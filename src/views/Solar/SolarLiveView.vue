@@ -26,6 +26,22 @@
         </p>
       </div>
       <div class="sl-header-right">
+        <!-- Filtro por proyecto -->
+        <div class="sl-filter-wrap">
+          <i class="pi pi-search sl-filter-icon" />
+          <AutoComplete
+            v-model="filtro"
+            :suggestions="projectSuggestions"
+            @complete="onFiltroComplete"
+            :completeOnFocus="true"
+            :delay="0"
+            scrollHeight="280px"
+            placeholder="Buscar o seleccionar proyecto..."
+            class="sl-filter-ac"
+            inputClass="sl-filter-input"
+          />
+          <i v-if="filtro" class="pi pi-times sl-filter-clear" @click="filtro = ''" />
+        </div>
         <!-- Toggle columnas -->
         <div class="sl-cols-toggle">
           <button v-for="c in [1,2,4]" :key="c"
@@ -71,6 +87,12 @@
       <p>Sin proyectos disponibles</p>
     </div>
 
+    <!-- ══ SIN COINCIDENCIAS ══ -->
+    <div v-else-if="sinCoincidencias" class="sl-empty">
+      <i class="pi pi-search" style="font-size:32px;color:#cbd5e1" />
+      <p>Ningún proyecto coincide con "{{ filtro }}"</p>
+    </div>
+
     <!-- ══ PROYECTOS (drag & drop) ══ -->
     <draggable
       v-else
@@ -79,10 +101,11 @@
       handle=".sl-drag-handle"
       class="sl-grid"
       :style="{ gridTemplateColumns: `repeat(${cols}, minmax(0,1fr))` }"
+      :disabled="!!filtro.trim()"
       @end="saveOrder"
     >
       <template #item="{ element: proy }">
-        <div class="sl-project-block">
+        <div v-show="matchesFiltro(proy)" class="sl-project-block">
 
           <!-- Nombre + estado -->
           <div class="sl-project-name">
@@ -224,6 +247,7 @@ import {
 } from 'chart.js'
 import { Line } from 'vue-chartjs'
 import draggable from 'vuedraggable'
+import AutoComplete from 'primevue/autocomplete'
 import api from '@/api/client'
 import GeneracionView from '@/views/Operaciones/GeneracionView.vue'
 
@@ -241,6 +265,29 @@ const detailMap   = reactive({})
 const lastUpdated = ref('')
 const cols        = ref(1)
 let refreshTimer  = null
+
+// ── Filtro por proyecto ────────────────────────────────────────────────────
+const filtro = ref('')
+
+function matchesFiltro(proy) {
+  const q = filtro.value.trim().toLowerCase()
+  if (!q) return true
+  return (proy.nombre || '').toLowerCase().includes(q)
+}
+
+const sinCoincidencias = computed(() =>
+  !!filtro.value.trim() && !proyectos.value.some(matchesFiltro)
+)
+
+// Sugerencias para el AutoComplete: escribir filtra en vivo (mismo filtro),
+// enfocar despliega la lista completa de proyectos para seleccionar.
+const projectSuggestions = ref([])
+function onFiltroComplete(e) {
+  const nombres = [...new Set((proyectos.value || []).map(p => p.nombre).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b))
+  const q = (e.query || '').toLowerCase().trim()
+  projectSuggestions.value = q ? nombres.filter(n => n.toLowerCase().includes(q)) : nombres
+}
 
 // ── Generación de hoy ──────────────────────────────────────────────────────
 const genHoyMap  = reactive({})   // proyecto_id → { kwh_real, fuente }
@@ -415,11 +462,15 @@ function getMedidorData(id) {
 const _todayStr = new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString().slice(0, 10)
 
 function getInversorAcum(id) {
-  // Fuente primaria: generación real del día desde Solenium
+  // Fuente primaria: total de hoy calculado por Solenium (endpoint /generation/,
+  // más preciso que integrar nosotros la curva de potencia por trapecios).
+  const genHoy = detailMap[id]?.generation_today_kwh
+  if (genHoy != null && genHoy > 0) return genHoy
+  // Fallback 1: generación real del día ya cerrado (histórico de 30 días)
   const gen30 = detailMap[id]?.generation_30d ?? []
   const hoy = gen30.find(d => d.date === _todayStr)
   if (hoy?.kwh > 0) return hoy.kwh
-  // Fallback: integración trapezoidal de la curva de potencia
+  // Fallback 2: integración trapezoidal de la curva de potencia
   const curve = detailMap[id]?.power_curve ?? []
   if (curve.length < 2) return null
   let kwh = 0
@@ -586,6 +637,27 @@ onUnmounted(() => {
 .sl-title { font-size: 20px; font-weight: 800; color: #2C2039; margin: 0; }
 .sl-subtitle { font-size: 12px; color: #6b5a8a; margin: 3px 0 0; }
 .sl-ts { color: #9ca3af; }
+
+/* ── Filtro por proyecto ── */
+.sl-filter-wrap { position: relative; display: flex; align-items: center; }
+.sl-filter-icon { position: absolute; left: 11px; font-size: 12px; color: #9ca3af; pointer-events: none; }
+.sl-filter-input {
+  width: 200px; padding: 7px 28px 7px 30px; border-radius: 8px; border: 1px solid #e5e7eb;
+  background: #fff; font-size: 13px; font-family: inherit; color: #2C2039; outline: none;
+  transition: border-color 0.15s;
+}
+.sl-filter-input:focus { border-color: #915BD8; }
+.sl-filter-input::placeholder { color: #9ca3af; }
+/* AutoComplete del filtro: mismo aspecto que el input anterior */
+.sl-filter-ac :deep(input) {
+  width: 200px; padding: 7px 28px 7px 30px; border-radius: 8px; border: 1px solid #e5e7eb;
+  background: #fff; font-size: 13px; font-family: inherit; color: #2C2039; outline: none;
+  transition: border-color 0.15s;
+}
+.sl-filter-ac :deep(input:focus) { border-color: #915BD8; }
+.sl-filter-ac :deep(input::placeholder) { color: #9ca3af; }
+.sl-filter-clear { position: absolute; right: 10px; font-size: 11px; color: #9ca3af; cursor: pointer; }
+.sl-filter-clear:hover { color: #6b5a8a; }
 
 /* ── Column toggle ── */
 .sl-cols-toggle { display: flex; gap: 4px; background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 3px; }

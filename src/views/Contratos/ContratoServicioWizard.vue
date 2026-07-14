@@ -184,6 +184,36 @@
             </div>
           </div>
 
+          <!-- Detalles operacionales y contractuales -->
+          <div class="border-t border-gray-100 pt-3">
+            <p class="text-xs font-semibold uppercase tracking-wide mb-3" :style="`color:${tipoColor}`">
+              Detalles operacionales y contractuales
+              <span class="normal-case font-normal text-gray-400">(opcional)</span>
+            </p>
+            <div class="space-y-4">
+              <div class="flex flex-col gap-1">
+                <label class="field-label">Alcance del servicio</label>
+                <Textarea v-model="form.service_scope" rows="3" autoResize class="w-full"
+                  placeholder="Describe el alcance del servicio…" />
+              </div>
+              <div class="flex flex-col gap-1">
+                <label class="field-label">Términos específicos del servicio</label>
+                <Textarea v-model="form.specific_service_terms" rows="3" autoResize class="w-full"
+                  placeholder="Términos específicos aplicables al servicio…" />
+              </div>
+              <div class="flex flex-col gap-1">
+                <label class="field-label">SLAs (Acuerdos de nivel de servicio)</label>
+                <Textarea v-model="form.slas" rows="3" autoResize class="w-full"
+                  placeholder="Acuerdos de nivel de servicio, tiempos de respuesta…" />
+              </div>
+              <div class="flex flex-col gap-1">
+                <label class="field-label">Responsabilidades</label>
+                <Textarea v-model="form.responsibilities" rows="3" autoResize class="w-full"
+                  placeholder="Responsabilidades de las partes…" />
+              </div>
+            </div>
+          </div>
+
           <!-- REC extra fields at bottom of Términos -->
           <template v-if="tipo === 'rec'">
             <div class="border-t border-gray-100 pt-3">
@@ -193,7 +223,7 @@
               <div class="grid grid-cols-3 gap-4">
                 <div class="flex flex-col gap-1">
                   <label class="field-label">Cantidad (kWh)</label>
-                  <InputNumber v-model="form.rec_cantidad" :minFractionDigits="0" :maxFractionDigits="3" class="w-full" />
+                  <InputNumber v-model="form.rec_cantidad" :minFractionDigits="0" :maxFractionDigits="3" locale="en-US" class="w-full" />
                 </div>
                 <div class="flex flex-col gap-1">
                   <label class="field-label">Precio unitario (COP/kWh)</label>
@@ -228,7 +258,7 @@
                 </div>
                 <div class="flex flex-col gap-1">
                   <label class="field-label">% FNCER</label>
-                  <InputNumber v-model="form.cgm_porcentaje_fncer" suffix="%" :minFractionDigits="1" :maxFractionDigits="2" class="w-full" />
+                  <InputNumber v-model="form.cgm_porcentaje_fncer" suffix="%" :minFractionDigits="1" :maxFractionDigits="2" locale="en-US" class="w-full" />
                 </div>
                 <div class="flex flex-col gap-1">
                   <label class="field-label">Tipo de asignación</label>
@@ -378,6 +408,10 @@ const form = reactive({
   rec_cantidad: null,
   rec_precio_unitario: null,
   rec_vintage: '',
+  service_scope: '',
+  specific_service_terms: '',
+  slas: '',
+  responsibilities: '',
 })
 
 function buscarCliente(event, rol) {
@@ -457,6 +491,10 @@ async function guardar() {
       rec_cantidad: form.rec_cantidad ?? null,
       rec_precio_unitario: form.rec_precio_unitario ?? null,
       rec_vintage: form.rec_vintage?.trim() || null,
+      service_scope: form.service_scope?.trim() || null,
+      specific_service_terms: form.specific_service_terms?.trim() || null,
+      slas: form.slas?.trim() || null,
+      responsibilities: form.responsibilities?.trim() || null,
     }
     await api.post('/contratos-servicio', payload)
     toast.add({ severity: 'success', summary: 'Contrato creado', life: 2500 })

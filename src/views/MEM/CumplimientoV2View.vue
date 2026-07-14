@@ -342,6 +342,12 @@
           </button>
         </div>
 
+        <!-- Filtro por offtaker (comprador del contrato) -->
+        <MultiSelect v-model="offtakersFiltro" :options="offtakerOpts" optionLabel="label" optionValue="value"
+                     filter :showToggleAll="false" placeholder="Todos los offtakers"
+                     :maxSelectedLabels="2" selectedItemsLabel="{0} offtakers" class="text-sm" style="min-width:12rem;"
+                     v-tooltip.bottom="'Filtrar contratos por offtaker (comprador)'" />
+
         <div class="flex-1"></div>
         <button @click="showNuevoForm = true" class="cv-btn-cta">
           <i class="pi pi-plus text-xs" />PPA nuevo
@@ -427,8 +433,8 @@
                     style="color: #915BD8;"
                   />
                   <div class="min-w-0">
-                    <div class="flex items-center gap-1.5">
-                      <span class="font-bold text-sm truncate" style="color: #2C2039;">{{ c.nombre }}</span>
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                      <span class="font-bold text-sm break-words" style="color: #2C2039;">{{ c.nombre }}</span>
                       <span v-if="c._ficticio" class="text-xs px-1.5 py-0.5 rounded font-medium flex-shrink-0" style="background: rgba(240,192,64,0.18); color: #9a6700;">Nuevo</span>
                       <span v-if="simResults[c.id]?.plantasEsp != null"
                         class="text-xs font-semibold px-1.5 py-0.5 rounded flex-shrink-0"
@@ -546,22 +552,6 @@
                   </div>
                 </div>
 
-                <!-- Cumplimiento de plantas: inscritas = registradas y despachando vía GESCON (numerador) / plantas contrato exigidas (denominador) -->
-                <div v-if="simResults[c.id].plantasEsp != null" class="mt-3 pt-3 border-t" style="border-color: rgba(44,32,57,0.07);">
-                  <div class="flex items-center justify-between mb-1.5">
-                    <span class="text-[10px] font-semibold uppercase tracking-wide" style="color: #7a6e8a;">Plantas inscritas / contrato</span>
-                    <div class="flex items-center gap-1.5">
-                      <span class="font-mono text-xs font-bold" style="color: #2C2039;">{{ simResults[c.id].plantasReg }} / {{ simResults[c.id].plantasEsp }}</span>
-                      <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap" :style="estadoBadge(simResults[c.id].estadoPlantas)">
-                        {{ estadoLabel(simResults[c.id].estadoPlantas) }}
-                      </span>
-                    </div>
-                  </div>
-                  <div class="relative rounded-md overflow-hidden" style="height: 8px; background: rgba(44,32,57,0.06);">
-                    <div class="absolute inset-y-0 left-0 rounded-sm transition-all duration-300"
-                      :style="{ width: simResults[c.id].plantasPct + '%', background: estadoColor(simResults[c.id].estadoPlantas) }" />
-                  </div>
-                </div>
               </div>
 
               <!-- Plant drop zone (collapsible) -->
@@ -686,24 +676,32 @@
           <label class="text-xs font-semibold uppercase tracking-wider" style="color: #915BD8;">Mes</label>
           <Select v-model="pcMonth" :options="MESES_OPTIONS" optionLabel="label" optionValue="value" class="w-40" @change="loadPlantasContratos" />
         </div>
-        <div class="flex rounded-lg overflow-hidden border" style="border-color: rgba(44,32,57,0.15);">
-          <button
-            v-for="mode in PC_MODES" :key="mode.key"
-            @click="pcMode = mode.key"
-            class="px-4 py-2 text-sm font-semibold transition-colors"
-            :style="pcMode === mode.key
-              ? `background: ${mode.bg}; color: ${mode.color};`
-              : 'background: transparent; color: #7a6e8a;'"
-          >{{ mode.label }}</button>
+        <!-- Estados estandarizados a-f (catálogo GET /clasificacion-energia/categorias) -->
+        <div class="flex flex-wrap items-end gap-3">
+          <div v-for="grupo in PC_GRUPOS" :key="grupo.label" class="flex flex-col gap-1">
+            <span class="text-[10px] font-semibold uppercase tracking-wider" style="color: #9b89b5;">{{ grupo.label }}</span>
+            <div class="flex rounded-lg overflow-hidden border" style="border-color: rgba(44,32,57,0.15);">
+              <button
+                v-for="mode in grupo.modes" :key="mode.key"
+                @click="pcMode = mode.key"
+                class="px-3 py-1.5 text-xs font-semibold transition-colors inline-flex items-center gap-1.5"
+                :style="pcMode === mode.key
+                  ? `background: ${mode.bg}; color: ${mode.color};`
+                  : 'background: transparent; color: #7a6e8a;'"
+              >
+                {{ mode.agente }}
+                <span v-if="pcCounts" class="font-mono text-[10px] px-1 rounded"
+                  style="background: rgba(44,32,57,0.08);">{{ pcCounts[mode.key] ?? 0 }}</span>
+              </button>
+            </div>
+          </div>
         </div>
-        <span class="text-xs" style="color: #7a6e8a;">
-          {{ pcMode === 'venta' ? 'Plantas inscritas en GESCON por contrato de venta'
-           : pcMode === 'compra' ? 'Plantas que Unergy compra energía'
-           : 'Plantas sin asignación GESCON este mes (van a bolsa)' }}
+        <span class="text-xs max-w-md" style="color: #7a6e8a;">
+          {{ PC_MODE_DESC[pcMode] }}
         </span>
         <Button label="Exportar resumen (Excel)" icon="pi pi-file-excel" size="small" outlined class="ml-auto"
           :disabled="!pcData || pcLoading" @click="exportarResumenPlantasContratos"
-          v-tooltip.bottom="'Contratos con sus plantas (venta + compra) y, al final, plantas sin contrato o en bolsa con UNGC'"
+          v-tooltip.bottom="'Descarga TODAS las categorías del mes, incl. plantas externas (todos los contratos y plantas), sin importar el filtro activo'"
           style="color:#915BD8; border-color:#915BD8;" />
       </div>
 
@@ -716,27 +714,76 @@
 
       <template v-else-if="pcData">
 
-        <!-- VENTA mode -->
-        <template v-if="pcMode === 'venta'">
-          <div v-for="c in pcData.venta" :key="c.id" class="cv-card">
-            <div class="px-4 py-3 flex items-center justify-between"
-              style="background: rgba(145,91,216,0.04); border-bottom: 1px solid rgba(44,32,57,0.07);">
+        <!-- a. PPA Venta (UNGG) -->
+        <template v-if="pcMode === 'ppa_venta_ungg'">
+          <!-- Resumen de modalidades: duplicados (compra en bolsa) y uso del recurso -->
+          <div v-if="pcVentaDupInfo.dup || pcVentaDupInfo.ur" class="flex flex-col gap-1 px-4 py-2.5 rounded-lg text-xs"
+            style="background: rgba(44,32,57,0.03); border: 1px solid rgba(44,32,57,0.12); color: #2C2039;">
+            <div class="flex items-center flex-wrap gap-x-3 gap-y-1">
+              <span><b>{{ pcVentaDupInfo.total }}</b> plantas en total.</span>
+              <span v-if="pcVentaDupInfo.dup" class="inline-flex items-center gap-1" style="color: #9a6700;">
+                <i class="pi pi-shopping-cart" style="font-size: 10px;" /><b>{{ pcVentaDupInfo.dup }}</b> duplicados (compra en bolsa)
+              </span>
+              <span v-if="pcVentaDupInfo.ur" class="inline-flex items-center gap-1" style="color: #0369a1;">
+                <i class="pi pi-sync" style="font-size: 10px;" /><b>{{ pcVentaDupInfo.ur }}</b> uso del recurso
+              </span>
+              <span style="color: #7a6e8a;">· resto suministro propio.</span>
+            </div>
+            <span style="color: #7a6e8a;">
+              Duplicados y uso del recurso también aparecen en «Compra en bolsa (UNGG)» — el duplicado se compra en bolsa (genera garantías); el uso del recurso se le paga al cliente a precio bolsa (sin garantías).
+            </span>
+          </div>
+          <div v-for="c in pcPools.ppa_venta_ungg" :key="c.id" class="cv-card">
+            <div class="px-4 py-3 flex items-center justify-between cv-row-click"
+              style="background: rgba(145,91,216,0.04); border-bottom: 1px solid rgba(44,32,57,0.07);"
+              @click="abrirDetalleContrato(c, 'ppa_venta_ungg')"
+              v-tooltip.right="'Ver detalle del contrato (PPA + GESCON)'">
               <div>
                 <span class="font-bold text-sm" style="color: #2C2039;">{{ c.nombre }}</span>
                 <span class="ml-2 text-xs" style="color: #7a6e8a;">{{ c.comprador_nombre }}</span>
+                <i class="pi pi-info-circle ml-1.5" style="font-size: 11px; color: #9b89b5;" />
               </div>
-              <span class="text-xs font-mono px-2 py-0.5 rounded"
-                style="background: rgba(145,91,216,0.10); color: #915BD8;">
-                {{ c.plantas.length }} plantas
-              </span>
+              <div class="flex items-center gap-2 flex-shrink-0">
+                <span class="text-xs font-mono px-2 py-0.5 rounded"
+                  style="background: rgba(145,91,216,0.10); color: #915BD8;">
+                  {{ c.plantas.length }} plantas
+                </span>
+                <span v-if="c.plantas.filter(p => p.es_duplicado && !p.uso_del_recurso).length"
+                  class="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded"
+                  style="background: rgba(240,192,64,0.22); color: #9a6700;"
+                  v-tooltip.bottom="'Plantas de este contrato que son compra en bolsa (duplicados)'">
+                  <i class="pi pi-shopping-cart" style="font-size: 9px;" />{{ c.plantas.filter(p => p.es_duplicado && !p.uso_del_recurso).length }} duplicadas
+                </span>
+                <span v-if="c.plantas.filter(p => p.uso_del_recurso).length"
+                  class="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded"
+                  style="background: rgba(2,132,199,0.14); color: #0369a1;"
+                  v-tooltip.bottom="'Plantas de este contrato marcadas como uso del recurso'">
+                  <i class="pi pi-sync" style="font-size: 9px;" />{{ c.plantas.filter(p => p.uso_del_recurso).length }} uso recurso
+                </span>
+                <button
+                  @click.stop="copiarImagenVenta(c)"
+                  class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors"
+                  :style="copiadoVentaId === c.id ? 'background: rgba(46,125,50,0.12); color: #2e7d32;' : 'background: #915BD8; color: white;'"
+                  v-tooltip.left="'Copia la imagen al portapapeles (o la descarga si el navegador no lo permite)'"
+                >
+                  <i class="pi text-xs" :class="copiadoVentaId === c.id ? 'pi-check' : 'pi-image'" />
+                  {{ copiadoVentaId === c.id ? '¡Copiado!' : 'Copiar imagen' }}
+                </button>
+              </div>
             </div>
             <div v-if="c.plantas.length" class="divide-y" style="border-color: rgba(44,32,57,0.05);">
-              <div v-for="p in c.plantas" :key="p.id" class="px-4 py-2.5 flex items-center justify-between text-sm"
-                :style="p.es_duplicado ? 'background: rgba(240,192,64,0.08);' : ''">
+              <div v-for="p in c.plantas" :key="p.id" class="px-4 py-2.5 flex items-center justify-between text-sm cv-row-click"
+                :style="p.uso_del_recurso ? 'background: rgba(2,132,199,0.06);' : p.es_duplicado ? 'background: rgba(240,192,64,0.08);' : ''"
+                @click="abrirDetalleContrato(c, 'ppa_venta_ungg')"
+                v-tooltip.left="'Ver detalle del contrato (PPA + GESCON)'">
                 <div class="flex items-center gap-2">
                   <span class="font-medium" style="color: #2C2039;">{{ p.nombre }}</span>
-                  <span v-if="p.es_duplicado" class="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded"
-                    style="background: rgba(240,192,64,0.22); color: #9a6700;" v-tooltip="'Compra en bolsa'"><i class="pi pi-shopping-cart" style="font-size: 9px;" />Compra bolsa</span>
+                  <span v-if="p.uso_del_recurso" class="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded"
+                    style="background: rgba(2,132,199,0.14); color: #0369a1;"
+                    v-tooltip="'Uso del recurso: la planta está en bolsa y se le paga al cliente su generación a precio bolsa — también listada en c. Compra en Bolsa (UNGG). No genera garantías.'"><i class="pi pi-sync" style="font-size: 9px;" />Uso del recurso</span>
+                  <span v-else-if="p.es_duplicado" class="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded"
+                    style="background: rgba(240,192,64,0.22); color: #9a6700;"
+                    v-tooltip="'Duplicado: suministra a este contrato con origen bolsa — también listado en c. Compra en Bolsa (UNGG). Genera garantías.'"><i class="pi pi-shopping-cart" style="font-size: 9px;" />Duplicado</span>
                   <span v-if="p.codigo_sic" class="text-xs font-mono px-1.5 py-0.5 rounded" style="background: rgba(44,32,57,0.06); color: #7a6e8a;">{{ p.codigo_sic }}</span>
                   <span v-if="p.pct_despacho != null" class="text-xs font-mono" style="color: #915BD8;">{{ (p.pct_despacho * 100).toFixed(0) }}%</span>
                 </div>
@@ -753,17 +800,20 @@
           </div>
         </template>
 
-        <!-- COMPRA mode -->
-        <template v-if="pcMode === 'compra'">
-          <div v-if="!pcData.compra.length" class="text-center py-12 text-sm" style="color: #7a6e8a;">
+        <!-- b. PPA Compra (UNGC) -->
+        <template v-if="pcMode === 'ppa_compra_ungc'">
+          <div v-if="!pcPools.ppa_compra_ungc.length" class="text-center py-12 text-sm" style="color: #7a6e8a;">
             No hay contratos de compra vigentes en {{ MESES[pcMonth - 1] }} {{ pcYear }}
           </div>
-          <div v-for="c in pcData.compra" :key="c.id" class="cv-card-gold">
-            <div class="px-4 py-3 flex items-center justify-between"
-              style="background: rgba(240,192,64,0.08); border-bottom: 1px solid rgba(240,192,64,0.2);">
+          <div v-for="c in pcPools.ppa_compra_ungc" :key="c.id" class="cv-card-gold">
+            <div class="px-4 py-3 flex items-center justify-between cv-row-click"
+              style="background: rgba(240,192,64,0.08); border-bottom: 1px solid rgba(240,192,64,0.2);"
+              @click="abrirDetalleContrato(c, 'ppa_compra_ungc')"
+              v-tooltip.right="'Ver detalle del contrato (PPA + GESCON)'">
               <div>
                 <span class="font-bold text-sm" style="color: #9a6700;">{{ c.nombre }}</span>
                 <span class="ml-2 text-xs" style="color: #7a6e8a;">Vendedor: {{ c.vendedor_nombre }}</span>
+                <i class="pi pi-info-circle ml-1.5" style="font-size: 11px; color: #9b89b5;" />
               </div>
               <span class="text-xs font-mono px-2 py-0.5 rounded"
                 style="background: rgba(240,192,64,0.18); color: #9a6700;">
@@ -771,7 +821,9 @@
               </span>
             </div>
             <div v-if="c.plantas.length" class="divide-y" style="border-color: rgba(44,32,57,0.05);">
-              <div v-for="p in c.plantas" :key="p.id" class="px-4 py-2.5 flex items-center justify-between text-sm">
+              <div v-for="p in c.plantas" :key="p.id" class="px-4 py-2.5 flex items-center justify-between text-sm cv-row-click"
+                @click="abrirDetalleContrato(c, 'ppa_compra_ungc')"
+                v-tooltip.left="'Ver detalle del contrato (PPA + GESCON)'">
                 <span class="font-medium" style="color: #2C2039;">{{ p.nombre }}</span>
                 <div class="text-xs font-mono text-right" style="color: #7a6e8a;">
                   <span v-if="p.fecha_inicio">{{ p.fecha_inicio }}</span>
@@ -783,45 +835,200 @@
           </div>
         </template>
 
-        <!-- BOLSA mode -->
-        <template v-if="pcMode === 'bolsa'">
-          <!-- En bolsa con el comercializador (UNGC) -->
-          <div v-if="pcBolsaComercializador.length" class="cv-card">
-            <div class="px-4 py-3" style="background: rgba(44,32,57,0.04); border-bottom: 1px solid rgba(44,32,57,0.07);">
-              <span class="font-bold text-sm" style="color: #2C2039;">En bolsa con el comercializador (UNGC)</span>
-              <span class="ml-2 text-xs" style="color: #7a6e8a;">SIC vigente con comprador UNGC en {{ MESES[pcMonth - 1] }} {{ pcYear }}</span>
-              <span class="ml-2 text-xs font-mono px-2 py-0.5 rounded" style="background: rgba(44,32,57,0.08); color: #7a6e8a;">
-                {{ pcBolsaComercializador.length }}
+        <!-- g. Plantas externas: PPAs de compra directa a terceros, fuera de GESCON -->
+        <template v-if="pcMode === 'ppa_compra_externa'">
+          <Message v-if="externasSinPlantas.length" severity="warn" :closable="false">
+            <span v-if="externasSinPlantas.length === 1">
+              El contrato <b>{{ externasSinPlantas[0].nombre }}</b> no tiene plantas vinculadas:
+              no sabemos a qué planta le estamos comprando. Asóciala en el módulo PPA.
+            </span>
+            <span v-else>
+              {{ externasSinPlantas.length }} contratos de compra externa no tienen plantas vinculadas:
+              <b>{{ externasSinPlantas.map(c => c.nombre).join(', ') }}</b>.
+              Asócialas en el módulo PPA para saber a qué planta le compramos.
+            </span>
+          </Message>
+          <div v-if="!pcPools.ppa_compra_externa.length" class="text-center py-12 text-sm" style="color: #7a6e8a;">
+            No hay PPAs de compra a plantas externas vigentes en {{ MESES[pcMonth - 1] }} {{ pcYear }}.<br/>
+            <span class="text-xs">Se registran en el módulo PPA con tipo de contrato «compra» (sin código GESCON).</span>
+          </div>
+          <div v-for="c in pcPools.ppa_compra_externa" :key="c.id" class="cv-card-gold">
+            <div class="px-4 py-3 flex items-center justify-between cv-row-click"
+              style="background: rgba(240,192,64,0.08); border-bottom: 1px solid rgba(240,192,64,0.2);"
+              @click="abrirDetalleContrato(c, 'ppa_compra_externa')"
+              v-tooltip.right="'Ver detalle del contrato PPA'">
+              <div>
+                <span class="font-bold text-sm" style="color: #9a6700;">{{ c.nombre }}</span>
+                <span class="ml-2 text-xs" style="color: #7a6e8a;">
+                  Le compramos a: <span class="font-semibold" style="color: #2C2039;">{{ c.vendedor_nombre || '—' }}</span>
+                  <span v-if="c.vendedor_nit"> · NIT {{ c.vendedor_nit }}</span>
+                </span>
+                <i class="pi pi-info-circle ml-1.5" style="font-size: 11px; color: #9b89b5;" />
+              </div>
+              <div class="flex items-center gap-2 flex-shrink-0">
+                <span v-if="c.tarifa_base != null" class="text-xs font-mono px-2 py-0.5 rounded"
+                  style="background: rgba(240,192,64,0.18); color: #9a6700;"
+                  v-tooltip="'Tarifa base del PPA'">{{ Number(c.tarifa_base).toLocaleString('es-CO') }} $/kWh</span>
+                <span v-if="!c.plantas.length" class="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded"
+                  style="background: rgba(214,68,85,0.12); color: #D64455;"
+                  v-tooltip="'No sabemos a qué planta le compramos — asóciala en el módulo PPA'">
+                  <i class="pi pi-exclamation-triangle" style="font-size: 10px;" />Sin plantas vinculadas
+                </span>
+                <span v-else class="text-xs font-mono px-2 py-0.5 rounded" style="background: rgba(240,192,64,0.18); color: #9a6700;">
+                  {{ c.plantas.length }} plantas
+                </span>
+              </div>
+            </div>
+            <div v-if="c.plantas.length" class="divide-y" style="border-color: rgba(44,32,57,0.05);">
+              <div v-for="p in c.plantas" :key="p.id" class="px-4 py-2.5 flex items-center justify-between text-sm cv-row-click"
+                @click="abrirDetalleContrato(c, 'ppa_compra_externa')"
+                v-tooltip.left="'Ver detalle del contrato PPA'">
+                <span class="font-medium" style="color: #2C2039;">{{ p.nombre }}</span>
+                <div class="text-xs font-mono text-right" style="color: #7a6e8a;">
+                  <span v-if="p.fecha_inicio">{{ p.fecha_inicio }}</span>
+                  <span v-if="p.fecha_inicio && p.fecha_fin"> → </span>
+                  <span v-if="p.fecha_fin" :style="isExpiringSoon(p.fecha_fin) ? 'color: #D64455; font-weight: 600;' : ''">{{ p.fecha_fin }}</span>
+                </div>
+              </div>
+            </div>
+            <div v-else class="px-4 py-4 text-xs text-center" style="color: rgba(44,32,57,0.3);">
+              Sin plantas vinculadas — asócialas al contrato en el módulo PPA
+            </div>
+          </div>
+        </template>
+
+        <!-- c. Compra en Bolsa (UNGG): duplicados agrupados por el contrato al que aportan -->
+        <template v-if="pcMode === 'bolsa_compra_ungg'">
+          <div v-if="!pcPools.bolsa_compra_ungg.length" class="cv-card">
+            <div class="px-4 py-8 text-xs text-center" style="color: rgba(44,32,57,0.35);">
+              Sin compras en bolsa de UNGG en {{ MESES[pcMonth - 1] }} {{ pcYear }}.<br/>
+              Aquí aparecen las plantas duplicadas (origen bolsa) y las de uso del recurso que aportan a un contrato de venta.
+              Los contratos PLC entrarán cuando se liquiden en plataforma.
+            </div>
+          </div>
+          <div v-if="pcPools.bolsa_compra_ungg.length" class="flex flex-col gap-1.5 px-4 py-2.5 rounded-lg text-xs"
+            style="background: rgba(44,32,57,0.03); border: 1px solid rgba(44,32,57,0.12); color: #2C2039;">
+            <span>
+              La misma planta también suministra a un contrato de venta (aparece en «Venta · UNGG»);
+              aquí se agrupa por el contrato al que aporta. Hay <b>dos modalidades</b>:
+            </span>
+            <div class="flex flex-wrap gap-x-4 gap-y-1">
+              <span class="inline-flex items-center gap-1" style="color: #9a6700;">
+                <i class="pi pi-shopping-cart" style="font-size: 10px;" /><b>Duplicado</b> — su energía se compra en bolsa (genera garantías).
+              </span>
+              <span class="inline-flex items-center gap-1" style="color: #0369a1;">
+                <i class="pi pi-sync" style="font-size: 10px;" /><b>Uso del recurso</b> — se le paga al cliente a precio bolsa (sin garantías).
+              </span>
+            </div>
+          </div>
+          <div v-for="c in pcPools.bolsa_compra_ungg" :key="c.id" class="cv-card-gold">
+            <div class="px-4 py-3 flex items-center justify-between cv-row-click"
+              style="background: rgba(240,192,64,0.08); border-bottom: 1px solid rgba(240,192,64,0.2);"
+              @click="abrirDetalleContrato(c, 'bolsa_compra_ungg')"
+              v-tooltip.right="'Ver detalle del contrato (PPA + GESCON)'">
+              <div>
+                <span class="font-bold text-sm" style="color: #9a6700;">{{ c.nombre }}</span>
+                <span class="ml-2 text-xs" style="color: #7a6e8a;">compra en bolsa para cumplir este contrato · {{ c.comprador_nombre }}</span>
+                <i class="pi pi-info-circle ml-1.5" style="font-size: 11px; color: #9b89b5;" />
+              </div>
+              <span class="text-xs font-mono px-2 py-0.5 rounded" style="background: rgba(240,192,64,0.18); color: #9a6700;">
+                {{ c.plantas.length }} plantas
               </span>
             </div>
             <div class="divide-y" style="border-color: rgba(44,32,57,0.05);">
-              <div v-for="p in pcBolsaComercializador" :key="p.id" class="px-4 py-2.5 flex items-center gap-2 text-sm font-medium" style="color: #2C2039;">
-                <span>{{ p.nombre }}</span>
-                <span v-if="p.codigo_sic" class="text-xs font-mono px-1.5 py-0.5 rounded" style="background: rgba(44,32,57,0.06); color: #7a6e8a;">{{ p.codigo_sic }}</span>
+              <div v-for="p in c.plantas" :key="p.id" class="px-4 py-2.5 flex items-center justify-between text-sm cv-row-click"
+                @click="abrirDetalleContrato(c, 'bolsa_compra_ungg')"
+                v-tooltip.left="'Ver detalle del contrato (PPA + GESCON)'">
+                <div class="flex items-center gap-2">
+                  <i class="pi" :class="p.uso_del_recurso ? 'pi-sync' : 'pi-shopping-cart'"
+                    :style="`font-size: 10px; color: ${p.uso_del_recurso ? '#0369a1' : '#9a6700'};`" />
+                  <span class="font-medium" style="color: #2C2039;">{{ p.nombre }}</span>
+                  <span v-if="p.uso_del_recurso" class="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded"
+                    style="background: rgba(2,132,199,0.14); color: #0369a1;"
+                    v-tooltip="'Uso del recurso: la planta está en bolsa y también suministra a un contrato de venta (Venta · UNGG); se le paga al cliente a precio bolsa. No genera garantías.'">Uso del recurso</span>
+                  <span v-else class="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded"
+                    style="background: rgba(240,192,64,0.22); color: #9a6700;"
+                    v-tooltip="'Duplicado: esta planta también suministra a un contrato de venta (Venta · UNGG); su energía a este contrato se compra en bolsa. Genera garantías.'">Duplicado</span>
+                  <span v-if="p.codigo_sic" class="text-xs font-mono px-1.5 py-0.5 rounded" style="background: rgba(44,32,57,0.06); color: #7a6e8a;">{{ p.codigo_sic }}</span>
+                </div>
+                <div class="text-xs font-mono" style="color: #7a6e8a;">
+                  <span v-if="p.fecha_inicio">{{ p.fecha_inicio }}</span>
+                  <span v-if="p.fecha_inicio && p.fecha_fin"> → </span>
+                  <span v-if="p.fecha_fin">{{ p.fecha_fin }}</span>
+                </div>
               </div>
             </div>
           </div>
+        </template>
 
-          <!-- Libre en bolsa -->
-          <div v-if="pcBolsaLibre.length" class="cv-card">
+        <!-- d. Compra en Bolsa (UNGC): reglas por definir -->
+        <template v-if="pcMode === 'bolsa_compra_ungc'">
+          <div class="cv-card">
+            <div class="px-4 py-10 text-center space-y-2">
+              <i class="pi pi-compass" style="font-size: 22px; color: #9b89b5;" />
+              <p class="text-sm font-semibold" style="color: #2C2039;">Compra en Bolsa (UNGC) — reglas por definir</p>
+              <p class="text-xs max-w-lg mx-auto" style="color: #7a6e8a;">
+                Ocurre cuando UNGC debe comprar en bolsa, pero todavía no hay reglas de negocio
+                definidas para clasificarlo. La categoría queda reservada en el estándar
+                (<span class="font-mono">bolsa_compra_ungc</span>) y se activará cuando se definan.
+              </p>
+            </div>
+          </div>
+        </template>
+
+        <!-- e. Venta en Bolsa (UNGG): sin contrato GESCON -->
+        <template v-if="pcMode === 'bolsa_venta_ungg'">
+          <div v-if="pcPools.bolsa_venta_ungg.length" class="cv-card">
             <div class="px-4 py-3" style="background: rgba(44,32,57,0.04); border-bottom: 1px solid rgba(44,32,57,0.07);">
-              <span class="font-bold text-sm" style="color: #2C2039;">Libre en bolsa</span>
-              <span class="ml-2 text-xs" style="color: #7a6e8a;">Sin SIC vigente en {{ MESES[pcMonth - 1] }} {{ pcYear }}</span>
+              <span class="font-bold text-sm" style="color: #2C2039;">Venta en Bolsa (UNGG)</span>
+              <span class="ml-2 text-xs" style="color: #7a6e8a;">Sin contrato vigente en GESCON en {{ MESES[pcMonth - 1] }} {{ pcYear }} — venden en bolsa como generador</span>
               <span class="ml-2 text-xs font-mono px-2 py-0.5 rounded" style="background: rgba(44,32,57,0.08); color: #7a6e8a;">
-                {{ pcBolsaLibre.length }}
+                {{ pcPools.bolsa_venta_ungg.length }}
               </span>
             </div>
             <div class="divide-y" style="border-color: rgba(44,32,57,0.05);">
-              <div v-for="p in pcBolsaLibre" :key="p.id" class="px-4 py-2.5 text-sm font-medium" style="color: #2C2039;">
+              <div v-for="p in pcPools.bolsa_venta_ungg" :key="p.id" class="px-4 py-2.5 text-sm font-medium cv-row-click" style="color: #2C2039;"
+                @click="abrirDetallePlanta(p, 'bolsa_venta_ungg')"
+                v-tooltip.left="'Ver historial GESCON de la planta'">
                 {{ p.nombre }}
               </div>
             </div>
           </div>
-
-          <!-- Sin plantas en bolsa -->
-          <div v-if="!pcBolsaComercializador.length && !pcBolsaLibre.length" class="cv-card">
+          <div v-else class="cv-card">
             <div class="px-4 py-8 text-xs text-center" style="color: rgba(44,32,57,0.3);">
               Todas las plantas tienen asignación GESCON este mes
+            </div>
+          </div>
+        </template>
+
+        <!-- f. Venta en Bolsa (UNGC): SIC vigente con comprador UNGC -->
+        <template v-if="pcMode === 'bolsa_venta_ungc'">
+          <div v-if="pcPools.bolsa_venta_ungc.length" class="cv-card">
+            <div class="px-4 py-3" style="background: rgba(44,32,57,0.04); border-bottom: 1px solid rgba(44,32,57,0.07);">
+              <span class="font-bold text-sm" style="color: #2C2039;">Venta en Bolsa (UNGC)</span>
+              <span class="ml-2 text-xs" style="color: #7a6e8a;">UNGC compra la energía a UNGG (usualmente a precio de bolsa) para venderla en bolsa — SIC vigente con comprador UNGC</span>
+              <span class="ml-2 text-xs font-mono px-2 py-0.5 rounded" style="background: rgba(44,32,57,0.08); color: #7a6e8a;">
+                {{ pcPools.bolsa_venta_ungc.length }}
+              </span>
+            </div>
+            <div class="divide-y" style="border-color: rgba(44,32,57,0.05);">
+              <div v-for="p in pcPools.bolsa_venta_ungc" :key="p.id" class="px-4 py-2.5 text-sm font-medium cv-row-click" style="color: #2C2039;"
+                @click="abrirDetallePlanta(p, 'bolsa_venta_ungc')"
+                v-tooltip.left="'Ver detalle GESCON de la planta'">
+                <div class="flex items-center gap-2">
+                  <span>{{ p.nombre }}</span>
+                  <span v-if="p.codigo_sic" class="text-xs font-mono px-1.5 py-0.5 rounded" style="background: rgba(44,32,57,0.06); color: #7a6e8a;">{{ p.codigo_sic }}</span>
+                </div>
+                <div v-if="ventanaBolsa(p)" class="text-xs mt-0.5" style="color: #7a6e8a;"
+                     v-tooltip.right="'Vigencia del registro SIC con comprador UNGC que pone la planta en esta modalidad'">
+                  <i class="pi pi-calendar" style="font-size: 10px;" /> {{ ventanaBolsa(p) }}
+                </div>
+              </div>
+            </div>
+          </div>
+          <div v-else class="cv-card">
+            <div class="px-4 py-8 text-xs text-center" style="color: rgba(44,32,57,0.3);">
+              Ninguna planta está en bolsa con el comercializador este mes
             </div>
           </div>
         </template>
@@ -1212,6 +1419,181 @@
       </template>
     </Teleport>
 
+    <!-- Floating: detalle completo de contrato (tab Proyectos) — PPA formal + GESCON + plantas -->
+    <Teleport to="body">
+      <template v-if="detalleContrato">
+        <div class="fixed inset-0" style="z-index: 60; background: rgba(44,32,57,0.28);" @click="cerrarDetalleContrato" />
+        <div
+          class="fixed shadow-2xl"
+          style="z-index: 61; background: #ffffff; width: 860px; max-width: 96vw; max-height: 90vh; overflow-y: auto; border-radius: 16px; border: 1px solid rgba(44,32,57,0.12); top: 50%; left: 50%; transform: translate(-50%, -50%);"
+          @click.stop
+        >
+          <div style="height: 6px; background: #915BD8; border-radius: 16px 16px 0 0;" />
+          <!-- Header -->
+          <div class="px-6 pt-4 pb-3" style="border-bottom: 1px solid rgba(44,32,57,0.08);">
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="font-bold text-lg" style="color: #2C2039;">{{ detalleContrato.c.nombre }}</span>
+                  <span class="text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0" :style="`background: ${dcTipo.bg}; color: ${dcTipo.color};`">{{ dcTipo.label }}</span>
+                </div>
+                <div v-if="dcContraparte" class="text-sm mt-0.5" style="color: #7a6e8a;">{{ dcContraparte }}</div>
+              </div>
+              <div class="flex items-center gap-2 flex-shrink-0">
+                <a v-if="dcPpa?.carpeta_link" :href="dcPpa.carpeta_link" target="_blank" rel="noopener"
+                  class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold"
+                  style="background: rgba(145,91,216,0.10); color: #915BD8;"
+                  v-tooltip.left="'Abrir la carpeta del contrato'"><i class="pi pi-folder-open text-xs" />Carpeta</a>
+                <button class="rounded-lg p-1.5 transition-colors hover:bg-gray-100" style="color: #7a6e8a;" @click="cerrarDetalleContrato"><i class="pi pi-times text-sm" /></button>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="dcLoading" class="flex flex-col items-center justify-center py-16 gap-3">
+            <ProgressSpinner style="width:40px;height:40px;" strokeWidth="4" animationDuration=".8s" />
+            <p class="text-sm" style="color: #7a6e8a;">Cargando contrato…</p>
+          </div>
+
+          <div v-else class="px-6 py-4 space-y-6">
+            <Message v-if="dcError" severity="warn" :closable="false">{{ dcError }}</Message>
+
+            <!-- 1. Contrato formal (módulo PPA) -->
+            <div>
+              <p class="text-xs font-bold uppercase tracking-widest mb-2" style="color: #915BD8;">Contrato formal (PPA)</p>
+              <Message v-if="!dcPpa && !dcError" severity="info" :closable="false">
+                Este contrato no está registrado en el módulo PPA — solo existe como registro GESCON (abajo).
+              </Message>
+              <div v-else-if="dcPpa" class="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3">
+                <div v-for="f in dcCamposFormales" :key="f.label">
+                  <div class="text-[10px] font-semibold uppercase tracking-wide" style="color: #7a6e8a;">{{ f.label }}</div>
+                  <div class="text-sm mt-0.5 break-words" style="color: #2C2039;" :class="f.mono ? 'font-mono' : ''">{{ f.value }}</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 2. Cantidades comprometidas por mes -->
+            <div v-if="dcCompromisos.length">
+              <p class="text-xs font-bold uppercase tracking-widest mb-2" style="color: #915BD8;">Cantidades comprometidas por mes</p>
+              <div class="overflow-auto rounded-lg border" style="max-height: 230px; border-color: rgba(44,32,57,0.10);">
+                <table class="w-full text-sm">
+                  <thead class="sticky top-0" style="background: rgba(145,91,216,0.06);">
+                    <tr style="color: #7a6e8a; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">
+                      <th class="text-left px-3 py-2">Período</th>
+                      <th class="text-right px-3 py-2">Mín (kWh/mes)</th>
+                      <th class="text-right px-3 py-2">Máx (kWh/mes)</th>
+                      <th class="text-right px-3 py-2">Plantas esperadas</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="r in dcCompromisos" :key="r.id" style="border-top: 1px solid rgba(44,32,57,0.05);"
+                      :style="r['año'] === pcYear && r.mes === pcMonth ? 'background: rgba(145,91,216,0.08);' : ''">
+                      <td class="px-3 py-1.5 font-mono text-xs" style="color: #2C2039;">{{ MESES[r.mes - 1] }} {{ r['año'] }}</td>
+                      <td class="px-3 py-1.5 text-right font-mono" style="color: #2C2039;">{{ fmtQ(r.energia_minima) }}</td>
+                      <td class="px-3 py-1.5 text-right font-mono" style="color: #2C2039;">{{ fmtQ(r.energia_maxima) }}</td>
+                      <td class="px-3 py-1.5 text-right font-mono" style="color: #7a6e8a;">{{ r.cantidad_proyectos ?? '—' }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- 3. Tarifas por mes -->
+            <div v-if="dcTarifas.length">
+              <p class="text-xs font-bold uppercase tracking-widest mb-2" style="color: #915BD8;">Tarifas por mes ($/kWh)</p>
+              <div class="overflow-auto rounded-lg border" style="max-height: 200px; border-color: rgba(44,32,57,0.10);">
+                <table class="w-full text-sm">
+                  <thead class="sticky top-0" style="background: rgba(145,91,216,0.06);">
+                    <tr style="color: #7a6e8a; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">
+                      <th class="text-left px-3 py-2">Período</th>
+                      <th class="text-right px-3 py-2">Tarifa</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="r in dcTarifas" :key="r.id" style="border-top: 1px solid rgba(44,32,57,0.05);"
+                      :style="r['año'] === pcYear && r.mes === pcMonth ? 'background: rgba(145,91,216,0.08);' : ''">
+                      <td class="px-3 py-1.5 font-mono text-xs" style="color: #2C2039;">{{ MESES[r.mes - 1] }} {{ r['año'] }}</td>
+                      <td class="px-3 py-1.5 text-right font-mono" style="color: #2C2039;">{{ fmtQ(r.tarifa) }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- 4. GESCON -->
+            <div>
+              <p class="text-xs font-bold uppercase tracking-widest mb-2" style="color: #915BD8;">GESCON — registros ante el ASIC</p>
+              <div v-if="dcGesconResumen.length" class="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-3 mb-3 px-3 py-2.5 rounded-lg" style="background: rgba(240,192,64,0.08);">
+                <div v-for="f in dcGesconResumen" :key="f.label">
+                  <div class="text-[10px] font-semibold uppercase tracking-wide" style="color: #9a6700;">{{ f.label }}</div>
+                  <div class="text-sm mt-0.5" style="color: #2C2039;" :class="f.mono ? 'font-mono' : ''">{{ f.value }}</div>
+                </div>
+              </div>
+              <div v-if="dcGescon.length" class="overflow-auto rounded-lg border" style="max-height: 280px; border-color: rgba(44,32,57,0.10);">
+                <table class="w-full text-sm">
+                  <thead class="sticky top-0" style="background: rgba(145,91,216,0.06);">
+                    <tr style="color: #7a6e8a; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">
+                      <th class="text-left px-3 py-2">Planta</th>
+                      <th class="text-left px-2 py-2">SIC</th>
+                      <th class="text-left px-2 py-2">Tipo</th>
+                      <th class="text-right px-2 py-2">% Desp.</th>
+                      <th class="text-left px-2 py-2">Inicio</th>
+                      <th class="text-left px-2 py-2">Fin (efectivo)</th>
+                      <th class="text-left px-3 py-2">Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="r in dcGescon" :key="r.id" style="border-top: 1px solid rgba(44,32,57,0.05);"
+                      :style="!r.es_version_vigente ? 'opacity: 0.55;' : ''">
+                      <td class="px-3 py-1.5 font-medium" style="color: #2C2039;">
+                        {{ r.planta_nombre || (r.proyecto_id ? `Proyecto ${r.proyecto_id}` : '—') }}
+                        <span v-if="r.es_duplicado" class="ml-1 inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded" style="background: rgba(240,192,64,0.22); color: #9a6700;"><i class="pi pi-shopping-cart" style="font-size: 9px;" />Duplicado</span>
+                        <span v-if="r.uso_del_recurso" class="ml-1 text-[10px] font-semibold px-1.5 py-0.5 rounded" style="background: rgba(20,184,166,0.14); color: #0f766e;">Uso del recurso</span>
+                      </td>
+                      <td class="px-2 py-1.5 font-mono text-xs" style="color: #7a6e8a;">{{ r.codigo_sic_contrato || '—' }}</td>
+                      <td class="px-2 py-1.5 text-xs" style="color: #7a6e8a;">{{ r.tipo_solicitud }}</td>
+                      <td class="px-2 py-1.5 text-right font-mono text-xs" style="color: #915BD8;">{{ r.porcentaje_despacho != null ? (r.porcentaje_despacho * 100).toFixed(0) + '%' : '—' }}</td>
+                      <td class="px-2 py-1.5 font-mono text-xs" style="color: #7a6e8a;">{{ r.fecha_inicio || '—' }}</td>
+                      <td class="px-2 py-1.5 font-mono text-xs" style="color: #7a6e8a;">{{ r.fecha_fin_efectiva || r.fecha_fin || 'abierta' }}</td>
+                      <td class="px-3 py-1.5">
+                        <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded" :style="dcEstadoStyle(r.estado_solicitud)">{{ r.estado_solicitud }}</span>
+                        <span v-if="r.es_version_vigente" class="ml-1 text-[10px] font-semibold px-1.5 py-0.5 rounded" style="background: rgba(46,125,50,0.12); color: #2e7d32;">vigente</span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div v-else class="px-4 py-4 text-xs text-center rounded-lg border" style="color: rgba(44,32,57,0.35); border-color: rgba(44,32,57,0.08);">
+                <template v-if="detalleContrato.c._proyecto_id">Sin registros GESCON para esta planta — vende en bolsa como generador</template>
+                <template v-else>Sin registros GESCON para este contrato{{ detalleContrato.modo === 'ppa_compra_externa' ? ' — es una compra directa fuera del MEM' : '' }}</template>
+              </div>
+            </div>
+
+            <!-- 5. Plantas del mes consultado (lo que ve la piscina) -->
+            <div v-if="detalleContrato.c.plantas?.length">
+              <p class="text-xs font-bold uppercase tracking-widest mb-2" style="color: #915BD8;">
+                {{ detalleContrato.c._proyecto_id ? 'Planta consultada' : 'Plantas en el contrato' }} · {{ MESES[pcMonth - 1] }} {{ pcYear }} ({{ detalleContrato.c.plantas.length }})
+              </p>
+              <div class="rounded-lg border divide-y" style="border-color: rgba(44,32,57,0.10);">
+                <div v-for="p in detalleContrato.c.plantas" :key="p.id" class="px-3 py-2 flex items-center justify-between text-sm">
+                  <div class="flex items-center gap-2">
+                    <span class="font-medium" style="color: #2C2039;">{{ p.nombre }}</span>
+                    <span v-if="p.codigo_sic" class="text-xs font-mono px-1.5 py-0.5 rounded" style="background: rgba(44,32,57,0.06); color: #7a6e8a;">{{ p.codigo_sic }}</span>
+                    <span v-if="p.pct_despacho != null" class="text-xs font-mono" style="color: #915BD8;">{{ (p.pct_despacho * 100).toFixed(0) }}%</span>
+                    <span v-if="p.es_duplicado" class="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded" style="background: rgba(240,192,64,0.22); color: #9a6700;"><i class="pi pi-shopping-cart" style="font-size: 9px;" />Compra bolsa</span>
+                  </div>
+                  <div class="text-xs font-mono" style="color: #7a6e8a;">
+                    <span v-if="p.fecha_inicio">{{ p.fecha_inicio }}</span>
+                    <span v-if="p.fecha_inicio && p.fecha_fin"> → </span>
+                    <span v-if="p.fecha_fin">{{ p.fecha_fin }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </template>
+    </Teleport>
+
   </div>
 </template>
 
@@ -1358,7 +1740,7 @@ const backendProyectos = ref([])
 
 async function loadBackendProyectos() {
   try {
-    const res = await client.get('/proyectos', { params: { size: 200 } })
+    const res = await client.get('/proyectos', { params: { size: 500 } })
     backendProyectos.value = res.data.items || []
   } catch { /* degradar silenciosamente */ }
 }
@@ -1388,6 +1770,20 @@ const ESTADO_FILTROS = [
   { key: 'excedente', label: 'Exposición en bolsa', color: '#14B8A6', tip: 'Excedente sobre el máximo o plantas duplicadas (compra en bolsa)' },
 ]
 function toggleEstadoFiltro(k) { estadoFiltro.value = estadoFiltro.value === k ? null : k }
+// Filtro por offtaker (comprador del contrato). Vacío = todos. Opciones derivadas
+// de los contratos cargados; '' agrupa los que no tienen comprador (ej. PPA nuevo).
+const offtakersFiltro = ref([])
+const offtakerOpts = computed(() => {
+  const nombres = new Set(allContratos.value.map(c => c.comprador_nombre || ''))
+  const opts = [...nombres].filter(Boolean).sort((a, b) => a.localeCompare(b, 'es'))
+    .map(n => ({ label: n, value: n }))
+  if (nombres.has('')) opts.push({ label: '(Sin offtaker)', value: '' })
+  return opts
+})
+function contratoMatchOfftaker(c) {
+  if (!offtakersFiltro.value.length) return true
+  return offtakersFiltro.value.includes(c.comprador_nombre || '')
+}
 // Exposición en bolsa = excedente (vende en bolsa) O plantas duplicadas (compra en bolsa,
 // genDup>0), aunque el contrato esté cumplido/déficit. Los demás estados son excluyentes.
 function contratoMatchEstado(r, key) {
@@ -1400,14 +1796,35 @@ const dragFromContrato = ref(undefined)
 const dragOver         = ref(null)
 
 // ── Proyectos tab state ──────────────────────────────────────────────────────
-const PC_MODES = [
-  { key: 'venta',  label: 'Venta',  bg: 'rgba(145,91,216,0.12)', color: '#915BD8' },
-  { key: 'compra', label: 'Compra', bg: 'rgba(240,192,64,0.18)', color: '#9a6700' },
-  { key: 'bolsa',  label: 'Bolsa',  bg: 'rgba(44,32,57,0.10)',   color: '#2C2039' },
+// Estados estandarizados a-f (mismo catálogo que GET /clasificacion-energia/categorias
+// en el backend): agente UNGG (generador) / UNGC (comercializador) × PPA / bolsa × rol.
+const PC_GRUPOS = [
+  { label: 'PPA', modes: [
+    { key: 'ppa_venta_ungg',  agente: 'Venta · UNGG',  bg: 'rgba(145,91,216,0.12)', color: '#915BD8' },
+    { key: 'ppa_compra_ungc', agente: 'Compra · UNGC', bg: 'rgba(240,192,64,0.18)', color: '#9a6700' },
+    { key: 'ppa_compra_externa', agente: 'Plantas externas', bg: 'rgba(240,192,64,0.18)', color: '#9a6700' },
+  ]},
+  { label: 'Compra en bolsa', modes: [
+    { key: 'bolsa_compra_ungg', agente: 'UNGG', bg: 'rgba(240,192,64,0.18)', color: '#9a6700' },
+    { key: 'bolsa_compra_ungc', agente: 'UNGC', bg: 'rgba(44,32,57,0.10)',   color: '#2C2039' },
+  ]},
+  { label: 'Venta en bolsa', modes: [
+    { key: 'bolsa_venta_ungg', agente: 'UNGG', bg: 'rgba(44,32,57,0.10)', color: '#2C2039' },
+    { key: 'bolsa_venta_ungc', agente: 'UNGC', bg: 'rgba(44,32,57,0.10)', color: '#2C2039' },
+  ]},
 ]
+const PC_MODE_DESC = {
+  ppa_venta_ungg:   'a. Plantas en contratos GESCON donde UNGG le vende a otro agente (Terpel, NEU, …).',
+  ppa_compra_ungc:  'b. Contratos en que UNGC compra energía a algún agente en GESCON (usualmente a UNGG).',
+  ppa_compra_externa: 'g. Plantas externas: PPAs firmados para comprarle energía directamente a terceros, SIN registro en GESCON — aquí está el detalle de a quién le compramos.',
+  bolsa_compra_ungg:'c. Compras de UNGG a precio de bolsa: plantas duplicadas que aportan a un contrato con origen bolsa (los PLC entrarán cuando se liquiden).',
+  bolsa_compra_ungc:'d. UNGC comprando en bolsa — reglas de negocio por definir.',
+  bolsa_venta_ungg: 'e. Plantas sin contrato en GESCON: venden en bolsa desde UNGG.',
+  bolsa_venta_ungc: 'f. UNGC compra la energía a UNGG (usualmente a precio de bolsa) para venderla en bolsa.',
+}
 const pcYear    = ref(now.getFullYear())
 const pcMonth   = ref(now.getMonth() + 1)
-const pcMode    = ref('venta')
+const pcMode    = ref('ppa_venta_ungg')
 const pcData    = ref(null)
 const pcLoading = ref(false)
 const pcError   = ref(null)
@@ -1427,6 +1844,203 @@ const pcBolsaLibre = computed(() => {
   return (d.bolsa || []).filter(p => p.piscina !== 'comercializador')
 })
 
+// Piscinas estandarizadas a-f: usa `pools` del backend; si aún no llega
+// (deploy en tránsito), las deriva client-side con la misma regla.
+const pcPools = computed(() => {
+  const d = pcData.value
+  if (!d) return { ppa_venta_ungg: [], ppa_compra_ungc: [], bolsa_compra_ungg: [],
+                   bolsa_compra_ungc: [], bolsa_venta_ungg: [], bolsa_venta_ungc: [],
+                   ppa_compra_externa: [] }
+  // ppa_compra_externa por delante: un payload cacheado de un backend viejo puede no traerla
+  if (d.pools) return { ppa_compra_externa: d.compra_externa || [], ...d.pools }
+  const a = [], c = []
+  for (const ct of (d.venta || [])) {
+    const dup = (ct.plantas || []).filter(p => p.es_duplicado)
+    // (a) muestra TODAS las plantas (duplicadas con badge); (c) agrupa las duplicadas
+    a.push({ ...ct, plantas: ct.plantas || [] })
+    if (dup.length) c.push({ ...ct, plantas: dup })
+  }
+  return {
+    ppa_venta_ungg: a,
+    ppa_compra_ungc: d.compra || [],
+    bolsa_compra_ungg: c,
+    bolsa_compra_ungc: [],
+    bolsa_venta_ungg: pcBolsaLibre.value,
+    bolsa_venta_ungc: pcBolsaComercializador.value,
+    ppa_compra_externa: d.compra_externa || [],
+  }
+})
+// Resumen de modalidades en Venta·UNGG: total de plantas vs cuántas son compra
+// en bolsa (duplicado) y cuántas uso del recurso. Alimenta el banner y los chips
+// de la piscina de venta. uso_del_recurso y es_duplicado son excluyentes.
+const pcVentaDupInfo = computed(() => {
+  let total = 0, dup = 0, ur = 0
+  for (const c of (pcPools.value.ppa_venta_ungg || [])) {
+    for (const p of (c.plantas || [])) {
+      total++
+      if (p.uso_del_recurso) ur++
+      else if (p.es_duplicado) dup++
+    }
+  }
+  return { total, dup, ur }
+})
+
+// Contratos de compra externa sin plantas vinculadas: no sabemos a qué planta
+// le compramos — se alerta arriba de las tarjetas (g).
+const externasSinPlantas = computed(() =>
+  (pcPools.value.ppa_compra_externa || []).filter(c => !(c.plantas || []).length)
+)
+
+// ── Detalle de contrato (tab Proyectos): PPA formal + GESCON ─────────────────
+// Click en una tarjeta → modal con el contrato del módulo PPA (indexaciones,
+// cantidades, tarifas, compromisos) + los registros GESCON del contrato
+// (vigencia efectiva) + las plantas del mes consultado.
+const detalleContrato = ref(null)   // { c: tarjeta de la piscina, modo: clave a-g }
+const dcPpa     = ref(null)
+const dcGescon  = ref([])
+const dcLoading = ref(false)
+const dcError   = ref(null)
+
+const DC_TIPOS = {
+  ppa_venta_ungg:     { label: 'Venta PPA · UNGG',   bg: 'rgba(145,91,216,0.10)', color: '#915BD8' },
+  ppa_compra_ungc:    { label: 'Compra PPA · UNGC',  bg: 'rgba(240,192,64,0.18)', color: '#9a6700' },
+  ppa_compra_externa: { label: 'Compra externa (fuera de GESCON)', bg: 'rgba(240,192,64,0.18)', color: '#9a6700' },
+  bolsa_compra_ungg:  { label: 'Compra en bolsa · UNGG', bg: 'rgba(240,192,64,0.18)', color: '#9a6700' },
+  bolsa_venta_ungg:   { label: 'Venta en bolsa · UNGG', bg: 'rgba(44,32,57,0.08)', color: '#2C2039' },
+  bolsa_venta_ungc:   { label: 'Venta en bolsa · UNGC', bg: 'rgba(44,32,57,0.08)', color: '#2C2039' },
+}
+const dcTipo = computed(() => DC_TIPOS[detalleContrato.value?.modo] || DC_TIPOS.ppa_venta_ungg)
+
+const fmtQ = v => (v == null || v === '' ? '—' : Number(v).toLocaleString('es-CO'))
+
+const dcContraparte = computed(() => {
+  const c = detalleContrato.value?.c || {}
+  const p = dcPpa.value
+  const vnd = p?.vendedor_nombre || c.vendedor_nombre
+  const cmp = p?.comprador_nombre || c.comprador_nombre
+  const parts = []
+  if (vnd) parts.push(`Vendedor: ${vnd}${p?.vendedor_nit ? ` (NIT ${p.vendedor_nit})` : ''}`)
+  if (cmp) parts.push(`Comprador: ${cmp}${p?.comprador_nit ? ` (NIT ${p.comprador_nit})` : ''}`)
+  return parts.join('  ·  ')
+})
+
+// Campos del contrato formal, en el orden en que se muestran en la grilla
+const dcCamposFormales = computed(() => {
+  const p = dcPpa.value
+  if (!p) return []
+  return [
+    { label: 'Número / código',        value: p.numero_codigo_contrato || '—', mono: true },
+    { label: 'Tipo de contrato',       value: p.tipo_contrato || 'venta' },
+    { label: 'Vigencia',               value: `${p.fecha_inicio || '—'} → ${p.fecha_fin || 'indefinida'}`, mono: true },
+    { label: 'Tarifa base ($/kWh)',    value: fmtQ(p.tarifa_base), mono: true },
+    { label: 'Índice de indexación',   value: p.indice_indexacion || '—' },
+    { label: 'Periodicidad indexación', value: p.periodicidad_indexacion || '—' },
+    { label: 'Período base indexación', value: p.periodo_indexacion_base ? `${p.periodo_indexacion_base}${p.valor_indexacion_base != null ? ` = ${fmtQ(p.valor_indexacion_base)}` : ''}` : '—', mono: true },
+    { label: 'Cantidad mínima (kWh/mes)', value: fmtQ(p.cantidad_minima_kwh_mes), mono: true },
+    { label: 'Cantidad máxima (kWh/mes)', value: fmtQ(p.cantidad_maxima_kwh_mes), mono: true },
+    { label: 'Periodicidad facturación', value: p.periodicidad_facturacion || '—' },
+    { label: 'Tiempo de pago',         value: p.tiempo_pago != null ? `${p.tiempo_pago} días` : '—' },
+    { label: 'Condiciones de pago',    value: p.condiciones_pago || '—' },
+  ]
+})
+
+// Resumen GESCON del propio contrato PPA (condiciones registradas ante el ASIC)
+const dcGesconResumen = computed(() => {
+  const p = dcPpa.value
+  if (!p || !(p.gescon_codigo || p.gescon_fecha_inicio || p.gescon_precio || p.gescon_cantidades_kwh)) return []
+  return [
+    { label: 'Código GESCON', value: p.gescon_codigo || '—', mono: true },
+    { label: 'Vigencia GESCON', value: `${p.gescon_fecha_inicio || '—'} → ${p.gescon_fecha_fin || '—'}`, mono: true },
+    { label: 'Precio GESCON ($/kWh)', value: fmtQ(p.gescon_precio), mono: true },
+    { label: 'Cantidades GESCON (kWh)', value: fmtQ(p.gescon_cantidades_kwh), mono: true },
+  ]
+})
+
+const dcCompromisos = computed(() =>
+  [...(dcPpa.value?.compromisos_energia || [])].sort((a, b) => a['año'] - b['año'] || a.mes - b.mes)
+)
+const dcTarifas = computed(() =>
+  [...(dcPpa.value?.tarifas || [])].sort((a, b) => a['año'] - b['año'] || a.mes - b.mes)
+)
+
+function dcEstadoStyle(e) {
+  if (e === 'publicado') return 'background: rgba(46,125,50,0.12); color: #2e7d32;'
+  if (e === 'desistimiento' || e === 'rechazado') return 'background: rgba(214,68,85,0.12); color: #D64455;'
+  return 'background: rgba(44,32,57,0.08); color: #7a6e8a;'
+}
+
+async function abrirDetalleContrato(c, modo) {
+  detalleContrato.value = { c, modo }
+  dcPpa.value = null; dcGescon.value = []; dcError.value = null; dcLoading.value = true
+  try {
+    // 1) Contrato formal del módulo PPA (si la tarjeta tiene id real)
+    const ppaId = c.contrato_ppa_id || (typeof c.id === 'number' ? c.id : null)
+    let ppa = null
+    if (ppaId) {
+      try { ppa = (await client.get(`/ppa/${ppaId}`)).data } catch { ppa = null }
+    }
+    // 2) Registros GESCON del contrato (por contrato_interno; fallback por SIC;
+    //    último fallback: historial GESCON de la planta, para capas sin contrato)
+    let gescon = []
+    const ci = c.numero_codigo_contrato || c.contrato_interno || ppa?.numero_codigo_contrato
+    if (ci) {
+      try { gescon = (await client.get('/asic', { params: { contrato_interno: ci } })).data } catch { gescon = [] }
+    }
+    if (!gescon.length && c._proyecto_id) {
+      try { gescon = (await client.get('/asic', { params: { proyecto_id: c._proyecto_id } })).data } catch { /* sin fallback */ }
+    }
+    if (!gescon.length && modo !== 'ppa_compra_externa') {
+      const sic = (c.plantas || []).find(p => p.codigo_sic)?.codigo_sic
+      if (sic) {
+        try { gescon = (await client.get('/asic', { params: { codigo_sic_contrato: sic } })).data } catch { /* sin fallback */ }
+      }
+    }
+    // Vigentes primero, luego por fecha de inicio descendente
+    gescon.sort((a, b) => (b.es_version_vigente === true) - (a.es_version_vigente === true)
+      || String(b.fecha_inicio || '').localeCompare(String(a.fecha_inicio || '')))
+    // 3) Contrato actual desde GESCON: si la capa no traía PPA, el registro
+    //    vigente puede apuntar al contrato con contrato_ppa_id
+    if (!ppa) {
+      const vig = gescon.find(r => r.es_version_vigente && r.contrato_ppa_id)
+      if (vig) {
+        try { ppa = (await client.get(`/ppa/${vig.contrato_ppa_id}`)).data } catch { ppa = null }
+      }
+    }
+    dcPpa.value = ppa
+    dcGescon.value = gescon
+    if (!ppa && !gescon.length) {
+      dcError.value = c._proyecto_id
+        ? 'No se encontraron datos: la planta no tiene registros GESCON ni contrato en el módulo PPA.'
+        : 'No se encontraron datos: el contrato no está en el módulo PPA ni tiene registros GESCON.'
+    }
+  } finally {
+    dcLoading.value = false
+  }
+}
+// Detalle desde una capa de PLANTA (piscinas e/f, sin tarjeta de contrato):
+// tarjeta sintética con la planta; abrirDetalleContrato resuelve GESCON por
+// SIC o por proyecto_id y el contrato actual desde el registro vigente.
+function abrirDetallePlanta(p, modo) {
+  abrirDetalleContrato({ id: null, nombre: p.nombre, plantas: [p], _proyecto_id: p.id }, modo)
+}
+function cerrarDetalleContrato() { detalleContrato.value = null }
+const pcCounts = computed(() => {
+  const d = pcData.value
+  if (!d) return null
+  if (d.counts) return d.counts
+  const P = pcPools.value
+  const nPlantas = list => list.reduce((s, ct) => s + (ct.plantas?.length || 0), 0)
+  return {
+    ppa_venta_ungg: nPlantas(P.ppa_venta_ungg),
+    ppa_compra_ungc: nPlantas(P.ppa_compra_ungc),
+    bolsa_compra_ungg: nPlantas(P.bolsa_compra_ungg),
+    bolsa_compra_ungc: 0,
+    bolsa_venta_ungg: P.bolsa_venta_ungg.length,
+    bolsa_venta_ungc: P.bolsa_venta_ungc.length,
+    ppa_compra_externa: nPlantas(P.ppa_compra_externa || []),
+  }
+})
+
 // Exporta un resumen plano y filtrable: cada contrato (venta + compra) con sus plantas,
 // y al final las plantas SIN contrato (libre) o en bolsa con el comercializador UNGC.
 async function exportarResumenPlantasContratos() {
@@ -1440,27 +2054,41 @@ async function exportarResumenPlantasContratos() {
   const headerRow = aoa.length
   aoa.push(header)
 
-  for (const c of (pcData.value.venta || [])) {
+  // Categorías estandarizadas a-f (mismo catálogo que GET /clasificacion-energia)
+  const P = pcPools.value
+  for (const c of P.ppa_venta_ungg) {
     if (c.plantas.length) {
       for (const p of c.plantas)
-        aoa.push(['Venta', c.nombre, c.comprador_nombre || '', p.nombre, p.codigo_sic || '',
-          pct(p.pct_despacho), p.fecha_inicio || '', p.fecha_fin || '', p.es_duplicado ? 'Compra bolsa' : ''])
+        aoa.push(['a. PPA Venta (UNGG)', c.nombre, c.comprador_nombre || '', p.nombre, p.codigo_sic || '',
+          pct(p.pct_despacho), p.fecha_inicio || '', p.fecha_fin || '', p.es_duplicado ? 'Duplicado — ver c.' : ''])
     } else {
-      aoa.push(['Venta', c.nombre, c.comprador_nombre || '', '(sin plantas en GESCON)', '', '', '', '', ''])
+      aoa.push(['a. PPA Venta (UNGG)', c.nombre, c.comprador_nombre || '', '(sin plantas en GESCON)', '', '', '', '', ''])
     }
   }
-  for (const c of (pcData.value.compra || [])) {
+  for (const c of P.ppa_compra_ungc) {
     if (c.plantas.length) {
       for (const p of c.plantas)
-        aoa.push(['Compra', c.nombre, c.vendedor_nombre || '', p.nombre, '', '', p.fecha_inicio || '', p.fecha_fin || '', ''])
+        aoa.push(['b. PPA Compra (UNGC)', c.nombre, c.vendedor_nombre || '', p.nombre, '', '', p.fecha_inicio || '', p.fecha_fin || '', ''])
     } else {
-      aoa.push(['Compra', c.nombre, c.vendedor_nombre || '', '(sin plantas)', '', '', '', '', ''])
+      aoa.push(['b. PPA Compra (UNGC)', c.nombre, c.vendedor_nombre || '', '(sin plantas)', '', '', '', '', ''])
     }
   }
-  for (const p of pcBolsaComercializador.value)
-    aoa.push(['Bolsa UNGC', '', 'UNGC (comercializador)', p.nombre, p.codigo_sic || '', '', '', '', 'En contrato con UNGC'])
-  for (const p of pcBolsaLibre.value)
-    aoa.push(['Sin contrato', '', '', p.nombre, '', '', '', '', 'Sin SIC vigente'])
+  for (const c of P.ppa_compra_externa || []) {
+    if (c.plantas.length) {
+      for (const p of c.plantas)
+        aoa.push(['g. Plantas externas (PPA)', c.nombre, c.vendedor_nombre || '', p.nombre, '', '', p.fecha_inicio || '', p.fecha_fin || '', 'Compra directa fuera de GESCON'])
+    } else {
+      aoa.push(['g. Plantas externas (PPA)', c.nombre, c.vendedor_nombre || '', '(sin plantas vinculadas)', '', '', c.fecha_inicio || '', c.fecha_fin || '', 'Compra directa fuera de GESCON'])
+    }
+  }
+  for (const c of P.bolsa_compra_ungg)
+    for (const p of c.plantas)
+      aoa.push(['c. Compra en Bolsa (UNGG)', c.nombre, c.comprador_nombre || '', p.nombre, p.codigo_sic || '',
+        pct(p.pct_despacho), p.fecha_inicio || '', p.fecha_fin || '', 'Duplicado — origen bolsa'])
+  for (const p of P.bolsa_venta_ungg)
+    aoa.push(['e. Venta en Bolsa (UNGG)', '', '', p.nombre, '', '', '', '', 'Sin SIC vigente'])
+  for (const p of P.bolsa_venta_ungc)
+    aoa.push(['f. Venta en Bolsa (UNGC)', '', 'UNGC (comercializador)', p.nombre, p.codigo_sic || '', '', '', '', 'SIC con comprador UNGC'])
 
   const ws = XLSX.utils.aoa_to_sheet(aoa)
   const C = { morado: '915BD8', oscuro: '2C2039', blanco: 'FFFFFF' }
@@ -1787,6 +2415,7 @@ const visibleContratos = computed(() => {
   const res = simResults.value
   const filtered = allContratos.value.filter(c => {
     if (hiddenContratos.value.has(c.id)) return false
+    if (!contratoMatchOfftaker(c)) return false
     if (estadoFiltro.value && !contratoMatchEstado(res[c.id], estadoFiltro.value)) return false
     return true
   })
@@ -1797,12 +2426,14 @@ const visibleContratos = computed(() => {
   })
 })
 
-// Conteo por estado (sobre los contratos no ocultos) para mostrar en los botones de filtro.
+// Conteo por estado (sobre los contratos no ocultos, respetando el filtro de
+// offtaker) para mostrar en los botones de filtro.
 const estadoCounts = computed(() => {
   const res = simResults.value
   const counts = { ok: 0, deficit: 0, excedente: 0 }
   for (const c of allContratos.value) {
     if (hiddenContratos.value.has(c.id)) continue
+    if (!contratoMatchOfftaker(c)) continue
     // Conteos por propiedad (no excluyentes: un contrato cumplido puede tener exposición).
     for (const k of ['ok', 'deficit', 'excedente']) {
       if (contratoMatchEstado(res[c.id], k)) counts[k]++
@@ -2108,6 +2739,19 @@ function fmtFecha(iso) {
   if (!iso) return '—'
   const [y, m] = iso.split('-')
   return `${MESES_CORTOS[parseInt(m) - 1]} ${y}`
+}
+function fmtFechaDia(iso) {
+  if (!iso) return '—'
+  const [y, m, d] = iso.split('-')
+  return `${d} ${MESES_CORTOS[parseInt(m) - 1].toLowerCase()} ${y}`
+}
+// Ventana de la modalidad Venta en Bolsa (UNGC): fecha_inicio del registro SIC
+// y fecha_fin EFECTIVA (recortada por relevos) que envía el backend.
+function ventanaBolsa(p) {
+  if (!p.fecha_inicio && !p.fecha_fin) return ''
+  if (!p.fecha_fin) return `En bolsa UNGC desde ${fmtFechaDia(p.fecha_inicio)} · vigente`
+  if (!p.fecha_inicio) return `En bolsa UNGC hasta ${fmtFechaDia(p.fecha_fin)}`
+  return `En bolsa UNGC del ${fmtFechaDia(p.fecha_inicio)} al ${fmtFechaDia(p.fecha_fin)}`
 }
 
 // ── Helpers de barras de cumplimiento (simulador) ─────────────────────────────
@@ -2472,6 +3116,156 @@ async function copiarImagenCapa(c) {
       const a = document.createElement('a')
       a.href = url
       a.download = `capa-${(c.nombre || 'contrato').replace(/[^\w-]+/g, '_')}.png`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    }
+  }, 'image/png')
+}
+
+// ── Copiar imagen de un contrato de venta (tab Proyectos → modo Venta) ────────
+// Mismo mecanismo que copiarImagenCapa: Canvas → PNG → portapapeles, con
+// fallback a descarga si el navegador no permite escribir imágenes.
+const copiadoVentaId = ref(null)
+
+function _renderVentaCanvas(c) {
+  const plantas = c.plantas || []
+  const DARK = '#2C2039', GREY = '#7a6e8a', PURPLE = '#915BD8', GOLD = '#9a6700'
+  const scale = 2
+  const W = 760, padX = 36
+  const headerH = 96, tableHeadH = 30, rowH = 34, footerH = 46
+  const bodyTop = headerH + tableHeadH
+  const H = bodyTop + Math.max(plantas.length, 1) * rowH + footerH
+
+  const canvas = document.createElement('canvas')
+  canvas.width = W * scale
+  canvas.height = H * scale
+  const ctx = canvas.getContext('2d')
+  ctx.scale(scale, scale)
+  ctx.textBaseline = 'alphabetic'
+
+  // Fondo + barra de acento
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(0, 0, W, H)
+  ctx.fillStyle = PURPLE
+  ctx.fillRect(0, 0, W, 6)
+
+  // ── Header: nombre + comprador ──
+  ctx.fillStyle = DARK
+  ctx.font = 'bold 21px Inter, Arial, sans-serif'
+  ctx.fillText(_truncarTexto(ctx, c.nombre || 'Contrato', W - padX * 2 - 130), padX, 42)
+  ctx.fillStyle = GREY
+  ctx.font = '13px Inter, Arial, sans-serif'
+  ctx.fillText(_truncarTexto(ctx, c.comprador_nombre || '', W - padX * 2 - 130), padX, 62)
+  ctx.fillStyle = PURPLE
+  ctx.font = 'bold 11px Inter, Arial, sans-serif'
+  ctx.fillText(`Período de consulta: ${MESES[pcMonth.value - 1]} ${pcYear.value}`, padX, 80)
+
+  // Pill "N plantas" arriba a la derecha
+  ctx.textBaseline = 'middle'
+  const pillTxt = `${plantas.length} planta${plantas.length === 1 ? '' : 's'}`
+  const f = 'bold 12px Inter, Arial, sans-serif'
+  ctx.font = f
+  const pillW = ctx.measureText(pillTxt).width + 18
+  _dibujarPill(ctx, W - padX - pillW, 30, pillTxt, 'rgba(145,91,216,0.12)', PURPLE, f)
+  ctx.textBaseline = 'alphabetic'
+
+  // ── Cabecera de tabla ──
+  const colVigR = W - padX
+  const colPctR = W - padX - 150
+  const colSicR = W - padX - 260
+  const yHead = headerH + 20
+  ctx.fillStyle = GREY
+  ctx.font = 'bold 10px Inter, Arial, sans-serif'
+  ctx.fillText('PROYECTO', padX, yHead)
+  ctx.textAlign = 'right'
+  ctx.fillText('CÓDIGO SIC', colSicR, yHead)
+  ctx.fillText('% DESPACHO', colPctR, yHead)
+  ctx.fillText('VIGENCIA', colVigR, yHead)
+  ctx.textAlign = 'left'
+
+  // ── Filas de plantas ──
+  if (!plantas.length) {
+    ctx.fillStyle = 'rgba(44,32,57,0.35)'
+    ctx.font = 'italic 13px Inter, Arial, sans-serif'
+    ctx.fillText(`Sin plantas asignadas en GESCON para ${MESES[pcMonth.value - 1]} ${pcYear.value}`, padX, bodyTop + 24)
+  }
+  plantas.forEach((p, i) => {
+    const yTop = bodyTop + i * rowH
+    const yMid = yTop + rowH / 2
+    if (i % 2 === 1) {
+      ctx.fillStyle = 'rgba(145,91,216,0.04)'
+      ctx.fillRect(padX - 8, yTop, W - padX * 2 + 16, rowH)
+    }
+    ctx.textBaseline = 'middle'
+    // Nombre + tag duplicado
+    ctx.fillStyle = p.es_duplicado ? GOLD : DARK
+    ctx.font = '600 13px Inter, Arial, sans-serif'
+    const nameMaxW = colSicR - padX - (p.es_duplicado ? 190 : 100)
+    const nombre = _truncarTexto(ctx, p.nombre || `Proyecto ${p.id}`, nameMaxW)
+    ctx.fillText(nombre, padX, yMid)
+    if (p.es_duplicado) {
+      const nx = padX + ctx.measureText(nombre).width + 8
+      _dibujarPill(ctx, nx, yMid - 9, 'Compra bolsa', 'rgba(240,192,64,0.22)', GOLD, 'bold 10px Inter, Arial, sans-serif')
+    }
+    // Código SIC
+    ctx.textAlign = 'right'
+    ctx.fillStyle = GREY
+    ctx.font = '12px Inter, Arial, sans-serif'
+    ctx.fillText(p.codigo_sic || '—', colSicR, yMid)
+    // % despacho
+    ctx.fillStyle = PURPLE
+    ctx.font = 'bold 12px Inter, Arial, sans-serif'
+    ctx.fillText(p.pct_despacho != null ? (p.pct_despacho * 100).toFixed(0) + '%' : '—', colPctR, yMid)
+    // Vigencia (rojo si vence pronto)
+    const vigencia = (p.fecha_inicio || p.fecha_fin) ? `${p.fecha_inicio || '—'} → ${p.fecha_fin || '—'}` : '—'
+    const vence = p.fecha_fin && isExpiringSoon(p.fecha_fin)
+    ctx.fillStyle = vence ? '#D64455' : GREY
+    ctx.font = (vence ? 'bold ' : '') + '12px Inter, Arial, sans-serif'
+    ctx.fillText(vigencia, colVigR, yMid)
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'alphabetic'
+  })
+
+  // ── Footer ──
+  ctx.fillStyle = '#faf8fc'
+  ctx.fillRect(0, H - footerH, W, footerH)
+  ctx.fillStyle = PURPLE
+  ctx.font = 'bold 12px Inter, Arial, sans-serif'
+  ctx.fillText('Unergy', padX, H - footerH / 2 + 1)
+  ctx.fillStyle = GREY
+  ctx.font = '11px Inter, Arial, sans-serif'
+  ctx.textBaseline = 'middle'
+  ctx.fillText('Plantas y contratos · Venta', padX + 58, H - footerH / 2 + 1)
+  ctx.textAlign = 'right'
+  ctx.fillText(`${MESES[pcMonth.value - 1]} ${pcYear.value}`, W - padX, H - footerH / 2 + 1)
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'alphabetic'
+
+  return canvas
+}
+
+async function copiarImagenVenta(c) {
+  let canvas
+  try {
+    canvas = _renderVentaCanvas(c)
+  } catch (e) {
+    console.error('No se pudo renderizar la imagen del contrato', e)
+    return
+  }
+  canvas.toBlob(async (blob) => {
+    if (!blob) return
+    try {
+      await navigator.clipboard.write([new window.ClipboardItem({ 'image/png': blob })])
+      copiadoVentaId.value = c.id
+      setTimeout(() => { if (copiadoVentaId.value === c.id) copiadoVentaId.value = null }, 2200)
+    } catch (e) {
+      // Fallback: el navegador no permite escribir imágenes al portapapeles → descargar
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `venta-${(c.nombre || 'contrato').replace(/[^\w-]+/g, '_')}.png`
       document.body.appendChild(a)
       a.click()
       a.remove()
@@ -2990,6 +3784,9 @@ onMounted(async () => {
   transform: translateY(-2px);
 }
 .cv-card-dragover { border-color: #915BD8 !important; box-shadow: 0 0 0 2px rgba(145,91,216,0.18) !important; }
+/* Fila/encabezado que abre el detalle (ventana emergente) al hacer click */
+.cv-row-click { cursor: pointer; transition: background .12s; }
+.cv-row-click:hover { background: rgba(145,91,216,0.06); }
 .cv-panel {
   background: #fff; border: 1px solid rgba(44,32,57,0.07); border-radius: 16px;
   box-shadow: 0 1px 2px rgba(44,32,57,0.04), 0 2px 10px rgba(44,32,57,0.035);

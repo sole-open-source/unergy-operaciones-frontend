@@ -27,6 +27,15 @@ export const ACC2CONCEPT = {
   '28151010': 'iva_int',  '28151016': 'iva_int',
   '28150515': 'arr',      '28150517': 'arr',
   '28150516': 'iva_arr',  '28150518': 'iva_arr',
+  // Póliza todo riesgo y lucrocesante (antes sin mapear: el verificador la
+  // ignoraba tanto en el asiento como en el mandato).
+  '28151004': 'poliza',   '28151007': 'iva_poliza',
+  // Servicios públicos - consumo de energía (sin cuenta de IVA separada; la
+  // contrapartida en Haber —p. ej. "23355001 SERV DE ENERGIA"— no es un costo
+  // adicional, es solo el otro lado del asiento).
+  '28151008': 'serv_pub',
+  // Administración de proyectos (costos para terceros).
+  '28151020': 'admin',    '28151021': 'iva_admin',
 }
 
 /** Concepto -> etiqueta legible. */
@@ -34,6 +43,13 @@ export const CONCEPTS = {
   mant: 'Mantenimiento', iva_mant: 'IVA mantenimiento',
   int: 'Servicio de internet', iva_int: 'IVA internet',
   arr: 'Arriendo', iva_arr: 'IVA arriendo',
+  poliza: 'Póliza todo riesgo y lucrocesante', iva_poliza: 'IVA póliza',
+  serv_pub: 'Servicios públicos - consumo de energía',
+  admin: 'Administración', iva_admin: 'IVA administración',
+  // Sub-tipos de arriendo cuando el proyecto factura por separado (ej. La
+  // Reserva). Si el proyecto no divide el arriendo, todo sigue cayendo en el
+  // concepto genérico 'arr'.
+  arr_cc: 'Arriendo Cuenta de Cobro', arr_fact: 'Arriendo Factura Electrónica',
 }
 
 /** Cuentas que NO son de costo de mandato: si reciben débito = "cuenta equivocada". */
@@ -63,18 +79,94 @@ export const norm = (s) =>
 
 export const projectTokens = (s) => norm(s).split(' ').filter((t) => t.length > 2 && !FILLER.has(t))
 
-/** Conjunto de tokens distintivos de un nombre de empresa/persona (palabra completa). */
-export const nameTokenSet = (s) => new Set(norm(s).split(' ').filter((w) => w.length >= 3 && !STOP.has(w)))
+/**
+ * Expande abreviaturas comunes ANTES de tokenizar. En algunas filas el campo
+ * "Asociado" del asiento abrevia el mandante con "PA" (Patrimonio Autónomo) en
+ * vez del nombre completo "PATRIMONIOS AUTONOMOS..." (ej. "FIDUCIARIA BANCOLOMBIA
+ * PA NESTLE 18254"). Como "PA" tiene solo 2 letras se descartaba por el filtro de
+ * longitud y nunca calzaba con "PATRIMONIOS"/"AUTONOMOS" del mandato → el mandato
+ * se reportaba como "no aparece registrado" aunque sí estaba, con otro texto.
+ */
+export const expandirAbreviaturas = (s) => norm(s).replace(/\bPA\b/g, 'PATRIMONIOS AUTONOMOS')
 
-/** Convierte "1.234.567,89" / "$ 1.234.567,89" a número (formato CO). */
-export const parseNum = (s) => {
-  if (s == null) return 0
-  if (typeof s === 'number') return s
+/** Conjunto de tokens distintivos de un nombre de empresa/persona (palabra completa). */
+export const nameTokenSet = (s) => new Set(expandirAbreviaturas(s).split(' ').filter((w) => w.length >= 3 && !STOP.has(w)))
+
+/**
+ * Normaliza un string monetario a "cuerpo numérico" y signo: quita $, espacios,
+ * y detecta negativo por signo menos o paréntesis contables "(1.234)".
+ * @returns {{body: string, neg: boolean} | null}  null si queda vacío.
+ */
+const stripMoney = (s) => {
+  if (s == null) return null
+  if (typeof s === 'number') return { body: String(s), neg: false, isNumber: true, value: s }
   let t = s.toString().trim().replace(/\$/g, '').replace(/\s/g, '')
-  t = t.replace(/\./g, '').replace(/,/g, '.')
-  const n = parseFloat(t)
-  return isNaN(n) ? 0 : n
+  if (!t) return null
+  const neg = /^-/.test(t) || /^\(.*\)$/.test(t)
+  t = t.replace(/[()]/g, '').replace(/^-/, '')
+  if (!t) return null
+  return { body: t, neg }
 }
+
+/**
+ * Normaliza una CIFRA a Number, detectando automáticamente si la coma/punto es
+ * separador de miles o decimal. Es la ÚNICA función de parseo numérico; sirve
+ * para AMBAS fuentes, sin necesidad de saber de cuál viene el dato:
+ *   - Mandato (PDF), formato US: coma=miles, punto=decimal  ("2,011.51" → 2011.51)
+ *   - Asiento (Excel), formato CO: punto=miles, coma=decimal ("2.011,51" → 2011.51)
+ *
+ * Reglas de detección:
+ *   1. Si ya es número, se devuelve tal cual (así llegan las celdas del xlsx).
+ *   2. Se quitan $ y espacios; negativo por signo "-" o paréntesis contable "(1.234)".
+ *   3. Si hay coma Y punto: el ÚLTIMO en aparecer es el DECIMAL; el otro, miles.
+ *      ("1,234.56"→1234.56 US · "1.234,56"→1234.56 CO)
+ *   4. Si hay un solo tipo de separador:
+ *        - aparece varias veces           → miles   ("1.234.567" / "1,234,567" → 1234567)
+ *        - una vez con EXACTAMENTE 3 dígitos detrás → miles ("497,333"→497333 · "129.413"→129413)
+ *        - una vez con ≠3 dígitos detrás   → decimal ("0,50"→0.5 · "12.5"→12.5)
+ *
+ * La regla 4 asume el dominio (pesos colombianos): NO hay importes con 3 decimales
+ * —los decimales son de 2 (,00 / .51)— por eso "X,YYY"/"X.YYY" con 3 dígitos son
+ * siempre miles. Maneja vacío/null → 0.
+ */
+export const normalizarCifra = (s) => {
+  const p = stripMoney(s)
+  if (!p) return 0
+  if (p.isNumber) return p.value
+  const body = p.body                          // solo dígitos y separadores , .
+  const hasComma = body.includes(',')
+  const hasDot = body.includes('.')
+  let t
+  if (hasComma && hasDot) {
+    // El último separador que aparece es el decimal; el otro es de miles.
+    const comaEsDecimal = body.lastIndexOf(',') > body.lastIndexOf('.')
+    t = comaEsDecimal
+      ? body.replace(/\./g, '').replace(',', '.')  // CO: puntos=miles fuera, coma=decimal
+      : body.replace(/,/g, '')                     // US: comas=miles fuera, punto=decimal
+  } else if (hasComma || hasDot) {
+    const sep = hasComma ? ',' : '.'
+    const parts = body.split(sep)
+    const unaVez = parts.length === 2
+    const decimales = unaVez ? parts[1].length : 0
+    // Único separador: decimal solo si aparece una vez y NO tiene 3 dígitos detrás.
+    t = (unaVez && decimales !== 3)
+      ? body.replace(sep, '.')                      // decimal
+      : parts.join('')                             // miles
+  } else {
+    t = body
+  }
+  const n = parseFloat(t)
+  if (isNaN(n)) return 0
+  return p.neg ? -n : n
+}
+
+/**
+ * @deprecated Usar normalizarCifra. Alias mantenidos para compatibilidad con
+ * código/tests que aún los importen; ahora ambos delegan en la función única.
+ */
+export const parseMandatoNumber = normalizarCifra
+export const parseAsientoNumber = normalizarCifra
+export const parseNum = normalizarCifra
 
 // ===================== PARSEO DE ASIENTOS (Excel Odoo) =====================
 
@@ -126,10 +218,10 @@ export function parseAsientos(rows) {
     // Débito/haber: usar DEBE/HABER si existen; si no, derivar del importe con signo.
     let debe = 0, haber = 0
     if (col.debe !== -1 || col.haber !== -1) {
-      debe = parseNum(r[col.debe])
-      haber = parseNum(r[col.haber])
+      debe = parseAsientoNumber(r[col.debe])
+      haber = parseAsientoNumber(r[col.haber])
     } else if (col.importe !== -1) {
-      const imp = parseNum(r[col.importe])
+      const imp = parseAsientoNumber(r[col.importe])
       if (imp >= 0) debe = imp; else haber = -imp
     }
 
@@ -175,22 +267,38 @@ export function extractMandate(text, filename = '') {
   if (!proj) { const m = filename.match(/-Costos-(.+?)-[^-]+\.pdf/i); proj = m ? m[1] : filename }
   proj = (proj || '').replace(/\s+/g, ' ').trim()
 
-  // Conceptos: línea "ETIQUETA ... $ valor"
+  // Conceptos: línea "ETIQUETA ... $ valor".
+  // El ORDEN importa: las reglas específicas se evalúan antes que las genéricas
+  // (label.startsWith), para que "ARRIENDO CUENTA DE COBRO" no caiga en 'arr'.
   const map = [
     ['MANTENIMIENTO', 'mant'], ['IVA MANTENIMIENTO', 'iva_mant'],
     ['SERVICIO DE INTERNET', 'int'], ['IVA INTERNET', 'iva_int'],
+    // Variantes específicas de arriendo ANTES del genérico: cuando el proyecto
+    // divide el arriendo en dos facturas (ej. La Reserva), se guardan como
+    // conceptos separados y cada una se verifica contra su etiqueta del asiento.
+    ['ARRIENDO CUENTA DE COBRO', 'arr_cc'], ['ARRIENDO FACTURA', 'arr_fact'],
     ['ARRIENDO', 'arr'], ['IVA ARRIENDO', 'iva_arr'],
+    // 'POLIZA' (sin el resto de la frase) para tolerar variaciones de redacción.
+    ['POLIZA', 'poliza'], ['IVA POLIZA', 'iva_poliza'],
+    // Servicios públicos - consumo de energía (sin IVA separado).
+    ['SERVICIOS PUBLICOS', 'serv_pub'],
+    // Administración de proyectos.
+    ['ADMINISTRACION', 'admin'], ['IVA ADMINISTRACION', 'iva_admin'],
   ]
   const vals = {}; let total = null
   text.split('\n').forEach((line) => {
     const m = line.match(/^(.*?)\$\s*([\d.,]+)\s*$/)
     if (!m) return
-    const label = norm(m[1]); const v = parseNum(m[2])
+    const label = norm(m[1]); const v = parseMandatoNumber(m[2])
     if (label.includes('VALOR A PAGAR')) { total = v; return }
     for (const [kw, key] of map) {
       if (label.startsWith(kw) || (kw.startsWith('IVA') && label.includes(kw))) {
-        if ((key === 'mant' || key === 'int' || key === 'arr') && label.includes('IVA')) continue
-        vals[key] = v; return
+        // Evita que "IVA MANTENIMIENTO"/"IVA PÓLIZA"/... caiga en el concepto base.
+        if ((key === 'mant' || key === 'int' || key === 'arr' || key === 'poliza' || key === 'admin') && label.includes('IVA')) continue
+        // Se ACUMULA (no se sobrescribe) para soportar conceptos que el mandato
+        // divide en varias líneas mapeadas al mismo concepto genérico (ej. dos
+        // líneas de "arriendo"); antes la segunda pisaba a la primera.
+        vals[key] = (vals[key] || 0) + v; return
       }
     }
   })
@@ -241,11 +349,23 @@ export function reconciliar(mandato, details, tag) {
     return { status: 'bad', flags: [{ lvl: 'bad', code: 'SIN_TAG', txt: 'No se asignó etiqueta analítica; no se puede verificar.' }], sums: {}, lines: [] }
   }
 
-  // Mandante por PALABRA COMPLETA y con TODOS los términos distintivos (fix STRADA/ESTRADA)
+  // Mandante por PALABRA COMPLETA (fix STRADA/ESTRADA) pero tolerando abreviaturas.
   const mandTok = [...nameTokenSet(mandato.mandante)]
   const asociadoMatch = (aso) => {
+    // Coincide si uno de los nombres es SUBCONJUNTO del otro. El asiento suele
+    // abreviar el mandante omitiendo las palabras corporativas — p. ej.
+    // "PA 17844 SOL DE LA SIERRA" vs. el mandante completo "PATRIMONIOS AUTONOMOS
+    // FIDUCIARIA BANCOLOMBIA ... 17844 SOL DE LA SIERRA": comparten patrimonio +
+    // fondo pero el asiento no trae FIDUCIARIA/BANCOLOMBIA. Exigir TODOS los
+    // tokens del mandante fallaba (0 líneas). Se exige que TODOS los tokens del
+    // conjunto MÁS PEQUEÑO estén en el otro, con intersección no vacía. NO
+    // reintroduce STRADA⊂ESTRADA (por palabra completa no comparten tokens) y
+    // distingue fondos distintos por su token distintivo (17844 vs 18254).
     const aset = nameTokenSet(aso)
-    return mandTok.length > 0 && mandTok.every((t) => aset.has(t))
+    if (!mandTok.length || !aset.size) return false
+    let inter = 0
+    for (const t of mandTok) if (aset.has(t)) inter++
+    return inter > 0 && (inter === mandTok.length || inter === aset.size)
   }
   const lines = details.filter((d) => d.proj === tag && asociadoMatch(d.asociado))
 
@@ -260,7 +380,18 @@ export function reconciliar(mandato, details, tag) {
   //  asociado no es el mandante y, además, son crédito, no débito.)
   const sums = {}; const wrongAcc = []
   lines.forEach((d) => {
-    const c = ACC2CONCEPT[d.acc]
+    let c = ACC2CONCEPT[d.acc]
+    // Si la cuenta es de arriendo genérico, se afina el concepto según la
+    // ETIQUETA del asiento — algunos proyectos (ej. La Reserva) dividen el
+    // arriendo en dos facturas que comparten cuenta contable pero se distinguen
+    // por la etiqueta: "...CC..." (Cuenta de Cobro) o "...FACT..." (Factura). Si
+    // la etiqueta no trae ninguna de las dos, se queda como 'arr' genérico y no
+    // rompe los proyectos que no dividen el arriendo.
+    if (c === 'arr') {
+      const etq = norm(d.etiqueta || '')
+      if (/\bCC\b/.test(etq)) c = 'arr_cc'
+      else if (/\bFACT\b/.test(etq)) c = 'arr_fact'
+    }
     if (c) sums[c] = (sums[c] || 0) + d.debe
     else if (NON_COST_ACCOUNTS[d.acc] && (d.debe - d.haber) > 0) wrongAcc.push(d)
   })

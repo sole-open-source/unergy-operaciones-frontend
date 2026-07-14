@@ -15,6 +15,7 @@ const routes = [
   { path: '/m/coordinador', name: 'MobileCoordinador', component: () => import('@/mobile/MobileCoordinadorFallasView.vue'), meta: { mobile: true, roles: ['coordinador', 'admin'] } },
   { path: '/m/tecnico',     name: 'MobileTecnico',     component: () => import('@/mobile/MobileTecnicoFallasView.vue'),    meta: { mobile: true, roles: ['tecnico'] } },
   { path: '/m/resumen',   name: 'MobileResumen', component: () => import('@/mobile/MobileResumenView.vue'), meta: { mobile: true } },
+  { path: '/m/reporte-cgm', name: 'MobileReporteCGM', component: () => import('@/mobile/MobileReporteCGMView.vue'), meta: { mobile: true } },
 
   // ── General ──────────────────────────────────────────────────────
   { path: '/', redirect: '/dashboard' },
@@ -30,9 +31,13 @@ const routes = [
   { path: '/contratos/:id',name: 'ContratoDetalle', component: () => import('@/views/Contratos/ContratoDetailView.vue') },
   { path: '/general/proximos-energizar', name: 'ProximosEnergizar', component: () => import('@/views/General/ProximosEnergizarView.vue') },
 
+  // ── Comercial ────────────────────────────────────────────────────
+  { path: '/comercial', name: 'Comercial', component: () => import('@/views/Comercial/ComercialPipelineView.vue'), meta: { roles: ['admin', 'comercial'] } },
+  { path: '/comercial/oportunidades/:id', name: 'OportunidadDetalle', component: () => import('@/views/Comercial/OportunidadDetailView.vue'), meta: { roles: ['admin', 'comercial'] } },
+
   // ── Operaciones ──────────────────────────────────────────────────
   { path: '/operaciones/informes-mensuales', name: 'InformesMensuales', component: () => import('@/views/Operaciones/InformesMensualesView.vue'), meta: { roles: ['admin', 'operaciones', 'monitoreo'] } },
-  { path: '/operaciones/control-generacion', name: 'ControlGeneracion', component: () => import('@/views/Operaciones/ControlGeneracion.vue'), meta: { roles: ['admin', 'operaciones', 'monitoreo'] } },
+  { path: '/operaciones/informes-mensuales/dashboard', name: 'InformesMensualesDashboard', component: () => import('@/views/Operaciones/InformesMensualesDashboard.vue'), meta: { roles: ['admin', 'operaciones', 'monitoreo'] } },
   { path: '/informes/:id', name: 'InformeDetalle', component: () => import('@/views/Operaciones/InformeDetailView.vue'), meta: { roles: ['admin', 'operaciones', 'monitoreo'] } },
   { path: '/operaciones/gestion-fallas', name: 'GestionFallas', component: () => import('@/views/Operaciones/GestionFallasView.vue'), meta: { roles: ['admin', 'operaciones', 'monitoreo'] } },
   { path: '/operaciones/costos-variables', name: 'CostosVariables', component: () => import('@/views/Operaciones/CostosVariablesTabsView.vue'), meta: { roles: ['admin', 'operaciones'] } },
@@ -49,9 +54,10 @@ const routes = [
   // ── Finanzas ─────────────────────────────────────────────────────
   { path: '/liquidaciones',                  name: 'Liquidaciones',                  component: () => import('@/views/Liquidaciones/LiquidacionesView.vue'),                     meta: { roles: ['admin', 'liquidaciones'] } },
   { path: '/liquidaciones/inversionista',    redirect: '/liquidaciones?tab=inversionistas' },
-  { path: '/liquidaciones/cargar-excel',     redirect: '/liquidaciones?tab=cargar' },
+  { path: '/liquidaciones/cargar-excel',     redirect: '/liquidaciones' },
   { path: '/finanzas/costos',             name: 'Costos',                     component: () => import('@/views/Finanzas/CostosView.vue'),                                meta: { roles: ['admin', 'liquidaciones'] } },
   { path: '/validador-mandatos',          name: 'ValidadorMandatos',          component: () => import('@/views/Finanzas/ValidadorMandatosView.vue'),                     meta: { roles: ['admin', 'liquidaciones'] } },
+  { path: '/finanzas/descarga-xm',     name: 'DescargaXM',     component: () => import('@/views/Finanzas/DescargaXMView.vue'),        meta: { roles: ['admin', 'liquidaciones'] } },
   { path: '/panel-contable',              name: 'PanelContable',              component: () => import('@/views/PanelContable/PanelContableView.vue'),                    meta: { roles: ['admin', 'liquidaciones'] } },
   { path: '/liquidaciones/minigranjas',   redirect: '/liquidaciones' },
   { path: '/liquidaciones/:id',           name: 'LiquidacionDetalle',         component: () => import('@/views/Liquidaciones/LiquidacionDetailView.vue'),           meta: { roles: ['admin', 'liquidaciones'] } },
@@ -61,6 +67,9 @@ const routes = [
   // ── MEM ──────────────────────────────────────────────────────────
   { path: '/mem/gescon',       name: 'MemGescon',       component: () => import('@/views/MEM/GesconView.vue'),        meta: { roles: ['admin', 'operaciones'] } },
   { path: '/mem/fronteras',    name: 'MemFronteras',    component: () => import('@/views/MEM/FronterasView.vue'),     meta: { roles: ['admin', 'operaciones'] } },
+  { path: '/mem/reporte-energia', name: 'MemReporteEnergia', component: () => import('@/views/MEM/ReporteEnergiaView.vue'), meta: { roles: ['admin', 'operaciones'] } },
+  { path: '/mem/operadores-red', name: 'MemOperadoresRed', component: () => import('@/views/MEM/OperadoresRedView.vue'), meta: { roles: ['admin', 'operaciones'] } },
+  { path: '/mem/operadores-red/:id', name: 'MemOperadorRedDetalle', component: () => import('@/views/MEM/OperadorRedDetailView.vue'), meta: { roles: ['admin', 'operaciones'] } },
   { path: '/mem/precio-bolsa', name: 'MemPrecioBolsa',  component: () => import('@/views/MEM/PrecioBolsaView.vue') },
   { path: '/mem/balance',      name: 'MemBalance',      component: () => import('@/views/MEM/BalanceView.vue') },
   { path: '/mem/clima',        name: 'MemClima',        component: () => import('@/views/MEM/ClimaView.vue') },
@@ -79,6 +88,19 @@ const routes = [
 const router = createRouter({
   history: createWebHistory(),
   routes,
+})
+
+// Cada deploy a Vercel borra los archivos JS de la versión anterior. Si el
+// usuario tenía una pestaña abierta desde antes del deploy, el import()
+// perezoso de una vista falla (404) al navegar -- la ruta se queda "pegada"
+// sin ningún error visible, hasta que refresca a mano. El listener de
+// `vite:preloadError` en main.js recarga para tomar los archivos nuevos; aquí
+// solo evitamos que la ruta quede completamente muerta si esa recarga no llega
+// a dispararse por algún motivo (navegamos al dashboard en vez de no hacer nada).
+router.onError((_err, to) => {
+  if (to.fullPath !== router.currentRoute.value.fullPath) {
+    router.push('/dashboard').catch(() => {})
+  }
 })
 
 router.beforeEach((to) => {

@@ -4,10 +4,11 @@
  * Combina, para un período (YYYY-MM):
  *  - Mantenimiento  → /om/calculo/{periodo} (incluido + valor_a_facturar)   [mainteinance]
  *  - Arriendos      → /arriendos/calculo/{periodo} (incluido + canon_a_facturar) [lease]
- *  - Internet       → /starlink/factura/{periodo} (agrupado.monto_total)     [public_services]
+ *  - Internet       → /starlink/factura/{periodo} (lineas.sin_iva, resueltas por proyecto) [public_services]
  *
- * Universo de proyectos = (✓ en Mantenimiento) ∪ (✓ en Arriendos).
- * Cada proyecto genera 7 filas (una por payment_type). Genera y descarga el .xlsx.
+ * Universo de proyectos = CATÁLOGO MAESTRO (MASTER_PKS), en su orden exacto.
+ * Cada proyecto genera SIEMPRE sus 7 filas (una por payment_type); los payment_type
+ * sin registro guardado ese mes quedan en value = 0. Genera y descarga el .xlsx.
  */
 import * as XLSX from 'xlsx'
 import api from '@/api/client'
@@ -18,6 +19,22 @@ const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
 // Orden fijo de payment_type (strings exactos del spec, incluidos los typos)
 const PAYMENT_TYPES = ['mainteinance', 'adjustment', 'polizas', 'discounts',
                        'interests', 'public_services', 'lease']
+
+// Catálogo maestro de project_pk — lista y ORDEN EXACTO (nombres, mayúsculas y
+// tildes tal cual). Es la fuente de verdad del universo de proyectos del export:
+// SIEMPRE se generan estos 53, cada uno con sus 7 payment_type. Los que aún no
+// tengan puente nombre→pk en PROJECT_PK saldrán en value = 0 (no tienen registro).
+const MASTER_PKS = [
+  'uruaco_gd', 'baraya', 'gandalf', 'cañahuate', 'vallenata', 'naos1', 'perija',
+  'elmolino', 'mgs0011', 'verso', 'esmeralda', 'jerico_merengue', 'jerico_el_son',
+  'puya', 'naos2', 'MGS 0012 La Reserva', 'villanueva', 'joropo', 'chima',
+  'copey_occidente', 'mapale', 'ibirico', 'mgs18', 'naos3', 'bayunca', 'polaris_1',
+  'delta_1', 'olimpo', 'san_onofre', 'lamesa', 'delta_2', 'polaris_2', 'agustin_1',
+  'marimonda', 'san_diego_sur', 'yuan_solar', 'yurbaqua', 'cedillanosexc', 'piloneras',
+  'valenciaoriente', 'valencia_oriente_2', 'sirius', 'catedral', 'cacica', 'bongos',
+  'astrolumen', 'biosolar', 'cienaga', 'cumbia', 'chiriguana_norte_2',
+  'chiriguana_norte_4', 'san_pelayo', 'agustin_2',
+]
 
 // ── Normalización y emparejamiento de nombres ─────────────────────────────────
 function normName(s) {
@@ -107,33 +124,40 @@ export async function generarExcelCostos(periodo) {
   let omFilas = []
   try { omFilas = (await api.get(`/om/calculo/${periodo}`)).data.filas || [] } catch { omFilas = [] }
 
-  // Internet (backend)
-  let agrupado = []
-  try { agrupado = (await api.get(`/starlink/factura/${periodo}`)).data.agrupado || [] } catch { agrupado = [] }
+  // Internet (backend) — líneas ya resueltas a proyecto (proyecto_id + nombre_comercial)
+  let starlinkData = { lineas: [], agrupado: [] }
+  try { starlinkData = (await api.get(`/starlink/factura/${periodo}`)).data } catch { /* sin datos */ }
 
-  // public_services por pk
+  // public_services por pk. Fuente primaria: lineas resueltas (nombre_comercial).
+  // Fallback (datos aún sin backfill): agrupado + mapeo de nombre en el front.
   const pubByPk = {}
-  agrupado.forEach(it => {
-    const pk = resolvePk(starlinkPanel(it.descripcion))
-    pubByPk[pk] = (pubByPk[pk] || 0) + (it.monto_total || 0)
-  })
-
-  // Universo = proyectos ✓ en Mantenimiento ∪ ✓ en Arriendos
-  const proyectos = new Map()  // pk → { pk, mant, lease }
-  const get = (pk) => {
-    if (!proyectos.has(pk)) proyectos.set(pk, { pk, mant: 0, lease: 0 })
-    return proyectos.get(pk)
+  const lineas = starlinkData.lineas || []
+  if (lineas.length) {
+    lineas.forEach(l => {
+      const pk = resolvePk(l.nombre_comercial || l.descripcion)
+      pubByPk[pk] = (pubByPk[pk] || 0) + (l.sin_iva || 0)
+    })
+  } else {
+    (starlinkData.agrupado || []).forEach(it => {
+      const pk = resolvePk(starlinkPanel(it.descripcion))
+      pubByPk[pk] = (pubByPk[pk] || 0) + (it.sin_iva || 0)
+    })
   }
 
+  // Valores guardados por el usuario, indexados por project_pk.
+  // Mismos criterios de siempre (solo ✓ incluido && habilitado); NO se recalcula
+  // ni se sobrescribe ningún valor guardado — solo se indexa para consultarlo.
+  const mantByPk = {}
   omFilas.forEach(f => {
-    if (f.incluido && f.habilitado) get(resolvePk(f.nombre_proyecto)).mant = f.valor_a_facturar || 0
+    if (f.incluido && f.habilitado) mantByPk[resolvePk(f.nombre_proyecto)] = f.valor_a_facturar || 0
   })
 
   // Arriendos (backend)
   let arrFilas = []
   try { arrFilas = (await api.get(`/arriendos/calculo/${periodo}`)).data.filas || [] } catch { arrFilas = [] }
+  const leaseByPk = {}
   arrFilas.forEach(f => {
-    if (f.incluido && f.habilitado) get(resolvePk(f.proyecto)).lease = f.canon_a_facturar || 0
+    if (f.incluido && f.habilitado) leaseByPk[resolvePk(f.proyecto)] = f.canon_a_facturar || 0
   })
 
   // Fechas del período
@@ -141,18 +165,19 @@ export async function generarExcelCostos(periodo) {
   const fromDate = `${yyyy}-${String(mm).padStart(2, '0')}-01`
   const toDate   = `${yyyy}-${String(mm).padStart(2, '0')}-${String(ultimo).padStart(2, '0')}`
 
-  // Filas (7 por proyecto, orden fijo)
+  // Filas: se itera el CATÁLOGO MAESTRO (MASTER_PKS) en su orden exacto.
+  // Cada proyecto genera SIEMPRE sus 7 payment_type; value real si hay registro
+  // guardado ese mes, 0 si no existe. No se incluye ningún pk fuera del maestro.
   const rows = []
-  for (const o of proyectos.values()) {
-    const pub = pubByPk[o.pk] || 0
+  for (const pk of MASTER_PKS) {
     const valorDe = {
-      mainteinance:    o.mant,
-      public_services: pub,
-      lease:           o.lease,
+      mainteinance:    mantByPk[pk]  ?? 0,
+      public_services: pubByPk[pk]   ?? 0,
+      lease:           leaseByPk[pk] ?? 0,
     }
     for (const pt of PAYMENT_TYPES) {
       rows.push({
-        project_pk:        o.pk,
+        project_pk:        pk,
         payment_type:      pt,
         value:             valorDe[pt] ?? 0,
         from_date:         fromDate,
@@ -171,5 +196,5 @@ export async function generarExcelCostos(periodo) {
   const filename = `proyectos_con_payment_type_${MESES[mm - 1]}_${yyyy}.xlsx`
   XLSX.writeFile(wb, filename)
 
-  return { proyectos: proyectos.size, filas: rows.length }
+  return { proyectos: MASTER_PKS.length, filas: rows.length }
 }

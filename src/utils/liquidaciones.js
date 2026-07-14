@@ -54,6 +54,22 @@ export function mesActualISO() {
 // El backend serializa enums como "TipoLineaMandatoEnum.foo" — normalizar a "foo".
 export const normTipo = (t) => (t || '').replace(/^TipoLineaMandatoEnum\./, '')
 
+// Flujo de estado del panel (#12), DERIVADO de señales existentes (sin migración):
+// Cargado (hay panel) → Numerado (tiene consecutivos) → Firmado (fecha_firma).
+export const ESTADO_FLUJO = [
+  { key: 'cargado', label: 'Cargado', color: '#F59E0B', sev: 'warn' },
+  { key: 'numerado', label: 'Numerado', color: '#3B82F6', sev: 'info' },
+  { key: 'firmado', label: 'Firmado', color: '#10B981', sev: 'success' },
+]
+export function estadoFlujoPanel(p, tipo = 'oficial') {
+  // La preliquidación no lleva consecutivos ni firma (el mandato oficial = la
+  // diferencia); por eso solo el oficial avanza a Numerado/Firmado.
+  if (tipo !== 'oficial') return ESTADO_FLUJO[0]
+  if (p?.fecha_firma) return ESTADO_FLUJO[2]
+  if (p?.consecutivo_ingresos != null || p?.consecutivo_costos != null) return ESTADO_FLUJO[1]
+  return ESTADO_FLUJO[0]
+}
+
 /** Normaliza un porcentaje de participación que puede venir en 0–1 o 0–100 → fracción 0–1. */
 export function normPct(p) {
   const n = Number(p) || 0
@@ -81,45 +97,6 @@ export function facturaEstadoSeverity(e) {
 //   ingreso bruto − comercialización − compras en bolsa + ventas en bolsa
 //   ± ajuste de protocolo (incluye el caso NEU, que resta compras/ajustes extra).
 // Por eso usamos valor_neto_cop directo y NO recalculamos línea por línea.
-
-const _sum = (arr, key) => (arr || []).reduce((s, x) => s + (Number(x?.[key]) || 0), 0)
-
-/**
- * Neto a partir de la forma que devuelve GET /liquidaciones/vistas/por-proyecto
- * (cada liquidación trae mandatos_total_ingresos[], mandatos_total_costos[],
- *  facturas_servicio[] y un resumen{} de respaldo).
- */
-export function netoFromVista(liqResumen) {
-  if (!liqResumen) return 0
-  const ingTotal = liqResumen.mandatos_total_ingresos || []
-  const cosTotal = liqResumen.mandatos_total_costos || []
-  const facturas = liqResumen.facturas_servicio || []
-
-  if (ingTotal.length || cosTotal.length || facturas.length) {
-    const valorAPagar = _sum(ingTotal, 'valor_neto_cop')
-    const costos = _sum(cosTotal, 'valor_neto_cop')
-    const serv = _sum(facturas, 'valor_cop')
-    return valorAPagar - costos - serv
-  }
-  // Respaldo: el resumen pre-calculado del backend
-  return Number(liqResumen.resumen?.ingreso_neto_cop) || 0
-}
-
-/** "Valor a pagar" (ingreso bruto neto de comercialización/bolsa) de la vista por-proyecto. */
-export function valorAPagarFromVista(liqResumen) {
-  if (!liqResumen) return 0
-  const ingTotal = liqResumen.mandatos_total_ingresos || []
-  if (ingTotal.length) return _sum(ingTotal, 'valor_neto_cop')
-  return Number(liqResumen.resumen?.total_ingresos_cop) || 0
-}
-
-/** Costos totales (mandato de costos + facturas de servicio) de la vista por-proyecto. */
-export function costosFromVista(liqResumen) {
-  if (!liqResumen) return 0
-  const cosTotal = liqResumen.mandatos_total_costos || []
-  const facturas = liqResumen.facturas_servicio || []
-  return _sum(cosTotal, 'valor_neto_cop') + _sum(facturas, 'valor_cop')
-}
 
 // ── Desglose del Estado de Resultados (grupos + neto, con soportes) ──────────
 // Lógica única usada tanto por la tarjeta "Total" como por la vista por

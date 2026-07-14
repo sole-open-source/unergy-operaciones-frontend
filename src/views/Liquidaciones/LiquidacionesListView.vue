@@ -5,127 +5,103 @@
         <Button label="Nueva liquidación" icon="pi pi-plus" size="small" @click="dialogNueva = true" />
       </template>
     </PageHeader>
-    <div v-else class="flex justify-end">
+
+    <!-- Barra: filtro por tipo (vía ?tipo=), búsqueda, aviso de espejo, acción -->
+    <div class="flex items-center gap-3 flex-wrap">
+      <span v-if="tipoLabel" class="text-sm font-semibold" style="color:#915BD8;">{{ tipoLabel }}</span>
+      <RouterLink v-if="tipoLabel" to="/liquidaciones?tab=proyectos"
+        class="text-xs hover:underline" style="color:#9b8fb0;">Ver todos</RouterLink>
+      <IconField>
+        <InputIcon class="pi pi-search" />
+        <InputText v-model="q" placeholder="Buscar proyecto…" class="w-56" />
+      </IconField>
+      <Select v-model="estadoFiltro" :options="ESTADO_OPCIONES" optionLabel="label" optionValue="value"
+        showClear placeholder="Estado" class="w-40" />
+      <span class="text-[11px] ml-auto" style="color:#9b8fb0">
+        Espejo del Panel Contable · edición en Panel Contable
+      </span>
       <Button label="Nueva liquidación" icon="pi pi-plus" size="small" @click="dialogNueva = true" />
     </div>
 
-    <!-- Indicador de filtro por tipo (vía query ?tipo=) -->
-    <div v-if="tipoLabel" class="flex items-center gap-2">
-      <span class="text-sm font-semibold" style="color:#915BD8;">{{ tipoLabel }}</span>
-      <RouterLink to="/liquidaciones?tab=proyectos"
-        class="text-xs hover:underline" style="color:#9b8fb0;">Ver todas</RouterLink>
-    </div>
+    <ProgressSpinner v-if="loading" class="block mx-auto my-10" />
 
-    <!-- Filtros -->
-    <div class="bg-white rounded-xl shadow-sm p-4 flex flex-wrap gap-3 items-end">
-      <div>
-        <label class="field-label">Buscar</label>
-        <IconField>
-          <InputIcon class="pi pi-search" />
-          <InputText v-model="filtros.q" placeholder="Nombre proyecto…" class="w-56" />
-        </IconField>
+    <div v-else class="bg-white rounded-xl shadow-sm border overflow-hidden" style="border-color:#e8e0f0">
+      <div class="px-4 py-2.5 flex items-center gap-2 border-b" style="border-color:#f0ebf6">
+        <h3 class="text-sm font-bold" style="color:#2C2039">Proyectos · {{ formatPeriodo(periodo) }}</h3>
+        <span class="text-[11px] px-2 py-0.5 rounded-full font-semibold"
+          style="background:#F1EAF9; color:#6E3FB8">{{ proyectosFiltrados.length }}</span>
       </div>
-      <div>
-        <label class="field-label">Desde</label>
-        <DatePicker v-model="filtros.desde" view="month" dateFormat="mm/yy" showButtonBar placeholder="Mes inicio" class="w-36" />
-      </div>
-      <div>
-        <label class="field-label">Hasta</label>
-        <DatePicker v-model="filtros.hasta" view="month" dateFormat="mm/yy" showButtonBar placeholder="Mes fin" class="w-36" />
-      </div>
-      <div>
-        <label class="field-label">Estado</label>
-        <Select v-model="filtros.estado" :options="estadosOpciones" showClear placeholder="Todos" class="w-44" />
-      </div>
-      <div>
-        <label class="field-label">Tipo venta</label>
-        <Select v-model="filtros.tipo_venta" :options="tiposVentaOpciones" showClear placeholder="Todos" class="w-36" />
-      </div>
-      <Button icon="pi pi-search" label="Buscar" @click="recargar" />
-      <Button icon="pi pi-times" label="Limpiar" severity="secondary" text @click="limpiarFiltros" />
-    </div>
-
-    <!-- Tabla -->
-    <div class="bg-white rounded-xl shadow-sm overflow-hidden">
-      <!-- Toolbar de selección múltiple -->
-      <div v-if="liqIdsVisibles.length"
-        class="flex items-center gap-3 px-4 py-2.5 border-b" style="border-color:#F0ECF6;">
-        <span @click.stop>
-          <Checkbox :modelValue="allVisiblesSelected" binary @update:modelValue="toggleSelectAll" />
-        </span>
-        <span class="text-xs font-semibold" style="color:#6b5a8a;">Seleccionar todas</span>
-        <span v-if="seleccionadas.size" class="text-xs font-semibold" style="color:#915BD8;">
-          · {{ seleccionadas.size }} seleccionada(s)
-        </span>
-        <Button v-if="seleccionadas.size" label="Cambiar estado" icon="pi pi-pencil"
-          size="small" class="ml-auto" @click="abrirDialogEstado" />
-      </div>
-
-      <DataTable
-        :value="filasResumenFiltradas"
-        :loading="loadingVista"
-        scrollable
-        scrollHeight="calc(100vh - 260px)"
-        class="text-sm"
-      >
+      <DataTable :value="proyectosFiltrados" v-model:expandedRows="expandedRows" dataKey="panel_id"
+        rowHover class="text-sm" :rows="25" paginator :alwaysShowPaginator="false">
         <template #empty>
           <div class="text-center py-8 text-sm text-gray-400">
-            No hay liquidaciones para los filtros seleccionados.
+            Sin paneles para este período/tipo. Cárgalos en Panel Contable.
           </div>
         </template>
-
-        <Column style="width:100%; padding:0">
+        <Column expander style="width:3rem" />
+        <Column field="proyecto" header="Proyecto" sortable />
+        <Column header="Estado" style="width:110px">
           <template #body="{ data }">
-
-            <!-- PROYECTO -->
-            <div v-if="data.tipo === 'proyecto'"
-              class="flex items-center gap-2 px-3 py-2 cursor-pointer select-none bg-gray-100 hover:bg-gray-200"
-              @click="toggleProy(data.proyKey)">
-              <i :class="expandedProyectos.has(data.proyKey)
-                ? 'pi pi-chevron-down' : 'pi pi-chevron-right'"
-                class="text-xs text-gray-500" />
-              <span class="font-semibold text-gray-800 text-sm">{{ data.proyecto }}</span>
-            </div>
-
-            <!-- AÑO -->
-            <div v-else-if="data.tipo === 'anio'"
-              class="flex items-center gap-2 px-6 py-1.5 cursor-pointer select-none bg-gray-50 hover:bg-gray-100"
-              @click="toggleAnio(data.anioKey)">
-              <i :class="expandedAnios.has(data.anioKey)
-                ? 'pi pi-chevron-down' : 'pi pi-chevron-right'"
-                class="text-xs text-gray-400" />
-              <span class="text-sm font-medium text-gray-500">{{ data.anio }}</span>
-            </div>
-
-            <!-- MES -->
-            <div v-else
-              class="flex items-center gap-4 px-10 py-2 cursor-pointer hover:bg-purple-50 border-b border-gray-100"
-              @click="router.push(`/liquidaciones/${data.liq_id}`)">
-              <span @click.stop>
-                <Checkbox :modelValue="seleccionadas.has(data.liq_id)" binary
-                  @update:modelValue="() => toggleSel(data.liq_id)" />
-              </span>
-              <span class="w-20 text-gray-700 text-sm">{{ data.periodoLabel }}</span>
-              <Tag :value="data.estado" :severity="estadoSeverity(data.estado)" class="text-[10px]" />
-              <span v-if="tipoFilter === 'autoconsumo'" class="text-xs text-gray-600 truncate max-w-[180px]">
-                {{ data.cliente || '—' }}
-              </span>
-              <span v-else :class="badgeTipoVenta(data.tipo_venta)">{{ data.tipo_venta || '—' }}</span>
-              <span class="ml-auto font-mono text-gray-800 text-sm">
-                {{ data.ingreso_neto != null ? fmt(data.ingreso_neto) : '—' }}
-              </span>
-              <Button icon="pi pi-eye" text rounded size="small"
-                @click.stop="router.push(`/liquidaciones/${data.liq_id}`)" />
-            </div>
-
+            <Tag :value="estadoFlujoPanel(data, tipo).label" :severity="estadoFlujoPanel(data, tipo).sev" class="text-[10px]" />
           </template>
         </Column>
+        <Column v-if="tipo === 'oficial'" header="Consec. Ing." style="width:100px">
+          <template #body="{ data }"><span class="font-mono text-xs">{{ data.consecutivo_ingresos ?? '—' }}</span></template>
+        </Column>
+        <Column v-if="tipo === 'oficial'" header="Consec. Cos." style="width:100px">
+          <template #body="{ data }"><span class="font-mono text-xs">{{ data.consecutivo_costos ?? '—' }}</span></template>
+        </Column>
+        <Column header="Ingresos" style="width:120px">
+          <template #body="{ data }"><span class="font-mono text-xs">{{ fmtCompact(data.ingresos_cop) }}</span></template>
+        </Column>
+        <Column header="Costos" style="width:110px">
+          <template #body="{ data }"><span class="font-mono text-xs text-red-600">{{ fmtCompact(data.costos_cop) }}</span></template>
+        </Column>
+        <Column header="Valor a pagar" style="width:130px">
+          <template #body="{ data }"><span class="font-mono text-xs font-semibold" style="color:#915BD8">{{ fmtCompact(data.valor_a_pagar_total) }}</span></template>
+        </Column>
+        <Column header="" style="width:56px">
+          <template #body="{ data }">
+            <Button v-if="data.liquidacion_id" icon="pi pi-eye" text rounded size="small"
+              v-tooltip.left="'Ver detalle operativo'"
+              @click="router.push(`/liquidaciones/${data.liquidacion_id}`)" />
+            <Button v-else icon="pi pi-plus" text rounded size="small"
+              v-tooltip.left="'Crear detalle operativo'" :loading="creandoDesde === data.proyecto_id"
+              @click="crearDesdeProyecto(data)" />
+          </template>
+        </Column>
+        <template #expansion="{ data }">
+          <div class="px-4 py-3" style="background:#FAF8FD">
+            <p class="text-[11px] font-semibold mb-2" style="color:#6b5a8a">Por inversionista</p>
+            <table class="w-full text-xs">
+              <thead>
+                <tr class="text-left" style="color:#9b8fb0">
+                  <th class="pb-1 font-medium">Inversionista</th>
+                  <th class="pb-1 font-medium">%</th>
+                  <th class="pb-1 font-medium text-right">Valor a pagar</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="inv in data.inversionistas" :key="inv.proyecto_inversionista_id || inv.nombre"
+                  class="border-t" style="border-color:#f0ebf6">
+                  <td class="py-1.5" style="color:#2C2039">{{ inv.cliente_nombre || inv.nombre || '—' }}</td>
+                  <td class="py-1.5 font-mono" style="color:#6b5a8a">{{ inv.porcentaje != null ? inv.porcentaje.toFixed(2) + '%' : '—' }}</td>
+                  <td class="py-1.5 font-mono text-right font-semibold" style="color:#915BD8">{{ fmtCompact(inv.valor_a_pagar) }}</td>
+                </tr>
+              </tbody>
+            </table>
+            <p v-if="!data.inversionistas?.length" class="text-[11px] text-center py-2" style="color:#9b8fb0">Sin inversionistas en este panel.</p>
+          </div>
+        </template>
       </DataTable>
     </div>
 
-    <!-- Dialog nueva liquidación -->
-    <Dialog v-model:visible="dialogNueva" header="Nueva liquidación" modal class="w-full max-w-md">
+    <!-- Dialog nueva liquidación (detalle operativo) -->
+    <Dialog v-model:visible="dialogNueva" header="Nueva liquidación (detalle operativo)" modal class="w-full max-w-md">
       <div class="space-y-3 py-2">
+        <p class="text-xs" style="color:#9b8fb0">
+          Crea el registro operativo (mandatos/facturas/XM). Los valores contables viven en el Panel Contable.
+        </p>
         <div>
           <label class="field-label">Proyecto</label>
           <Select v-model="nueva.proyecto_id" :options="proyectosOpcionesFiltradas"
@@ -146,25 +122,6 @@
         </div>
       </div>
     </Dialog>
-
-    <!-- Dialog cambio masivo de estado -->
-    <Dialog v-model:visible="dialogEstado" header="Cambiar estado" modal class="w-full max-w-md">
-      <div class="space-y-3 py-2">
-        <p class="text-sm" style="color:#6b5a8a;">
-          Se aplicará a <b style="color:#2C2039;">{{ seleccionadas.size }}</b> liquidación(es) seleccionada(s).
-        </p>
-        <div>
-          <label class="field-label">Nuevo estado</label>
-          <Select v-model="nuevoEstado" :options="estadosOpciones" placeholder="Seleccionar estado" class="w-full" />
-        </div>
-        <div class="flex justify-end gap-2 pt-2">
-          <Button label="Cancelar" severity="secondary" size="small" @click="dialogEstado = false" />
-          <Button :label="`Aplicar a ${seleccionadas.size} liquidaciones seleccionadas`"
-            size="small" :loading="aplicandoEstado" :disabled="!nuevoEstado"
-            @click="aplicarEstadoMasivo" />
-        </div>
-      </div>
-    </Dialog>
   </div>
 </template>
 
@@ -174,7 +131,6 @@ import { useRouter, useRoute } from 'vue-router'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Button from 'primevue/button'
-import Checkbox from 'primevue/checkbox'
 import Dialog from 'primevue/dialog'
 import Tag from 'primevue/tag'
 import Select from 'primevue/select'
@@ -182,11 +138,17 @@ import DatePicker from 'primevue/datepicker'
 import IconField from 'primevue/iconfield'
 import InputIcon from 'primevue/inputicon'
 import InputText from 'primevue/inputtext'
+import ProgressSpinner from 'primevue/progressspinner'
 import { useToast } from 'primevue/usetoast'
 import api from '@/api/client'
 import { proyectoActivoEnMes } from '@/utils/proyectoActivo'
+import { fmtCompact, formatPeriodo, estadoFlujoPanel } from '@/utils/liquidaciones'
 
-defineProps({ embedded: { type: Boolean, default: false } })
+const props = defineProps({
+  embedded: { type: Boolean, default: false },
+  periodo: { type: String, default: null },   // "YYYY-MM-01" (del contenedor)
+  tipo: { type: String, default: 'preliquidacion' },
+})
 
 const toast = useToast()
 const router = useRouter()
@@ -201,195 +163,60 @@ const tipoLabel = computed(() =>
   ({ minigranja: 'Minigranjas', autoconsumo: 'Autoconsumo' }[tipoFilter.value] || '')
 )
 
-const vistaProyectos = ref([])
-const loadingVista = ref(false)
+const periodoYYYYMM = computed(() => (props.periodo || '').slice(0, 7))
+
+const loading = ref(false)
+const proyectos = ref([])
+const expandedRows = ref({})
+const q = ref('')
+const estadoFiltro = ref(null)
+const ESTADO_OPCIONES = [
+  { label: 'Firmado', value: 'firmado' },
+  { label: 'Pendiente', value: 'pendiente' },
+]
+
+const proyectosFiltrados = computed(() => {
+  const term = q.value.toLowerCase().trim()
+  const tf = tipoFilter.value
+  const ef = estadoFiltro.value
+  return proyectos.value.filter(p =>
+    (!term || (p.proyecto || '').toLowerCase().includes(term)) &&
+    (!tf || p.tipo_proyecto === tf) &&
+    (!ef || p.estado === ef)
+  )
+})
+
+async function load() {
+  if (!periodoYYYYMM.value) return
+  loading.value = true
+  try {
+    const { data } = await api.get('/liquidaciones/resumen-panel', {
+      params: { periodo: periodoYYYYMM.value, tipo: props.tipo },
+    })
+    proyectos.value = data.proyectos || []
+  } catch {
+    proyectos.value = []
+  } finally {
+    loading.value = false
+  }
+}
+
+watch([() => props.periodo, () => props.tipo], load)
+
+// ─── Nueva liquidación (detalle operativo) ────────────────────────────────────
+const dialogNueva = ref(false)
+const creando = ref(false)
+const nueva = ref({ proyecto_id: null, periodo: null, tipo_venta: 'bolsa' })
 const proyectosOpciones = ref([])
+const creandoDesde = ref(null)
+
+const tiposVentaOpciones = ['bolsa', 'ppa', 'interno', 'autoconsumo']
 
 const proyectosOpcionesFiltradas = computed(() => {
   if (!nueva.value.periodo) return proyectosOpciones.value
   const d = new Date(nueva.value.periodo)
-  const anio = d.getFullYear()
-  const mes = d.getMonth() + 1
-  return proyectosOpciones.value.filter(p => proyectoActivoEnMes(p, anio, mes))
+  return proyectosOpciones.value.filter(p => proyectoActivoEnMes(p, d.getFullYear(), d.getMonth() + 1))
 })
-
-const filtros = ref({ q: '', desde: null, hasta: null, estado: null, tipo_venta: null })
-
-const estadosOpciones = [
-  'iniciada', 'costos_registrados', 'xm_procesado', 'mandatos_emitidos',
-  'en_contabilidad', 'en_revisoria', 'facturado', 'entregado',
-]
-const tiposVentaOpciones = ['bolsa', 'ppa', 'interno', 'autoconsumo']
-
-const expandedProyectos = ref(new Set())
-const expandedAnios = ref(new Set())
-
-const dialogNueva = ref(false)
-const creando = ref(false)
-const nueva = ref({ proyecto_id: null, periodo: null, tipo_venta: 'bolsa' })
-
-// ─── Estructura 3 niveles: proyecto → año → mes ───────────────────────────────
-const filasResumen = computed(() => {
-  const filas = []
-  for (const proy of vistaProyectos.value) {
-    const proyKey = String(proy.proyecto_id)
-    const cliente = (proy.inversionistas_registrados || [])[0]?.inversionista_nombre || ''
-    filas.push({ tipo: 'proyecto', proyKey, proyecto: proy.proyecto_nombre })
-
-    const porAnio = {}
-    for (const liq of proy.liquidaciones) {
-      const anio = liq.periodo?.split('-')[0] || '?'
-      if (!porAnio[anio]) porAnio[anio] = []
-      porAnio[anio].push(liq)
-    }
-    for (const anio of Object.keys(porAnio).sort().reverse()) {
-      const anioKey = `${proyKey}_${anio}`
-      filas.push({ tipo: 'anio', proyKey, anioKey, anio })
-      for (const liq of porAnio[anio]) {
-        const mandatoTotal = (liq.mandatos_total_ingresos || [])[0]
-        filas.push({
-          tipo:         'mes',
-          proyKey,
-          anioKey,
-          liq_id:       liq.liquidacion_id,
-          proyecto:     proy.proyecto_nombre,
-          periodo:      liq.periodo,
-          periodoLabel: formatPeriodo(liq.periodo),
-          estado:       liq.estado,
-          tipo_venta:   liq.tipo_venta,
-          cliente,
-          ingreso_neto: mandatoTotal?.valor_neto_cop ?? null,
-        })
-      }
-    }
-  }
-  return filas
-})
-
-// ─── Filtrado + visibilidad según expansión ───────────────────────────────────
-const filasResumenFiltradas = computed(() => {
-  const q = (filtros.value.q || '').toLowerCase().trim()
-  const tv = filtros.value.tipo_venta
-  const tipo = tipoFilter.value
-
-  const proyTipo = {}
-  for (const p of vistaProyectos.value) proyTipo[String(p.proyecto_id)] = p.tipo_proyecto
-
-  const proyMatching = new Set(
-    filasResumen.value
-      .filter(f => f.tipo === 'mes'
-        && (!q || f.proyecto.toLowerCase().includes(q))
-        && (!tv || f.tipo_venta === tv)
-        && (!tipo || proyTipo[f.proyKey] === tipo))
-      .map(f => f.proyKey)
-  )
-
-  return filasResumen.value.filter(f => {
-    if (!proyMatching.has(f.proyKey)) return false
-    if (f.tipo === 'proyecto') return true
-    if (f.tipo === 'anio') return expandedProyectos.value.has(f.proyKey)
-    if (f.tipo === 'mes')  return expandedProyectos.value.has(f.proyKey)
-                               && expandedAnios.value.has(f.anioKey)
-    return false
-  })
-})
-
-// ─── Toggle expansión ─────────────────────────────────────────────────────────
-function toggleProy(key) {
-  expandedProyectos.value.has(key)
-    ? expandedProyectos.value.delete(key)
-    : expandedProyectos.value.add(key)
-  expandedProyectos.value = new Set(expandedProyectos.value)
-}
-
-function toggleAnio(key) {
-  expandedAnios.value.has(key)
-    ? expandedAnios.value.delete(key)
-    : expandedAnios.value.add(key)
-  expandedAnios.value = new Set(expandedAnios.value)
-}
-
-// ─── Selección múltiple + cambio masivo de estado ─────────────────────────────
-const seleccionadas = ref(new Set())
-const dialogEstado = ref(false)
-const nuevoEstado = ref(null)
-const aplicandoEstado = ref(false)
-
-// liquidaciones (filas mes) actualmente visibles tras filtros/expansión
-const liqIdsVisibles = computed(() =>
-  filasResumenFiltradas.value.filter(f => f.tipo === 'mes').map(f => f.liq_id)
-)
-const allVisiblesSelected = computed(() =>
-  liqIdsVisibles.value.length > 0 &&
-  liqIdsVisibles.value.every(id => seleccionadas.value.has(id))
-)
-
-function toggleSel(id) {
-  seleccionadas.value.has(id) ? seleccionadas.value.delete(id) : seleccionadas.value.add(id)
-  seleccionadas.value = new Set(seleccionadas.value)
-}
-
-function toggleSelectAll() {
-  if (allVisiblesSelected.value) {
-    liqIdsVisibles.value.forEach(id => seleccionadas.value.delete(id))
-  } else {
-    liqIdsVisibles.value.forEach(id => seleccionadas.value.add(id))
-  }
-  seleccionadas.value = new Set(seleccionadas.value)
-}
-
-function abrirDialogEstado() {
-  nuevoEstado.value = null
-  dialogEstado.value = true
-}
-
-async function aplicarEstadoMasivo() {
-  if (!nuevoEstado.value || !seleccionadas.value.size) return
-  aplicandoEstado.value = true
-  const ids = [...seleccionadas.value]
-  let ok = 0, fail = 0
-  for (const id of ids) {
-    try {
-      await api.patch(`/liquidaciones/${id}`, { estado: nuevoEstado.value })
-      ok++
-    } catch {
-      fail++
-    }
-  }
-  aplicandoEstado.value = false
-  dialogEstado.value = false
-  seleccionadas.value = new Set()
-  nuevoEstado.value = null
-  toast.add({
-    severity: fail ? 'warn' : 'success',
-    summary: 'Estados actualizados',
-    detail: `${ok} liquidación(es) actualizada(s)${fail ? ` · ${fail} con error` : ''}`,
-    life: 3000,
-  })
-  loadVistas()
-}
-
-// ─── Helpers de estilo ────────────────────────────────────────────────────────
-function badgeTipoVenta(tv) {
-  return { ppa: 'badge-ppa', autoconsumo: 'badge-auto', bolsa: 'badge-bolsa' }[tv] || 'badge-bolsa'
-}
-
-function estadoSeverity(e) {
-  return {
-    iniciada: 'secondary', costos_registrados: 'info', xm_procesado: 'info',
-    mandatos_emitidos: 'warn', en_contabilidad: 'warn', en_revisoria: 'warn',
-    facturado: 'success', entregado: 'contrast',
-  }[e] || 'secondary'
-}
-
-// ─── Carga de datos ───────────────────────────────────────────────────────────
-function buildParams() {
-  const p = {}
-  if (filtros.value.desde) p.periodo_desde = toISOMonth(filtros.value.desde)
-  if (filtros.value.hasta) p.periodo_hasta = toISOMonth(filtros.value.hasta)
-  if (filtros.value.estado) p.estado = filtros.value.estado
-  return p
-}
 
 function toISOMonth(d) {
   if (!d) return null
@@ -397,45 +224,23 @@ function toISOMonth(d) {
   return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-01`
 }
 
-async function loadVistas() {
-  loadingVista.value = true
-  seleccionadas.value = new Set()
-  try {
-    const { data } = await api.get('/liquidaciones/vistas/por-proyecto', { params: buildParams() })
-    vistaProyectos.value = data
-  } catch (e) {
-    console.error('Vista por proyecto:', e)
-    vistaProyectos.value = []
-  } finally {
-    loadingVista.value = false
-  }
-}
-
 async function loadProyectosOpciones() {
   try {
-    const { data } = await api.get('/proyectos', { params: { size: 200 } })
+    const { data } = await api.get('/proyectos', { params: { size: 500 } })
     proyectosOpciones.value = data.items || []
   } catch {
     proyectosOpciones.value = []
   }
 }
 
-function recargar() { loadVistas() }
-
-function limpiarFiltros() {
-  filtros.value = { q: '', desde: null, hasta: null, estado: null, tipo_venta: null }
-  loadVistas()
-}
-
-// ─── Nueva liquidación ────────────────────────────────────────────────────────
 async function crearLiquidacion() {
   if (!nueva.value.proyecto_id || !nueva.value.periodo) return
   creando.value = true
   try {
     const { data } = await api.post('/liquidaciones', {
       proyecto_id: nueva.value.proyecto_id,
-      periodo:     toISOMonth(nueva.value.periodo),
-      tipo_venta:  nueva.value.tipo_venta,
+      periodo: toISOMonth(nueva.value.periodo),
+      tipo_venta: nueva.value.tipo_venta,
     })
     dialogNueva.value = false
     toast.add({ severity: 'success', summary: 'Creada', life: 2000 })
@@ -447,44 +252,38 @@ async function crearLiquidacion() {
   }
 }
 
-// ─── Formato ──────────────────────────────────────────────────────────────────
-function fmt(v) {
-  if (v == null) return '—'
-  return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 2 }).format(v)
+// Crear el detalle operativo directamente desde una fila del Panel
+async function crearDesdeProyecto(row) {
+  if (!props.periodo) return
+  creandoDesde.value = row.proyecto_id
+  try {
+    const { data } = await api.post('/liquidaciones', {
+      proyecto_id: row.proyecto_id,
+      periodo: props.periodo,
+      tipo_venta: 'bolsa',
+    })
+    router.push(`/liquidaciones/${data.id}`)
+  } catch (e) {
+    // 409 = ya existe: recargar para traer el liquidacion_id y navegar
+    const existente = e?.response?.status === 409
+    toast.add({
+      severity: existente ? 'info' : 'error',
+      summary: existente ? 'Ya existe' : 'Error',
+      detail: existente ? 'Recargando…' : 'No se pudo crear el detalle',
+      life: 2500,
+    })
+    if (existente) await load()
+  } finally {
+    creandoDesde.value = null
+  }
 }
-
-function formatPeriodo(p) {
-  if (!p) return ''
-  const [y, m] = p.split('-')
-  const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
-  return `${meses[parseInt(m) - 1]} ${y}`
-}
-
-// ─── Persistencia de filtros (localStorage) ───────────────────────────────────
-const LS_KEY = 'liq.list.filtros'
-try {
-  const saved = JSON.parse(localStorage.getItem(LS_KEY) || '{}')
-  if (saved.q != null) filtros.value.q = saved.q
-  if (saved.estado != null) filtros.value.estado = saved.estado
-  if (saved.tipo_venta != null) filtros.value.tipo_venta = saved.tipo_venta
-} catch { /* ignora json corrupto */ }
-
-watch(filtros, () => {
-  localStorage.setItem(LS_KEY, JSON.stringify({
-    q: filtros.value.q, estado: filtros.value.estado,
-    tipo_venta: filtros.value.tipo_venta,
-  }))
-}, { deep: true })
 
 onMounted(() => {
-  loadVistas()
+  load()
   loadProyectosOpciones()
 })
 </script>
 
 <style scoped>
 .field-label { @apply block text-xs font-medium text-gray-600 mb-1; }
-.badge-ppa   { @apply bg-purple-100 text-purple-800 text-[10px] font-semibold px-1.5 py-0.5 rounded; }
-.badge-auto  { @apply bg-green-100 text-green-800 text-[10px] font-semibold px-1.5 py-0.5 rounded; }
-.badge-bolsa { @apply bg-blue-50 text-blue-700 text-[10px] font-semibold px-1.5 py-0.5 rounded; }
 </style>

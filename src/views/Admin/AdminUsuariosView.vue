@@ -78,6 +78,7 @@ const ROL_LABELS = {
   liquidaciones: 'Liquidaciones',
   cgm: 'CGM',
   solo_lectura: 'Solo lectura',
+  comercial: 'Comercial',
 }
 
 const ROL_SEVERITY = {
@@ -87,6 +88,7 @@ const ROL_SEVERITY = {
   liquidaciones: 'success',
   cgm: 'secondary',
   solo_lectura: 'contrast',
+  comercial: 'info',
 }
 
 const filtered = computed(() => {

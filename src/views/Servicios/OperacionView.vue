@@ -847,7 +847,7 @@
                 <div class="flex flex-col gap-1">
                   <label class="text-xs font-medium text-gray-600">IPC aplicado (%)</label>
                   <InputNumber v-model="modalIdxArriendo.form.ipc_aplicado"
-                    :minFractionDigits="2" :maxFractionDigits="4"
+                    :minFractionDigits="2" :maxFractionDigits="4" locale="en-US"
                     placeholder="Ej: 5.10" class="w-full" />
                   <p class="text-xs text-gray-400">Dejar vacío si es el valor base</p>
                 </div>

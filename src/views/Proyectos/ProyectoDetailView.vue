@@ -33,13 +33,24 @@
             <InfoField label="Capacidad instalada (kWp)" :value="proyecto.info_tecnica?.capacidad_instalada_kwp" />
             <InfoField label="Departamento" :value="proyecto.departamento" />
             <InfoField label="Municipio" :value="proyecto.municipio" />
-            <InfoField label="Operador de red" :value="proyecto.operador_red" />
+            <InfoField label="Operador de red" :value="proyecto.operador_red_legal || proyecto.operador_red" />
             <InfoField label="Clasificación" :value="proyecto.clasificacion_regulatoria" />
             <InfoField label="Carpeta Drive" :value="proyecto.carpeta_drive_codigo" />
             <InfoField label="API ID Unergy" :value="proyecto.sub_project" />
             <InfoField label="Código TSF" :value="proyecto.codigo_tsf" />
             <InfoField label="Fecha de entrada en operación" :value="fmtFecha(proyecto.fecha_entrada_operacion)" />
+            <InfoField
+              label="Inicio de comercialización"
+              :value="proyecto.fecha_inicio_comercializacion ? (fmtFecha(proyecto.fecha_inicio_comercializacion) + (proyecto.fecha_comercializacion_editada_manual ? ' (manual)' : ' (auto)')) : '—'" />
             <InfoField label="Fecha fin de representación" :value="proyecto.fecha_fin_representacion ? fmtFecha(proyecto.fecha_fin_representacion) : '—'" />
+            <div class="flex flex-col gap-1">
+              <label class="field-label">Comunidad energética</label>
+              <div>
+                <Tag v-if="proyecto.es_comunidad_energetica" severity="success"
+                     :value="proyecto.nombre_comunidad ? ('🏘 ' + proyecto.nombre_comunidad) : '🏘 Sí'" />
+                <span v-else class="text-gray-400">—</span>
+              </div>
+            </div>
           </template>
           <template v-else>
             <div class="flex flex-col gap-1">
@@ -52,19 +63,21 @@
             </div>
             <div class="flex flex-col gap-1">
               <label class="field-label">Capacidad instalada (kWp)</label>
-              <InputNumber v-model="editInfoTecnica.capacidad_instalada_kwp" :maxFractionDigits="3" class="w-full" />
+              <InputNumber v-model="editInfoTecnica.capacidad_instalada_kwp" :maxFractionDigits="3" locale="en-US" class="w-full" />
             </div>
             <div class="flex flex-col gap-1">
               <label class="field-label">Departamento</label>
-              <InputText v-model="editForm.departamento" class="w-full" />
+              <Select v-model="editForm.departamento" :options="departamentos" class="w-full" placeholder="Seleccionar" showClear filter />
             </div>
             <div class="flex flex-col gap-1">
               <label class="field-label">Municipio</label>
-              <InputText v-model="editForm.municipio" class="w-full" />
+              <Select v-model="editForm.municipio" :options="municipiosDisponibles" class="w-full" placeholder="Seleccionar" showClear filter
+                :disabled="!editForm.departamento" />
             </div>
             <div class="flex flex-col gap-1">
               <label class="field-label">Operador de red</label>
-              <InputText v-model="editForm.operador_red" class="w-full" />
+              <Select v-model="editForm.operador_red_id" :options="operadoresRedOptions" optionLabel="label"
+                optionValue="id" class="w-full" placeholder="Seleccionar" showClear filter />
             </div>
             <div class="flex flex-col gap-1">
               <label class="field-label">Clasificación regulatoria</label>
@@ -87,8 +100,24 @@
               <DatePicker v-model="editFechaEntrada" dateFormat="yy-mm-dd" showIcon showClear class="w-full" placeholder="Seleccionar" />
             </div>
             <div class="flex flex-col gap-1">
+              <label class="field-label">Inicio de comercialización</label>
+              <DatePicker v-model="editFechaComerc" dateFormat="yy-mm-dd" showIcon showClear class="w-full" placeholder="Auto (1er día con generación)" />
+              <small class="text-xs text-gray-400">Se autoderiva del 1er día con generación. Si la fijas a mano, el sistema no la vuelve a cambiar.</small>
+            </div>
+            <div class="flex flex-col gap-1">
               <label class="field-label">Fecha fin de representación</label>
               <DatePicker v-model="editFechaFinRep" dateFormat="yy-mm-dd" showIcon showClear class="w-full" placeholder="Vigente" />
+            </div>
+            <div class="flex flex-col gap-1">
+              <label class="field-label">Comunidad energética</label>
+              <div class="flex items-center gap-2 h-full">
+                <ToggleSwitch v-model="editForm.es_comunidad_energetica" />
+                <span class="text-sm text-gray-500">{{ editForm.es_comunidad_energetica ? 'Sí' : 'No' }}</span>
+              </div>
+            </div>
+            <div v-if="editForm.es_comunidad_energetica" class="flex flex-col gap-1">
+              <label class="field-label">Nombre de la comunidad</label>
+              <InputText v-model="editForm.nombre_comunidad" class="w-full" placeholder="Opcional" />
             </div>
           </template>
         </div>
@@ -129,6 +158,8 @@
                 <InfoField label="Voltaje red" :value="proyecto.info_tecnica?.voltaje_red" />
                 <InfoField label="Tipo tracker" :value="proyecto.info_tecnica?.tipo_tracker" />
                 <InfoField label="Producción específica (kWh/kWp)" :value="proyecto.produccion_especifica_kwh_kwp" />
+                <InfoField label="Latitud" :value="proyecto.latitud" />
+                <InfoField label="Longitud" :value="proyecto.longitud" />
               </div>
             </div>
             <!-- Paneles -->
@@ -211,11 +242,11 @@
               <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <div class="flex flex-col gap-1">
                   <label class="field-label">Potencia AC (kW)</label>
-                  <InputNumber v-model="editInfoTecnica.potencia_ac_kw" :maxFractionDigits="3" class="w-full" />
+                  <InputNumber v-model="editInfoTecnica.potencia_ac_kw" :maxFractionDigits="3" locale="en-US" class="w-full" />
                 </div>
                 <div class="flex flex-col gap-1">
                   <label class="field-label">Capacidad instalada (kWp)</label>
-                  <InputNumber v-model="editInfoTecnica.capacidad_instalada_kwp" :maxFractionDigits="3" class="w-full" />
+                  <InputNumber v-model="editInfoTecnica.capacidad_instalada_kwp" :maxFractionDigits="3" locale="en-US" class="w-full" />
                 </div>
                 <div class="flex flex-col gap-1">
                   <label class="field-label">Voltaje red</label>
@@ -227,7 +258,7 @@
                 </div>
                 <div class="flex flex-col gap-1">
                   <label class="field-label">Producción específica (kWh/kWp)</label>
-                  <InputNumber v-model="editForm.produccion_especifica_kwh_kwp" :maxFractionDigits="2" class="w-full" />
+                  <InputNumber v-model="editForm.produccion_especifica_kwh_kwp" :maxFractionDigits="2" locale="en-US" class="w-full" />
                 </div>
               </div>
             </div>
@@ -341,7 +372,7 @@
               <div v-if="editInfoTecnica.tiene_almacenamiento" class="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <div class="flex flex-col gap-1">
                   <label class="field-label">Capacidad (kWh)</label>
-                  <InputNumber v-model="editInfoTecnica.capacidad_almacenamiento_kwh" :maxFractionDigits="3" class="w-full" />
+                  <InputNumber v-model="editInfoTecnica.capacidad_almacenamiento_kwh" :maxFractionDigits="3" locale="en-US" class="w-full" />
                 </div>
                 <div class="flex flex-col gap-1">
                   <label class="field-label">Marca</label>
@@ -376,6 +407,7 @@
                   v-if="isEditMode"
                   v-model="sim.editArray.value[i]"
                   :maxFractionDigits="1"
+                  locale="en-US"
                   class="w-full"
                   inputClass="text-center text-xs px-1 py-1"
                 />
@@ -397,7 +429,7 @@
               <template #body="{ data }">
                 <template v-if="editandoInvId === data.id">
                   <InputNumber v-model="editPct" :min="0" :max="100" :minFractionDigits="2" :maxFractionDigits="7"
-                    suffix="%" class="w-32" />
+                    suffix="%" locale="en-US" class="w-32" />
                 </template>
                 <template v-else>
                   {{ data.porcentaje_participacion != null ? (data.porcentaje_participacion * 100).toFixed(4) + '%' : '—' }}
@@ -491,7 +523,7 @@
             <div class="flex flex-col gap-1">
               <label class="text-xs text-gray-500">Porcentaje de participación (%)</label>
               <InputNumber v-model="nuevoInv.porcentaje_pct" :min="0" :max="100"
-                :minFractionDigits="2" :maxFractionDigits="7" suffix="%" class="w-full" />
+                :minFractionDigits="2" :maxFractionDigits="7" suffix="%" locale="en-US" class="w-full" />
             </div>
             <div class="flex flex-col gap-1">
               <label class="text-xs text-gray-500">Fecha inicio</label>
@@ -513,6 +545,17 @@
           </div>
           <Button label="Agregar" icon="pi pi-plus" :loading="guardando"
             :disabled="!nuevoInv.cliente_id" @click="agregarInversionista" class="mt-2" />
+        </div>
+      </TabPanel>
+
+      <!-- ══ CONTACTOS ══ -->
+      <TabPanel header="Contactos">
+        <div class="p-4">
+          <ProyectoAreaContactosPanel
+            :proyecto-id="proyecto.id"
+            :inversionistas="proyecto.inversionistas"
+            :clientes-options="clientes"
+          />
         </div>
       </TabPanel>
 
@@ -749,7 +792,9 @@ import Dialog from 'primevue/dialog'
 import { useToast } from 'primevue/usetoast'
 import * as XLSX from 'xlsx'
 import api from '@/api/client'
+import divipola from '@/data/colombia-divipola.json'
 import ContratoServicioWizard from '@/views/Contratos/ContratoServicioWizard.vue'
+import ProyectoAreaContactosPanel from '@/components/ProyectoAreaContactosPanel.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -757,7 +802,7 @@ const toast = useToast()
 
 // ── Constantes (sin hardcode en template) ────────────────────────────────────
 const ESTADOS = ['en_desarrollo', 'en_operacion', 'suspendido', 'cancelado']
-const TIPOS_PROYECTO = ['minigranja', 'autoconsumo', 'gd', 'movilidad_electrica', 'otro']
+const TIPOS_PROYECTO = ['minigranja', 'autoconsumo', 'gd', 'movilidad_electrica']
 const TIPOS_TECNOLOGIA = ['solar', 'eolica', 'hidraulica', 'biomasa', 'otra']
 const CLASIFICACIONES = ['AGP', 'AGPE', 'AGGE', 'GD', 'DER', 'otra']
 const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
@@ -823,13 +868,15 @@ const editForm = reactive({
   potencia_instalada_kwp: null,
   departamento: null,
   municipio: null,
-  operador_red: null,
+  operador_red_id: null,
   clasificacion_regulatoria: null,
   carpeta_drive_codigo: null,
   sub_project: null,
   codigo_tsf: null,
   cantidad_total_paneles: null,
   produccion_especifica_kwh_kwp: null,
+  es_comunidad_energetica: false,
+  nombre_comunidad: '',
 })
 
 const editInfoTecnica = reactive({
@@ -866,6 +913,7 @@ const editInfoTecnica = reactive({
 
 // Fechas del proyecto (DatePicker trabaja con Date; el API espera 'YYYY-MM-DD')
 const editFechaEntrada = ref(null)
+const editFechaComerc = ref(null)
 const editFechaFinRep = ref(null)
 
 // ── Helpers de fecha ──────────────────────────────────────────────────────────
@@ -972,6 +1020,7 @@ function populateEditForm() {
   editP50.value = parseMonthArray(p.p50_mensual_kwh)
   editP99.value = parseMonthArray(p.p99_mensual_kwh)
   editFechaEntrada.value = toDate(p.fecha_entrada_operacion)
+  editFechaComerc.value = toDate(p.fecha_inicio_comercializacion)
   editFechaFinRep.value = toDate(p.fecha_fin_representacion)
 }
 
@@ -1004,6 +1053,15 @@ async function saveEdit() {
     // preserva lo existente y permite limpiarlas (null) explícitamente.
     payload.fecha_entrada_operacion = formatFecha(editFechaEntrada.value)
     payload.fecha_fin_representacion = formatFecha(editFechaFinRep.value)
+    // Inicio de comercialización: solo se envía si el usuario la cambió, para no
+    // marcarla como "editada a mano" en cada guardado (el backend fija ese flag
+    // cuando este campo llega en el payload).
+    const comercNueva = formatFecha(editFechaComerc.value)
+    const comercActual = proyecto.value?.fecha_inicio_comercializacion || null
+    if (comercNueva !== comercActual) payload.fecha_inicio_comercializacion = comercNueva
+    // Comunidad energética: enviar siempre el flag y el nombre (permite limpiarlo).
+    payload.es_comunidad_energetica = !!editForm.es_comunidad_energetica
+    payload.nombre_comunidad = editForm.es_comunidad_energetica ? (editForm.nombre_comunidad || null) : null
 
     await api.patch(`/proyectos/${route.params.id}`, payload)
     const itPayload = {}
@@ -1039,6 +1097,7 @@ const editandoInvId = ref(null)
 const editPct = ref(null)
 const editFechaInicio = ref(null)
 const editFechaFin = ref(null)
+
 
 const clientesDisponibles = computed(() => {
   if (!proyecto.value) return clientes.value
@@ -1217,19 +1276,38 @@ const estadoSeverity = (e) => (
   { en_operacion: 'success', en_desarrollo: 'info', suspendido: 'warn', cancelado: 'secondary' }[e] || 'secondary'
 )
 
+// Departamento/municipio -- select en vez de texto libre (DIVIPOLA), para
+// evitar variantes de escritura que luego no se puedan agrupar/filtrar bien.
+const departamentos = Object.keys(divipola).sort()
+const municipiosDisponibles = computed(() => editForm.departamento ? (divipola[editForm.departamento] || []) : [])
+watch(() => editForm.departamento, (nuevo, anterior) => {
+  if (nuevo !== anterior && editForm.municipio && !(divipola[nuevo] || []).includes(editForm.municipio)) {
+    editForm.municipio = null
+  }
+})
+
+// Catálogo de operadores de red -- select en vez de texto libre, para que
+// coincida con el vínculo real que usa Reporte CGM (Frontera.operador_red_id).
+const operadoresRed = ref([])
+const operadoresRedOptions = computed(() =>
+  operadoresRed.value.map(o => ({ id: o.id, label: o.nombre_comercial || o.nombre_legal }))
+)
+
 // ── Carga inicial ─────────────────────────────────────────────────────────────
 onMounted(async () => {
   try {
-    const [proyRes, clientesRes, invRes] = await Promise.all([
+    const [proyRes, clientesRes, invRes, operadoresRes] = await Promise.all([
       api.get(`/proyectos/${route.params.id}`),
       api.get('/clientes', { params: { size: 200 } }),
       api.get(`/proyectos/${route.params.id}/inversionistas`),
+      api.get('/operadores-red').catch(() => ({ data: [] })),
     ])
     proyecto.value = {
       ...proyRes.data,
       inversionistas: Array.isArray(invRes.data) ? invRes.data : (invRes.data.items ?? []),
     }
     clientes.value = clientesRes.data.items
+    operadoresRed.value = Array.isArray(operadoresRes.data) ? operadoresRes.data : (operadoresRes.data.items ?? [])
     for (const s of SERVICIOS_FLAGS) srvFlags[s.key] = proyRes.data[s.key]
     if (isEditMode.value) populateEditForm()
     loadCrossData()
@@ -1242,9 +1320,19 @@ onMounted(async () => {
 </script>
 
 <script>
+import { h } from 'vue'
+
+// Definido con render function (no `template` string) -- el build runtime-only
+// de Vue no puede compilar strings de template en producción, lo que dejaba
+// cada InfoField invisible (solo se veía el label de la sección, sin datos).
 const InfoField = {
   props: { label: String, value: [String, Number, Boolean] },
-  template: `<div><p class="text-xs text-gray-400 uppercase tracking-wide">{{ label }}</p><p class="text-gray-800 font-medium mt-0.5">{{ value ?? '—' }}</p></div>`,
+  render() {
+    return h('div', [
+      h('p', { class: 'text-xs text-gray-400 uppercase tracking-wide' }, this.label),
+      h('p', { class: 'text-gray-800 font-medium mt-0.5' }, this.value ?? '—'),
+    ])
+  },
 }
 export default { components: { InfoField } }
 </script>

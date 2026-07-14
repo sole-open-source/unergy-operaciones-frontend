@@ -2,37 +2,46 @@
   <div class="rounded-xl border" style="border-color: rgba(44,32,57,0.12); background: white;">
 
     <!-- Header -->
-    <div class="px-5 py-4 flex items-center justify-between gap-3" style="border-bottom: 1px solid rgba(44,32,57,0.10);">
-      <div class="flex items-center gap-2">
-        <i class="pi pi-bolt" style="color: #F0C040;" />
-        <div>
-          <h2 class="text-base font-bold" style="color: #2C2039;">Proyectos próximos a energizarse</h2>
-          <p class="text-xs mt-0.5" style="color: #7a6e8a;">
-            Sincronizado desde TSF/Solenium · proyección mensual prorrateada desde la fecha de energización
-          </p>
+    <div class="px-5 py-4 flex items-center justify-between gap-3 flex-wrap" style="border-bottom: 1px solid rgba(44,32,57,0.10);">
+      <div class="flex items-center gap-2.5 flex-wrap">
+        <div class="stat-pill">
+          <span class="stat-num">{{ projects.length }}</span>
+          <span class="stat-label">en pipeline</span>
         </div>
-      </div>
-      <div class="flex items-center gap-2">
-        <span v-if="lastSync" class="text-xs" style="color: rgba(44,32,57,0.45);">
-          Última sync: {{ lastSync.toLocaleTimeString() }}
-        </span>
+        <button
+          type="button"
+          class="stat-pill clickable"
+          :class="{ active: soloProximosAEnergizar }"
+          @click="soloProximosAEnergizar = !soloProximosAEnergizar"
+          v-tooltip.bottom="'Tienen frontera asignada o Sun Factory ya los marca \'Próximo a energizar\'.'"
+        >
+          <span class="stat-num" style="color:#b45309;">{{ proximosAEnergizarCount }}</span>
+          <span class="stat-label">próximos a energizar</span>
+          <i class="pi" :class="soloProximosAEnergizar ? 'pi-times-circle' : 'pi-filter'" style="font-size:0.65rem; color:#b45309;" />
+        </button>
+        <button
+          type="button"
+          class="stat-pill clickable"
+          :class="{ active: soloConFrontera }"
+          @click="soloConFrontera = !soloConFrontera"
+          v-tooltip.bottom="'Ya tienen frontera comercial registrada en Quoia.'"
+        >
+          <span class="stat-num" style="color:#15803d;">{{ conFronteraCount }}</span>
+          <span class="stat-label">con frontera asignada</span>
+          <i class="pi" :class="soloConFrontera ? 'pi-times-circle' : 'pi-filter'" style="font-size:0.65rem;" />
+        </button>
         <Button
           icon="pi pi-sync"
-          label="Sincronizar ahora"
+          label="Actualizar"
           size="small"
-          outlined
           :loading="syncing"
-          @click="onSync(false)"
-        />
-        <Button
-          icon="pi pi-replay"
-          label="Re-sincronizar (sobrescribir mis cambios)"
-          size="small"
-          severity="warn"
-          :loading="syncing"
-          @click="onSync(true)"
+          @click="onSync"
+          v-tooltip.bottom="'Trae de nuevo % de obra, estado y fecha estimada desde Sun Factory'"
         />
       </div>
+      <p class="text-xs" style="color: #7a6e8a;">
+        <template v-if="lastSync">última sincronización {{ lastSyncLabel }}</template>
+      </p>
     </div>
 
     <!-- Aviso de origen de datos (config faltante / fuente caída) -->
@@ -56,10 +65,11 @@
     <!-- Table -->
     <div class="p-3 overflow-x-auto">
       <DataTable
-        :value="projects"
+        :value="filteredProjects"
         dataKey="id"
         size="small"
         stripedRows
+        v-model:expandedRows="expandedRows"
         class="energ-table"
       >
         <template #empty>
@@ -73,65 +83,47 @@
               <p class="mt-2">No se pudieron cargar los proyectos.</p>
               <p class="mt-1 text-xs" style="color: rgba(44,32,57,0.4);">Revisa el aviso de arriba (configuración / fuente de datos).</p>
             </template>
+            <template v-else-if="soloConFrontera">
+              Ningún proyecto en construcción tiene frontera asignada todavía.
+            </template>
             <template v-else>
-              Aún no hay proyectos en el pipeline. Presiona «Sincronizar ahora» para traerlos desde TSF/Solenium.
+              Aún no hay proyectos en el pipeline. Revisa «Proyectos pendientes» en la pestaña Proyectos para traer nuevos desde TSF/Solenium.
             </template>
           </div>
         </template>
 
-        <!-- Commercial name (editable) -->
-        <Column header="Proyecto" frozen style="min-width: 180px;">
+        <Column expander style="width: 44px" />
+
+        <!-- Commercial name (read-only, viene de Sun Factory) -->
+        <Column header="Proyecto" frozen style="min-width: 340px;">
           <template #body="{ data }">
-            <InputText
-              :model-value="data.commercialName"
-              @update:model-value="v => persistField(data, 'commercialName', v)"
-              class="w-full"
-            />
+            <span class="text-sm proyecto-name" v-tooltip.top="data.commercialName">{{ data.commercialName }}</span>
           </template>
         </Column>
 
         <!-- Origina project code (read-only) -->
-        <Column header="Código" style="min-width: 170px;">
+        <Column header="Código" style="min-width: 150px;">
           <template #body="{ data }">
             <span class="text-xs font-mono" style="color: rgba(44,32,57,0.5);">{{ data.name || '—' }}</span>
           </template>
         </Column>
 
-        <!-- Status (editable) -->
-        <Column header="Estado" style="min-width: 170px;">
+        <!-- Status (read-only, viene de Sun Factory) -->
+        <Column header="Estado" style="min-width: 200px;">
           <template #body="{ data }">
-            <Select
-              :model-value="data.status"
-              @update:model-value="v => persistField(data, 'status', v)"
-              :options="STATUS_OPTIONS"
-              class="w-full"
-            />
+            <span class="text-sm">{{ data.status }}</span>
           </template>
         </Column>
 
-        <!-- Energization date (editable → marca fecha como manual) -->
-        <Column header="Energización" style="min-width: 160px;">
+        <!-- Energization date (read-only, viene de Sun Factory) -->
+        <Column header="Energización" style="min-width: 140px;">
           <template #body="{ data }">
-            <div class="flex items-center gap-1">
-              <DatePicker
-                :model-value="data.energizationDate"
-                @update:model-value="v => persistField(data, 'energizationDate', v)"
-                dateFormat="yy-mm-dd"
-                showIcon
-                class="w-full"
-              />
-              <i
-                v-if="data.editadaManual"
-                class="pi pi-pencil"
-                style="color:#915BD8; font-size:0.7rem;"
-                v-tooltip="'Fecha editada manualmente — el sync no la sobrescribe (usa Re-sincronizar para forzar)'"
-              />
-            </div>
+            <span class="text-sm font-mono tabular-nums">{{ formatDate(data.energizationDate) }}</span>
           </template>
         </Column>
 
         <!-- Construction progress (Sun Factory, read-only) -->
-        <Column header="% Obra" style="min-width: 110px;">
+        <Column header="% Obra" style="min-width: 90px;">
           <template #body="{ data }">
             <span v-if="data.avancePct != null" class="text-sm font-mono tabular-nums" style="color: #2C2039;">
               {{ Number(data.avancePct).toFixed(1) }}%
@@ -140,43 +132,35 @@
           </template>
         </Column>
 
+        <!-- Frontera asignada (señal real de energización inminente) -->
+        <Column header="Frontera" style="min-width: 130px;">
+          <template #body="{ data }">
+            <span v-if="data.tieneFrontera" class="frontera-badge yes" v-tooltip.top="data.codigoFrontera">
+              <i class="pi pi-check-circle" /> {{ data.codigoFrontera }}
+            </span>
+            <span v-else class="frontera-badge no">—</span>
+          </template>
+        </Column>
+
         <!-- Linked PPA contracts (read-only — se gestionan en el flujo PPA) -->
-        <Column header="Contratos" style="min-width: 200px;">
+        <Column header="Contratos" style="min-width: 110px;">
           <template #body="{ data }">
-            <div v-if="data.contracts && data.contracts.length" class="flex flex-wrap gap-1">
-              <span
-                v-for="c in data.contracts" :key="c"
-                class="inline-block px-2 py-0.5 rounded text-xs"
-                style="background: rgba(145,91,216,0.12); color:#6b3fa0;"
-              >{{ c }}</span>
-            </div>
-            <span v-else class="text-xs" style="color: rgba(44,32,57,0.3);">Sin contratos</span>
+            <span v-if="data.contracts && data.contracts.length" class="contract-badge has-contract"
+                  v-tooltip.top="data.contracts.join(', ')">
+              <i class="pi pi-file" />
+              {{ data.contracts[0] }}<template v-if="data.contracts.length > 1"> +{{ data.contracts.length - 1 }}</template>
+            </span>
+            <span v-else class="contract-badge">
+              <span class="dot" /> Sin contratos
+            </span>
           </template>
         </Column>
 
-        <!-- Expected monthly MWh (editable) -->
-        <Column header="MWh / mes" style="min-width: 130px;">
+        <!-- Expected monthly MWh (read-only, viene de Sun Factory) -->
+        <Column header="MWh / mes" style="min-width: 110px;">
           <template #body="{ data }">
-            <InputNumber
-              :model-value="data.monthlyMwh"
-              @update:model-value="v => persistField(data, 'monthlyMwh', v)"
-              :maxFractionDigits="2" :min="0" class="w-full"
-            />
-          </template>
-        </Column>
-
-        <!-- Dynamic month columns -->
-        <Column v-for="col in monthColumns" :key="col.field" :header="col.header" style="min-width: 96px; text-align: right;">
-          <template #body="{ data }">
-            <span
-              class="inline-block px-2 py-0.5 rounded font-mono text-sm tabular-nums"
-              :class="isProrated(data, col.year, col.month) ? 'bg-yellow-100 font-bold' : ''"
-              :style="isProrated(data, col.year, col.month)
-                ? 'background: rgba(240,192,64,0.22); color: #9a6700;'
-                : calculateGeneration(data, col.year, col.month) > 0 ? 'color: #2C2039;' : 'color: rgba(44,32,57,0.3);'"
-              v-tooltip="isProrated(data, col.year, col.month) ? 'Mes parcial — prorrateado desde la energización' : ''"
-            >
-              {{ calculateGeneration(data, col.year, col.month).toFixed(2) }}
+            <span class="text-sm font-mono tabular-nums" :class="{ 'mwh-muted': !data.monthlyMwh }">
+              {{ Number(data.monthlyMwh).toFixed(2) }}
             </span>
           </template>
         </Column>
@@ -187,6 +171,26 @@
             <Button icon="pi pi-trash" severity="danger" text rounded size="small" @click="confirmRemove(data)" />
           </template>
         </Column>
+
+        <!-- Proyección mensual (detalle expandible por fila) -->
+        <template #expansion="{ data }">
+          <div class="px-5 py-4" style="background: rgba(145,91,216,0.04);">
+            <p class="text-xs font-semibold uppercase tracking-wide mb-2.5" style="color:#7a6e8a; letter-spacing:0.05em;">
+              Proyección MWh/mes — {{ data.commercialName }}
+            </p>
+            <div class="month-grid">
+              <div
+                v-for="col in monthColumns" :key="col.field"
+                class="month-chip"
+                :class="{ partial: isProrated(data, col.year, col.month), zero: calculateGeneration(data, col.year, col.month) === 0 }"
+                v-tooltip.top="isProrated(data, col.year, col.month) ? 'Mes parcial — prorrateado desde la energización' : ''"
+              >
+                <div class="m">{{ col.header }}</div>
+                <div class="v">{{ calculateGeneration(data, col.year, col.month).toFixed(2) }}</div>
+              </div>
+            </div>
+          </div>
+        </template>
       </DataTable>
     </div>
 
@@ -236,47 +240,78 @@ import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
-import InputText from 'primevue/inputtext'
-import InputNumber from 'primevue/inputnumber'
-import DatePicker from 'primevue/datepicker'
-import Select from 'primevue/select'
 import { useToast } from 'primevue/usetoast'
 import api from '@/api/client'
 import { useEnergizationProjects } from '@/composables/useEnergizationProjects'
 
 const {
   projects, loading, warning, syncing, lastSync,
-  loadProjects, persistField, removeProject, syncNow,
+  loadProjects, removeProject, syncNow,
 } = useEnergizationProjects()
 
 const toast = useToast()
 const sugerencias = ref([])
 const sugerenciasVisible = ref(false)
 const vinculandoId = ref(null)
+const expandedRows = ref({})
+const soloConFrontera = ref(false)
+const soloProximosAEnergizar = ref(false)
 
-const STATUS_OPTIONS = ['En construcción', 'Pruebas', 'Próximo a energizar', 'Energizado']
 const MESES_CORTOS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+
+function formatDate(d) {
+  if (!d) return '—'
+  const dt = d instanceof Date ? d : new Date(d)
+  if (isNaN(dt.getTime())) return '—'
+  return dt.toISOString().slice(0, 10)
+}
 
 onMounted(loadProjects)
 
-async function onSync(force) {
-  if (force && !window.confirm('Esto sobrescribirá las fechas que hayas editado manualmente con la información de Solenium. ¿Continuar?')) {
-    return
-  }
-  const r = await syncNow(force)
+// Pregunta frecuente: "¿qué proyectos están por energizar de verdad?" -- en
+// construcción + con frontera comercial ya registrada (señal más confiable
+// que el estado propio de Sun Factory).
+const filteredProjects = computed(() => {
+  let list = projects.value
+  if (soloConFrontera.value) list = list.filter(p => p.tieneFrontera)
+  if (soloProximosAEnergizar.value) list = list.filter(p => p.tieneFrontera || p.status === 'Próximo a energizar')
+  return list
+})
+
+const conFronteraCount = computed(() => projects.value.filter(p => p.tieneFrontera).length)
+
+// "Próximos a energizar" = unión de dos señales (no se suman, se unen -- un
+// proyecto puede cumplir ambas y solo cuenta una vez): tiene frontera asignada
+// (la señal real, aunque Sun Factory no lo sepa) O Sun Factory ya lo marca
+// como "Próximo a energizar" en su propio pipeline de obra.
+const proximosAEnergizarCount = computed(() =>
+  projects.value.filter(p => p.tieneFrontera || p.status === 'Próximo a energizar').length
+)
+
+const lastSyncLabel = computed(() => {
+  if (!lastSync.value) return ''
+  const mins = Math.round((Date.now() - lastSync.value.getTime()) / 60000)
+  if (mins < 1) return 'hace un momento'
+  if (mins < 60) return `hace ${mins} min`
+  const hours = Math.round(mins / 60)
+  // Ahora esta fecha viene de la BD (último sync real, no de esta sesión) --
+  // puede tener horas o días, así que no basta con mostrar solo la hora.
+  if (hours < 24) return `hace ${hours} h`
+  return lastSync.value.toLocaleString('es-CO', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+})
+
+async function onSync() {
+  const r = await syncNow()
   if (r) {
     const partes = [
-      `Creados: ${r.creados ?? 0}`,
       `Actualizados: ${r.actualizados ?? 0}`,
+      r.sin_match ? `Sin vínculo (revisar en Proyectos › Proyectos pendientes): ${r.sin_match}` : null,
       r.errores ? `Errores: ${r.errores}` : null,
-      `Fuente: ${r.fuente ?? 'sunfactory'}`,
     ].filter(Boolean)
-    let msg = `Sincronización completa.\n${partes.join(' · ')}`
+    toast.add({ severity: 'success', summary: 'Sincronización completa', detail: partes.join(' · '), life: 4000 })
     if (Array.isArray(r.warnings) && r.warnings.length) {
-      msg += `\n\nAvisos:\n- ${r.warnings.join('\n- ')}`
+      toast.add({ severity: 'warn', summary: 'Avisos', detail: r.warnings.join(' · '), life: 6000 })
     }
-    window.alert(msg)
-
     if (Array.isArray(r.sugerencias_vinculo) && r.sugerencias_vinculo.length) {
       sugerencias.value = r.sugerencias_vinculo
       sugerenciasVisible.value = true
@@ -371,6 +406,40 @@ function isProrated(project, year, month) {
 </script>
 
 <style scoped>
+/* Tarjetas de resumen en el header -- responden "cuántos" de un vistazo,
+   y la de "con frontera" duplica como el toggle del filtro (antes un
+   checkbox aparte, poco intuitivo). */
+.stat-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 12px; border-radius: 10px;
+  background: rgba(44,32,57,0.04);
+  border: 1.5px solid transparent;
+  font-size: 12px;
+}
+.stat-pill.clickable {
+  cursor: pointer;
+  background: rgba(22,163,74,0.07);
+  transition: background 0.12s, border-color 0.12s;
+}
+.stat-pill.clickable:hover { background: rgba(22,163,74,0.13); }
+.stat-pill.clickable.active {
+  background: rgba(22,163,74,0.14);
+  border-color: rgba(22,163,74,0.4);
+}
+.stat-pill.clickable .pi-filter,
+.stat-pill.clickable .pi-times-circle { color: #15803d; }
+.stat-num { font-size: 15px; font-weight: 800; color: #2C2039; font-variant-numeric: tabular-nums; }
+.stat-label { color: #7a6e8a; white-space: nowrap; }
+
+/* Nombres largos: no cortar sin avisar -- el tooltip muestra el valor entero. */
+.proyecto-name {
+  display: block;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 :deep(.energ-table .p-datatable-thead th) {
   background: rgba(44,32,57,0.05);
   color: #7a6e8a;
@@ -387,4 +456,45 @@ function isProrated(project, year, month) {
   color: #2C2039;
   vertical-align: middle;
 }
+
+/* Frontera asignada */
+.frontera-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11.5px; font-weight: 600; padding: 3px 9px; border-radius: 999px;
+  white-space: nowrap; max-width: 120px; overflow: hidden; text-overflow: ellipsis;
+}
+.frontera-badge.yes { background: rgba(22,163,74,0.10); color: #15803d; }
+.frontera-badge.no  { color: rgba(44,32,57,0.3); }
+
+/* Contratos: badge compacto en vez de columna ancha */
+.contract-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11.5px; color: rgba(44,32,57,0.35); white-space: nowrap;
+}
+.contract-badge.has-contract { color: #6b3fa0; font-weight: 600; }
+.contract-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(44,32,57,0.25); }
+
+/* MWh/mes apagado cuando es 0 -- se activa visualmente solo si hay dato */
+.mwh-muted {
+  color: rgba(44,32,57,0.3);
+}
+
+/* Proyección mensual expandible */
+.month-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(74px, 1fr));
+  gap: 8px;
+}
+.month-chip {
+  background: white;
+  border: 1px solid rgba(44,32,57,0.08);
+  border-radius: 8px;
+  padding: 7px 6px;
+  text-align: center;
+}
+.month-chip .m { font-size: 9.5px; text-transform: uppercase; color: #9b89b5; letter-spacing: 0.04em; }
+.month-chip .v { font-size: 13px; font-weight: 700; margin-top: 2px; color: #2C2039; font-variant-numeric: tabular-nums; }
+.month-chip.zero .v { color: rgba(44,32,57,0.3); font-weight: 500; }
+.month-chip.partial { background: rgba(240,192,64,0.15); border-color: rgba(240,192,64,0.4); }
+.month-chip.partial .v { color: #9a6700; }
 </style>

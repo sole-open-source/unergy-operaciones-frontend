@@ -14,8 +14,12 @@
         <Select v-model="f.estado" :options="estados" class="w-full" />
       </div>
       <div>
-        <label class="field-label">Potencia instalada (kWp)</label>
-        <InputNumber v-model="f.potencia_instalada_kwp" :maxFractionDigits="2" class="w-full" />
+        <label class="field-label">Potencia AC (kW)</label>
+        <InputNumber v-model="potenciaAcKw" :maxFractionDigits="3" locale="en-US" class="w-full" />
+      </div>
+      <div>
+        <label class="field-label">Capacidad instalada (kWp)</label>
+        <InputNumber v-model="capacidadInstaladaKwp" :maxFractionDigits="3" locale="en-US" class="w-full" />
       </div>
       <div>
         <label class="field-label">Tipo tecnología</label>
@@ -23,15 +27,17 @@
       </div>
       <div>
         <label class="field-label">Departamento</label>
-        <InputText v-model="f.departamento" class="w-full" />
+        <Select v-model="f.departamento" :options="departamentos" class="w-full" placeholder="Seleccionar" showClear filter />
       </div>
       <div>
         <label class="field-label">Municipio</label>
-        <InputText v-model="f.municipio" class="w-full" />
+        <Select v-model="f.municipio" :options="municipiosDisponibles" class="w-full" placeholder="Seleccionar" showClear filter
+          :disabled="!f.departamento" />
       </div>
       <div>
         <label class="field-label">Operador de red</label>
-        <InputText v-model="f.operador_red" class="w-full" />
+        <Select v-model="f.operador_red_id" :options="operadoresRedOptions" optionLabel="label"
+          optionValue="id" class="w-full" placeholder="Seleccionar" showClear filter />
       </div>
       <div>
         <label class="field-label">Clasificación regulatoria</label>
@@ -173,7 +179,7 @@
 </template>
 
 <script setup>
-import { reactive, ref, watch, computed } from 'vue'
+import { reactive, ref, watch, computed, onMounted } from 'vue'
 import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import DatePicker from 'primevue/datepicker'
@@ -186,6 +192,7 @@ import Divider from 'primevue/divider'
 import Tag from 'primevue/tag'
 import { useToast } from 'primevue/usetoast'
 import api from '@/api/client'
+import divipola from '@/data/colombia-divipola.json'
 
 const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 
@@ -199,7 +206,7 @@ const emit = defineEmits(['save', 'cancel'])
 const editMode = computed(() => !!props.proyecto)
 
 const estados = ['en_desarrollo', 'en_operacion', 'suspendido', 'cancelado']
-const tipos = ['minigranja', 'autoconsumo', 'gd', 'movilidad_electrica', 'otro']
+const tipos = ['minigranja', 'autoconsumo', 'gd', 'movilidad_electrica']
 const tecnologias = ['solar', 'eolica', 'hidraulica', 'biomasa', 'otra']
 const clasificaciones = ['AGP', 'AGPE', 'AGGE', 'GD', 'DER', 'otra']
 
@@ -207,16 +214,47 @@ const f = reactive({
   nombre_comercial: '',
   estado: 'en_desarrollo',
   tipo_proyecto: null,
-  potencia_instalada_kwp: null,
   tipo_tecnologia: null,
   departamento: null,
   municipio: null,
-  operador_red: null,
+  operador_red_id: null,
   clasificacion_regulatoria: null,
   carpeta_drive_codigo: null,
   sub_project: null,
   codigo_tsf: null,
 })
+
+// Departamento/municipio -- select en vez de texto libre (DIVIPOLA), para
+// evitar variantes de escritura que luego no se puedan agrupar/filtrar bien.
+const departamentos = Object.keys(divipola).sort()
+const municipiosDisponibles = computed(() => f.departamento ? (divipola[f.departamento] || []) : [])
+watch(() => f.departamento, (nuevo, anterior) => {
+  if (nuevo !== anterior && f.municipio && !(divipola[nuevo] || []).includes(f.municipio)) {
+    f.municipio = null
+  }
+})
+
+// Catálogo de operadores de red -- select en vez de texto libre, para que
+// coincida con el vínculo real que usa Reporte CGM (Frontera.operador_red_id).
+const operadoresRed = ref([])
+const operadoresRedOptions = computed(() =>
+  operadoresRed.value.map(o => ({ id: o.id, label: o.nombre_comercial || o.nombre_legal }))
+)
+onMounted(async () => {
+  try {
+    const { data } = await api.get('/operadores-red')
+    operadoresRed.value = Array.isArray(data) ? data : (data.items ?? [])
+  } catch { /* graceful degrade -- el select queda vacío */ }
+})
+
+// Potencia AC y capacidad instalada -- viven en proyecto_info_tecnica (pestaña
+// Técnico), que requiere un proyecto_id existente, así que no son parte de `f`
+// (el payload de POST/PATCH /proyectos). El submit las emite aparte para que
+// quien las reciba haga el PUT a /proyectos/{id}/info-tecnica después de crear.
+// capacidad_instalada_kwp también se copia a proyectos.potencia_instalada_kwp
+// (el campo que usan los cálculos de generación esperada en el resto del backend).
+const potenciaAcKw = ref(null)
+const capacidadInstaladaKwp = ref(null)
 
 // Fechas del proyecto (DatePicker usa Date; el API espera 'YYYY-MM-DD')
 const fechaEntrada = ref(null)
@@ -256,6 +294,8 @@ const p50Array = ref(Array(12).fill(null))
 watch(() => props.proyecto, (p) => {
   if (p) {
     Object.keys(f).forEach(k => { if (k in p) f[k] = p[k] })
+    potenciaAcKw.value = p.info_tecnica?.potencia_ac_kw ?? null
+    capacidadInstaladaKwp.value = p.info_tecnica?.capacidad_instalada_kwp ?? p.potencia_instalada_kwp ?? null
     p90Array.value = parseMonthArray(p.p90_mensual_kwh)
     p50Array.value = parseMonthArray(p.p50_mensual_kwh)
     fechaEntrada.value = toDate(p.fecha_entrada_operacion)
@@ -329,7 +369,15 @@ function submit() {
   // Fechas del proyecto (null = sin fecha / vigente)
   payload.fecha_entrada_operacion = formatFecha(fechaEntrada.value)
   payload.fecha_fin_representacion = formatFecha(fechaFinRep.value)
-  emit('save', payload)
+  // Capacidad instalada (DC) es la que usan los cálculos de generación esperada
+  // en el resto del backend -- se guarda también aquí, no solo en info-tecnica.
+  if (capacidadInstaladaKwp.value !== null) payload.potencia_instalada_kwp = capacidadInstaladaKwp.value
+
+  const infoTecnica = {}
+  if (potenciaAcKw.value !== null) infoTecnica.potencia_ac_kw = potenciaAcKw.value
+  if (capacidadInstaladaKwp.value !== null) infoTecnica.capacidad_instalada_kwp = capacidadInstaladaKwp.value
+
+  emit('save', payload, infoTecnica)
 }
 </script>
 

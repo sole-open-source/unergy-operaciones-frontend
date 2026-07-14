@@ -48,4 +48,22 @@ app.directive('tooltip', Tooltip)
 app.component('InfoField', InfoField)
 app.component('PageHeader', PageHeader)
 
-router.isReady().then(() => app.mount('#app'))
+router.isReady().then(() => {
+  app.mount('#app')
+  // Si llegamos hasta acá es porque el build actual sí cargó bien -- limpiar
+  // la marca para que un deploy FUTURO (mientras esta pestaña siga abierta)
+  // pueda disparar su propia recarga automática, en vez de quedar bloqueado
+  // por una recarga de un deploy anterior ya resuelta.
+  sessionStorage.removeItem('vite_reload_intentado')
+})
+
+// Vite dispara esto cuando falla la carga de un módulo/CSS cargado con import()
+// perezoso (pestaña abierta desde antes de un deploy, pidiendo un archivo que
+// Vercel ya reemplazó). Recarga UNA sola vez para tomar la versión nueva --
+// sin este guardado, si el archivo sigue sin existir tras recargar (deploy
+// roto, no solo desactualizado), esto reintentaría para siempre.
+window.addEventListener('vite:preloadError', () => {
+  if (sessionStorage.getItem('vite_reload_intentado')) return
+  sessionStorage.setItem('vite_reload_intentado', '1')
+  window.location.reload()
+})

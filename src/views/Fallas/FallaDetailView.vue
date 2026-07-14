@@ -25,13 +25,13 @@
           <div class="flex items-center gap-2 mb-1.5">
             <Tag :value="falla.estado?.etiqueta || '—'" :style="pillStyle(falla.estado?.color_hex)" />
             <Tag :value="falla.prioridad?.etiqueta || '—'" :severity="prioSeverity(falla.prioridad?.codigo)" />
-            <Tag v-if="falla.tipo?.categoria" :value="falla.tipo.categoria.etiqueta"
-              :style="catTagStyle(falla.tipo.categoria.color_hex)" />
+            <Tag v-if="categoria.etiqueta" :value="categoria.etiqueta"
+              :style="catTagStyle(categoria.color)" />
           </div>
           <h2 class="text-xl font-bold text-gray-800 flex items-center gap-2 flex-wrap">
             <code class="text-base font-mono text-purple-700 bg-purple-50 px-2 py-0.5 rounded">{{ falla.codigo_interno }}</code>
             <span class="text-gray-400 text-sm">·</span>
-            <span class="text-base font-medium text-gray-700">{{ falla.tipo?.etiqueta || falla.tipo_libre || '—' }}</span>
+            <span class="text-base font-medium text-gray-700">{{ titulo }}</span>
           </h2>
           <p class="text-sm text-gray-600 mt-1 max-w-2xl">{{ falla.descripcion }}</p>
           <div class="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-xs text-gray-500">
@@ -72,6 +72,60 @@
       <!-- COLUMNA PRINCIPAL -->
       <div class="lg:col-span-2 space-y-4">
 
+        <!-- Clasificación (metodología estructurada) -->
+        <div v-if="clasif" class="bg-white rounded-xl shadow-sm p-5">
+          <div class="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100">
+            <i :class="clasif.icono" class="text-sm" :style="{ color: clasif.categoriaColor }" />
+            <h3 class="font-semibold text-sm text-gray-700">Clasificación</h3>
+            <Tag v-if="clasif.pendienteReclasificar" value="Pendiente de reclasificar"
+              severity="warn" class="ml-auto text-[11px]" />
+          </div>
+
+          <!-- Sistema + equipo/evento -->
+          <div class="flex flex-wrap items-center gap-2 mb-3">
+            <Tag :value="clasif.categoriaEtiqueta" :style="catTagStyle(clasif.categoriaColor)" />
+            <span v-if="clasif.subtitulo" class="text-sm font-semibold text-gray-800">{{ clasif.subtitulo }}</span>
+          </div>
+
+          <!-- Detalle libre -->
+          <p v-if="clasif.detalle" class="text-sm text-gray-700 leading-relaxed whitespace-pre-line mb-3">
+            {{ clasif.detalle }}
+          </p>
+
+          <!-- Frontera: flags -->
+          <div v-if="clasif.frontera" class="flex flex-wrap gap-2">
+            <span class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-md"
+              :class="clasif.frontera.afectaMedicion ? 'bg-red-50 text-red-700' : 'bg-gray-100 text-gray-500'">
+              <i :class="clasif.frontera.afectaMedicion ? 'pi pi-times-circle' : 'pi pi-check-circle'" class="text-[11px]" />
+              {{ clasif.frontera.afectaMedicion ? 'Afecta la medición' : 'No afecta la medición' }}
+            </span>
+            <span class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-md"
+              :class="clasif.frontera.perdidaComunicacion ? 'bg-amber-50 text-amber-700' : 'bg-gray-100 text-gray-500'">
+              <i :class="clasif.frontera.perdidaComunicacion ? 'pi pi-wifi' : 'pi pi-check-circle'" class="text-[11px]" />
+              {{ clasif.frontera.perdidaComunicacion ? 'Pérdida de comunicación' : 'Comunicación OK' }}
+            </span>
+          </div>
+
+          <!-- Inversores afectados -->
+          <div v-if="clasif.inversores.length" class="space-y-2">
+            <p class="text-xs text-gray-400 uppercase tracking-wide">Inversores afectados ({{ clasif.inversores.length }})</p>
+            <div v-for="(inv, idx) in clasif.inversores" :key="idx"
+              class="rounded-lg border border-gray-100 bg-gray-50 p-3">
+              <div class="flex items-center gap-2 mb-1.5">
+                <i class="pi pi-server text-xs" style="color:#915BD8" />
+                <span class="text-sm font-semibold text-gray-800">{{ inv.nombre }}</span>
+                <span v-if="inv.potenciaKw != null" class="text-xs text-gray-500">· {{ inv.potenciaKw }} kW</span>
+              </div>
+              <div v-if="inv.tipos.length" class="flex flex-wrap gap-1.5">
+                <span v-for="(t, ti) in inv.tipos" :key="ti"
+                  class="text-[11px] font-semibold px-2 py-0.5 rounded"
+                  style="background:#915BD81a;color:#6E3FB8">{{ t }}</span>
+              </div>
+              <p v-else class="text-xs text-gray-400">Sin tipo de falla especificado</p>
+            </div>
+          </div>
+        </div>
+
         <!-- Información general -->
         <div class="bg-white rounded-xl shadow-sm p-5">
           <div class="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100">
@@ -80,7 +134,7 @@
           </div>
           <div class="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
             <InfoField label="Proyecto" :value="falla.proyecto?.nombre_comercial" highlight />
-            <InfoField label="Tipo de falla" :value="falla.tipo?.etiqueta || falla.tipo_libre" />
+            <InfoField label="Equipo / evento" :value="titulo" />
             <InfoField label="Registrado por" :value="falla.registrado_por?.nombre" />
             <InfoField label="Asignado a" :value="falla.asignado_a?.nombre || 'Sin asignar'" />
             <InfoField label="Fecha ocurrencia" :value="fmtDatetime(falla.fecha_ocurrencia)" />
@@ -265,7 +319,7 @@
             <div class="flex flex-col gap-1">
               <label class="field-label">Energía perdida (kWh)</label>
               <InputNumber v-model="quickEdit.energia_perdida_kwh" :minFractionDigits="0" :maxFractionDigits="2"
-                :min="0" class="w-full" />
+                :min="0" locale="en-US" class="w-full" />
             </div>
             <div class="flex flex-col gap-1">
               <label class="field-label">Causa raíz</label>
@@ -322,6 +376,7 @@ import Textarea from 'primevue/textarea'
 import InputNumber from 'primevue/inputnumber'
 import ProgressSpinner from 'primevue/progressspinner'
 import FallaForm from './FallaForm.vue'
+import { tituloFalla, categoriaFalla, clasificacionDetalle } from '@/utils/fallaTitulo'
 import api from '@/api/client'
 
 const route = useRoute()
@@ -351,6 +406,12 @@ const quickEdit = reactive({
 })
 
 // ── Computed ────────────────────────────────────────────────────────────
+// Título / categoría / clasificación derivados de lo REALMENTE reportado
+// (metodología estructurada), con respaldo al tipo legacy para fallas viejas.
+const titulo = computed(() => tituloFalla(falla.value))
+const categoria = computed(() => categoriaFalla(falla.value))
+const clasif = computed(() => clasificacionDetalle(falla.value))
+
 const sortedSeguimientos = computed(() =>
   [...(falla.value?.seguimientos ?? [])].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
 )
@@ -639,12 +700,20 @@ onMounted(() => {
 </script>
 
 <script>
+import { h } from 'vue'
+
+// Render function (no `template` string) -- el build runtime-only de Vue no
+// compila strings de template en producción, lo que dejaba esto invisible.
 const InfoField = {
   props: { label: String, value: [String, Number, Boolean], highlight: Boolean },
-  template: `<div>
-    <p class="text-xs text-gray-400 uppercase tracking-wide">{{ label }}</p>
-    <p class="mt-0.5" :class="highlight ? 'font-bold text-gray-800' : 'font-medium text-gray-700'">{{ value || '—' }}</p>
-  </div>`,
+  render() {
+    return h('div', [
+      h('p', { class: 'text-xs text-gray-400 uppercase tracking-wide' }, this.label),
+      h('p', {
+        class: ['mt-0.5', this.highlight ? 'font-bold text-gray-800' : 'font-medium text-gray-700'],
+      }, this.value || '—'),
+    ])
+  },
 }
 export default { components: { InfoField } }
 </script>

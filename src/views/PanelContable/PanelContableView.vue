@@ -131,7 +131,12 @@
             </div>
           </div>
 
-          <div v-if="!paneles.length" class="empty sm">
+          <div v-if="cargaError" class="empty sm">
+            No se pudieron cargar los paneles de {{ periodoLabel }} (error de conexión).
+            <button class="mini" style="margin-left:8px" @click="cargarPaneles">Reintentar</button>
+          </div>
+
+          <div v-else-if="!paneles.length" class="empty sm">
             No hay paneles para {{ periodoLabel }}. Carga uno o varios archivos ER.
           </div>
 
@@ -163,22 +168,36 @@
             </table>
           </div>
 
-          <div class="cons-pool">
+          <!-- Consecutivos: SOLO en oficial (la preliquidación no lleva; el mandato
+               oficial = la diferencia). Únicos globalmente por cadena. -->
+          <div v-if="tab === 'oficial'" class="cons-pool">
             <div class="fld">
               <label>Consecutivo Ingresos inicial</label>
               <input type="number" v-model.number="consIngIni" @change="reasignarTodo" />
+              <span v-if="consInfo && consInfo.ingresos.usados.includes(consIngIni)" class="cons-warn">
+                ⚠ {{ consIngIni }} ya está usado —
+                <button class="mini" @click="usarSiguiente('ing')">usar {{ consInfo.ingresos.siguiente }}</button>
+              </span>
             </div>
             <div class="fld">
               <label>Consecutivo Costos inicial</label>
               <input type="number" v-model.number="consCosIni" @change="reasignarTodo" />
+              <span v-if="consInfo && consInfo.costos.usados.includes(consCosIni)" class="cons-warn">
+                ⚠ {{ consCosIni }} ya está usado —
+                <button class="mini" @click="usarSiguiente('cos')">usar {{ consInfo.costos.siguiente }}</button>
+              </span>
             </div>
             <div class="hint">
-              Ingresos y costos numeran por separado. Los costos solo consumen
-              consecutivo si el proyecto tiene costos.
+              Ingresos y costos numeran por separado y son únicos globalmente (no se
+              repiten entre períodos).
+              <template v-if="consInfo"> Siguiente libre: Ing <b>{{ consInfo.ingresos.siguiente }}</b> · Cost <b>{{ consInfo.costos.siguiente }}</b>.</template>
             </div>
             <div class="summary">
               <b>{{ nLiqIng }}</b> liq. ingresos · <b>{{ nLiqCost }}</b> liq. costos · <b>{{ nGeneran }}</b> generan mandatos
             </div>
+          </div>
+          <div v-else class="hint" style="padding:8px 12px">
+            La preliquidación no lleva consecutivos — se asignan en el panel <b>oficial</b> (el mandato = la diferencia).
           </div>
         </div>
 
@@ -206,8 +225,8 @@
             <span v-if="!p.liquidar_ingresos && p.liquidar_costos" class="pill pill-bolsa">solo costos</span>
             <span v-if="!esActivo(p)" class="pill pill-off">no liquida</span>
             <div class="pcons">
-              <span>Ing: <b>{{ p.consecutivo_ingresos ?? '—' }}</b></span>
-              <span>Cost: <b>{{ p.consecutivo_costos ?? '—' }}</b></span>
+              <span>Ing: <b>{{ tab === 'oficial' ? (p.consecutivo_ingresos ?? '—') : '—' }}</b></span>
+              <span>Cost: <b>{{ tab === 'oficial' ? (p.consecutivo_costos ?? '—') : '—' }}</b></span>
             </div>
           </div>
 
@@ -218,8 +237,8 @@
                 <div class="inv-head">
                   <div class="inv-name">{{ inv.nombre }} · {{ (inv.porcentaje ?? 0).toFixed(2) }}%</div>
                   <div class="inv-cons">
-                    <span>Ing: <b>{{ p.liquidar_ingresos ? (p.consecutivo_ingresos ?? '—') : '—' }}</b></span>
-                    <span>Cost: <b>{{ p.liquidar_costos ? (p.consecutivo_costos ?? '—') : '—' }}</b></span>
+                    <span>Ing: <b>{{ tab === 'oficial' && p.liquidar_ingresos ? (p.consecutivo_ingresos ?? '—') : '—' }}</b></span>
+                    <span>Cost: <b>{{ tab === 'oficial' && p.liquidar_costos ? (p.consecutivo_costos ?? '—') : '—' }}</b></span>
                   </div>
                 </div>
 
@@ -295,8 +314,8 @@
                 <div class="inv-head">
                   <div class="inv-name">100% — Total proyecto</div>
                   <div class="inv-cons">
-                    <span>Ing: <b>{{ p.liquidar_ingresos ? (p.consecutivo_ingresos ?? '—') : '—' }}</b></span>
-                    <span>Cost: <b>{{ p.liquidar_costos ? (p.consecutivo_costos ?? '—') : '—' }}</b></span>
+                    <span>Ing: <b>{{ tab === 'oficial' && p.liquidar_ingresos ? (p.consecutivo_ingresos ?? '—') : '—' }}</b></span>
+                    <span>Cost: <b>{{ tab === 'oficial' && p.liquidar_costos ? (p.consecutivo_costos ?? '—') : '—' }}</b></span>
                   </div>
                 </div>
 
@@ -544,10 +563,25 @@ const savedAt = reactive({})
 const origenOpen = reactive({})
 const toggleOrigen = (id) => { origenOpen[id] = !origenOpen[id] }
 const loading = ref(false)
+const cargaError = ref(false)   // distingue "falló la carga" de "no hay paneles"
 const uploading = ref(0)
 const uploadMsg = ref('')
 const consIngIni = ref(793)
 const consCosIni = ref(850)
+const consInfo = ref(null)   // { ingresos:{usados,siguiente}, costos:{...} } de oficiales (global)
+
+async function cargarConsInfo () {
+  try {
+    const { data } = await api.get('/panel-contable/consecutivos-usados')
+    consInfo.value = data
+  } catch { consInfo.value = null }
+}
+function usarSiguiente (cadena) {
+  if (!consInfo.value) return
+  if (cadena === 'ing') consIngIni.value = consInfo.value.ingresos.siguiente
+  else consCosIni.value = consInfo.value.costos.siguiente
+  reasignarTodo()
+}
 const erInput = ref(null)
 
 // Clasificación de liquidación por período.
@@ -660,17 +694,22 @@ async function cargarPaneles () {
   if (tab.value === 'diferencia') return cargarDiferencia()
   if (!periodo.value) { paneles.value = []; return }
   loading.value = true
+  cargaError.value = false
   try {
     const { data } = await api.get('/panel-contable', { params: { periodo: periodo.value, tipo: tab.value } })
     paneles.value = data.paneles || []
     paneles.value.forEach((p, i) => { if (open[p.id] === undefined) open[p.id] = (i === 0 && esActivo(p)) })
-    // Al cargar: numerar SOLO los faltantes (preserva los consecutivos ya
-    // asignados/editados a mano). Así todo panel marcado queda con consecutivo
-    // sin pisar ediciones — incluida la pestaña Oficial, que antes quedaba en —.
-    if (paneles.value.some(p => p.liquidar_ingresos || p.liquidar_costos)) {
-      await reasignar(true)
+    // Consecutivos SOLO en oficial (la preliquidación no lleva). Al cargar el oficial:
+    // traer los usados globalmente (para avisar/sugerir) y numerar solo los faltantes.
+    if (tab.value === 'oficial') {
+      await cargarConsInfo()
+      if (paneles.value.some(p => p.liquidar_ingresos || p.liquidar_costos)) {
+        await reasignar(true)
+      }
     }
   } catch (e) {
+    cargaError.value = true
+    paneles.value = []
     toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudieron cargar los paneles', life: 4000 })
   } finally {
     loading.value = false
@@ -792,23 +831,40 @@ async function onErSelected (e) {
   }
 }
 
+// Aplica un cambio de flags en lote con rollback: si algún PATCH falla, revierte
+// SOLO esos paneles a su valor previo y avisa (antes se tragaba el error y la UI
+// quedaba desincronizada del backend).
+function _aplicarLoteFlags (campos, val, trasReasignar = true) {
+  const prev = paneles.value.map(p => ({ p, old: Object.fromEntries(campos.map(c => [c, p[c]])) }))
+  paneles.value.forEach(p => campos.forEach(c => { p[c] = val }))
+  Promise.all(paneles.value.map(p => {
+    const payload = Object.fromEntries(campos.map(c => [c, p[c]]))
+    return api.patch(`/panel-contable/${p.id}`, payload).then(() => null).catch(() => p.id)
+  })).then(res => {
+    const fallidos = new Set(res.filter(Boolean))
+    if (fallidos.size) {
+      prev.forEach(({ p, old }) => { if (fallidos.has(p.id)) Object.assign(p, old) })
+      toast.add({ severity: 'warn', summary: 'Algunos no se guardaron',
+        detail: `${fallidos.size} panel(es) revertido(s)`, life: 3500 })
+    }
+    if (trasReasignar) reasignar()
+  })
+}
+
 function selAll (campo, val) {
   // El usuario decide qué liquidar; 'liquidar_costos' ya no se ata a si el ER trajo
   // costos (pueden faltar este mes o venir luego de la vista de costos).
-  paneles.value.forEach(p => { p[campo] = val })
-  Promise.all(paneles.value.map(p => api.patch(`/panel-contable/${p.id}`, {
-    [campo]: p[campo],
-  }).catch(() => {}))).then(() => { if (campo !== 'generar_mandatos') reasignar() })
+  _aplicarLoteFlags([campo], val, campo !== 'generar_mandatos')
 }
 
 function selNinguno () {
-  paneles.value.forEach(p => { p.liquidar_ingresos = false; p.liquidar_costos = false })
-  Promise.all(paneles.value.map(p => api.patch(`/panel-contable/${p.id}`, {
-    liquidar_ingresos: false, liquidar_costos: false,
-  }).catch(() => {}))).then(() => reasignar())
+  _aplicarLoteFlags(['liquidar_ingresos', 'liquidar_costos'], false, true)
 }
 
 async function onFlag (p) {
+  // v-model ya aplicó el cambio en p antes de este handler, así que no tenemos el
+  // valor previo para revertir localmente: si el PATCH falla, resincronizamos desde
+  // el backend (autoritativo) para que el checkbox refleje lo realmente guardado.
   try {
     await api.patch(`/panel-contable/${p.id}`, {
       liquidar_ingresos: p.liquidar_ingresos,
@@ -816,7 +872,10 @@ async function onFlag (p) {
       generar_mandatos: p.generar_mandatos,
     })
     reasignar()
-  } catch (e) { /* noop */ }
+  } catch (e) {
+    toast.add({ severity: 'error', summary: 'No se guardó', detail: 'Recargando estado…', life: 3000 })
+    cargarPaneles()
+  }
 }
 
 // Renumeración completa (desde el valor inicial) — al cambiar el consecutivo inicial.
@@ -826,21 +885,24 @@ const reasignarTodo = () => reasignar(false)
 // asignados/editados. false: renumera todo desde el valor inicial.
 async function reasignar (soloFaltantes = true) {
   try {
-    await api.post('/panel-contable/reasignar-consecutivos', {
+    // La respuesta trae 'asignados' con los consecutivos de cada panel, así que
+    // actualizamos en memoria SIN un segundo GET completo (antes: POST + GET =
+    // triple round-trip al entrar/cambiar de pestaña).
+    const { data } = await api.post('/panel-contable/reasignar-consecutivos', {
       periodo: periodo.value,
       tipo: tab.value,
       consecutivo_ingresos_inicial: Number(consIngIni.value) || 0,
       consecutivo_costos_inicial: Number(consCosIni.value) || 0,
       solo_faltantes: soloFaltantes,
     })
-    // Refrescar consecutivos sin perder el estado de despliegue.
-    const { data } = await api.get('/panel-contable', { params: { periodo: periodo.value, tipo: tab.value } })
-    const map = Object.fromEntries((data.paneles || []).map(p => [p.id, p]))
+    const map = Object.fromEntries((data.asignados || []).map(a => [a.panel_id, a]))
     paneles.value.forEach(p => {
       const fresh = map[p.id]
       if (fresh) { p.consecutivo_ingresos = fresh.consecutivo_ingresos; p.consecutivo_costos = fresh.consecutivo_costos }
     })
-  } catch (e) { /* noop */ }
+  } catch (e) {
+    toast.add({ severity: 'warn', summary: 'Consecutivos', detail: 'No se pudieron reasignar los consecutivos', life: 3500 })
+  }
 }
 
 // Reemplaza un panel en paneles.value con la respuesta del backend,
@@ -1033,6 +1095,8 @@ onMounted(cargarPaneles)
 .cons-pool { display:flex; gap:18px; align-items:flex-end; flex-wrap:wrap; padding:13px 18px; background:#faf8fd; border-top:1px solid var(--line); }
 .fld label { font-size:11px; color:var(--txt2); display:block; margin-bottom:4px; }
 .fld input { font-size:13px; padding:6px 9px; border:1px solid var(--line2); border-radius:7px; width:130px; }
+.cons-warn { display:block; font-size:11px; color:#D64455; margin-top:4px; }
+.cons-warn .mini { padding:2px 7px; font-size:11px; margin-left:4px; }
 .hint { font-size:12px; color:var(--txt3); max-width:320px; align-self:center; }
 .summary { font-size:12px; color:var(--txt2); align-self:center; margin-left:auto; }
 .summary b { color:var(--p1); }

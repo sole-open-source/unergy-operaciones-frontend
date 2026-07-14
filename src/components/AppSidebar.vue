@@ -268,15 +268,28 @@ const ALL_GROUPS = [
     ],
   },
   {
+    label: 'Comercial',
+    items: [
+      { to: '/comercial', label: 'Pipeline', icon: 'pi pi-briefcase', roles: ['admin', 'comercial'] },
+    ],
+  },
+  {
     label: 'Operaciones',
     items: [
       { to: '/solar-live', label: 'Generación Solar', icon: 'pi pi-sun', roles: ['admin', 'operaciones', 'monitoreo'] },
       { to: '/operaciones/informes-mensuales', label: 'Informes Mensuales', icon: 'pi pi-file-edit', roles: ['admin', 'operaciones', 'monitoreo'] },
-      { to: '/operaciones/control-generacion', label: 'Control de Generación', icon: 'pi pi-sliders-h', roles: ['admin', 'operaciones', 'monitoreo'] },
+      { to: '/operaciones/informes-mensuales/dashboard', label: 'Informes · Dashboard', icon: 'pi pi-chart-bar', roles: ['admin', 'operaciones', 'monitoreo'] },
       { to: '/fallas', label: 'Gestión de Fallas', icon: 'pi pi-wrench', roles: ['admin', 'operaciones', 'monitoreo'] },
       { to: '/alertas/monitoreo', label: 'Alarmas MGS', icon: 'pi pi-bell', roles: ['admin', 'operaciones', 'monitoreo'] },
       { to: '/operaciones/costos-variables', label: 'Costos Variables', icon: 'pi pi-receipt', roles: ['admin', 'operaciones'] },
-      { to: '/mem/fronteras',   label: 'Fronteras',        icon: 'pi pi-globe', roles: ['admin', 'operaciones', 'monitoreo'] },
+    ],
+  },
+  {
+    label: 'Fronteras Comerciales',
+    items: [
+      { to: '/mem/fronteras',         label: 'General',            icon: 'pi pi-globe',      roles: ['admin', 'operaciones', 'monitoreo'] },
+      { to: '/mem/reporte-energia',   label: 'Reporte de Energía', icon: 'pi pi-file-edit',  roles: ['admin', 'operaciones', 'monitoreo'] },
+      { to: '/mem/operadores-red',    label: 'Operadores de Red',  icon: 'pi pi-sitemap',    roles: ['admin', 'operaciones', 'monitoreo'] },
     ],
   },
   {
@@ -302,10 +315,10 @@ const ALL_GROUPS = [
         ],
       },
       { to: '/liquidaciones/inversionista', label: 'Por Inversionista', icon: 'pi pi-users', roles: ['admin', 'liquidaciones'] },
-      { to: '/liquidaciones/cargar-excel', label: 'Cargar Excel', icon: 'pi pi-upload', roles: ['admin', 'liquidaciones'] },
       { to: '/panel-contable', label: 'Panel Contable', icon: 'pi pi-calculator', roles: ['admin', 'liquidaciones'] },
       { to: '/finanzas/costos', label: 'Costos', icon: 'pi pi-credit-card', roles: ['admin', 'liquidaciones'] },
       { to: '/validador-mandatos', label: 'Validador de Mandatos', icon: 'pi pi-file-check', roles: ['admin', 'liquidaciones'] },
+      { to: '/finanzas/descarga-xm', label: 'Descarga de XM', icon: 'pi pi-cloud-download', roles: ['admin', 'liquidaciones'] },
     ],
   },
   {

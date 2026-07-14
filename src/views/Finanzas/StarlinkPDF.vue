@@ -126,6 +126,7 @@
                   class="px-3 py-2.5 text-xs font-semibold text-gray-500 whitespace-nowrap"
                   :class="h.right ? 'text-right' : 'text-left'"
                   :style="h.key === 'descripcion' ? 'width:34%' : ''">{{ h.label }}</th>
+                <th class="px-3 py-2.5 text-xs font-semibold text-gray-500 whitespace-nowrap text-left">Minigranja</th>
               </tr>
             </thead>
             <tbody>
@@ -138,6 +139,16 @@
                 <td class="px-3 py-2 text-xs text-right font-mono text-gray-600">{{ formatCOP(item.sin_iva) }}</td>
                 <td class="px-3 py-2 text-xs text-right font-mono text-gray-600">{{ formatCOP(item.iva) }}</td>
                 <td class="px-3 py-2 text-xs text-right font-semibold tabular-nums" style="color:#7c3aed">{{ formatCOP(item.monto_total) }}</td>
+                <td class="px-3 py-2 text-xs">
+                  <span v-if="minigranjaDe(item.descripcion)" style="color:#2C2039">{{ minigranjaDe(item.descripcion) }}</span>
+                  <div v-else class="flex items-center gap-1.5">
+                    <Tag severity="warn" value="Sin asignar" />
+                    <button type="button" class="mn-asignar-btn" title="Asignar minigranja"
+                      @click="abrirAsignarMinigranja(item.descripcion)">
+                      <i class="pi pi-link text-xs" />
+                    </button>
+                  </div>
+                </td>
               </tr>
               <tr class="bg-gray-50 border-t-2 border-gray-200">
                 <td class="px-3 py-2.5 text-xs font-semibold text-gray-600">TOTAL</td>
@@ -146,6 +157,7 @@
                 <td class="px-3 py-2.5 text-right text-xs font-semibold font-mono text-gray-600">{{ formatCOP(totalAgrupado.sin_iva) }}</td>
                 <td class="px-3 py-2.5 text-right text-xs font-semibold font-mono text-gray-600">{{ formatCOP(totalAgrupado.iva) }}</td>
                 <td class="px-3 py-2.5 text-right text-xs font-bold font-mono tabular-nums" style="color:#7c3aed">{{ formatCOP(totalAgrupado.total) }}</td>
+                <td class="px-3 py-2.5"></td>
               </tr>
             </tbody>
           </table>
@@ -209,6 +221,40 @@
       </div>
     </Dialog>
 
+    <!-- ── Dialog: asignar minigranja a un sitio sin mapear ─────────────────── -->
+    <Dialog v-model:visible="showAsignarDialog" modal header="Asignar minigranja"
+      :style="{ width: '420px' }" :closable="!asignando">
+      <div class="space-y-4 pt-1">
+        <p class="text-xs text-gray-500">
+          Sitio Starlink: <strong style="color:#2C2039">{{ descripcionParaAsignar }}</strong>
+        </p>
+
+        <div class="flex flex-col gap-2">
+          <label class="text-xs font-medium text-gray-600">Minigranja / proyecto</label>
+          <Select
+            v-model="proyectoParaAsignar"
+            :options="proyectos"
+            optionLabel="nombre_comercial"
+            optionValue="id"
+            placeholder="Selecciona un proyecto…"
+            filter
+            showClear
+            :loading="loadingProyectos"
+            class="w-full"
+          />
+        </div>
+
+        <div class="flex gap-2 justify-end pt-1">
+          <Button label="Cancelar" size="small" outlined severity="secondary"
+            :disabled="asignando" @click="showAsignarDialog = false" />
+          <Button label="Asignar" icon="pi pi-check" size="small"
+            :loading="asignando" :disabled="!proyectoParaAsignar"
+            @click="confirmarAsignarMinigranja"
+            style="background:#915BD8;border-color:#915BD8" />
+        </div>
+      </div>
+    </Dialog>
+
   </div>
 </template>
 
@@ -217,6 +263,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 import Dialog from 'primevue/dialog'
+import Select from 'primevue/select'
 import { useToast } from 'primevue/usetoast'
 import api from '@/api/client'
 
@@ -289,6 +336,14 @@ const periodoIndex   = ref(0)    // índice actual (0 = más reciente)
 const facturaActual  = ref(null)
 const cargandoFactura = ref(false)
 
+// ── Líneas resueltas a proyecto (minigranja) ───────────────────────────────────
+const lineas = ref([])   // [{ descripcion, proyecto_id, nombre_comercial, sin_iva, iva, monto_total }, ...]
+
+function minigranjaDe(descripcion) {
+  const l = (lineas.value || []).find(x => x.descripcion === descripcion)
+  return l ? l.nombre_comercial : null
+}
+
 const periodoActual = computed(() => periodos.value[periodoIndex.value] ?? null)
 const periodoLabel  = computed(() => periodoLabelFrom(periodoActual.value))
 
@@ -312,12 +367,13 @@ async function cargarPeriodos() {
 }
 
 async function cargarFactura(periodo) {
-  if (!periodo) { facturaActual.value = null; return }
+  if (!periodo) { facturaActual.value = null; lineas.value = []; return }
   cargandoFactura.value = true
   try {
     const { data } = await api.get(`/starlink/factura/${periodo}`)
     facturaActual.value = data
-  } catch { facturaActual.value = null }
+    lineas.value = data?.lineas ?? []
+  } catch { facturaActual.value = null; lineas.value = [] }
   finally { cargandoFactura.value = false }
 }
 
@@ -434,6 +490,59 @@ async function descargarExcel() {
   }
 }
 
+// ── Asignar minigranja a sitio sin mapear ──────────────────────────────────────
+const proyectos        = ref([])
+const loadingProyectos = ref(false)
+
+const showAsignarDialog     = ref(false)
+const descripcionParaAsignar = ref('')
+const proyectoParaAsignar   = ref(null)
+const asignando             = ref(false)
+
+function _normSitio(s) {
+  return (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .trim().toUpperCase().replace(/\s+/g, ' ')
+}
+
+async function cargarProyectos() {
+  loadingProyectos.value = true
+  try {
+    const { data } = await api.get('/proyectos', { params: { size: 500 } })
+    const lista = Array.isArray(data) ? data : (data.items ?? [])
+    proyectos.value = [...lista].sort((a, b) => a.nombre_comercial.localeCompare(b.nombre_comercial))
+  } catch {
+    proyectos.value = []
+  } finally {
+    loadingProyectos.value = false
+  }
+}
+
+function abrirAsignarMinigranja(descripcion) {
+  descripcionParaAsignar.value = descripcion
+  proyectoParaAsignar.value    = null
+  showAsignarDialog.value      = true
+}
+
+async function confirmarAsignarMinigranja() {
+  if (!proyectoParaAsignar.value || !descripcionParaAsignar.value) return
+  asignando.value = true
+  try {
+    await api.put('/starlink/mapeo', {
+      patron:      _normSitio(descripcionParaAsignar.value),
+      proyecto_id: proyectoParaAsignar.value,
+      activo:      true,
+    })
+    toast.add({ severity: 'success', summary: 'Minigranja asignada', life: 3000 })
+    showAsignarDialog.value = false
+    await cargarFactura(periodoActual.value)
+  } catch (err) {
+    toast.add({ severity: 'error', summary: 'Error al asignar minigranja',
+      detail: err.response?.data?.detail ?? err.message, life: 4000 })
+  } finally {
+    asignando.value = false
+  }
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function formatCOP(v) {
   if (v == null) return '—'
@@ -451,6 +560,7 @@ function fmtFecha(iso) {
 onMounted(async () => {
   await cargarPeriodos()
   if (periodos.value.length) await cargarFactura(periodos.value[0])
+  cargarProyectos()
 })
 </script>
 
@@ -494,4 +604,20 @@ onMounted(async () => {
   box-shadow: 0 1px 4px rgba(145,91,216,.3);
 }
 .mon-tab--active:hover { color: #FDFAF7; }
+
+/* Botón de asignar minigranja (columna Minigranja, tabla Agrupado) */
+.mn-asignar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: 1px solid #E5E2EC;
+  background: #fff;
+  color: #915BD8;
+  cursor: pointer;
+  transition: background .15s;
+}
+.mn-asignar-btn:hover { background: #F4F1FA; }
 </style>
