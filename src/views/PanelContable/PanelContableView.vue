@@ -259,6 +259,7 @@
                             <th class="l">Concepto</th>
                             <th>Valor ({{ shortName(inv.nombre) }})</th>
                             <th class="l">Comprobante</th>
+                            <th class="l">Soporte</th>
                           </tr></thead>
                           <tbody>
                             <tr v-for="ln in lineasSec(inv, sec.key)" :key="ln.id">
@@ -287,9 +288,20 @@
                               <td class="l">
                                 <input class="comp-in" placeholder="comprob." v-model="ln.comprobante_contable" @change="markDirty(p)" />
                               </td>
+                              <td class="l">
+                                <template v-if="ln.soporte">
+                                  <a class="sop-link" :href="ln.soporte.archivo_url" target="_blank" rel="noopener"
+                                     :title="ln.soporte.archivo_nombre || 'Ver soporte'">📎 ver</a>
+                                  <button class="sop-x" title="Quitar soporte" @click="eliminarSoporte(p, ln)">✕</button>
+                                </template>
+                                <button v-else class="sop-up" :disabled="subiendoSoporte === sopKey(ln)"
+                                        title="Subir soporte" @click="pickSoporte(p, ln)">
+                                  {{ subiendoSoporte === sopKey(ln) ? '…' : '📎 subir' }}
+                                </button>
+                              </td>
                             </tr>
                             <tr v-if="sec.key === 'ingresos'">
-                              <td colspan="3">
+                              <td colspan="4">
                                 <button class="fuente-add" @click="agregarFuente(p)">+ Agregar fuente de ingreso</button>
                               </td>
                             </tr>
@@ -335,12 +347,24 @@
                             <th class="l">Concepto</th>
                             <th>Valor</th>
                             <th class="l">Comprobante</th>
+                            <th class="l">Soporte</th>
                           </tr></thead>
                           <tbody>
                             <tr v-for="(ln, i) in lineas100Sec(p, sec.key)" :key="'100' + sec.key + i">
                               <td class="l">{{ ln.concepto }}</td>
                               <td :class="{ neg: ln.valor_cop < 0 }">{{ fmt(ln.valor_cop) }}</td>
                               <td class="l">{{ ln.comprobante_contable || '' }}</td>
+                              <td class="l">
+                                <template v-if="ln.soporte">
+                                  <a class="sop-link" :href="ln.soporte.archivo_url" target="_blank" rel="noopener"
+                                     :title="ln.soporte.archivo_nombre || 'Ver soporte'">📎 ver</a>
+                                  <button class="sop-x" title="Quitar soporte" @click="eliminarSoporte(p, ln)">✕</button>
+                                </template>
+                                <button v-else class="sop-up" :disabled="subiendoSoporte === sopKey(ln)"
+                                        title="Subir soporte" @click="pickSoporte(p, ln)">
+                                  {{ subiendoSoporte === sopKey(ln) ? '…' : '📎 subir' }}
+                                </button>
+                              </td>
                             </tr>
                           </tbody>
                         </table>
@@ -671,6 +695,49 @@ const lineasSec = (inv, sk) => inv.lineas.filter(l => _keysDeSec(sk).includes(l.
 const totalSec = (inv, sk) => lineasSec(inv, sk).reduce((s, l) => s + (Number(l.valor_cop) || 0), 0)
 const lineas100Sec = (p, sk) => (p.total_100 || []).filter(l => _keysDeSec(sk).includes(l.grupo))
 const total100Sec = (p, sk) => lineas100Sec(p, sk).reduce((s, l) => s + (Number(l.valor_cop) || 0), 0)
+
+// ── Soportes/comprobantes por transacción (archivo en Drive) ──────────────────
+const subiendoSoporte = ref(null)   // "grupo|concepto" en curso
+const sopKey = (ln) => `${ln.grupo}|${ln.concepto}`
+function aplicarSoporte (p, grupo, concepto, soporte) {
+  for (const inv of (p.inversionistas || [])) {
+    for (const l of (inv.lineas || [])) {
+      if (l.grupo === grupo && l.concepto === concepto) l.soporte = soporte
+    }
+  }
+  for (const l of (p.total_100 || [])) {
+    if (l.grupo === grupo && l.concepto === concepto) l.soporte = soporte
+  }
+}
+function pickSoporte (p, ln) {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.onchange = () => { const f = input.files && input.files[0]; if (f) subirSoporte(p, ln, f) }
+  input.click()
+}
+async function subirSoporte (p, ln, file) {
+  const fd = new FormData()
+  fd.append('archivo', file)
+  fd.append('grupo', ln.grupo)
+  fd.append('concepto', ln.concepto)
+  subiendoSoporte.value = sopKey(ln)
+  try {
+    const { data } = await api.post(`/panel-contable/${p.id}/soporte`, fd,
+      { headers: { 'Content-Type': 'multipart/form-data' } })
+    aplicarSoporte(p, ln.grupo, ln.concepto, { archivo_url: data.archivo_url, archivo_nombre: data.archivo_nombre })
+  } catch (e) {
+    alert('No se pudo subir el soporte: ' + (e?.response?.data?.detail || e.message || e))
+  } finally { subiendoSoporte.value = null }
+}
+async function eliminarSoporte (p, ln) {
+  if (!confirm(`¿Quitar el soporte de "${ln.concepto}"? (el archivo queda en Drive)`)) return
+  try {
+    await api.delete(`/panel-contable/${p.id}/soporte`, { params: { grupo: ln.grupo, concepto: ln.concepto } })
+    aplicarSoporte(p, ln.grupo, ln.concepto, null)
+  } catch (e) {
+    alert('No se pudo quitar el soporte: ' + (e?.response?.data?.detail || e.message || e))
+  }
+}
 
 // Estado de despliegue por (proyecto, inversionista, sección). Colapsado por defecto.
 const invKeyOf = (inv) => inv.proyecto_inversionista_id || inv.nombre
@@ -1162,6 +1229,14 @@ tr.tot td { background:var(--sec); font-weight:600; }
 .val-in:hover { border-color:var(--line2); }
 .val-in:focus { outline:none; background:var(--info); border-color:var(--p2); }
 .comp-in { width:100px; font-size:11px; padding:3px 6px; border:1px solid var(--line2); border-radius:5px; text-align:left; }
+.sop-up { background:transparent; border:1px dashed #ddd6e8; color:#915BD8; font-size:11px;
+  padding:3px 8px; border-radius:6px; cursor:pointer; white-space:nowrap; }
+.sop-up:hover { background:#f5f2fa; }
+.sop-up:disabled { opacity:.5; cursor:default; }
+.sop-link { color:#2C7a3f; font-size:11px; font-weight:600; text-decoration:none; white-space:nowrap; }
+.sop-link:hover { text-decoration:underline; }
+.sop-x { background:none; border:none; color:#9a93a8; font-size:11px; cursor:pointer; margin-left:4px; }
+.sop-x:hover { color:#c0392b; }
 .celda-origen { display:block; width:95px; margin-top:3px; font-size:10.5px; color:#9a93a8;
   padding:2px 5px; border:1px solid #ddd6e8; border-radius:5px; text-align:left;
   font-variant-numeric:tabular-nums; background:transparent; }
