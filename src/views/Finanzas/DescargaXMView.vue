@@ -51,10 +51,10 @@
             <input v-model="form.fechaFin" type="date" class="xm-input" />
           </div>
 
-          <div class="col-span-2 flex items-center gap-2" v-if="tipoEsEnriquecible">
+          <div class="col-span-2 flex items-center gap-2" v-if="tipoEsFiltrable">
             <Checkbox v-model="form.enriquecer" binary inputId="xm-enriquecer" />
             <label for="xm-enriquecer" class="text-xs text-gray-500">
-              Filtrar solo plantas Unergy y agregar nombre + MW
+              {{ etiquetaFiltro }}
             </label>
           </div>
         </div>
@@ -119,7 +119,11 @@ import { iniciarDescargaXM, consultarEstadoXM, agenteLocalNoDisponible } from '@
 
 const TIPOS = ['dspcttos', 'aenc', 'BalCttos', 'grip', 'arrpas', 'tgrl', 'trsd', 'cxcsb', 'tserv', 'afac']
 const EXTENSIONES = ['txf', 'txr', 'tx1', 'tx2', 'tx3', 'tx4', 'tx5', 'tx6', 'tx7', 'tx8']
+// Tipos con código SIC de planta: el checkbox filtra a plantas Unergy y agrega nombre + MW.
 const TIPOS_ENRIQUECIBLES = ['grip', 'arrpas', 'cxcsb']
+// Tipos que listan todos los agentes (ej. tgrl): el checkbox filtra solo las filas del agente UNGG.
+const TIPOS_FILTRO_AGENTE = ['tgrl']
+const TIPOS_FILTRABLES = [...TIPOS_ENRIQUECIBLES, ...TIPOS_FILTRO_AGENTE]
 const STORAGE_KEY = 'xm_credenciales_sesion'
 
 const form = ref({
@@ -159,11 +163,16 @@ watch(
   }
 )
 
-const tipoEsEnriquecible = computed(() => TIPOS_ENRIQUECIBLES.includes(form.value.tipo))
+const tipoEsFiltrable = computed(() => TIPOS_FILTRABLES.includes(form.value.tipo))
+const etiquetaFiltro = computed(() =>
+  TIPOS_FILTRO_AGENTE.includes(form.value.tipo)
+    ? 'Filtrar solo las filas del agente Unergy (UNGG)'
+    : 'Filtrar solo plantas Unergy y agregar nombre + MW'
+)
 watch(
   () => form.value.tipo,
   () => {
-    if (!tipoEsEnriquecible.value) form.value.enriquecer = false
+    if (!tipoEsFiltrable.value) form.value.enriquecer = false
   }
 )
 
