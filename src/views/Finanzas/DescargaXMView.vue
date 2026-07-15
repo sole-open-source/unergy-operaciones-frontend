@@ -57,6 +57,13 @@
               {{ etiquetaFiltro }}
             </label>
           </div>
+
+          <!-- Elegir agente (solo tipos que filtran por agente, ej. tgrl) -->
+          <div class="col-span-2 flex items-center gap-2 pl-6" v-if="tipoFiltraPorAgente && form.enriquecer">
+            <label class="text-xs font-medium text-gray-500">Agente</label>
+            <Select v-model="form.agenteFiltro" :options="AGENTES" class="w-40" />
+            <span class="text-xs text-gray-400">UNGG = generador · UNGC = comercializador</span>
+          </div>
         </div>
 
         <div class="mt-4">
@@ -124,6 +131,8 @@ const TIPOS_ENRIQUECIBLES = ['grip', 'arrpas', 'cxcsb']
 // Tipos que listan todos los agentes (ej. tgrl): el checkbox filtra solo las filas del agente UNGG.
 const TIPOS_FILTRO_AGENTE = ['tgrl']
 const TIPOS_FILTRABLES = [...TIPOS_ENRIQUECIBLES, ...TIPOS_FILTRO_AGENTE]
+// Unergy participa como generador (UNGG) y comercializador (UNGC).
+const AGENTES = ['UNGG', 'UNGC']
 const STORAGE_KEY = 'xm_credenciales_sesion'
 
 const form = ref({
@@ -134,6 +143,7 @@ const form = ref({
   fechaInicio: '',
   fechaFin: '',
   enriquecer: false,
+  agenteFiltro: 'UNGG',
 })
 const recordarCredenciales = ref(false)
 
@@ -164,9 +174,10 @@ watch(
 )
 
 const tipoEsFiltrable = computed(() => TIPOS_FILTRABLES.includes(form.value.tipo))
+const tipoFiltraPorAgente = computed(() => TIPOS_FILTRO_AGENTE.includes(form.value.tipo))
 const etiquetaFiltro = computed(() =>
-  TIPOS_FILTRO_AGENTE.includes(form.value.tipo)
-    ? 'Filtrar solo las filas del agente Unergy (UNGG)'
+  tipoFiltraPorAgente.value
+    ? 'Filtrar solo las filas del agente Unergy'
     : 'Filtrar solo plantas Unergy y agregar nombre + MW'
 )
 watch(
@@ -201,6 +212,7 @@ async function onDescargar() {
     fecha_inicio: form.value.fechaInicio,
     fecha_fin: form.value.fechaFin,
     enriquecer: form.value.enriquecer,
+    agente_filtro: form.value.agenteFiltro,
   }
   try {
     const { job_id: id } = await iniciarDescargaXM(payload)
