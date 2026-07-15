@@ -10,7 +10,7 @@
 // que si aparece una nueva, hay que agregarla acá a mano.
 const SIGLAS = [
   'MGS', 'GD', 'COX', 'S.A.S.', 'E.S.P.',
-  'MDM', 'IML', 'AMC', 'IX', 'VIII', 'PSF', 'CSCI', 'FMO', 'FEM', 'BBVA', 'S.A', 'E2E',
+  'MDM', 'IML', 'AMC', 'IX', 'VIII', 'PSF', 'CSCI', 'FMO', 'FEM', 'BBVA', 'S.A', 'E2E', 'CGM',
 ]
 const SIGLAS_POR_CLAVE = new Map(SIGLAS.map(s => [s.replace(/\./g, '').toUpperCase(), s]))
 
