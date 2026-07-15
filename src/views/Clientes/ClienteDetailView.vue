@@ -7,7 +7,7 @@
         <i class="pi pi-arrow-left text-xs" /> Clientes
       </button>
       <span style="color: #c5b9db;">/</span>
-      <span class="text-sm font-semibold" style="color: #2C2039;">{{ cliente.razon_social_nombre }}</span>
+      <span class="text-sm font-semibold" style="color: #2C2039;">{{ formatearNombre(cliente.razon_social_nombre) }}</span>
       <button @click="deleteVisible = true"
         class="ml-auto text-xs flex items-center gap-1 px-3 py-1.5 rounded-lg transition-colors hover:bg-red-50"
         style="color: #dc2626;">
@@ -19,7 +19,7 @@
     <Dialog v-model:visible="deleteVisible" header="Eliminar cliente" modal class="w-full max-w-sm">
       <p class="text-sm text-gray-700 mb-4">
         ¿Estás seguro de que deseas eliminar
-        <strong>{{ cliente.razon_social_nombre }}</strong>? Esta acción no se puede deshacer.
+        <strong>{{ formatearNombre(cliente.razon_social_nombre) }}</strong>? Esta acción no se puede deshacer.
       </p>
       <div class="flex justify-end gap-2">
         <Button label="Cancelar" severity="secondary" @click="deleteVisible = false" />
@@ -361,7 +361,7 @@
     <div class="py-2 text-sm" style="color: #2C2039;">
       ¿Confirma agregar el servicio
       <strong>{{ servicioLabel(nuevoServicio.tipo) }}</strong>
-      al cliente <strong>{{ cliente?.razon_social_nombre }}</strong>?
+      al cliente <strong>{{ formatearNombre(cliente?.razon_social_nombre) }}</strong>?
     </div>
     <template #footer>
       <Button label="Cancelar" severity="secondary" @click="dialogConfirmServicio = false" />
@@ -477,6 +477,7 @@ import api from '@/api/client'
 import ClienteForm from './ClienteForm.vue'
 import ClienteResumen from './ClienteResumen.vue'
 import ContactosPanel from '@/components/ContactosPanel.vue'
+import { formatearNombre } from '@/utils/nombreFormato'
 
 const route = useRoute()
 const router = useRouter()
@@ -649,7 +650,7 @@ function nombreSugerido(tipo) {
     contrato: 'Contrato de servicio',
   }
   const base = labels[tipo] || ''
-  return base ? `${base} — ${cliente.value?.razon_social_nombre || ''}` : ''
+  return base ? `${base} — ${formatearNombre(cliente.value?.razon_social_nombre) || ''}` : ''
 }
 
 function onArchivoChange(e) {

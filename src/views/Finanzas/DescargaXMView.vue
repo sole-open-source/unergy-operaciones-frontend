@@ -51,11 +51,18 @@
             <input v-model="form.fechaFin" type="date" class="xm-input" />
           </div>
 
-          <div class="col-span-2 flex items-center gap-2" v-if="tipoEsEnriquecible">
+          <div class="col-span-2 flex items-center gap-2" v-if="tipoEsFiltrable">
             <Checkbox v-model="form.enriquecer" binary inputId="xm-enriquecer" />
             <label for="xm-enriquecer" class="text-xs text-gray-500">
-              Filtrar solo plantas Unergy y agregar nombre + MW
+              {{ etiquetaFiltro }}
             </label>
+          </div>
+
+          <!-- Elegir agente (solo tipos que filtran por agente, ej. tgrl) -->
+          <div class="col-span-2 flex items-center gap-2 pl-6" v-if="tipoFiltraPorAgente && form.enriquecer">
+            <label class="text-xs font-medium text-gray-500">Agente</label>
+            <Select v-model="form.agenteFiltro" :options="AGENTES" class="w-40" />
+            <span class="text-xs text-gray-400">UNGG = generador · UNGC = comercializador</span>
           </div>
         </div>
 
@@ -119,7 +126,13 @@ import { iniciarDescargaXM, consultarEstadoXM, agenteLocalNoDisponible } from '@
 
 const TIPOS = ['dspcttos', 'aenc', 'BalCttos', 'grip', 'arrpas', 'tgrl', 'trsd', 'cxcsb', 'tserv', 'afac']
 const EXTENSIONES = ['txf', 'txr', 'tx1', 'tx2', 'tx3', 'tx4', 'tx5', 'tx6', 'tx7', 'tx8']
-const TIPOS_ENRIQUECIBLES = ['grip', 'arrpas', 'tgrl', 'cxcsb']
+// Tipos con código SIC de planta: el checkbox filtra a plantas Unergy y agrega nombre + MW.
+const TIPOS_ENRIQUECIBLES = ['grip', 'arrpas', 'cxcsb']
+// Tipos que listan todos los agentes (ej. tgrl): el checkbox filtra solo las filas del agente UNGG.
+const TIPOS_FILTRO_AGENTE = ['tgrl']
+const TIPOS_FILTRABLES = [...TIPOS_ENRIQUECIBLES, ...TIPOS_FILTRO_AGENTE]
+// Unergy participa como generador (UNGG) y comercializador (UNGC).
+const AGENTES = ['UNGG', 'UNGC']
 const STORAGE_KEY = 'xm_credenciales_sesion'
 
 const form = ref({
@@ -130,6 +143,7 @@ const form = ref({
   fechaInicio: '',
   fechaFin: '',
   enriquecer: false,
+  agenteFiltro: 'UNGG',
 })
 const recordarCredenciales = ref(false)
 
@@ -159,11 +173,17 @@ watch(
   }
 )
 
-const tipoEsEnriquecible = computed(() => TIPOS_ENRIQUECIBLES.includes(form.value.tipo))
+const tipoEsFiltrable = computed(() => TIPOS_FILTRABLES.includes(form.value.tipo))
+const tipoFiltraPorAgente = computed(() => TIPOS_FILTRO_AGENTE.includes(form.value.tipo))
+const etiquetaFiltro = computed(() =>
+  tipoFiltraPorAgente.value
+    ? 'Filtrar solo las filas del agente Unergy'
+    : 'Filtrar solo plantas Unergy y agregar nombre + MW'
+)
 watch(
   () => form.value.tipo,
   () => {
-    if (!tipoEsEnriquecible.value) form.value.enriquecer = false
+    if (!tipoEsFiltrable.value) form.value.enriquecer = false
   }
 )
 
@@ -192,6 +212,7 @@ async function onDescargar() {
     fecha_inicio: form.value.fechaInicio,
     fecha_fin: form.value.fechaFin,
     enriquecer: form.value.enriquecer,
+    agente_filtro: form.value.agenteFiltro,
   }
   try {
     const { job_id: id } = await iniciarDescargaXM(payload)

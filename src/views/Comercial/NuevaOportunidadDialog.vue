@@ -34,7 +34,7 @@
         </div>
         <div>
           <div class="flex items-center justify-between mb-1">
-            <label class="text-sm font-medium">Contactos * (mínimo 1 con correo)</label>
+            <label class="text-sm font-medium">Contacto Comercial * (mínimo 1 con correo)</label>
             <Button label="Agregar" icon="pi pi-plus" text size="small" @click="nuevo.contactos.push({ nombre: '', telefono: '', email: '' })" />
           </div>
           <div v-for="(c, i) in nuevo.contactos" :key="i" class="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 mb-2">
