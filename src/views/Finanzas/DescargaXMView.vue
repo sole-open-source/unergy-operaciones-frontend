@@ -119,7 +119,7 @@ import { iniciarDescargaXM, consultarEstadoXM, agenteLocalNoDisponible } from '@
 
 const TIPOS = ['dspcttos', 'aenc', 'BalCttos', 'grip', 'arrpas', 'tgrl', 'trsd', 'cxcsb', 'tserv', 'afac']
 const EXTENSIONES = ['txf', 'txr', 'tx1', 'tx2', 'tx3', 'tx4', 'tx5', 'tx6', 'tx7', 'tx8']
-const TIPOS_ENRIQUECIBLES = ['grip', 'arrpas', 'tgrl', 'cxcsb']
+const TIPOS_ENRIQUECIBLES = ['grip', 'arrpas', 'cxcsb']
 const STORAGE_KEY = 'xm_credenciales_sesion'
 
 const form = ref({
