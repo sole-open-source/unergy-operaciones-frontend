@@ -203,9 +203,11 @@ const toast = useToast()
 
 const ESTADOS = [
   { label: 'Prospección', value: 'prospeccion' },
-  { label: 'Oferta', value: 'oferta' },
-  { label: 'Negociación', value: 'negociacion' },
-  { label: 'Servicio operativo', value: 'servicio_operativo' },
+  { label: 'Envío de oferta', value: 'envio_oferta' },
+  { label: 'Negociación del contrato', value: 'negociacion_contrato' },
+  { label: 'Firmado', value: 'firmado' },
+  { label: 'Operando', value: 'operando' },
+  { label: 'Declinado', value: 'declinado' },
 ]
 const TIPOS_SERVICIO = [
   { label: 'Servicios operacionales', value: 'servicios_operacionales' },
