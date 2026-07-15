@@ -8,7 +8,10 @@
 // Las siglas son una lista fija -- no hay forma de adivinar si "NAOS" es una
 // sigla a propósito o alguien escribió el nombre completo en mayúscula, así
 // que si aparece una nueva, hay que agregarla acá a mano.
-const SIGLAS = ['MGS', 'GD', 'COX', 'S.A.S.', 'E.S.P.']
+const SIGLAS = [
+  'MGS', 'GD', 'COX', 'S.A.S.', 'E.S.P.',
+  'MDM', 'IML', 'AMC', 'IX', 'VIII', 'PSF', 'CSCI', 'FMO', 'FEM', 'BBVA', 'S.A', 'E2E',
+]
 const SIGLAS_POR_CLAVE = new Map(SIGLAS.map(s => [s.replace(/\./g, '').toUpperCase(), s]))
 
 export function formatearNombre(nombre) {
