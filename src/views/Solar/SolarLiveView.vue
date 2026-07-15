@@ -144,7 +144,7 @@
                   </span>
                 </div>
                 <div v-if="getInversorData(proy.proyecto_id).labels.length" class="sl-chart-wrap">
-                  <Line :data="getInversorData(proy.proyecto_id)" :options="chartOptionsInv"
+                  <Line :data="getInversorData(proy.proyecto_id)" :options="chartOptionsInv(proy.proyecto_id)"
                     :plugins="[crosshairPlugin]" :key="'inv-' + proy.proyecto_id" />
                 </div>
                 <div v-else class="sl-no-data">Sin datos</div>
@@ -165,7 +165,7 @@
                   </span>
                 </div>
                 <div v-if="getMedidorData(proy.proyecto_id).labels.length" class="sl-chart-wrap">
-                  <Line :data="getMedidorData(proy.proyecto_id)" :options="chartOptionsMed"
+                  <Line :data="getMedidorData(proy.proyecto_id)" :options="chartOptionsMed(proy.proyecto_id)"
                     :plugins="[crosshairPlugin]" :key="'med-' + proy.proyecto_id" />
                 </div>
                 <div v-else class="sl-no-data">Sin datos</div>
@@ -528,7 +528,7 @@ function getDiffPct(id) {
 }
 
 // ── Chart options ─────────────────────────────────────────────────────────
-function makeOptions(color) {
+function makeOptions(color, maxY) {
   return {
     responsive: true,
     maintainAspectRatio: false,
@@ -543,13 +543,33 @@ function makeOptions(color) {
     },
     scales: {
       x: { ticks: { font: { size: 9 }, color: '#9ca3af', maxTicksLimit: 9 }, grid: { color: 'rgba(28,18,50,0.06)' } },
-      y: { beginAtZero: true, ticks: { font: { size: 9 }, color: '#9ca3af' }, grid: { color: 'rgba(28,18,50,0.06)' }, title: { display: true, text: 'kW', font: { size: 9 }, color: '#9ca3af' } },
+      y: {
+        beginAtZero: true, ticks: { font: { size: 9 }, color: '#9ca3af' },
+        grid: { color: 'rgba(28,18,50,0.06)' }, title: { display: true, text: 'kW', font: { size: 9 }, color: '#9ca3af' },
+        ...(maxY ? { max: maxY } : {}),
+      },
     },
   }
 }
 
-const chartOptionsInv = makeOptions('#915BD8')
-const chartOptionsMed = makeOptions('#D4A017')
+// Escala Y compartida entre Inversores y Medidores del MISMO proyecto -- si
+// cada gráfica autoescala su propio máximo, dos curvas con magnitudes muy
+// distintas pueden verse "igual de altas" aunque haya una diferencia real
+// grande (ej. +44%). Con un máximo compartido, la diferencia se ve a simple
+// vista en vez de quedar escondida por el autoescalado independiente.
+function getChartMax(id) {
+  const invValores = getInversorData(id).datasets?.[0]?.data ?? []
+  const medValores = getMedidorData(id).datasets?.[0]?.data ?? []
+  const valores = [...invValores, ...medValores].filter(v => v != null)
+  if (!valores.length) return undefined
+  const max = Math.max(...valores)
+  // Redondeado al múltiplo de 50 más cercano, +10% de aire para que el pico
+  // no toque el borde superior del gráfico.
+  return Math.ceil((max * 1.1) / 50) * 50
+}
+
+function chartOptionsInv(id) { return makeOptions('#915BD8', getChartMax(id)) }
+function chartOptionsMed(id) { return makeOptions('#D4A017', getChartMax(id)) }
 
 // ── Carga ─────────────────────────────────────────────────────────────────
 async function cargar() {
@@ -642,7 +662,7 @@ onUnmounted(() => {
 .sl-filter-wrap { position: relative; display: flex; align-items: center; }
 .sl-filter-icon { position: absolute; left: 11px; font-size: 12px; color: #9ca3af; pointer-events: none; }
 .sl-filter-input {
-  width: 200px; padding: 7px 28px 7px 30px; border-radius: 8px; border: 1px solid #e5e7eb;
+  width: 260px; padding: 7px 28px 7px 30px; border-radius: 8px; border: 1px solid #e5e7eb;
   background: #fff; font-size: 13px; font-family: inherit; color: #2C2039; outline: none;
   transition: border-color 0.15s;
 }
@@ -650,7 +670,7 @@ onUnmounted(() => {
 .sl-filter-input::placeholder { color: #9ca3af; }
 /* AutoComplete del filtro: mismo aspecto que el input anterior */
 .sl-filter-ac :deep(input) {
-  width: 200px; padding: 7px 28px 7px 30px; border-radius: 8px; border: 1px solid #e5e7eb;
+  width: 260px; padding: 7px 28px 7px 30px; border-radius: 8px; border: 1px solid #e5e7eb;
   background: #fff; font-size: 13px; font-family: inherit; color: #2C2039; outline: none;
   transition: border-color 0.15s;
 }

@@ -26,7 +26,7 @@
         <Column field="razon_social_nombre" header="Razón social" sortable>
           <template #body="{ data }">
             <div class="flex items-center gap-2">
-              <span class="font-medium" style="color:#2C2039">{{ data.razon_social_nombre }}</span>
+              <span class="font-medium" style="color:#2C2039">{{ formatearNombre(data.razon_social_nombre) }}</span>
               <span v-if="data.alerta_contrato" class="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
                 :style="{ color: SEMAFORO[data.alerta_contrato].color, background: SEMAFORO[data.alerta_contrato].bg }">
                 {{ SEMAFORO[data.alerta_contrato].label }}
@@ -34,7 +34,7 @@
             </div>
           </template>
         </Column>
-        <Column field="nit_cedula" header="NIT" sortable>
+        <Column field="nit_cedula" header="NIT" sortable style="white-space:nowrap">
           <template #body="{ data }">{{ fmt(data.nit_cedula) }}</template>
         </Column>
         <Column field="num_plantas" header="Plantas" sortable style="width:90px">
@@ -65,7 +65,7 @@
             </div>
           </template>
         </Column>
-        <Column field="contacto_comercial_correo" header="Correo comercial" sortable>
+        <Column field="contacto_comercial_correo" header="Correo comercial" sortable style="white-space:nowrap">
           <template #body="{ data }">{{ fmt(data.contacto_comercial_correo) }}</template>
         </Column>
         <Column header="" style="width:44px">
@@ -98,6 +98,7 @@ import { useToast } from 'primevue/usetoast'
 import api from '@/api/client'
 import ClienteForm from './ClienteForm.vue'
 import { SEMAFORO, servicioLabel, fmt } from './clientesUi'
+import { formatearNombre } from '@/utils/nombreFormato'
 
 const router = useRouter()
 const toast = useToast()

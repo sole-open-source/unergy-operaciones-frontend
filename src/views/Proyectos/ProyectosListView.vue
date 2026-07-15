@@ -90,7 +90,7 @@
                 <tr class="bg-gray-50 border-t border-gray-100">
                   <!-- Sticky: Nombre + TSF -->
                   <th class="sticky-col text-left px-4 py-2.5 font-medium text-gray-500 text-xs
-                              uppercase tracking-wide align-bottom" style="min-width:220px">
+                              uppercase tracking-wide align-bottom" style="min-width:250px">
                     <span class="block text-[10px] text-gray-400 font-normal normal-case tracking-normal">
                       Cód. TSF
                     </span>
@@ -124,13 +124,13 @@
                     class="border-t border-gray-100 hover:bg-gray-50/70 transition-colors duration-100 row-hover">
 
                   <!-- Nombre + TSF (sticky) -->
-                  <td class="sticky-col px-4 py-2" style="min-width:220px">
+                  <td class="sticky-col px-4 py-2" style="min-width:250px">
                     <span class="block text-[11px] leading-tight"
                           :class="row.codigo_tsf ? 'text-gray-400' : 'text-gray-300'">
                       {{ row.codigo_tsf || '—' }}
                     </span>
                     <span class="block text-sm text-gray-800 font-medium leading-snug mt-0.5">
-                      {{ row.nombre_comercial }}
+                      {{ formatearNombreProyecto(row.nombre_comercial) }}
                     </span>
                   </td>
 
@@ -231,7 +231,7 @@
     <Dialog v-model:visible="deleteVisible" header="Eliminar proyecto" modal class="w-full max-w-sm">
       <p class="text-sm text-gray-700 mb-4">
         ¿Estás seguro de que deseas eliminar
-        <strong>{{ deleteProyecto?.nombre_comercial }}</strong>?
+        <strong>{{ formatearNombreProyecto(deleteProyecto?.nombre_comercial) }}</strong>?
         Esta acción no se puede deshacer.
       </p>
       <div class="flex justify-end gap-2">
@@ -378,6 +378,7 @@ import InputIcon from 'primevue/inputicon'
 import { useToast } from 'primevue/usetoast'
 import api from '@/api/client'
 import ProyectoForm from './ProyectoForm.vue'
+import { formatearNombreProyecto } from './proyectosUi'
 
 const router = useRouter()
 const toast  = useToast()
@@ -751,7 +752,11 @@ thead .sticky-col {
   transition: max-height 0.35s ease-out;
 }
 .section-collapse.open {
-  max-height: 4000px;
+  /* Antes 4000px -- con secciones grandes (ej. Minigranja con 80+ filas de
+     2 líneas cada una) el contenido superaba ese límite y se cortaba. Un
+     valor bien holgado no cuesta nada (solo es el destino de la transición
+     de max-height, no se reserva espacio real). */
+  max-height: 20000px;
   transition: max-height 0.45s ease-in;
 }
 
