@@ -47,7 +47,7 @@
               </span>
               <span class="cgm-proj-count">
                 <i class="pi pi-chevron-down cgm-chev" :class="{ 'cgm-chev--open': expanded.has(row.key) }" />
-                {{ row.proyectos.length }} proy.
+                {{ labelProyectos(row) }}
               </span>
             </div>
             <div class="cgm-nombre" :class="{ 'cgm-nombre--muted': !row.nombre }">{{ row.nombre || row.sinVinculo }}</div>
@@ -61,8 +61,21 @@
             </RouterLink>
             <span v-else class="cgm-correos cgm-correos--muted">—</span>
 
-            <div v-if="expanded.has(row.key)" class="cgm-chips">
-              <span v-for="p in row.proyectos" :key="p" class="cgm-chip">{{ p }}</span>
+            <div v-if="expanded.has(row.key)">
+              <button v-if="proyectosDeFila(row.key).size" type="button" class="cgm-clear-sel"
+                @click.stop="limpiarProyectos(row.key)">
+                Quitar selección (volver a todos)
+              </button>
+              <div class="cgm-chips">
+                <button v-for="p in row.proyectos" :key="p.id" type="button" class="cgm-chip"
+                  :class="{
+                    'cgm-chip--on': proyectosDeFila(row.key).has(p.id),
+                    'cgm-chip--dim': proyectosDeFila(row.key).size && !proyectosDeFila(row.key).has(p.id),
+                  }"
+                  @click.stop="toggleProyecto(row.key, p.id)">
+                  {{ p.nombre }}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -121,7 +134,7 @@ function toggle(key) {
 const destinatarios = computed(() => {
   const proyectos = new Map()
   for (const f of fronteras.value) {
-    const key = f.proyecto_nombre || `frontera-${f.id}`
+    const key = f.proyecto_id ?? `frontera-${f.id}`
     if (!proyectos.has(key)) proyectos.set(key, f)
   }
 
@@ -134,7 +147,9 @@ const destinatarios = computed(() => {
     grupos.get(key).proyectos.push(proyecto)
   }
 
-  for (const [proyecto, f] of proyectos) {
+  for (const [proyectoId, f] of proyectos) {
+    const proyecto = { id: proyectoId, nombre: f.proyecto_nombre || 'Proyecto sin nombre' }
+
     addEntry('operador', f.operador_red_id, 'Operador de Red', f.operador_comercial,
       'Sin operador vinculado', f.operador_correos,
       f.operador_red_id ? `/mem/operadores-red/${f.operador_red_id}` : null, 'Sin correos — corregir', proyecto)
@@ -182,6 +197,35 @@ function toggleSeleccion(key) {
 
 const totalSeleccionados = computed(() => destinatarios.value.filter(r => seleccionados.value.has(r.key)).length)
 
+// Selección de proyectos DENTRO de un destinatario -- vacío = sin filtro, se
+// manda todo lo del destinatario (mismo criterio que la vista de escritorio).
+const proyectosSeleccionados = ref(new Map()) // key: row.key -> Set<proyecto_id>
+
+function proyectosDeFila(rowKey) {
+  return proyectosSeleccionados.value.get(rowKey) || new Set()
+}
+
+function toggleProyecto(rowKey, proyectoId) {
+  const set = new Set(proyectosDeFila(rowKey))
+  set.has(proyectoId) ? set.delete(proyectoId) : set.add(proyectoId)
+  const next = new Map(proyectosSeleccionados.value)
+  next.set(rowKey, set)
+  proyectosSeleccionados.value = next
+}
+
+function limpiarProyectos(rowKey) {
+  const next = new Map(proyectosSeleccionados.value)
+  next.set(rowKey, new Set())
+  proyectosSeleccionados.value = next
+}
+
+function labelProyectos(row) {
+  const total = row.proyectos.length
+  const numSeleccionados = proyectosDeFila(row.key).size
+  if (!numSeleccionados) return `${total} proy.`
+  return `${numSeleccionados}/${total} proy.`
+}
+
 async function loadData() {
   loading.value = true
   try {
@@ -203,7 +247,14 @@ async function enviarSeleccionados() {
     const { data } = await api.post('/reporte-cgm/enviar', {
       fecha_inicio: fechaDesdeStr.value,
       fecha_fin: fechaHastaStr.value || fechaDesdeStr.value,
-      destinatarios: filas.map(r => ({ tipo: r.refTipo, id: r.refId })),
+      destinatarios: filas.map(r => {
+        const proyectos = proyectosDeFila(r.key)
+        return {
+          tipo: r.refTipo,
+          id: r.refId,
+          proyectos: proyectos.size ? [...proyectos] : null,
+        }
+      }),
     })
     const ok = data.resultados.filter(r => r.ok)
     const conError = data.resultados.filter(r => !r.ok)
@@ -296,7 +347,16 @@ onMounted(loadData)
 .cgm-correos--muted { color: #c4b8d4; text-decoration: none; font-style: italic; }
 
 .cgm-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
-.cgm-chip { font-size: 11px; padding: 3px 8px; border-radius: 7px; background: #f9f7ff; border: 1px solid #eceaf2; color: #6b5a8a; }
+.cgm-chip {
+  font-family: inherit; font-size: 11px; padding: 3px 8px; border-radius: 7px;
+  background: #f9f7ff; border: 1px solid #eceaf2; color: #6b5a8a; transition: opacity .12s ease;
+}
+.cgm-chip--on { background: #915BD8; border-color: #915BD8; color: #fff; }
+.cgm-chip--dim { color: #c4b8d4; }
+.cgm-clear-sel {
+  display: block; margin: 0 0 6px auto; font-family: inherit;
+  font-size: 11px; font-weight: 700; color: #915BD8; text-decoration: underline;
+}
 
 .cgm-bottom-space { height: 74px; }
 
