@@ -111,11 +111,8 @@
             </tr>
             <tr v-if="expanded.has(row.key)" class="border-t" style="border-color: #f0ecf6; background: #fbfaff;">
               <td colspan="5" class="px-4 py-3">
-                <div class="flex items-center justify-between gap-3 mb-2">
-                  <span class="text-[11px]" style="color: #9b89b5;">
-                    {{ proyectosDeFila(row.key).size ? 'Se enviará solo lo seleccionado' : 'Se enviarán todos (nada en particular seleccionado)' }}
-                  </span>
-                  <button v-if="proyectosDeFila(row.key).size" type="button" @click="limpiarProyectos(row.key)"
+                <div v-if="proyectosDeFila(row.key).size" class="flex items-center justify-end gap-3 mb-2">
+                  <button type="button" @click="limpiarProyectos(row.key)"
                     class="text-[11px] font-semibold underline" style="color: #915BD8;">
                     Quitar selección (volver a todos)
                   </button>
