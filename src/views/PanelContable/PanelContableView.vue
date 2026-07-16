@@ -262,15 +262,16 @@
                             <th class="l">Soporte</th>
                           </tr></thead>
                           <tbody>
-                            <tr v-for="ln in lineasSec(inv, sec.key)" :key="ln.id">
+                            <tr v-for="ln in lineasSec(inv, sec.key)" :key="ln.id || (ln.grupo + '|' + ln.concepto)"
+                                :class="{ derivada: ln.derivada }">
                               <td class="l">
                                 <div v-if="sec.key === 'ingresos'" class="fuente-row">
                                   <input class="fuente-et" :value="ln.concepto"
                                          @change="renombrarFuente(p, ln, $event.target.value)" />
                                   <button class="fuente-x" title="Quitar fuente" @click="quitarFuente(p, ln)">✕</button>
                                 </div>
-                                <div v-else>{{ ln.concepto }}</div>
-                                <div class="origen-wrap">
+                                <div v-else class="cpt">{{ ln.concepto }}<span v-if="ln.derivada" class="imp-tag">impuesto</span></div>
+                                <div v-if="!ln.derivada" class="origen-wrap">
                                   <button class="origen-link" :title="origenOpen[ln.id] ? 'Ocultar origen' : 'Editar celda de origen'"
                                           @click="toggleOrigen(ln.id)">⚙ origen: {{ ln.origen || '—' }}</button>
                                   <input v-if="origenOpen[ln.id]" class="celda-origen" :value="ln.origen" placeholder="hoja!celda"
@@ -278,18 +279,20 @@
                                 </div>
                               </td>
                               <td>
-                                <input class="val-in" :class="{ neg: ln.valor_cop < 0 }"
+                                <input v-if="!ln.derivada" class="val-in" :class="{ neg: ln.valor_cop < 0 }"
                                        type="text" inputmode="decimal"
                                        :value="editandoMonto === ln.id ? montoPlano(ln.valor_cop) : fmt(ln.valor_cop)"
                                        @focus="editandoMonto = ln.id"
                                        @blur="commitMonto(ln, p, $event)"
                                        @keyup.enter="$event.target.blur()" />
+                                <span v-else class="val-ro" :class="{ neg: ln.valor_cop < 0 }">{{ fmt(ln.valor_cop) }}</span>
                               </td>
                               <td class="l">
-                                <input class="comp-in" placeholder="comprob." v-model="ln.comprobante_contable" @change="markDirty(p)" />
+                                <input v-if="!ln.derivada" class="comp-in" placeholder="comprob." v-model="ln.comprobante_contable" @change="markDirty(p)" />
                               </td>
                               <td class="l">
-                                <template v-if="ln.soporte">
+                                <template v-if="ln.derivada"></template>
+                                <template v-else-if="ln.soporte">
                                   <a class="sop-link" :href="ln.soporte.archivo_url" target="_blank" rel="noopener"
                                      :title="ln.soporte.archivo_nombre || 'Ver soporte'">📎 ver</a>
                                   <button class="sop-x" title="Quitar soporte" @click="eliminarSoporte(p, ln)">✕</button>
@@ -350,12 +353,14 @@
                             <th class="l">Soporte</th>
                           </tr></thead>
                           <tbody>
-                            <tr v-for="(ln, i) in lineas100Sec(p, sec.key)" :key="'100' + sec.key + i">
-                              <td class="l">{{ ln.concepto }}</td>
+                            <tr v-for="(ln, i) in lineas100Sec(p, sec.key)" :key="'100' + sec.key + i"
+                                :class="{ derivada: ln.derivada }">
+                              <td class="l">{{ ln.concepto }}<span v-if="ln.derivada" class="imp-tag">impuesto</span></td>
                               <td :class="{ neg: ln.valor_cop < 0 }">{{ fmt(ln.valor_cop) }}</td>
                               <td class="l">{{ ln.comprobante_contable || '' }}</td>
                               <td class="l">
-                                <template v-if="ln.soporte">
+                                <template v-if="ln.derivada"></template>
+                                <template v-else-if="ln.soporte">
                                   <a class="sop-link" :href="ln.soporte.archivo_url" target="_blank" rel="noopener"
                                      :title="ln.soporte.archivo_nombre || 'Ver soporte'">📎 ver</a>
                                   <button class="sop-x" title="Quitar soporte" @click="eliminarSoporte(p, ln)">✕</button>
@@ -1237,6 +1242,12 @@ tr.tot td { background:var(--sec); font-weight:600; }
 .sop-link:hover { text-decoration:underline; }
 .sop-x { background:none; border:none; color:#9a93a8; font-size:11px; cursor:pointer; margin-left:4px; }
 .sop-x:hover { color:#c0392b; }
+tr.derivada { background:#faf8fe; }
+tr.derivada .cpt, tr.derivada td { color:#8a7fa6; font-style:italic; }
+.val-ro { font-size:11px; font-variant-numeric:tabular-nums; color:#8a7fa6; }
+.val-ro.neg { color:#c0392b; }
+.imp-tag { margin-left:6px; font-size:9px; font-style:normal; text-transform:uppercase; letter-spacing:.03em;
+  background:#efe7fb; color:#7a5bbf; padding:1px 5px; border-radius:4px; vertical-align:middle; }
 .celda-origen { display:block; width:95px; margin-top:3px; font-size:10.5px; color:#9a93a8;
   padding:2px 5px; border:1px solid #ddd6e8; border-radius:5px; text-align:left;
   font-variant-numeric:tabular-nums; background:transparent; }
