@@ -8,12 +8,12 @@
         <div class="flex items-center gap-1.5">
           <label class="text-xs font-medium" style="color: #6b5a8a;">Desde</label>
           <DatePicker v-model="fechaDesde" dateFormat="dd/mm/yy" :maxDate="fechaHasta || ayer"
-            showIcon iconDisplay="input" style="width: 130px;" />
+            showIcon iconDisplay="input" style="width: 150px;" />
         </div>
         <div class="flex items-center gap-1.5">
           <label class="text-xs font-medium" style="color: #6b5a8a;">Hasta</label>
           <DatePicker v-model="fechaHasta" dateFormat="dd/mm/yy" :minDate="fechaDesde" :maxDate="ayer"
-            showIcon iconDisplay="input" style="width: 130px;" />
+            showIcon iconDisplay="input" style="width: 150px;" />
         </div>
         <button type="button" :disabled="!totalSeleccionados || enviando"
           @click="enviarSeleccionados"
