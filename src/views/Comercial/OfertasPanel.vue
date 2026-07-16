@@ -22,8 +22,8 @@
           <div v-if="data.detalle && data.detalle.fpo" class="text-xs text-gray-400 mt-1">FPO: {{ data.detalle.fpo }}</div>
         </template>
       </Column>
-      <Column field="numero_oferta" header="Nº oferta">
-        <template #body="{ data }">{{ data.numero_oferta || '—' }}</template>
+      <Column header="Código de seguimiento">
+        <template #body="{ data }"><span class="font-mono text-xs">{{ data.codigo_seguimiento || data.numero_oferta || '—' }}</span></template>
       </Column>
       <Column field="precio_detalle" header="Precio">
         <template #body="{ data }">{{ data.precio_detalle || '—' }}</template>
@@ -54,8 +54,8 @@
         </div>
         <div class="grid grid-cols-2 gap-3">
           <div>
-            <label class="block text-sm font-medium mb-1">Nº oferta (consecutivo)</label>
-            <InputText v-model.trim="form.numero_oferta" class="w-full" />
+            <label class="block text-sm font-medium mb-1">Código de seguimiento</label>
+            <InputText v-model.trim="form.numero_oferta" class="w-full" placeholder="Se autogenera (OP.…) si lo dejas vacío" />
           </div>
           <div>
             <label class="block text-sm font-medium mb-1">Resultado</label>

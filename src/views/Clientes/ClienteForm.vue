@@ -74,8 +74,12 @@
         <InputNumber v-model="f.iva_pct" :maxFractionDigits="2" locale="en-US" class="w-full" />
       </div>
       <div>
-        <label class="field-label">Retención %</label>
+        <label class="field-label">ReteFuente %</label>
         <InputNumber v-model="f.retencion_pct" :maxFractionDigits="2" locale="en-US" class="w-full" />
+      </div>
+      <div>
+        <label class="field-label">ReteIVA %</label>
+        <InputNumber v-model="f.reteiva_pct" :maxFractionDigits="2" locale="en-US" class="w-full" />
       </div>
       <div>
         <label class="field-label">ReteICA %</label>

@@ -2,52 +2,85 @@
   <div class="p-4 md:p-6">
     <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
       <div>
-        <h1 class="text-xl font-semibold">Comercial — Pipeline</h1>
+        <h1 class="text-xl font-semibold">Comercial — Ofertas</h1>
         <p class="text-sm text-gray-500">
-          {{ oportunidades.length }} oportunidades
+          {{ ofertas.length }} ofertas
           <span v-if="numAlertas" class="text-red-600 font-medium">· {{ numAlertas }} requieren atención (＞{{ alertaDias }} días sin respuesta)</span>
         </p>
       </div>
       <div class="flex items-center gap-2">
-        <SelectButton v-model="vista" :options="VISTAS" optionLabel="label" optionValue="value" />
+        <SelectButton v-model="vista" :options="VISTAS" optionLabel="label" optionValue="value" :allowEmpty="false" />
         <Button label="Nueva oportunidad" icon="pi pi-plus" @click="showNueva = true" />
       </div>
     </div>
 
     <div class="flex flex-wrap items-center gap-2 mb-4">
-      <InputText v-model.trim="filtroTexto" placeholder="Buscar cliente / negocio…" class="w-64" />
-      <Dropdown v-model="filtroServicio" :options="TIPOS_SERVICIO" optionLabel="label" optionValue="value"
-                showClear placeholder="Tipo de servicio" class="w-56" />
+      <InputText v-model.trim="filtroTexto" placeholder="Buscar código / cliente / planta…" class="w-72" />
+      <Dropdown v-model="filtroTipo" :options="TIPOS_OFERTA" optionLabel="label" optionValue="value"
+                showClear placeholder="Tipo de oferta" class="w-52" />
       <MultiSelect v-if="vista === 'tabla'" v-model="filtroEstados" :options="ESTADOS" optionLabel="label"
-                   optionValue="value" placeholder="Estados" class="w-56" />
+                   optionValue="value" placeholder="Estado del pipeline" class="w-56" />
+      <Dropdown v-model="filtroResultado" :options="RESULTADOS_OPT" optionLabel="label" optionValue="value"
+                showClear placeholder="Resultado" class="w-44" />
+      <SelectButton v-if="vista === 'tabla'" v-model="orden" :options="ORDENES" optionLabel="label" optionValue="value" :allowEmpty="false" />
       <div class="flex items-center gap-1">
         <Checkbox v-model="soloAlerta" binary inputId="soloAlerta" />
         <label for="soloAlerta" class="text-sm">Solo con alerta</label>
       </div>
     </div>
 
-    <!-- ── Tablero kanban ─────────────────────────────────────────────── -->
-    <div v-if="vista === 'tablero'" class="grid grid-cols-1 md:grid-cols-4 gap-3">
+    <!-- ── Tabla plana de ofertas (la oferta es la unidad) ───────────────── -->
+    <DataTable v-if="vista === 'tabla'" :value="filas" paginator :rows="30" dataKey="id" class="text-sm"
+               removableSort selectionMode="single" @row-click="irADetalle($event.data)">
+      <Column field="codigo_seguimiento" header="Código de seguimiento" sortable>
+        <template #body="{ data }"><span class="font-mono text-xs">{{ data.codigo_seguimiento || data.numero_oferta || '—' }}</span></template>
+      </Column>
+      <Column field="estado" header="Estado" sortable>
+        <template #body="{ data }"><Tag :value="labelEstado(data.estado)" :severity="severidadEstado(data.estado)" /></template>
+      </Column>
+      <Column field="tipo" header="Tipo" sortable>
+        <template #body="{ data }">{{ labelTipoOferta(data.tipo) }}</template>
+      </Column>
+      <Column field="planta_nombre" header="Proyecto / Planta" sortable>
+        <template #body="{ data }">{{ data.planta_nombre || '—' }}</template>
+      </Column>
+      <Column field="cliente_razon_social" header="Cliente" sortable />
+      <Column field="resultado" header="Resultado" sortable>
+        <template #body="{ data }"><Tag :value="labelResultado(data.resultado)" :severity="sevResultado(data.resultado)" /></template>
+      </Column>
+      <Column field="precio_detalle" header="Precio">
+        <template #body="{ data }">{{ data.precio_detalle || '—' }}</template>
+      </Column>
+      <Column field="updated_at" header="Última actividad" sortable>
+        <template #body="{ data }">{{ fmtFecha(data.updated_at) }}</template>
+      </Column>
+      <Column header="Alerta" style="width:5rem">
+        <template #body="{ data }"><Tag v-if="data.alerta" severity="danger" :value="`⚠ ${data.dias_sin_respuesta}d`" /></template>
+      </Column>
+      <template #empty><span class="text-gray-400">No hay ofertas con esos filtros.</span></template>
+    </DataTable>
+
+    <!-- ── Tablero kanban por etapa (tarjetas = ofertas) ─────────────────── -->
+    <div v-else class="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-3">
       <div v-for="col in ESTADOS" :key="col.value"
            class="bg-gray-50 rounded-lg p-2 min-h-[300px]"
            @dragover.prevent @drop="onDrop(col.value)">
         <div class="flex items-center justify-between px-2 py-1 mb-2">
-          <span class="text-sm font-semibold uppercase tracking-wide" :class="col.clase">{{ col.label }}</span>
+          <span class="text-xs font-semibold uppercase tracking-wide" :class="col.clase">{{ col.label }}</span>
           <span class="text-xs text-gray-500">{{ porEstado(col.value).length }}</span>
         </div>
-        <div v-for="op in visiblesEnColumna(col.value)" :key="op.id" draggable="true"
+        <div v-for="of in visiblesEnColumna(col.value)" :key="of.id" draggable="true"
              class="bg-white border rounded-md p-3 mb-2 cursor-pointer shadow-sm hover:shadow"
-             @dragstart="dragId = op.id" @click="irADetalle(op)">
+             @dragstart="dragOpId = of.oportunidad_id" @click="irADetalle(of)">
           <div class="flex items-start justify-between gap-2">
-            <span class="font-medium text-sm">{{ op.nombre }}</span>
-            <Tag v-if="op.alerta" severity="danger" :value="`⚠ ${op.dias_sin_respuesta}d`" class="shrink-0" />
+            <span class="font-mono text-[11px] text-gray-600">{{ of.codigo_seguimiento || of.numero_oferta || '—' }}</span>
+            <Tag v-if="of.alerta" severity="danger" :value="`⚠ ${of.dias_sin_respuesta}d`" class="shrink-0" />
           </div>
-          <div class="text-xs text-gray-500 mt-1 flex flex-wrap gap-1">
-            <span v-for="c in chipsResumen(op)" :key="c"
-                  class="inline-block bg-gray-100 rounded px-1.5 py-0.5">{{ c }}</span>
-          </div>
-          <div class="text-xs text-gray-400 mt-1">
-            {{ op.num_proyectos }} proy. · {{ fmtKwp(op.capacidad_total_kwp) }}
+          <div class="font-medium text-sm mt-1">{{ of.planta_nombre || of.cliente_razon_social }}</div>
+          <div class="text-xs text-gray-500">{{ of.cliente_razon_social }}</div>
+          <div class="mt-1 flex items-center gap-1">
+            <span class="text-[11px] bg-gray-100 rounded px-1.5 py-0.5">{{ labelTipoOferta(of.tipo) }}</span>
+            <Tag :value="labelResultado(of.resultado)" :severity="sevResultado(of.resultado)" class="scale-90" />
           </div>
         </div>
         <button v-if="ocultasEnColumna(col.value) > 0" class="text-xs text-primary underline px-2"
@@ -57,41 +90,12 @@
       </div>
     </div>
 
-    <!-- ── Tabla ──────────────────────────────────────────────────────── -->
-    <DataTable v-else :value="filas" paginator :rows="25" dataKey="id" class="text-sm"
-               selectionMode="single" @row-click="irADetalle($event.data)">
-      <Column field="nombre" header="Negocio / Cliente" sortable />
-      <Column field="cliente_razon_social" header="Razón social" sortable />
-      <Column header="Estado" sortable field="estado">
-        <template #body="{ data }">
-          <Tag :value="labelEstado(data.estado)" :severity="severidadEstado(data.estado)" />
-        </template>
-      </Column>
-      <Column header="Ofertas">
-        <template #body="{ data }">
-          <span v-for="c in chipsResumen(data)" :key="c"
-                class="inline-block bg-gray-100 rounded px-1.5 py-0.5 mr-1 text-xs">{{ c }}</span>
-          <span v-if="!chipsResumen(data).length">—</span>
-        </template>
-      </Column>
-      <Column field="num_proyectos" header="Proy." sortable />
-      <Column header="Capacidad" field="capacidad_total_kwp" sortable>
-        <template #body="{ data }">{{ fmtKwp(data.capacidad_total_kwp) }}</template>
-      </Column>
-      <Column field="dias_sin_respuesta" header="Días sin resp." sortable />
-      <Column header="Alerta">
-        <template #body="{ data }">
-          <Tag v-if="data.alerta" severity="danger" :value="`⚠ ${data.dias_sin_respuesta}d`" />
-        </template>
-      </Column>
-    </DataTable>
-
     <NuevaOportunidadDialog v-model:visible="showNueva" @creada="onCreada" />
   </div>
 </template>
 
 <script setup>
-import { ref, watch, onMounted, computed } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
@@ -110,51 +114,58 @@ const router = useRouter()
 const toast = useToast()
 
 const VISTAS = [
-  { label: 'Tablero', value: 'tablero' },
   { label: 'Tabla', value: 'tabla' },
+  { label: 'Tablero', value: 'tablero' },
 ]
+const ORDENES = [
+  { label: 'Más reciente', value: 'reciente' },
+  { label: 'Más antiguo', value: 'antiguo' },
+]
+// Pipeline de 6 estados (vive en la oportunidad; la oferta lo hereda para mostrarlo).
 const ESTADOS = [
   { label: 'Prospección', value: 'prospeccion', clase: 'text-blue-700' },
-  { label: 'Oferta', value: 'oferta', clase: 'text-amber-700' },
-  { label: 'Negociación', value: 'negociacion', clase: 'text-purple-700' },
-  { label: 'Servicio operativo', value: 'servicio_operativo', clase: 'text-green-700' },
+  { label: 'Envío de oferta', value: 'envio_oferta', clase: 'text-amber-700' },
+  { label: 'Negociación del contrato', value: 'negociacion_contrato', clase: 'text-purple-700' },
+  { label: 'Firmado', value: 'firmado', clase: 'text-teal-700' },
+  { label: 'Operando', value: 'operando', clase: 'text-green-700' },
+  { label: 'Declinado', value: 'declinado', clase: 'text-red-700' },
 ]
-const TIPOS_SERVICIO = [
+const TIPOS_OFERTA = [
   { label: 'Servicios operacionales', value: 'servicios_operacionales' },
   { label: 'Compra de energía', value: 'compra_energia' },
   { label: 'Comunidad energética', value: 'comunidad_energetica' },
 ]
-// Etiquetas cortas para los chips-resumen de oferta en la tarjeta.
-const TIPO_OFERTA_CORTO = {
-  servicios_operacionales: 'Servicios',
-  compra_energia: 'Energía',
-  comunidad_energetica: 'Comunidad',
-}
-function chipsResumen(op) {
-  const r = op.resumen_ofertas || {}
-  return Object.keys(r).map(t => `${TIPO_OFERTA_CORTO[t] || t} ${r[t]}`)
-}
-// Tarjetas visibles por columna antes del "+N más" (solo afecta a Fin en la práctica).
-const MAX_TARJETAS_COL = 15
+const RESULTADOS = { pendiente: 'Pendiente', aceptado: 'Aceptado', declinado: 'Declinado' }
+const RESULTADOS_OPT = [
+  { label: 'Pendiente', value: 'pendiente' },
+  { label: 'Aceptado', value: 'aceptado' },
+  { label: 'Declinado', value: 'declinado' },
+]
+const MAX_TARJETAS_COL = 20
 
-const vista = ref('tablero')
-const oportunidades = ref([])
-const filas = ref([])           // ref plano para DataTable (convención PV4 del repo)
-const alertaDias = ref(null)    // viene de /comercial/config — nunca asumir 5
+const vista = ref('tabla')
+const orden = ref('reciente')
+const ofertas = ref([])
+const filas = ref([])
+const alertaDias = ref(null)
 const filtroTexto = ref('')
-const filtroServicio = ref(null)
+const filtroTipo = ref(null)
 const filtroEstados = ref([])
+const filtroResultado = ref(null)
 const soloAlerta = ref(false)
 const showNueva = ref(false)
-const dragId = ref(null)
+const dragOpId = ref(null)
 
-const numAlertas = computed(() => oportunidades.value.filter(o => o.alerta).length)
+// Alertas contadas por oportunidad (varias ofertas comparten la alerta del deal).
+const numAlertas = computed(() =>
+  new Set(ofertas.value.filter(o => o.alerta).map(o => o.oportunidad_id)).size)
 
 function filtradas() {
   const q = filtroTexto.value.toLowerCase()
-  return oportunidades.value.filter(o => {
-    if (q && !(`${o.nombre} ${o.cliente_razon_social}`.toLowerCase().includes(q))) return false
-    if (filtroServicio.value && !(o.resumen_ofertas && o.resumen_ofertas[filtroServicio.value])) return false
+  return ofertas.value.filter(o => {
+    if (q && !(`${o.codigo_seguimiento || ''} ${o.numero_oferta || ''} ${o.cliente_razon_social || ''} ${o.planta_nombre || ''} ${o.oportunidad_nombre || ''}`.toLowerCase().includes(q))) return false
+    if (filtroTipo.value && o.tipo !== filtroTipo.value) return false
+    if (filtroResultado.value && o.resultado !== filtroResultado.value) return false
     if (soloAlerta.value && !o.alerta) return false
     return true
   })
@@ -163,45 +174,57 @@ function porEstado(estado) { return filtradas().filter(o => o.estado === estado)
 function visiblesEnColumna(estado) { return porEstado(estado).slice(0, MAX_TARJETAS_COL) }
 function ocultasEnColumna(estado) { return Math.max(0, porEstado(estado).length - MAX_TARJETAS_COL) }
 
-watch([oportunidades, filtroTexto, filtroServicio, filtroEstados, soloAlerta], () => {
+function ts(v) { return v ? new Date(v).getTime() : 0 }
+watch([ofertas, filtroTexto, filtroTipo, filtroEstados, filtroResultado, soloAlerta, orden], () => {
   let r = filtradas()
   if (filtroEstados.value.length) r = r.filter(o => filtroEstados.value.includes(o.estado))
+  r = [...r].sort((a, b) => orden.value === 'reciente'
+    ? ts(b.updated_at) - ts(a.updated_at)
+    : ts(a.updated_at) - ts(b.updated_at))
   filas.value = r
 }, { deep: true })
 
 function labelEstado(v) { return ESTADOS.find(e => e.value === v)?.label ?? v }
 function severidadEstado(v) {
-  return { prospeccion: 'info', oferta: 'warn', negociacion: 'secondary', servicio_operativo: 'success' }[v] ?? 'info'
+  return {
+    prospeccion: 'info', envio_oferta: 'warn', negociacion_contrato: 'secondary',
+    firmado: 'contrast', operando: 'success', declinado: 'danger',
+  }[v] ?? 'info'
 }
-function labelServicio(v) { return TIPOS_SERVICIO.find(t => t.value === v)?.label }
-function fmtKwp(v) { return v ? `${Number(v).toLocaleString('es-CO')} kWp` : '0 kWp' }
-function irADetalle(op) { router.push(`/comercial/oportunidades/${op.id}`) }
+function labelTipoOferta(v) { return TIPOS_OFERTA.find(t => t.value === v)?.label ?? v }
+function labelResultado(v) { return RESULTADOS[v] ?? v }
+function sevResultado(v) { return { aceptado: 'success', declinado: 'danger', pendiente: 'warn' }[v] ?? 'secondary' }
+function fmtFecha(v) { return v ? new Date(v).toLocaleDateString('es-CO', { dateStyle: 'medium' }) : '—' }
+// La oferta se gestiona dentro de su oportunidad (pestaña Ofertas del detalle).
+function irADetalle(of) { router.push(`/comercial/oportunidades/${of.oportunidad_id}`) }
 
 async function cargar() {
-  const [{ data: ops }, { data: cfg }] = await Promise.all([
-    api.get('/comercial/oportunidades'),
+  const [{ data: ofs }, { data: cfg }] = await Promise.all([
+    api.get('/comercial/ofertas'),
     api.get('/comercial/config'),
   ])
-  oportunidades.value = ops
+  ofertas.value = ofs
   alertaDias.value = cfg.alerta_dias
 }
 
 async function onDrop(estadoDestino) {
-  const op = oportunidades.value.find(o => o.id === dragId.value)
-  dragId.value = null
-  if (!op || op.estado === estadoDestino) return
-  const estadoAnterior = op.estado
-  op.estado = estadoDestino                       // optimista
+  const opId = dragOpId.value
+  dragOpId.value = null
+  if (!opId) return
+  const afectadas = ofertas.value.filter(o => o.oportunidad_id === opId)
+  if (!afectadas.length || afectadas[0].estado === estadoDestino) return
+  const previo = afectadas.map(o => [o, o.estado])
+  afectadas.forEach(o => { o.estado = estadoDestino })   // optimista (toda la oportunidad)
   try {
-    await api.post(`/comercial/oportunidades/${op.id}/estado`, { estado: estadoDestino })
-    await cargar()                                // refresca días/alerta desde el server
+    await api.post(`/comercial/oportunidades/${opId}/estado`, { estado: estadoDestino })
+    await cargar()
   } catch (err) {
-    op.estado = estadoAnterior                    // rollback visual
+    previo.forEach(([o, e]) => { o.estado = e })
     toast.add({ severity: 'error', summary: 'No se pudo cambiar el estado', detail: err.response?.data?.detail ?? '', life: 5000 })
   }
 }
 
 function onCreada(op) { router.push(`/comercial/oportunidades/${op.id}`) }
 
-onMounted(cargar)
+cargar()
 </script>
