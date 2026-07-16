@@ -2,7 +2,7 @@
   <div class="space-y-4">
     <div class="flex flex-wrap items-center justify-between gap-3">
       <p class="text-xs flex-1 min-w-[200px]" style="color: #9b89b5;">
-        Destinatarios del reporte CGM (operador de red + cliente). A cada uno le llega solo el Excel de sus propias fronteras.
+        Destinatarios del reporte CGM (operador de red + cliente). Por defecto a cada uno le llega el Excel de todas sus fronteras — despliega "Proyectos" para elegir solo uno o algunos en particular.
       </p>
       <div class="flex items-center gap-3 flex-wrap">
         <div class="flex items-center gap-1.5">
@@ -98,7 +98,7 @@
                 <button type="button" @click="toggle(row.key)"
                   class="flex items-center gap-1.5 text-xs font-medium" style="color: #6b5a8a;">
                   <i :class="['pi text-[10px]', expanded.has(row.key) ? 'pi-chevron-down' : 'pi-chevron-right']" />
-                  {{ row.proyectos.length }} proyecto{{ row.proyectos.length > 1 ? 's' : '' }}
+                  {{ labelProyectos(row) }}
                 </button>
               </td>
               <td class="px-4 py-2.5">
@@ -111,11 +111,26 @@
             </tr>
             <tr v-if="expanded.has(row.key)" class="border-t" style="border-color: #f0ecf6; background: #fbfaff;">
               <td colspan="5" class="px-4 py-3">
-                <div class="flex flex-wrap gap-2">
-                  <span v-for="p in row.proyectos" :key="p"
-                    class="text-xs px-2.5 py-1 rounded-lg" style="background: #fff; border: 1px solid #e8e0f0; color: #6b5a8a;">
-                    {{ p }}
+                <div class="flex items-center justify-between gap-3 mb-2">
+                  <span class="text-[11px]" style="color: #9b89b5;">
+                    {{ proyectosDeFila(row.key).size ? 'Se enviará solo lo seleccionado' : 'Se enviarán todos (nada en particular seleccionado)' }}
                   </span>
+                  <button v-if="proyectosDeFila(row.key).size" type="button" @click="limpiarProyectos(row.key)"
+                    class="text-[11px] font-semibold underline" style="color: #915BD8;">
+                    Quitar selección (volver a todos)
+                  </button>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                  <button v-for="p in row.proyectos" :key="p.id" type="button"
+                    @click="toggleProyecto(row.key, p.id)"
+                    class="text-xs px-2.5 py-1 rounded-lg transition-colors"
+                    :style="proyectosDeFila(row.key).has(p.id)
+                      ? 'background:#915BD8; border:1px solid #915BD8; color:#fff;'
+                      : proyectosDeFila(row.key).size
+                        ? 'background:#fff; border:1px solid #e8e0f0; color:#c4b8d4;'
+                        : 'background:#fff; border:1px solid #e8e0f0; color:#6b5a8a;'">
+                    {{ p.nombre }}
+                  </button>
                 </div>
               </td>
             </tr>
@@ -175,7 +190,7 @@ function toggle(key) {
 const destinatarios = computed(() => {
   const proyectos = new Map()
   for (const f of fronteras.value) {
-    const key = f.proyecto_nombre || `frontera-${f.id}`
+    const key = f.proyecto_id ?? `frontera-${f.id}`
     if (!proyectos.has(key)) proyectos.set(key, f)
   }
 
@@ -188,7 +203,9 @@ const destinatarios = computed(() => {
     grupos.get(key).proyectos.push(proyecto)
   }
 
-  for (const [proyecto, f] of proyectos) {
+  for (const [proyectoId, f] of proyectos) {
+    const proyecto = { id: proyectoId, nombre: f.proyecto_nombre || 'Proyecto sin nombre' }
+
     addEntry('operador', f.operador_red_id, 'Operador de Red', f.operador_comercial,
       'Sin operador vinculado', f.operador_correos,
       f.operador_red_id ? `/mem/operadores-red/${f.operador_red_id}` : null, 'Sin correos — corregir', proyecto)
@@ -254,6 +271,37 @@ function toggleTodos() {
   seleccionados.value = next
 }
 
+// Selección de proyectos DENTRO de un destinatario (independiente de a quién
+// se le va a enviar). Vacío = "sin filtro", se manda todo lo del destinatario
+// -- así no hay que deseleccionar uno por uno cuando son decenas de proyectos,
+// solo se marcan los pocos que sí se quieren mandar.
+const proyectosSeleccionados = ref(new Map()) // key: row.key -> Set<proyecto_id>
+
+function proyectosDeFila(rowKey) {
+  return proyectosSeleccionados.value.get(rowKey) || new Set()
+}
+
+function toggleProyecto(rowKey, proyectoId) {
+  const set = new Set(proyectosDeFila(rowKey))
+  set.has(proyectoId) ? set.delete(proyectoId) : set.add(proyectoId)
+  const next = new Map(proyectosSeleccionados.value)
+  next.set(rowKey, set)
+  proyectosSeleccionados.value = next
+}
+
+function limpiarProyectos(rowKey) {
+  const next = new Map(proyectosSeleccionados.value)
+  next.set(rowKey, new Set())
+  proyectosSeleccionados.value = next
+}
+
+function labelProyectos(row) {
+  const total = row.proyectos.length
+  const numSeleccionados = proyectosDeFila(row.key).size
+  if (!numSeleccionados) return `${total} proyecto${total === 1 ? '' : 's'}`
+  return `${numSeleccionados} de ${total} seleccionados`
+}
+
 async function enviarSeleccionados() {
   const filas = destinatarios.value.filter(r => seleccionados.value.has(r.key) && r.refId != null)
   if (!filas.length) return
@@ -263,7 +311,14 @@ async function enviarSeleccionados() {
     const { data } = await api.post('/reporte-cgm/enviar', {
       fecha_inicio: formatFecha(fechaDesde.value),
       fecha_fin: formatFecha(fechaHasta.value || fechaDesde.value),
-      destinatarios: filas.map(r => ({ tipo: r.refTipo, id: r.refId })),
+      destinatarios: filas.map(r => {
+        const proyectos = proyectosDeFila(r.key)
+        return {
+          tipo: r.refTipo,
+          id: r.refId,
+          proyectos: proyectos.size ? [...proyectos] : null,
+        }
+      }),
     })
     const ok = data.resultados.filter(r => r.ok)
     const conError = data.resultados.filter(r => !r.ok)
