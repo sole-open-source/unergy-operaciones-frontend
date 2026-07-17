@@ -340,5 +340,64 @@ VALOR A PAGAR $ 238,000.00`
   assert(normalizarCifra('2,011,510.00') !== 2.011, 'regresión Auditoría: US con comas no se lee como 2.011')
 }
 
+// 15) BUG jun-2026 — conceptos y clasificadores nuevos del soporte de INGRESOS.
+//     El batch de junio trajo conceptos que la regex vieja no reconocía, así que
+//     plantaDesdeEtiqueta NO les quitaba el prefijo y cada línea quedaba como una
+//     "planta" distinta (382 grupos en vez de ~70) → el match se quedaba con el
+//     bruto sin restar costos (~3% de diferencia falsa). Cada concepto/clasificador
+//     nuevo debe colapsar a la MISMA planta que INGRESO BRUTO.
+const URU = 'MINIGRANJA SOLAR URUACO'
+const etq = (concepto) => `${concepto} MINIGRANJA SOLAR URUACO JUNIO 2026 TERPEL`
+for (const concepto of [
+  'SERVICIOS DESPACHO Y COORDINACION CND',
+  'DESPACHO',
+  'ENERGIA EN BOLSA',
+  'ARRANQUE Y PARADA',
+  'SERVICIOS DE ADMINISTRACION SIC',
+  'I.V.A. SIC 19',
+  'CARGO POR CONFIABILIDAD',
+  'FAZNI',
+]) {
+  assert(plantaDesdeEtiqueta(etq(concepto)) === URU,
+    `plantaDesdeEtiqueta "${concepto}" → "${plantaDesdeEtiqueta(etq(concepto))}" (esperado "${URU}")`)
+}
+// Clasificadores nuevos entre el concepto y la planta (antes solo BIAC/UNGC/PPA):
+assert(plantaDesdeEtiqueta('INGRESO BRUTO TERPEL 1 MINIGRANJA SOLAR URUACO JUNIO 2026 TERPEL') === URU,
+  `plantaDesdeEtiqueta quita "TERPEL 1" = "${plantaDesdeEtiqueta('INGRESO BRUTO TERPEL 1 MINIGRANJA SOLAR URUACO JUNIO 2026 TERPEL')}"`)
+assert(plantaDesdeEtiqueta('INGRESO BRUTO TERPEL 2 MINIGRANJA SOLAR URUACO JUNIO 2026 TERPEL') === URU,
+  `plantaDesdeEtiqueta quita "TERPEL 2" = "${plantaDesdeEtiqueta('INGRESO BRUTO TERPEL 2 MINIGRANJA SOLAR URUACO JUNIO 2026 TERPEL')}"`)
+assert(plantaDesdeEtiqueta('INGRESO BRUTO UNGG MINIGRANJA SOLAR URUACO JUNIO 2026 TERPEL') === URU,
+  `plantaDesdeEtiqueta quita "UNGG" = "${plantaDesdeEtiqueta('INGRESO BRUTO UNGG MINIGRANJA SOLAR URUACO JUNIO 2026 TERPEL')}"`)
+// Sufijo COP/GENERADOR/COMERCIALIZADOR tras el concepto también debe quedar fuera:
+assert(plantaDesdeEtiqueta('ENERGIA EN BOLSA COP GENERADOR MINIGRANJA SOLAR URUACO JUNIO 2026') === URU,
+  `plantaDesdeEtiqueta sufijo COP/GENERADOR = "${plantaDesdeEtiqueta('ENERGIA EN BOLSA COP GENERADOR MINIGRANJA SOLAR URUACO JUNIO 2026')}"`)
+
+// 16) BUG jun-2026 — colapso en parseIngresos: las 6 líneas de Uruaco de junio
+//     (con conceptos nuevos) deben agrupar en UN solo grupo cuyo neto (débito −
+//     crédito) = 44.345.428, NO el bruto 45.786.907 (income sin restar costos).
+//     NOTA: no se entregaron las 6 líneas crudas; los importes por línea son
+//     representativos, elegidos para reproducir los totales reportados de junio
+//     (bruto 45.786.907 / neto 44.345.428). Lo que fija la regresión es (a) que
+//     todas colapsen a UN grupo y (b) que el neto reste los costos de conceptos
+//     nuevos. Reemplazar por las líneas reales del Excel cuando estén disponibles.
+const AC = '28150505 INGRESO DE ENERGIA'
+const ASO = 'RODRIGUEZ VELEZ BEATRIZ'
+const ingJun = [
+  ['Asiento contable', 'Cuenta', 'Asociado', 'Etiqueta', 'Debe', 'Haber'],
+  // Ingresos (haber) — bruto = 44.000.000 + 1.500.000 + 286.907 = 45.786.907
+  ['CM/6', AC, ASO, 'INGRESO BRUTO TERPEL 1 MINIGRANJA SOLAR URUACO JUNIO 2026 TERPEL', 0, 44000000],
+  ['CM/6', AC, ASO, 'CARGO POR CONFIABILIDAD MINIGRANJA SOLAR URUACO JUNIO 2026 TERPEL', 0, 1500000],
+  ['CM/6', AC, ASO, 'FAZNI MINIGRANJA SOLAR URUACO JUNIO 2026 TERPEL', 0, 286907],
+  // Costos (debe) — total = 900.000 + 400.000 + 141.479 = 1.441.479
+  ['CM/6', AC, ASO, 'COMERCIALIZACION MINIGRANJA SOLAR URUACO JUNIO 2026 TERPEL', 900000, 0],
+  ['CM/6', AC, ASO, 'ARRANQUE Y PARADA MINIGRANJA SOLAR URUACO JUNIO 2026 TERPEL', 400000, 0],
+  ['CM/6', AC, ASO, 'I.V.A. SIC 19 MINIGRANJA SOLAR URUACO JUNIO 2026 TERPEL', 141479, 0],
+]
+const ingJunRes = parseIngresos(ingJun)
+assert(ingJunRes.length === 1,
+  `parseIngresos jun-2026: 6 líneas → 1 grupo (colapso) — fue ${ingJunRes.length} grupos`)
+assert(ingJunRes[0] && Math.round(Math.abs(ingJunRes[0].valor_contabilidad)) === 44345428,
+  `parseIngresos jun-2026: neto = ${ingJunRes[0] && Math.round(Math.abs(ingJunRes[0].valor_contabilidad))} (esperado 44345428, NO bruto 45786907)`)
+
 console.log(ok ? '\nTODOS LOS TESTS PASARON' : '\nHAY FALLOS')
 process.exit(ok ? 0 : 1)
