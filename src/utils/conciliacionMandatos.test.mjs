@@ -399,5 +399,30 @@ assert(ingJunRes.length === 1,
 assert(ingJunRes[0] && Math.round(Math.abs(ingJunRes[0].valor_contabilidad)) === 44345428,
   `parseIngresos jun-2026: neto = ${ingJunRes[0] && Math.round(Math.abs(ingJunRes[0].valor_contabilidad))} (esperado 44345428, NO bruto 45786907)`)
 
+// 17) BUG jun-2026 — mandante ABREVIADO en la contabilidad (caso Sol de la Sierra).
+//     El PDF trae "PATRIMONIOS AUTONOMOS FIDUCIARIA BANCOLOMBIA ... 17844 SOL DE LA
+//     SIERRA" pero el asiento abrevia el PA a "PA 17844 SOL DE LA SIERRA" (sin
+//     FIDUCIARIA/BANCOLOMBIA). Comparten el código de portafolio 17844 → es el mismo
+//     PA. Antes matchIngresoContab exigía TODOS los tokens del mandante en el asociado
+//     y las 8 plantas de Sol de la Sierra quedaban SIN match (verificado con datos
+//     reales de junio: valor a pagar La Paz Leyenda = 66.407.637 = neto contable).
+const MSIERRA = 'PATRIMONIOS AUTONOMOS FIDUCIARIA BANCOLOMBIA S A SOCIEDAD FIDUCIARIA - 17844 SOL DE LA SIERRA'
+const gSierra = [
+  { asociado: 'PA 17844 SOL DE LA SIERRA', planta: 'MINIGRANJA SOLAR LA PAZ LEYENDA', valor_contabilidad: -66407637 },
+  { asociado: 'PA 17844 SOL DE LA SIERRA', planta: 'MINIGRANJA SOLAR SAN DIEGO SUR', valor_contabilidad: -57570713 },
+  // Decoy: otro fondo (18254) con el MISMO nombre de planta NO debe robar el match.
+  { asociado: 'PA 18254 OTRO FONDO', planta: 'MINIGRANJA SOLAR LA PAZ LEYENDA', valor_contabilidad: -999 },
+]
+const mLPL = matchIngresoContab({ mandante: MSIERRA, projName: 'Minigranja Solar La Paz Leyenda' }, gSierra)
+assert(mLPL && mLPL.asociado === 'PA 17844 SOL DE LA SIERRA' && Math.round(mLPL.valor_contabilidad) === -66407637,
+  `matchIngresoContab Sol de la Sierra/La Paz Leyenda (abrev. por código 17844) → ${mLPL ? mLPL.asociado + ' ' + Math.round(mLPL.valor_contabilidad) : 'SIN MATCH'} (esperado 'PA 17844 SOL DE LA SIERRA' -66407637)`)
+const mSDS = matchIngresoContab({ mandante: MSIERRA, projName: 'Minigranja Solar San Diego Sur' }, gSierra)
+assert(mSDS && mSDS.planta === 'MINIGRANJA SOLAR SAN DIEGO SUR',
+  `matchIngresoContab Sol de la Sierra/San Diego Sur → "${mSDS && mSDS.planta}" (esperado SAN DIEGO SUR)`)
+// El código distinto (18254) NO debe emparejar contra el fondo 17844 aunque compartan
+// el nombre de planta: al pedir el fondo 18254, el único grupo 17844/San Diego Sur no aplica.
+const mOtro = matchIngresoContab({ mandante: 'PATRIMONIOS AUTONOMOS X - 18254 OTRO FONDO', projName: 'Minigranja Solar San Diego Sur' }, gSierra)
+assert(!mOtro, `matchIngresoContab fondo 18254 no roba San Diego Sur del 17844 → ${mOtro ? mOtro.asociado : 'SIN MATCH (correcto)'}`)
+
 console.log(ok ? '\nTODOS LOS TESTS PASARON' : '\nHAY FALLOS')
 process.exit(ok ? 0 : 1)

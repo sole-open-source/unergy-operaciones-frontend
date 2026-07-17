@@ -93,6 +93,27 @@ export const expandirAbreviaturas = (s) => norm(s).replace(/\bPA\b/g, 'PATRIMONI
 export const nameTokenSet = (s) => new Set(expandirAbreviaturas(s).split(' ').filter((w) => w.length >= 3 && !STOP.has(w)))
 
 /**
+ * ¿El asociado del asiento corresponde al mandante del PDF? Coincide si los tokens
+ * distintivos de uno son SUBCONJUNTO de los del otro (con intersección no vacía). El
+ * asiento suele abreviar el nombre corporativo del PA omitiendo las palabras genéricas
+ * — p. ej. "PA 17844 SOL DE LA SIERRA" vs. el mandante completo "PATRIMONIOS AUTONOMOS
+ * FIDUCIARIA BANCOLOMBIA ... 17844 SOL DE LA SIERRA": comparten el código de portafolio
+ * (17844) + fondo, pero el asiento no trae FIDUCIARIA/BANCOLOMBIA. Exigir TODOS los
+ * tokens del mandante fallaba (0 líneas / sin match). Distingue fondos distintos por su
+ * token distintivo (17844 vs 18254) y NO reintroduce STRADA⊂ESTRADA (por palabra
+ * completa no comparten tokens). Usado por reconciliar (costos) y matchIngresoContab.
+ * @param {string[]} mandTok  Tokens del mandante (nameTokenSet del mandato).
+ * @param {string} aso        Asociado del asiento.
+ */
+export const asociadoCoincideMandante = (mandTok, aso) => {
+  const aset = nameTokenSet(aso)
+  if (!mandTok.length || !aset.size) return false
+  let inter = 0
+  for (const t of mandTok) if (aset.has(t)) inter++
+  return inter > 0 && (inter === mandTok.length || inter === aset.size)
+}
+
+/**
  * Normaliza un string monetario a "cuerpo numérico" y signo: quita $, espacios,
  * y detecta negativo por signo menos o paréntesis contables "(1.234)".
  * @returns {{body: string, neg: boolean} | null}  null si queda vacío.
@@ -349,25 +370,10 @@ export function reconciliar(mandato, details, tag) {
     return { status: 'bad', flags: [{ lvl: 'bad', code: 'SIN_TAG', txt: 'No se asignó etiqueta analítica; no se puede verificar.' }], sums: {}, lines: [] }
   }
 
-  // Mandante por PALABRA COMPLETA (fix STRADA/ESTRADA) pero tolerando abreviaturas.
+  // Mandante por PALABRA COMPLETA (fix STRADA/ESTRADA) pero tolerando abreviaturas
+  // del PA en el asiento (ver asociadoCoincideMandante).
   const mandTok = [...nameTokenSet(mandato.mandante)]
-  const asociadoMatch = (aso) => {
-    // Coincide si uno de los nombres es SUBCONJUNTO del otro. El asiento suele
-    // abreviar el mandante omitiendo las palabras corporativas — p. ej.
-    // "PA 17844 SOL DE LA SIERRA" vs. el mandante completo "PATRIMONIOS AUTONOMOS
-    // FIDUCIARIA BANCOLOMBIA ... 17844 SOL DE LA SIERRA": comparten patrimonio +
-    // fondo pero el asiento no trae FIDUCIARIA/BANCOLOMBIA. Exigir TODOS los
-    // tokens del mandante fallaba (0 líneas). Se exige que TODOS los tokens del
-    // conjunto MÁS PEQUEÑO estén en el otro, con intersección no vacía. NO
-    // reintroduce STRADA⊂ESTRADA (por palabra completa no comparten tokens) y
-    // distingue fondos distintos por su token distintivo (17844 vs 18254).
-    const aset = nameTokenSet(aso)
-    if (!mandTok.length || !aset.size) return false
-    let inter = 0
-    for (const t of mandTok) if (aset.has(t)) inter++
-    return inter > 0 && (inter === mandTok.length || inter === aset.size)
-  }
-  const lines = details.filter((d) => d.proj === tag && asociadoMatch(d.asociado))
+  const lines = details.filter((d) => d.proj === tag && asociadoCoincideMandante(mandTok, d.asociado))
 
   // Sumar por concepto el DÉBITO de la cuenta de costo (NUNCA el neto debe − haber).
   // En arriendo el mandante (la fiduciaria) aparece en AMBOS lados del asiento, con el
@@ -518,11 +524,10 @@ export function matchIngresoContab(mandato, grupos) {
   if (!ptk.length) return null
   let best = null, bestSc = 0
   for (const g of grupos) {
-    // Asociado: todas las palabras distintivas del mandante presentes (si las hay)
-    if (mandTok.length) {
-      const aset = nameTokenSet(g.asociado)
-      if (!mandTok.every((t) => aset.has(t))) continue
-    }
+    // Asociado: mismo criterio robusto que costos — tolera que el asiento abrevie el
+    // PA (p. ej. "PA 17844 SOL DE LA SIERRA" vs. el mandante completo con FIDUCIARIA
+    // BANCOLOMBIA) emparejando por identidad distintiva compartida (código 17844).
+    if (mandTok.length && !asociadoCoincideMandante(mandTok, g.asociado)) continue
     // Planta: score por tokens compartidos (incluye dígitos)
     const gtk = new Set(plantaTokens(g.planta))
     if (!gtk.size) continue
