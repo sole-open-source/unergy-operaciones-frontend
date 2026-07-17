@@ -500,19 +500,73 @@ export const plantaTokens = (s) =>
  * @param {string} accPrefix   Prefijo de cuenta a sumar (def. 28150505).
  * @returns {Array<{asociado, planta, valor_contabilidad}>}  valor_contabilidad<0 = a pagar.
  */
-export function parseIngresos(rows, accPrefix = INGRESO_ACC_PREFIX) {
+/**
+ * Núcleo de agrupación de INGRESOS. Agrupa el neto (débito − crédito) de la cuenta
+ * de ingreso por (asociado, planta), guardando total y desglose por concepto, y
+ * FUSIONA los costos del operador al inversionista de la misma planta.
+ *
+ * Motivo: la contabilidad a veces carga los costos operativos (Arranque y Parada,
+ * Energía en Bolsa, Servicios Despacho CND / Admin SIC, I.V.A. SIC…) en 28150505
+ * con el asociado del OPERADOR (XM, NEU, comercializador) en vez del inversionista
+ * (caso Agustín/Ibirico), mientras el Ingreso Bruto va bajo el inversionista.
+ * Señal robusta: el inversionista tiene neto NEGATIVO (recibe = valor a pagar) y el
+ * operador POSITIVO (solo cobra costos). Si una planta tiene UN inversionista y uno
+ * o más operadores, se fusionan al inversionista. Con VARIOS inversionistas (planta
+ * multi-inversionista, p. ej. Uruaco: Bancolombia + SUNO + RODRIGUEZ, cada uno
+ * auto-contenido) NO se fusiona: cada inversionista queda como su propio grupo.
+ * @returns {Array<{asociado, planta, valor_contabilidad, conceptos}>}
+ */
+function _gruposIngresos(rows, accPrefix = INGRESO_ACC_PREFIX) {
   const { details } = parseAsientos(rows)
-  const map = new Map()
+  const map = new Map()   // asociado|||planta → grupo
   for (const d of details) {
     if (!d.acc || !d.acc.startsWith(accPrefix)) continue
     const planta = plantaDesdeEtiqueta(d.etiqueta || d.proj)
     if (!planta || !d.asociado) continue
     const key = norm(d.asociado) + '|||' + planta
-    const cur = map.get(key) || { asociado: d.asociado, planta, valor_contabilidad: 0 }
-    cur.valor_contabilidad += d.debe - d.haber
+    const cur = map.get(key) || { asociado: d.asociado, planta, valor_contabilidad: 0, conceptos: {} }
+    const neto = d.debe - d.haber
+    cur.valor_contabilidad += neto
+    const con = conceptoDesdeEtiqueta(d.etiqueta || d.proj)
+    if (con) cur.conceptos[con] = (cur.conceptos[con] || 0) + neto
     map.set(key, cur)
   }
-  return [...map.values()].filter((g) => Math.abs(g.valor_contabilidad) > 1)
+  // Fusión operador → inversionista, por planta.
+  const porPlanta = new Map()
+  for (const g of map.values()) {
+    if (!porPlanta.has(g.planta)) porPlanta.set(g.planta, [])
+    porPlanta.get(g.planta).push(g)
+  }
+  const out = []
+  for (const grupos of porPlanta.values()) {
+    const inversionistas = grupos.filter((g) => g.valor_contabilidad < 0)
+    const operadores = grupos.filter((g) => g.valor_contabilidad >= 0)
+    if (inversionistas.length === 1 && operadores.length) {
+      const base = inversionistas[0]
+      for (const o of operadores) {
+        base.valor_contabilidad += o.valor_contabilidad
+        for (const [k, v] of Object.entries(o.conceptos)) base.conceptos[k] = (base.conceptos[k] || 0) + v
+      }
+      out.push(base)
+    } else {
+      out.push(...grupos)   // 0 o >1 inversionistas: sin fusión
+    }
+  }
+  return out
+}
+
+/**
+ * Agrupa el soporte de INGRESOS por (asociado, planta) sumando el neto
+ * (débito − crédito) de la cuenta de ingreso, con fusión operador→inversionista
+ * (ver _gruposIngresos). Reutiliza parseAsientos para detectar columnas.
+ * @param {Array<Array>} rows  Filas del Excel incluida cabecera (sheet_to_json {header:1}).
+ * @param {string} accPrefix   Prefijo de cuenta a sumar (def. 28150505).
+ * @returns {Array<{asociado, planta, valor_contabilidad}>}  valor_contabilidad<0 = a pagar.
+ */
+export function parseIngresos(rows, accPrefix = INGRESO_ACC_PREFIX) {
+  return _gruposIngresos(rows, accPrefix)
+    .map((g) => ({ asociado: g.asociado, planta: g.planta, valor_contabilidad: g.valor_contabilidad }))
+    .filter((g) => Math.abs(g.valor_contabilidad) > 1)
 }
 
 /**
@@ -592,19 +646,8 @@ export function conceptoDesdeEtiqueta(etiqueta) {
  * @returns {Array<{asociado, planta, conceptos: Object<string,number>}>}
  */
 export function parseIngresosPorConcepto(rows, accPrefix = INGRESO_ACC_PREFIX) {
-  const { details } = parseAsientos(rows)
-  const map = new Map()
-  for (const d of details) {
-    if (!d.acc || !d.acc.startsWith(accPrefix)) continue
-    const planta = plantaDesdeEtiqueta(d.etiqueta || d.proj)
-    const concepto = conceptoDesdeEtiqueta(d.etiqueta || d.proj)
-    if (!planta || !d.asociado || !concepto) continue
-    const key = norm(d.asociado) + '|||' + planta
-    const cur = map.get(key) || { asociado: d.asociado, planta, conceptos: {} }
-    cur.conceptos[concepto] = (cur.conceptos[concepto] || 0) + (d.debe - d.haber)
-    map.set(key, cur)
-  }
-  return [...map.values()]
+  return _gruposIngresos(rows, accPrefix)
+    .map((g) => ({ asociado: g.asociado, planta: g.planta, conceptos: g.conceptos }))
 }
 
 /**

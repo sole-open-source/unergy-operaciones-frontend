@@ -485,5 +485,34 @@ assert(mIng.vals['ARRANQUE Y PARADA'] === 612972, `extractMandate vals ARRANQUE 
 assert(mIng.vals['SERVICIOS DESPACHO Y COORDINACION CND'] === 387327, `extractMandate vals SERV DESPACHO CND = ${mIng.vals['SERVICIOS DESPACHO Y COORDINACION CND']} (esperado 387327)`)
 assert(mIng.vals['I V A SIC'] === 26283, `extractMandate vals I V A SIC = ${mIng.vals['I V A SIC']} (esperado 26283)`)
 
+// 19) jun-2026 — costos operativos bajo OTRO asociado (el operador: XM, NEU, …) se
+//     atribuyen al inversionista de la MISMA planta. La contabilidad a veces carga
+//     Arranque/Energía/Despacho CND/Admin SIC/IVA en 28150505 con el asociado del
+//     operador (net POSITIVO = solo costos), mientras el ingreso está bajo el
+//     inversionista (net NEGATIVO). Antes cada asociado era un grupo → el mandante
+//     quedaba sin sus costos y salían diferencias/"falta en contab" falsas.
+const ingOp = [
+  ['Asiento contable', 'Cuenta', 'Asociado', 'Etiqueta', 'Debe', 'Haber'],
+  ['CM/6', '28150505 INGRESO', 'FONSAR SAS', 'INGRESO BRUTO GD AGUSTIN 2 JUNIO 2026 XM', 0, 58238467],
+  ['CM/6', '28150505 INGRESO', 'XM COMPANIA DE EXPERTOS EN MERCADOS', 'ARRANQUE Y PARADA (COP) GD AGUSTIN 2 JUNIO 2026 XM', 675783, 0],
+  ['CM/6', '28150505 INGRESO', 'XM COMPANIA DE EXPERTOS EN MERCADOS', 'SERVICIOS DESPACHO Y COORDINACION CND (COP) GD AGUSTIN 2 JUNIO 2026 XM', 498739, 0],
+]
+const gOp = parseIngresos(ingOp)
+assert(gOp.length === 1, `parseIngresos fusiona operador al inversionista: 1 grupo — fue ${gOp.length}`)
+assert(gOp[0] && /FONSAR/.test(gOp[0].asociado), `grupo fusionado queda bajo el inversionista = "${gOp[0] && gOp[0].asociado}" (esperado FONSAR)`)
+assert(gOp[0] && Math.round(Math.abs(gOp[0].valor_contabilidad)) === 57063945,
+  `neto fusionado = ${gOp[0] && Math.round(Math.abs(gOp[0].valor_contabilidad))} (esperado 57063945 = 58238467-675783-498739)`)
+const gcOp = parseIngresosPorConcepto(ingOp)
+assert(gcOp.length === 1 && Math.round(gcOp[0].conceptos['ARRANQUE Y PARADA']) === 675783 && Math.round(gcOp[0].conceptos['SERVICIOS DESPACHO Y COORDINACION CND']) === 498739,
+  `parseIngresosPorConcepto fusiona los conceptos del operador en el inversionista (len=${gcOp.length}, arr=${gcOp[0] && gcOp[0].conceptos['ARRANQUE Y PARADA']})`)
+
+// Multi-inversionista (misma planta, varios net<0): NO se fusiona (cada uno su grupo).
+const ingMI = [
+  ['Asiento contable', 'Cuenta', 'Asociado', 'Etiqueta', 'Debe', 'Haber'],
+  ['CM/6', '28150505 INGRESO', 'PA 17844 BANCOLOMBIA', 'INGRESO BRUTO MINIGRANJA SOLAR URUACO JUNIO 2026 TERPEL', 0, 45786907],
+  ['CM/6', '28150505 INGRESO', 'SUNO ACTIVOS SOSTENIBLES S A S', 'INGRESO BRUTO MINIGRANJA SOLAR URUACO JUNIO 2026 TERPEL', 0, 6969547],
+]
+assert(parseIngresos(ingMI).length === 2, `multi-inversionista URUACO no se fusiona: 2 grupos — fue ${parseIngresos(ingMI).length}`)
+
 console.log(ok ? '\nTODOS LOS TESTS PASARON' : '\nHAY FALLOS')
 process.exit(ok ? 0 : 1)
