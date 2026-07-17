@@ -322,6 +322,12 @@ export function extractMandate(text, filename = '') {
         vals[key] = (vals[key] || 0) + v; return
       }
     }
+    // Conceptos de INGRESO (Ingreso Bruto, Arranque y Parada, Energía en Bolsa,
+    // Servicios Despacho CND / Admin SIC, I.V.A. SIC, etc.). Disjuntos de los de
+    // costos, así que es aditivo. Alimenta la conciliación por concepto de ingresos.
+    for (const c of INGRESO_CONCEPTOS) {
+      if (c.re.test(label)) { vals[c.key] = (vals[c.key] || 0) + v; return }
+    }
   })
   return { cmu, projName: proj, mandante, nit, vals, total }
 }
@@ -537,4 +543,89 @@ export function matchIngresoContab(mandato, grupos) {
     if (sc > bestSc) { bestSc = sc; best = g }
   }
   return best
+}
+
+// ===================== INGRESOS: DESGLOSE POR CONCEPTO =====================
+//
+// El mandato (PDF) de ingresos lista el "Valor a Pagar" como Ingreso Bruto (SUMA)
+// menos varios costos (RESTA): Arranque y Parada, Energía en Bolsa, Servicios
+// Despacho y Coordinación CND, Servicios de Administración SIC, I.V.A. SIC, etc.
+// La contabilidad trae los MISMOS conceptos como líneas del 28150505. Para
+// conciliar concepto a concepto (no solo el total) se normaliza cada concepto a
+// una clave canónica común a ambas fuentes. `rol` documenta si suma o resta al
+// valor a pagar (informativo; el cruce compara magnitudes absolutas por concepto).
+
+/** Conceptos de ingreso reconocidos, en orden de especificidad (el 1º que casa gana). */
+export const INGRESO_CONCEPTOS = [
+  { key: 'INGRESO BRUTO', rol: 'suma', re: /^INGRESO BRUTO\b/ },
+  { key: 'COMERCIALIZACION', rol: 'resta', re: /^COMERCIALIZACION\b/ },
+  { key: 'SERVICIOS DESPACHO Y COORDINACION CND', rol: 'resta', re: /^SERVICIOS DESPACHO Y COORDINACION CND\b/ },
+  { key: 'DESPACHO', rol: 'resta', re: /^DESPACHO\b/ },
+  { key: 'ENERGIA EN BOLSA', rol: 'resta', re: /^ENERGIA EN BOLSA\b/ },
+  { key: 'VENTAS EN BOLSA', rol: 'resta', re: /^VENTAS EN BOLSA\b/ },
+  { key: 'COMPRAS EN BOLSA', rol: 'resta', re: /^COMPRAS EN BOLSA\b/ },
+  { key: 'REDISTRIBUCION', rol: 'resta', re: /^REDISTRIBUCION\b/ },
+  { key: 'ARRANQUE Y PARADA', rol: 'resta', re: /^ARRANQUE Y PARADA\b/ },
+  { key: 'SERVICIOS DE ADMINISTRACION SIC', rol: 'resta', re: /^SERVICIOS DE ADMINISTRACION SIC\b/ },
+  { key: 'I V A SIC', rol: 'resta', re: /^I V A SIC\b/ },
+  { key: 'CARGO POR CONFIABILIDAD', rol: 'resta', re: /^CARGO POR CONFIABILIDAD\b/ },
+  { key: 'FAZNI', rol: 'resta', re: /^FAZNI\b/ },
+]
+
+/** Tolerancia por concepto (pesos) al conciliar mandato vs contabilidad. */
+export const TOL_CONCEPTO = 200
+
+/**
+ * Clave canónica del concepto a partir de la ETIQUETA del asiento (o del label del
+ * PDF ya normalizado). Devuelve null si no reconoce ningún concepto de ingreso.
+ */
+export function conceptoDesdeEtiqueta(etiqueta) {
+  const n = norm(etiqueta)
+  for (const c of INGRESO_CONCEPTOS) if (c.re.test(n)) return c.key
+  return null
+}
+
+/**
+ * Agrupa el soporte de INGRESOS por (asociado, planta) devolviendo el neto
+ * (débito − crédito) del 28150505 DESGLOSADO POR CONCEPTO. Ignora los contra-
+ * asientos (28151001/28151005/…) igual que parseIngresos.
+ * @returns {Array<{asociado, planta, conceptos: Object<string,number>}>}
+ */
+export function parseIngresosPorConcepto(rows, accPrefix = INGRESO_ACC_PREFIX) {
+  const { details } = parseAsientos(rows)
+  const map = new Map()
+  for (const d of details) {
+    if (!d.acc || !d.acc.startsWith(accPrefix)) continue
+    const planta = plantaDesdeEtiqueta(d.etiqueta || d.proj)
+    const concepto = conceptoDesdeEtiqueta(d.etiqueta || d.proj)
+    if (!planta || !d.asociado || !concepto) continue
+    const key = norm(d.asociado) + '|||' + planta
+    const cur = map.get(key) || { asociado: d.asociado, planta, conceptos: {} }
+    cur.conceptos[concepto] = (cur.conceptos[concepto] || 0) + (d.debe - d.haber)
+    map.set(key, cur)
+  }
+  return [...map.values()]
+}
+
+/**
+ * Cruza los conceptos del mandato (PDF) contra los de la contabilidad, concepto a
+ * concepto. Compara MAGNITUDES absolutas con tolerancia. Marca cada concepto como
+ * OK, DIFERENCIA, FALTA_CONTAB (en el PDF pero no en el asiento) o SOBRA_CONTAB
+ * (en el asiento pero no en el PDF).
+ * @param {Object<string,number>} valsPdf         Conceptos del PDF (magnitudes, de extractMandate.vals).
+ * @param {Object<string,number>} conceptosContab Netos por concepto (de parseIngresosPorConcepto).
+ * @returns {Array<{concepto, rol, pdf, contab, dif, estado}>}
+ */
+export function matchIngresoConceptos(valsPdf = {}, conceptosContab = {}, tol = TOL_CONCEPTO) {
+  return INGRESO_CONCEPTOS
+    .filter((c) => valsPdf[c.key] !== undefined || conceptosContab[c.key] !== undefined)
+    .map((c) => {
+      const pdf = valsPdf[c.key] !== undefined ? valsPdf[c.key] : null
+      const contab = conceptosContab[c.key] !== undefined ? Math.abs(conceptosContab[c.key]) : null
+      let estado
+      if (pdf === null) estado = 'SOBRA_CONTAB'
+      else if (contab === null) estado = 'FALTA_CONTAB'
+      else estado = Math.abs(pdf - contab) <= tol ? 'OK' : 'DIFERENCIA'
+      return { concepto: c.key, rol: c.rol, pdf, contab, dif: (pdf !== null && contab !== null) ? Math.round(pdf - contab) : null, estado }
+    })
 }

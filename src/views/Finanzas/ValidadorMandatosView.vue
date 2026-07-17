@@ -18,6 +18,7 @@ import * as XLSX from 'xlsx'
 import {
   parseAsientos, extractMandate, suggestTag, reconciliar, fmt, norm as normNombre,
   parseIngresos, matchIngresoContab, normalizarCifra,
+  parseIngresosPorConcepto, matchIngresoConceptos,
 } from '@/utils/conciliacionMandatos.js'
 
 const root = ref(null)
@@ -227,6 +228,7 @@ function initValidador(el) {
   let currentMode     = 'ingresos'
   let currentConcMode = 'ingresos'
   let contabilidadData = []   // [{asociado, planta, valor_contabilidad}]  cargado desde xlsx (modo total)
+  let contabPorConcepto = []  // [{asociado, planta, conceptos:{clave:neto}}]  desglose por concepto (ingresos)
   let concResults      = []   // resultados del cruce (modos ingresos/autoconsumo)
 
   // --- Modo COSTOS: conciliación detallada por concepto ---
@@ -276,6 +278,7 @@ function initValidador(el) {
         //  - COSTOS: parseAsientos arma el detalle línea-a-línea (motor existente).
         const matriz = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
         contabilidadData = parseIngresos(matriz)
+        try { contabPorConcepto = parseIngresosPorConcepto(matriz) } catch (e3) { contabPorConcepto = [] }
         try {
           const pa = parseAsientos(matriz)
           asientosDetalle = pa.details
@@ -408,6 +411,7 @@ function initValidador(el) {
         inversionista, planta,                       // para mostrar en la tabla
         mandante: mand.mandante || inversionista,    // para el match (palabra completa)
         projName: mand.projName || planta,           // para el match (tokens de planta)
+        conceptosPdf: mand.vals || {},               // desglose por concepto (para conciliación detallada)
       }
     } catch(e) {
       return { cmu:'', inversionista:'', planta:'', mandante:'', projName:'', valorPagar:0, fileName:file.name, error:true }
@@ -567,7 +571,14 @@ function initValidador(el) {
       else                { estado = 'DIFERENCIA'; diffN++ }
 
       if (rec) contMatched.add(rec.asociado + '|||' + rec.planta)
-      concResults.push({ ...d, contVal, diferencia, estado, recKey: rec ? rec.asociado+'|||'+rec.planta : null })
+      // Desglose por concepto: cruza los conceptos del PDF contra los del asiento
+      // emparejado (mismo asociado+planta). Vacío si no hubo match o no hay conceptos.
+      let conceptos = []
+      if (rec) {
+        const gc = contabPorConcepto.find(g => g.asociado === rec.asociado && g.planta === rec.planta)
+        conceptos = matchIngresoConceptos(d.conceptosPdf || {}, gc ? gc.conceptos : {}, tol)
+      }
+      concResults.push({ ...d, contVal, diferencia, estado, conceptos, recKey: rec ? rec.asociado+'|||'+rec.planta : null })
     }
 
     // Registros contables sin PDF
@@ -594,13 +605,13 @@ function initValidador(el) {
     tbody.innerHTML = ''
 
     let m=0, d=0, nc=0
-    const rows = concResults.map(r => {
+    const rows = concResults.map((r, i) => {
       let estado = r.estado
       if (r.contVal !== null && r.diferencia !== null) {
         estado = Math.abs(r.diferencia) <= tol ? 'OK' : 'DIFERENCIA'
       }
       if (estado==='OK') m++; else if (estado==='SIN_CONTAB'||estado==='ERROR_PDF') nc++; else d++
-      return {...r, estado}
+      return {...r, estado, _idx: i}
     })
     $('csMatch').textContent  = m
     $('csDiff').textContent   = d
@@ -645,8 +656,15 @@ function initValidador(el) {
           detalle = `<span style="font-size:10px;color:var(--warn)">Planta: "${r.planta||'?'}"</span>`
         }
 
-        tbody.innerHTML += `<tr>
-          <td class="mono" style="color:var(--accent);font-weight:600">${r.cmu||'-'}</td>
+        const idx = r._idx
+        const conc = r.conceptos || []
+        const hasConc = conc.length > 0
+        const caret = hasConc
+          ? `<span id="concCaret-${idx}" style="display:inline-block;width:12px;color:var(--accent)">▶</span> `
+          : '<span style="display:inline-block;width:12px"></span> '
+        const rowAttrs = hasConc ? ` onclick="toggleConcRow(${idx})" style="cursor:pointer"` : ''
+        tbody.innerHTML += `<tr${rowAttrs}>
+          <td class="mono" style="color:var(--accent);font-weight:600">${caret}${r.cmu||'-'}</td>
           <td style="font-size:12px;max-width:180px;word-break:break-word">${r.inversionista||'<span style="color:var(--warn)">No detectado</span>'}</td>
           <td style="font-size:12px;max-width:160px;word-break:break-word">${r.planta||'<span style="color:var(--warn)">No detectado</span>'}</td>
           <td class="mono" style="text-align:right">$${Math.round(r.valorPagar).toLocaleString('es-CO')}</td>
@@ -655,6 +673,28 @@ function initValidador(el) {
           <td>${badge}</td>
           <td style="font-size:11px;min-width:120px">${detalle}</td>
         </tr>`
+        if (hasConc) {
+          const cColor = { OK:'#10b981', DIFERENCIA:'#e11d48', FALTA_CONTAB:'#f59e0b', SOBRA_CONTAB:'#f59e0b' }
+          const cLabel = { OK:'✅ OK', DIFERENCIA:'❌ Diferencia', FALTA_CONTAB:'⚠️ Falta en contab.', SOBRA_CONTAB:'⚠️ Sobra en contab.' }
+          const filasConc = conc.map(c => `<tr>
+            <td style="padding:3px 10px">${c.concepto} <span style="color:#94a3b8">(${c.rol})</span></td>
+            <td class="mono" style="text-align:right;padding:3px 10px">${c.pdf!==null?'$'+Math.round(c.pdf).toLocaleString('es-CO'):'—'}</td>
+            <td class="mono" style="text-align:right;padding:3px 10px">${c.contab!==null?'$'+Math.round(c.contab).toLocaleString('es-CO'):'—'}</td>
+            <td class="mono" style="text-align:right;padding:3px 10px;color:${cColor[c.estado]};font-weight:600">${c.dif!==null?(c.dif>=0?'+':'')+c.dif.toLocaleString('es-CO'):'—'}</td>
+            <td style="padding:3px 10px;color:${cColor[c.estado]};font-size:11px">${cLabel[c.estado]}</td>
+          </tr>`).join('')
+          tbody.innerHTML += `<tr id="concDetail-${idx}" style="display:none"><td colspan="8" style="background:#f8fafc;padding:8px 16px">
+            <div style="font-size:11px;color:#64748b;margin-bottom:4px">Conciliación por concepto (cuenta 28150505)</div>
+            <table style="width:100%;border-collapse:collapse;font-size:12px">
+              <thead><tr style="color:#64748b;text-align:left;border-bottom:1px solid #e2e8f0">
+                <th style="padding:3px 10px">Concepto</th>
+                <th style="padding:3px 10px;text-align:right">Valor PDF</th>
+                <th style="padding:3px 10px;text-align:right">Valor Contab.</th>
+                <th style="padding:3px 10px;text-align:right">Diferencia</th>
+                <th style="padding:3px 10px">Estado</th></tr></thead>
+              <tbody>${filasConc}</tbody>
+            </table></td></tr>`
+        }
       }
     }
 
@@ -675,6 +715,15 @@ function initValidador(el) {
     } else {
       sinPdfSection.style.display = 'none'
     }
+  }
+
+  // Despliega/oculta el desglose por concepto de una fila de ingresos.
+  function toggleConcRow(idx) {
+    const row = $('concDetail-' + idx); const caret = $('concCaret-' + idx)
+    if (!row) return
+    const abrir = row.style.display === 'none'
+    row.style.display = abrir ? 'table-row' : 'none'
+    if (caret) caret.textContent = abrir ? '▼' : '▶'
   }
 
   function exportConcCSV() {
@@ -851,6 +900,7 @@ function initValidador(el) {
   window.updateConcUI = updateConcUI
   window.startConciliation = startConciliation
   window.renderConcTable = renderConcTable
+  window.toggleConcRow = toggleConcRow
   window.exportConcCSV = exportConcCSV
   window.startAudit = startAudit
   window.setCostoTag = setCostoTag
