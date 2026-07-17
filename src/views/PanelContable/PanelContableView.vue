@@ -244,8 +244,8 @@
 
                 <!-- Acordeones por sección: colapsados → solo título + total -->
                 <div class="secs">
-                  <div v-for="sec in secciones" :key="sec.key"
-                       v-show="lineasSec(inv, sec.key).length || sec.key === 'ingresos'"
+                  <template v-for="sec in secciones" :key="sec.key">
+                  <div v-show="lineasSec(inv, sec.key).length || sec.key === 'ingresos'"
                        class="sec-acc" :class="{ open: secOpen[secKey(p.id, invKeyOf(inv), sec.key)] }">
                     <div class="sec-bar" @click="toggleSec(p.id, invKeyOf(inv), sec.key)">
                       <span class="chev">▶</span>
@@ -314,6 +314,21 @@
                     </div>
                   </div>
 
+                  <!-- Subtotales "Valor a pagar" por bloque contable (Mandato/Costos/Facturas) -->
+                  <div v-if="sec.key === 'comercializacion'" class="sec-subtotal">
+                    <span class="sec-lbl">Valor a pagar (Ingresos − Comercialización)</span>
+                    <span class="sec-tot" :class="{ neg: (totalSec(inv, 'ingresos') + totalSec(inv, 'comercializacion')) < 0 }">{{ fmt(totalSec(inv, 'ingresos') + totalSec(inv, 'comercializacion')) }}</span>
+                  </div>
+                  <div v-else-if="sec.key === 'costos'" class="sec-subtotal">
+                    <span class="sec-lbl">Valor a pagar (Costos Operativos)</span>
+                    <span class="sec-tot" :class="{ neg: totalSec(inv, 'costos') < 0 }">{{ fmt(totalSec(inv, 'costos')) }}</span>
+                  </div>
+                  <div v-else-if="sec.key === 'facturas'" class="sec-subtotal">
+                    <span class="sec-lbl">Valor a pagar (Facturas de Servicio)</span>
+                    <span class="sec-tot" :class="{ neg: totalSec(inv, 'facturas') < 0 }">{{ fmt(totalSec(inv, 'facturas')) }}</span>
+                  </div>
+                  </template>
+
                   <!-- RESULTADO · valor a pagar: siempre visible -->
                   <div class="sec-resultado">
                     <span class="sec-lbl">RESULTADO · Valor a pagar</span>
@@ -335,8 +350,8 @@
                 </div>
 
                 <div class="secs">
-                  <div v-for="sec in secciones" :key="'100' + sec.key"
-                       v-show="lineas100Sec(p, sec.key).length"
+                  <template v-for="sec in secciones" :key="'100' + sec.key">
+                  <div v-show="lineas100Sec(p, sec.key).length"
                        class="sec-acc" :class="{ open: secOpen[secKey(p.id, '100', sec.key)] }">
                     <div class="sec-bar" @click="toggleSec(p.id, '100', sec.key)">
                       <span class="chev">▶</span>
@@ -376,6 +391,21 @@
                       </div>
                     </div>
                   </div>
+
+                  <!-- Subtotales "Valor a pagar" por bloque contable (Mandato/Costos/Facturas) -->
+                  <div v-if="sec.key === 'comercializacion'" class="sec-subtotal">
+                    <span class="sec-lbl">Valor a pagar (Ingresos − Comercialización)</span>
+                    <span class="sec-tot" :class="{ neg: (total100Sec(p, 'ingresos') + total100Sec(p, 'comercializacion')) < 0 }">{{ fmt(total100Sec(p, 'ingresos') + total100Sec(p, 'comercializacion')) }}</span>
+                  </div>
+                  <div v-else-if="sec.key === 'costos'" class="sec-subtotal">
+                    <span class="sec-lbl">Valor a pagar (Costos Operativos)</span>
+                    <span class="sec-tot" :class="{ neg: total100Sec(p, 'costos') < 0 }">{{ fmt(total100Sec(p, 'costos')) }}</span>
+                  </div>
+                  <div v-else-if="sec.key === 'facturas'" class="sec-subtotal">
+                    <span class="sec-lbl">Valor a pagar (Facturas de Servicio)</span>
+                    <span class="sec-tot" :class="{ neg: total100Sec(p, 'facturas') < 0 }">{{ fmt(total100Sec(p, 'facturas')) }}</span>
+                  </div>
+                  </template>
 
                   <!-- RESULTADO · valor a pagar: siempre visible -->
                   <div class="sec-resultado">
@@ -1220,6 +1250,11 @@ onMounted(cargarPaneles)
 .sec-resultado .sec-lbl { color:var(--p2); }
 .sec-resultado .sec-tot { color:var(--p2); font-size:14px; }
 .sec-resultado .sec-tot.neg { color:var(--red); }
+.sec-subtotal { display:flex; align-items:center; gap:10px; padding:6px 16px;
+  background:var(--sec); border-bottom:1px dashed var(--line2); }
+.sec-subtotal .sec-lbl { flex:1; font-size:11px; font-weight:600; color:var(--txt2); text-transform:none; letter-spacing:normal; font-style:italic; }
+.sec-subtotal .sec-tot { font-size:12.5px; color:var(--txt2); font-weight:700; font-variant-numeric:tabular-nums; }
+.sec-subtotal .sec-tot.neg { color:var(--red); }
 .tbl-wrap { overflow-x:auto; }
 table.dt { width:100%; border-collapse:collapse; font-size:12.5px; min-width:640px; }
 table.dt th { font-weight:500; color:var(--txt2); padding:6px 12px; text-align:right; border-bottom:1px solid var(--line); white-space:nowrap; }
