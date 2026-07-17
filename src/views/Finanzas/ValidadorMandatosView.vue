@@ -402,9 +402,13 @@ function initValidador(el) {
         }
       }
 
-      // Mandante + proyecto leídos del CUERPO del PDF (extractMandate, motor de
-      // costos) — más robustos que inversionista/planta para EMPAREJAR por tokens.
-      const mand = extractMandate(fullText, file.name)
+      // Mandante + proyecto + CONCEPTOS leídos del CUERPO del PDF (extractMandate,
+      // motor de costos) — más robustos que inversionista/planta para EMPAREJAR.
+      // OJO: se usa el texto RECONSTRUIDO POR LÍNEAS (extractPdfLines), no fullText
+      // (items unidos con espacios): extractMandate parsea los conceptos con
+      // split('\n') (una línea = un concepto), así que sin saltos de línea reales
+      // vals sale vacío y no se puede conciliar por concepto.
+      const mand = extractMandate(await extractPdfLines(file), file.name)
 
       return {
         cmu, fileName: file.name, valorPagar,
