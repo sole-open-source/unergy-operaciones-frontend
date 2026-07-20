@@ -695,6 +695,28 @@
               </button>
             </div>
           </div>
+
+          <!-- Modalidad de suministro: sub-filtro que solo aplica a Venta · UNGG -->
+          <div v-if="pcMode === 'ppa_venta_ungg'" class="flex flex-col gap-1">
+            <span class="text-[10px] font-semibold uppercase tracking-wider" style="color: #9b89b5;">Modalidad</span>
+            <div class="flex rounded-lg overflow-hidden border" style="border-color: rgba(44,32,57,0.15);">
+              <button @click="pcModalidad = null"
+                class="px-3 py-1.5 text-xs font-semibold transition-colors inline-flex items-center gap-1.5"
+                :style="pcModalidad === null ? 'background: rgba(145,91,216,0.12); color: #915BD8;' : 'background: transparent; color: #7a6e8a;'"
+                v-tooltip.bottom="'Todas las plantas del contrato de venta'">
+                Todas
+                <span class="font-mono text-[10px] px-1 rounded" style="background: rgba(44,32,57,0.08);">{{ pcVentaDupInfo.total }}</span>
+              </button>
+              <button v-for="f in PC_MODALIDAD_FILTROS" :key="f.key"
+                @click="pcModalidad = pcModalidad === f.key ? null : f.key"
+                class="px-3 py-1.5 text-xs font-semibold transition-colors inline-flex items-center gap-1.5"
+                :style="pcModalidad === f.key ? `background: ${f.bg}; color: ${f.color};` : 'background: transparent; color: #7a6e8a;'"
+                v-tooltip.bottom="f.tip">
+                {{ f.label }}
+                <span class="font-mono text-[10px] px-1 rounded" style="background: rgba(44,32,57,0.08);">{{ pcModalidadCounts[f.key] }}</span>
+              </button>
+            </div>
+          </div>
         </div>
         <span class="text-xs max-w-md" style="color: #7a6e8a;">
           {{ PC_MODE_DESC[pcMode] }}
@@ -716,23 +738,6 @@
 
         <!-- a. PPA Venta (UNGG) -->
         <template v-if="pcMode === 'ppa_venta_ungg'">
-          <!-- Filtro por modalidad de suministro: propio / compra en bolsa / uso del recurso -->
-          <div class="flex items-center gap-1.5 flex-wrap">
-            <span class="text-[10px] font-semibold uppercase tracking-wider mr-1" style="color: #9b89b5;">Modalidad</span>
-            <button @click="pcModalidad = null" class="cv-btn"
-              :style="pcModalidad === null ? 'border-color:#915BD8; background:rgba(145,91,216,0.10); color:#915BD8; font-weight:700;' : ''"
-              v-tooltip.bottom="'Todas las plantas del contrato de venta'">
-              Todas <b class="ml-0.5">{{ pcVentaDupInfo.total }}</b>
-            </button>
-            <button v-for="f in PC_MODALIDAD_FILTROS" :key="f.key"
-              @click="pcModalidad = pcModalidad === f.key ? null : f.key" class="cv-btn"
-              :style="pcModalidad === f.key ? `border-color:${f.color}; background:${f.color}1f; color:${f.color}; font-weight:700;` : ''"
-              v-tooltip.bottom="f.tip">
-              <span class="inline-block rounded-full" :style="`width:8px; height:8px; background:${f.color};`"></span>
-              {{ f.label }} <b class="ml-0.5">{{ pcModalidadCounts[f.key] }}</b>
-            </button>
-          </div>
-
           <!-- Resumen de modalidades: duplicados (compra en bolsa) y uso del recurso -->
           <div v-if="pcVentaDupInfo.dup || pcVentaDupInfo.ur" class="flex flex-col gap-1 px-4 py-2.5 rounded-lg text-xs"
             style="background: rgba(44,32,57,0.03); border: 1px solid rgba(44,32,57,0.12); color: #2C2039;">
@@ -1911,9 +1916,9 @@ const pcVentaDupInfo = computed(() => {
 // que los badges de la fila: uso del recurso tiene prioridad sobre duplicado.
 const pcModalidad = ref(null)
 const PC_MODALIDAD_FILTROS = [
-  { key: 'propio',      label: 'Suministro propio', color: '#7a6e8a', tip: 'Plantas con suministro propio (sin compra en bolsa ni uso del recurso)' },
-  { key: 'duplicado',   label: 'Compra en bolsa',   color: '#9a6700', tip: 'Plantas duplicadas: aportan al contrato con origen bolsa (genera garantías)' },
-  { key: 'uso_recurso', label: 'Uso del recurso',   color: '#0369a1', tip: 'Plantas en bolsa que se pagan al cliente a precio bolsa (sin garantías)' },
+  { key: 'propio',      label: 'Suministro propio', color: '#7a6e8a', bg: 'rgba(44,32,57,0.08)',   tip: 'Plantas con suministro propio (sin compra en bolsa ni uso del recurso)' },
+  { key: 'duplicado',   label: 'Compra en bolsa',   color: '#9a6700', bg: 'rgba(240,192,64,0.22)', tip: 'Plantas duplicadas: aportan al contrato con origen bolsa (genera garantías)' },
+  { key: 'uso_recurso', label: 'Uso del recurso',   color: '#0369a1', bg: 'rgba(2,132,199,0.14)',  tip: 'Plantas en bolsa que se pagan al cliente a precio bolsa (sin garantías)' },
 ]
 function modalidadPlanta(p) {
   if (p.uso_del_recurso) return 'uso_recurso'
