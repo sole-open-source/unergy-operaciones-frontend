@@ -72,7 +72,7 @@
           </template>
         </Column>
 
-        <Column field="requerimiento_asic" header="Req." style="width:115px;">
+        <Column field="requerimiento_asic" header="Req." sortable style="width:115px;">
           <template #body="{ data }">
             <span class="font-mono text-xs" style="color:#6b5a8a;">{{ data.requerimiento_asic || '—' }}</span>
           </template>
