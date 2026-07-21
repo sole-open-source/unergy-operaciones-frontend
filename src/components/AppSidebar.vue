@@ -290,6 +290,7 @@ const ALL_GROUPS = [
       { to: '/mem/fronteras',         label: 'General',            icon: 'pi pi-globe',      roles: ['admin', 'operaciones', 'monitoreo'] },
       { to: '/mem/reporte-energia',   label: 'Reporte de Energía', icon: 'pi pi-file-edit',  roles: ['admin', 'operaciones', 'monitoreo'] },
       { to: '/mem/operadores-red',    label: 'Operadores de Red',  icon: 'pi pi-sitemap',    roles: ['admin', 'operaciones', 'monitoreo'] },
+      { to: '/mem/conexion-xm',       label: 'Seguimiento XM (MDC)', icon: 'pi pi-link',     roles: ['admin', 'operaciones', 'monitoreo'] },
     ],
   },
   {
