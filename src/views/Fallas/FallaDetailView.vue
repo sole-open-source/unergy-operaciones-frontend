@@ -416,11 +416,21 @@ const sortedSeguimientos = computed(() =>
   [...(falla.value?.seguimientos ?? [])].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
 )
 
-// Backend retorna `fotos_lista: list[str]` (URLs). Soportar también legados.
+// El backend puede devolver `fotos_lista` como list[str] (URLs, legado) o como
+// list[obj] {url, nombre, ...} (formato actual). Normalizamos SIEMPRE a string:
+// para los objetos reconstruimos "url#nombre" — el fragment con el nombre real es
+// justo lo que leen filename()/isImage() (ver `filename`). Antes se devolvía el
+// objeto tal cual y el template llamaba filename(objeto) → objeto.includes(...) →
+// "TypeError: a.includes is not a function", que dejaba la página completa en blanco.
 const adjuntos = computed(() => {
   const v = falla.value
   if (!v) return []
-  if (Array.isArray(v.fotos_lista)) return v.fotos_lista
+  const toUrl = (a) => {
+    if (typeof a === 'string') return a
+    if (!a || !a.url) return null
+    return a.nombre ? `${a.url}#${encodeURIComponent(a.nombre)}` : a.url
+  }
+  if (Array.isArray(v.fotos_lista)) return v.fotos_lista.map(toUrl).filter(Boolean)
   if (Array.isArray(v.attachments)) return v.attachments.map(a => a.url || a.archivo_url || a).filter(Boolean)
   if (Array.isArray(v.fotos)) return v.fotos.map(a => a.url || a.archivo_url || a).filter(Boolean)
   return []
