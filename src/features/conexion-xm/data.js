@@ -1,6 +1,8 @@
-// Datos de ejemplo del seguimiento de conexion XM (mismos casos del nucleo probado:
-// La Cacica = 100%, El Roble = 40% + alertas). Autónomo en el navegador; cuando el
-// backend exponga /api/v1 para este proceso, `repo.js` se conmuta a la API real.
+// Datos de EJEMPLO (ficticios) del seguimiento de conexion XM: un proyecto al 100% y
+// otro al 40% + alertas. Nombres y codigos deliberadamente ficticios para NO colisionar
+// ni duplicar proyectos reales de la plataforma. Autónomo en el navegador; cuando el
+// backend exponga /api/v1 para este proceso, `repo.js` se conmuta a la API real y estos
+// datos de ejemplo se descartan.
 
 import { Estado, Etapa } from './domain/enums'
 
@@ -21,7 +23,7 @@ export function proyectosDemo() {
   return [
     {
       id: 1,
-      nombreComercial: 'MGS 0040 - La Cacica',
+      nombreComercial: 'DEMO · Proyecto Ejemplo Norte (GD solar)',
       promotor: 'Unergy',
       tipoProyecto: 'GD',
       tecnologia: 'SOLAR',
@@ -58,7 +60,7 @@ export function proyectosDemo() {
     },
     {
       id: 2,
-      nombreComercial: 'MGS 0055 - El Roble',
+      nombreComercial: 'DEMO · Proyecto Ejemplo Sur (GD solar)',
       promotor: 'Unergy',
       tipoProyecto: 'GD',
       tecnologia: 'SOLAR',
