@@ -14,7 +14,12 @@
         <i class="pi pi-chart-bar" style="color:#915BD8" />
         <div>
           <h2 class="imd-h2">Informes Mensuales · Dashboard</h2>
-          <span class="imd-sub">Generación, cumplimiento PPA, asignaciones XM e impacto financiero</span>
+          <span class="imd-sub">
+            <template v-if="!useMock && agg?.meta?.contratoNombre">
+              Contrato <b>{{ agg.meta.contratoNombre }}</b> · cumplimiento, bolsa e impacto financiero
+            </template>
+            <template v-else>Generación, cumplimiento PPA, asignaciones XM e impacto financiero</template>
+          </span>
         </div>
       </div>
 
@@ -45,6 +50,12 @@
       </div>
     </section>
 
+    <!-- No se pudieron cargar los proyectos (solo Real) -->
+    <div v-if="!useMock && proyectosError" class="imd-note imd-note--warn">
+      <i class="pi pi-exclamation-triangle" /> No se pudieron cargar los proyectos.
+      <button class="imd-retry" @click="cargarProyectos">Reintentar</button>
+    </div>
+
     <!-- Estado de carga -->
     <div v-if="loading" class="imd-loading">
       <ProgressSpinner style="width:38px;height:38px" strokeWidth="4" />
@@ -52,6 +63,14 @@
     </div>
 
     <template v-else-if="agg">
+      <!-- Avisos de datos (solo modo real) -->
+      <div v-if="!useMock && agg.meta?.sinContrato" class="imd-note imd-note--warn">
+        <i class="pi pi-exclamation-triangle" /> Este proyecto no tiene un contrato PPA asociado, así que no hay cumplimiento ni bolsa/XM que mostrar. Los ingresos y el neto, si existen, salen del Estado de Resultados.
+      </div>
+      <div v-else-if="!useMock && agg.meta?.sinDatosCumplimiento" class="imd-note imd-note--warn">
+        <i class="pi pi-exclamation-triangle" /> Sin datos de cumplimiento para el contrato en este período (la consulta pudo fallar o el contrato no estaba vigente). Los ingresos/neto no dependen de esto.
+      </div>
+
       <!-- ══ KPIs ═══════════════════════════════════════════════════ -->
       <section class="imd-kpis">
         <div class="imd-kpi">
@@ -64,14 +83,16 @@
         <div class="imd-kpi">
           <span class="imd-kpi-label">Ingresos PPA</span>
           <span class="imd-kpi-value imd-pos">{{ fmtCompact(agg.financialData.ingresoPPA) }}</span>
-          <span class="imd-kpi-foot">{{ fmtMWh(agg.technicalData.realTotalMWh) }} generados</span>
+          <span class="imd-kpi-foot">
+            {{ fmtMWh(agg.technicalData.realTotalMWh) }} generados<span v-if="!useMock && agg.meta?.ingresoEstimado"> · estimado</span>
+          </span>
         </div>
         <div class="imd-kpi">
           <span class="imd-kpi-label">Cumplimiento SLA</span>
           <span class="imd-kpi-value" :class="agg.complianceMetrics.breached ? 'imd-warn' : 'imd-pos'">
             {{ agg.complianceMetrics.compliancePct != null ? agg.complianceMetrics.compliancePct.toFixed(1) + '%' : '—' }}
           </span>
-          <span class="imd-kpi-foot">umbral {{ agg.complianceMetrics.slaThresholdPct }}%</span>
+          <span class="imd-kpi-foot">umbral {{ agg.complianceMetrics.slaThresholdPct }}%<span v-if="!useMock && agg.complianceMetrics.esContrato"> · contrato</span></span>
         </div>
         <div class="imd-kpi">
           <span class="imd-kpi-label">Multa SLA proyectada</span>
@@ -148,7 +169,7 @@ const filtro = reactive({
   mes: now.getMonth() + 1,
   anio: now.getFullYear(),
 })
-const useMock = ref(true)
+const useMock = ref(false)   // por defecto datos reales; el toggle deja ver el mock de demo
 const loading = ref(false)
 const loadingProyectos = ref(false)
 const agg = ref(null)
@@ -162,32 +183,49 @@ const opcionesAnio = computed(() => {
   return [y - 2, y - 1, y].map(v => ({ label: String(v), value: v }))
 })
 
-// Proyectos demo (fallback si el catálogo real no está disponible).
+// Proyectos demo: SOLO para el modo Mock (demo). En modo Real nunca se muestran,
+// para no confundir con proyectos que no existen.
 const proyectosDemo = [
   { label: 'Minigranja Solar La Reserva', value: 101 },
   { label: 'Granja Solar El Paso', value: 102 },
   { label: 'Autogeneración Norte', value: 103 },
 ]
 const proyectosReales = ref([])
-const opcionesProyecto = computed(() =>
-  proyectosReales.value.length ? proyectosReales.value : proyectosDemo
-)
+const proyectosError = ref(false)
+const opcionesProyecto = computed(() => {
+  if (proyectosReales.value.length) return proyectosReales.value
+  return useMock.value ? proyectosDemo : []
+})
 
 async function cargarProyectos() {
   loadingProyectos.value = true
-  try {
-    const { data } = await api.get('/monitoreo/_legacy', { params: { action: 'getProjects' } })
-    const projs = (data?.projects || []).filter(p => p.sub_project)
-    proyectosReales.value = projs.map(p => ({
-      label: p.nombre_comercial || p.nombre_clientes || `Proyecto ${p.id}`,
-      value: p.id ?? p.sub_project,
-    }))
-  } catch {
-    proyectosReales.value = []   // usa demo
-  } finally {
-    loadingProyectos.value = false
-    if (filtro.proyecto == null) filtro.proyecto = opcionesProyecto.value[0]?.value ?? null
+  proyectosError.value = false
+  // /proyectos devuelve el proyecto_id de NUESTRA BD (el que esperan /generacion,
+  // /ppa y el resumen de cumplimiento). Mismo patrón que el resto de la app: sin
+  // filtro de estado y size=500. Es pesado (varios selectinload): timeout amplio y
+  // un reintento para que un pico de latencia no deje el selector vacío.
+  for (let intento = 1; intento <= 2; intento++) {
+    try {
+      const { data } = await api.get('/proyectos', { params: { size: 500 }, timeout: 60000 })
+      // Solo minigranjas y GD (generación distribuida); se excluyen autoconsumo,
+      // movilidad eléctrica, etc.
+      const TIPOS_PERMITIDOS = new Set(['minigranja', 'gd'])
+      const projs = (data?.items || []).filter(
+        p => TIPOS_PERMITIDOS.has(String(p.tipo_proyecto || '').toLowerCase()),
+      )
+      proyectosReales.value = projs
+        .map(p => ({ label: p.nombre_comercial || `Proyecto ${p.id}`, value: p.id }))
+        .sort((a, b) => a.label.localeCompare(b.label, 'es'))
+      break
+    } catch {
+      if (intento === 2) {
+        proyectosReales.value = []
+        proyectosError.value = true   // en Real se muestra aviso + Reintentar (sin demos)
+      }
+    }
   }
+  loadingProyectos.value = false
+  if (filtro.proyecto == null) filtro.proyecto = opcionesProyecto.value[0]?.value ?? null
 }
 
 // ── Carga agregada ─────────────────────────────────────────────────
@@ -298,6 +336,19 @@ onMounted(async () => {
 
 .imd-panel { min-height: 260px; }
 .imd-grid-2 { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; align-items: start; }
+
+/* Avisos */
+.imd-note {
+  margin-top: 12px; padding: 9px 14px; border-radius: 10px;
+  font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 8px;
+}
+.imd-note--warn { background: #FEF3C7; color: #92650B; border: 1px solid #FBD9A5; }
+.imd-retry {
+  margin-left: auto; border: 1px solid #E0B44A; background: #fff; color: #92650B;
+  font-family: inherit; font-size: 11px; font-weight: 700; padding: 4px 12px;
+  border-radius: 7px; cursor: pointer;
+}
+.imd-retry:hover { background: #FDF6E3; }
 
 /* Estados */
 .imd-loading, .imd-empty {

@@ -3,29 +3,30 @@
     <div class="xat-head">
       <i class="pi pi-sitemap text-sm" style="color:#915BD8" />
       <h3 class="xat-title">Asignaciones XM</h3>
-      <span class="xat-sub">Exposición al mercado spot · {{ rows.length }} registro{{ rows.length !== 1 ? 's' : '' }}</span>
+      <span class="xat-sub">{{ modoBolsa ? 'Compras / excedentes de bolsa' : 'Exposición al mercado spot' }} · {{ rows.length }} registro{{ rows.length !== 1 ? 's' : '' }}</span>
     </div>
 
     <DataTable
       :value="rows"
       :rowClass="rowClass"
-      sortField="fecha" :sortOrder="1"
+      :sortField="modoBolsa ? 'concepto' : 'fecha'" :sortOrder="1"
       removableSort
       paginator :rows="10" :rowsPerPageOptions="[10, 20, 50]"
-      dataKey="fecha"
+      :dataKey="modoBolsa ? 'concepto' : 'fecha'"
       class="xat-table" size="small" stripedRows
     >
       <template #empty>
         <div class="xat-empty">Sin asignaciones XM para este período.</div>
       </template>
 
-      <Column field="fecha" header="Fecha" sortable style="min-width:8rem" />
+      <Column :field="modoBolsa ? 'concepto' : 'fecha'" :header="modoBolsa ? 'Concepto' : 'Fecha'"
+              sortable style="min-width:8rem" />
 
-      <Column field="mwhAsignados" header="MWh Asignados" sortable style="min-width:8rem">
+      <Column field="mwhAsignados" :header="modoBolsa ? 'MWh' : 'MWh Asignados'" sortable style="min-width:8rem">
         <template #body="{ data }">{{ fmtMWhNum(data.mwhAsignados) }}</template>
       </Column>
 
-      <Column field="precioSpot" header="Precio Spot Prom." sortable style="min-width:9rem">
+      <Column field="precioSpot" :header="modoBolsa ? 'Precio bolsa Prom.' : 'Precio Spot Prom.'" sortable style="min-width:9rem">
         <template #body="{ data }">
           <span :class="deviates(data) ? 'xat-warn-text' : ''">{{ fmt(data.precioSpot) }}</span>
           <i v-if="deviates(data)" class="pi pi-exclamation-triangle xat-warn-ico"
@@ -51,16 +52,22 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import { formatCurrency } from '@/utils/financialCalculations'
 
 const props = defineProps({
-  // [{ fecha, mwhAsignados, precioSpot, precioPpa, impacto, estado }]
+  // Mock (spot diario): [{ fecha, mwhAsignados, precioSpot, precioPpa, impacto, estado }]
+  // Real (bolsa):        [{ concepto, mwhAsignados, precioSpot, precioPpa, impacto, estado }]
   rows: { type: Array, default: () => [] },
   // Umbral de desvío (fracción) para resaltar filas: 0.15 = 15%.
   deviationThreshold: { type: Number, default: 0.15 },
 })
+
+// En modo real las filas traen `concepto` (Compras / Excedentes de bolsa) en vez
+// de una fecha diaria. Ajusta encabezados y clave de fila en consecuencia.
+const modoBolsa = computed(() => props.rows.some(r => r?.concepto))
 
 const fmt = (v) => formatCurrency(v)
 const fmtMWhNum = (v) => (v == null ? '—' : Number(v).toLocaleString('es-CO', { maximumFractionDigits: 1 }))
