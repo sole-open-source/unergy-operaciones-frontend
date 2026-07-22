@@ -524,12 +524,14 @@ function ipcAcumPct(fila) {
 }
 
 async function cargarDatos() {
+  const periodoReq = periodoActual.value
   loading.value = true
   try {
     const [calcRes, ipcRes] = await Promise.all([
-      api.get(`/om/calculo/${periodoActual.value}`),
+      api.get(`/om/calculo/${periodoReq}`),
       api.get('/om/ipc'),
     ])
+    if (periodoReq !== periodoActual.value) return   // respuesta obsoleta: ya se cambió de mes
     filas.value    = calcRes.data.filas
     ipcTasas.value = ipcRes.data
 
@@ -539,9 +541,10 @@ async function cargarDatos() {
       }
     })
   } catch (e) {
+    if (periodoReq !== periodoActual.value) return   // error de una petición ya descartada
     toast.add({ severity: 'error', summary: 'Error al cargar', life: 3000 })
   } finally {
-    loading.value = false
+    if (periodoReq === periodoActual.value) loading.value = false
   }
 }
 
@@ -614,8 +617,10 @@ function fmtFechaFactura(iso) {
 }
 
 async function cargarFacturaProveedor() {
+  const periodoReq = periodoActual.value
   try {
-    const { data } = await api.get(`/om/factura/${periodoActual.value}`)
+    const { data } = await api.get(`/om/factura/${periodoReq}`)
+    if (periodoReq !== periodoActual.value) return   // respuesta obsoleta
     facturaProveedor.value = data
   } catch { facturaProveedor.value = { nombre_archivo: null, enlace_pdf: null, tiene_archivo: false, subido_en: null } }
 }
