@@ -11,6 +11,7 @@
 const SIGLAS = [
   'MGS', 'GD', 'COX', 'S.A.S.', 'E.S.P.',
   'MDM', 'IML', 'AMC', 'IX', 'VIII', 'PSF', 'CSCI', 'FMO', 'FEM', 'BBVA', 'S.A', 'E2E', 'CGM',
+  'AGGE', 'AGPE',
 ]
 const SIGLAS_POR_CLAVE = new Map(SIGLAS.map(s => [s.replace(/\./g, '').toUpperCase(), s]))
 
