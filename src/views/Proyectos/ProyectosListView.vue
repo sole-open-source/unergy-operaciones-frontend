@@ -604,7 +604,7 @@ function confirmDelete(row) {
 }
 
 async function guardarInfoTecnicaSiAplica(proyectoId, infoTecnica) {
-  if (!infoTecnica || (infoTecnica.potencia_ac_kw == null && infoTecnica.capacidad_instalada_kwp == null)) return
+  if (!infoTecnica || (infoTecnica.potencia_ac_kw == null && infoTecnica.capacidad_instalada_kwp == null && infoTecnica.cantidad_total_paneles == null)) return
   try {
     await api.put(`/proyectos/${proyectoId}/info-tecnica`, infoTecnica)
   } catch (e) {

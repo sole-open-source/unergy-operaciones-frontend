@@ -26,6 +26,10 @@
         <Select v-model="f.tipo_tecnologia" :options="tecnologias" class="w-full" placeholder="Seleccionar" showClear />
       </div>
       <div>
+        <label class="field-label">Cantidad de paneles</label>
+        <InputNumber v-model="cantidadTotalPaneles" :useGrouping="false" class="w-full" />
+      </div>
+      <div>
         <label class="field-label">Departamento</label>
         <Select v-model="f.departamento" :options="departamentos" class="w-full" placeholder="Seleccionar" showClear filter />
       </div>
@@ -255,6 +259,8 @@ onMounted(async () => {
 // (el campo que usan los cálculos de generación esperada en el resto del backend).
 const potenciaAcKw = ref(null)
 const capacidadInstaladaKwp = ref(null)
+// Cantidad de paneles -- también vive en proyecto_info_tecnica; opcional al crear.
+const cantidadTotalPaneles = ref(null)
 
 // Fechas del proyecto (DatePicker usa Date; el API espera 'YYYY-MM-DD')
 const fechaEntrada = ref(null)
@@ -296,6 +302,7 @@ watch(() => props.proyecto, (p) => {
     Object.keys(f).forEach(k => { if (k in p) f[k] = p[k] })
     potenciaAcKw.value = p.info_tecnica?.potencia_ac_kw ?? null
     capacidadInstaladaKwp.value = p.info_tecnica?.capacidad_instalada_kwp ?? p.potencia_instalada_kwp ?? null
+    cantidadTotalPaneles.value = p.info_tecnica?.cantidad_total_paneles ?? p.cantidad_total_paneles ?? null
     p90Array.value = parseMonthArray(p.p90_mensual_kwh)
     p50Array.value = parseMonthArray(p.p50_mensual_kwh)
     fechaEntrada.value = toDate(p.fecha_entrada_operacion)
@@ -376,6 +383,7 @@ function submit() {
   const infoTecnica = {}
   if (potenciaAcKw.value !== null) infoTecnica.potencia_ac_kw = potenciaAcKw.value
   if (capacidadInstaladaKwp.value !== null) infoTecnica.capacidad_instalada_kwp = capacidadInstaladaKwp.value
+  if (cantidadTotalPaneles.value !== null) infoTecnica.cantidad_total_paneles = cantidadTotalPaneles.value
 
   emit('save', payload, infoTecnica)
 }
