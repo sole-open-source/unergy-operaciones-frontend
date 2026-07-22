@@ -74,16 +74,6 @@
             <Tag :value="data.estado" :severity="estadoSeverity(data.estado)" />
           </template>
         </Column>
-        <Column header="Est. Operacional" style="min-width: 130px">
-          <template #body="{ data }">
-            <span v-if="data.estado_operacional"
-              class="text-xs px-2 py-0.5 rounded-full font-semibold"
-              :style="opStyle(data.estado_operacional)">
-              {{ opLabel(data.estado_operacional) }}
-            </span>
-            <span v-else class="text-xs" style="color: #9b89b5;">—</span>
-          </template>
-        </Column>
         <Column field="nro_serie_med_ppal" header="Serial Medidor Principal" style="min-width: 170px">
           <template #body="{ data }">
             <span v-if="data.nro_serie_med_ppal" class="font-mono text-xs" style="color: #6b5a8a;">{{ data.nro_serie_med_ppal }}</span>
@@ -215,15 +205,6 @@
           <div>
             <label class="text-xs font-semibold uppercase block mb-1" style="color: #6b5a8a;">Estado</label>
             <Dropdown v-model="editForm.estado" :options="estadoOptions" optionLabel="label" optionValue="value" class="w-full" />
-          </div>
-          <div>
-            <label class="text-xs font-semibold uppercase block mb-1" style="color: #6b5a8a;">Estado operacional</label>
-            <Dropdown v-model="editForm.estado_operacional" :options="opOptions" optionLabel="label" optionValue="value"
-              class="w-full" showClear />
-          </div>
-          <div>
-            <label class="text-xs font-semibold uppercase block mb-1" style="color: #6b5a8a;">Medidor Quoia ID</label>
-            <InputText v-model="editForm.quoia_meter_id" class="w-full" />
           </div>
           <div>
             <label class="text-xs font-semibold uppercase block mb-1" style="color: #6b5a8a;">Operador red</label>
@@ -437,13 +418,6 @@ const estadoOptions = [
   { label: 'Cancelada', value: 'cancelada' },
 ]
 
-const opOptions = [
-  { label: 'Normal', value: 'normal' },
-  { label: 'Degradada', value: 'degradada' },
-  { label: 'Sin datos', value: 'sin_datos' },
-  { label: 'Fuera de servicio', value: 'fuera_servicio' },
-]
-
 const proyectoOptions = computed(() => {
   const seen = new Map()
   for (const f of fronteras.value) {
@@ -478,8 +452,7 @@ const filteredFronteras = computed(() => {
       (f.proyecto_nombre || '').toLowerCase().includes(s) ||
       (f.operador_red || '').toLowerCase().includes(s) ||
       (f.operador_comercial || '').toLowerCase().includes(s) ||
-      (f.municipio || '').toLowerCase().includes(s) ||
-      String(f.quoia_meter_id ?? '').toLowerCase().includes(s)
+      (f.municipio || '').toLowerCase().includes(s)
     )
   }
   return list
@@ -509,28 +482,12 @@ function estadoSeverity(e) {
   return map[e] || 'info'
 }
 
-function opLabel(v) {
-  const map = { normal: 'Normal', degradada: 'Degradada', sin_datos: 'Sin datos', fuera_servicio: 'Fuera de servicio' }
-  return map[v] || v
-}
-function opStyle(v) {
-  const map = {
-    normal: 'background: rgba(16,185,129,0.12); color: #10B981;',
-    degradada: 'background: rgba(240,192,64,0.12); color: #CA8A04;',
-    sin_datos: 'background: rgba(214,68,85,0.12); color: #D64455;',
-    fuera_servicio: 'background: rgba(156,163,175,0.12); color: #6B7280;',
-  }
-  return map[v] || 'color: #6b5a8a;'
-}
-
 function editFrontera(f) {
   editingFrontera.value = f
   editForm.value = {
     codigo_frontera: f.codigo_frontera,
     nombre_frontera: f.nombre_frontera,
     estado: f.estado,
-    estado_operacional: f.estado_operacional || null,
-    quoia_meter_id: f.quoia_meter_id || '',
     operador_red_id: f.operador_red_id || null,
   }
   showEdit.value = true
