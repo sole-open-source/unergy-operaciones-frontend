@@ -754,6 +754,26 @@
           </div>
         </div>
       </TabPanel>
+
+      <!-- ══ ID LIQUIDACIONES ══ -->
+      <TabPanel header="ID liquidaciones">
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-4 p-4 text-sm">
+          <template v-if="!isEditMode">
+            <InfoField label="SIC generación" :value="proyecto.codigo_sic_generacion" />
+            <InfoField label="SIC consumo" :value="proyecto.codigo_sic_consumo" />
+          </template>
+          <template v-else>
+            <div class="flex flex-col gap-1">
+              <label class="field-label">SIC generación</label>
+              <InputText v-model="editForm.codigo_sic_generacion" class="w-full" placeholder="Código SIC de generación" />
+            </div>
+            <div class="flex flex-col gap-1">
+              <label class="field-label">SIC consumo</label>
+              <InputText v-model="editForm.codigo_sic_consumo" class="w-full" placeholder="Código SIC de consumo" />
+            </div>
+          </template>
+        </div>
+      </TabPanel>
     </TabView>
 
   </div>
@@ -873,6 +893,8 @@ const editForm = reactive({
   carpeta_drive_codigo: null,
   sub_project: null,
   codigo_tsf: null,
+  codigo_sic_generacion: null,
+  codigo_sic_consumo: null,
   cantidad_total_paneles: null,
   produccion_especifica_kwh_kwp: null,
   es_comunidad_energetica: false,
