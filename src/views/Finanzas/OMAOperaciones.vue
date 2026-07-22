@@ -372,6 +372,7 @@ import Popover       from 'primevue/popover'
 import { useToast }  from 'primevue/usetoast'
 import api           from '@/api/client'
 import DocumentoIcon  from '@/components/DocumentoIcon.vue'
+import { parseCOP }   from '@/utils/parseCOP.js'
 
 const toast = useToast()
 
@@ -448,14 +449,6 @@ const totalSeleccionado = computed(() =>
 function formatCOP(v) {
   if (v == null) return '—'
   return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(v)
-}
-
-function parseCOP(str) {
-  if (str == null) return null
-  const limpio = String(str).replace(/[^\d]/g, '')   // quita $, puntos de miles, espacios
-  if (limpio === '') return null
-  const n = Number(limpio)
-  return Number.isFinite(n) ? n : null
 }
 
 // Valor a mostrar/guardar: override local dirty → valor del backend (ya resuelto)
