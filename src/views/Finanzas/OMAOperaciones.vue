@@ -169,6 +169,13 @@
                   <!-- Indicador de modificación manual -->
                   <span v-if="esManual(fila)" title="Valor modificado manualmente"
                     style="color:#f59e0b; font-size:12px; line-height:1">●</span>
+                  <!-- Avisos: IPC incompleto (#5) y override desactualizado (#6) -->
+                  <i v-if="fila.ipc_incompleto" class="pi pi-exclamation-triangle text-[10px]"
+                    style="color:#d97706"
+                    title="Falta la tasa IPC de algún año; la indexación de este proyecto es parcial." />
+                  <i v-if="fila.valor_manual_desactualizado" class="pi pi-exclamation-triangle text-[10px]"
+                    style="color:#dc2626"
+                    title="El valor manual difiere del recalculado; revísalo tras el cambio de IPC." />
                   <!-- Valor -->
                   <span class="font-semibold tabular-nums cursor-text"
                     :style="(fila.incluido && fila.habilitado) ? 'color:#7c3aed' : 'color:#9ca3af'"
@@ -283,6 +290,13 @@
             <span>{{ filaInfo.prorrateo_label }}</span>
           </div>
         </div>
+        <!-- Aviso: falta tasa IPC de algún año (#5) -->
+        <div v-if="filaInfo.ipc_incompleto"
+          class="mt-2 rounded-md p-2 text-[11px] flex items-start gap-1.5"
+          style="background:#fffbeb; color:#92400e">
+          <i class="pi pi-exclamation-triangle text-[11px] mt-0.5" style="color:#d97706" />
+          <span>Falta la tasa IPC de algún año del período; la indexación mostrada es parcial. Cárgala con el botón IPC.</span>
+        </div>
         <div class="border-t mt-2 pt-2">
           <div class="flex justify-between gap-6 font-semibold">
             <span>Valor a Facturar</span>
@@ -298,6 +312,9 @@
             <p>⚠️ Valor modificado manualmente.</p>
             <p class="mt-0.5">Original calculado:
               <strong>{{ formatCOP(filaInfo.valor_calculado) }}</strong>
+            </p>
+            <p v-if="filaInfo.valor_manual_desactualizado" class="mt-0.5" style="color:#b91c1c">
+              El valor manual ya no coincide con el recalculado — revísalo.
             </p>
             <button type="button" class="mt-1 underline" style="color:#915BD8"
               @click="revertirCalculado(filaInfo)">
