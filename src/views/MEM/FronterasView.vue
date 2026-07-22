@@ -610,8 +610,8 @@ const pendingCreatePayload = ref(null)  // body a reintentar con forzar=true
 async function crearFrontera() {
   if (!createForm.value) return
   creating.value = true
+  const body = { ...createForm.value, codigo_frontera: createForm.value.codigo_frontera || null }
   try {
-    const body = { ...createForm.value, codigo_frontera: createForm.value.codigo_frontera || null }
     await api.post('/fronteras', body)
     toast.add({ severity: 'success', summary: 'Frontera creada', life: 2500 })
     showCreate.value = false
