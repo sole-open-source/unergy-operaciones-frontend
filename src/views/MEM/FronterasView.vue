@@ -267,6 +267,20 @@
       </template>
     </Dialog>
 
+    <!-- Dialog: nombre parecido a una frontera existente -->
+    <Dialog v-model:visible="duplicadoVisible" header="Frontera parecida ya existe" modal class="w-full max-w-sm">
+      <p class="text-sm mb-4" style="color: #6b5a8a;">
+        Ya existe una frontera con un nombre muy parecido:
+        <strong>{{ duplicadoInfo?.candidato_nombre }}</strong>
+        (ID {{ duplicadoInfo?.candidato_id }}).
+        Si de verdad es una frontera distinta, puedes crearla igual.
+      </p>
+      <div class="flex justify-end gap-2">
+        <Button label="Cancelar" severity="secondary" text @click="duplicadoVisible = false" />
+        <Button label="Crear de todos modos" :loading="forzando" @click="crearFronteraForzado" />
+      </div>
+    </Dialog>
+
     <!-- Pendientes de Quoia Dialog -->
     <Dialog v-model:visible="showPendientesDialog" header="Fronteras nuevas en Quoia" modal class="w-full max-w-3xl">
       <p class="text-sm mb-4" style="color: #6b5a8a;">
@@ -474,6 +488,12 @@ const showCreate = ref(false)
 const creating = ref(false)
 const createForm = ref(blankCreateForm())
 
+// Aviso de nombre parecido (409 estructurado, igual que en Proyectos): se
+// puede confirmar y crear igual con forzar=true.
+const duplicadoVisible = ref(false)
+const duplicadoInfo = ref(null)   // { mensaje, candidato_id, candidato_nombre }
+const forzando = ref(false)
+
 const estadoOptions = [
   { label: 'Activa', value: 'activa' },
   { label: 'En registro', value: 'en_registro' },
@@ -585,6 +605,8 @@ function abrirCrear() {
   loadProyectosAll()
 }
 
+const pendingCreatePayload = ref(null)  // body a reintentar con forzar=true
+
 async function crearFrontera() {
   if (!createForm.value) return
   creating.value = true
@@ -595,9 +617,34 @@ async function crearFrontera() {
     showCreate.value = false
     await loadData()
   } catch (e) {
-    toast.add({ severity: 'error', summary: 'Error', detail: e.response?.data?.detail || 'No se pudo crear la frontera', life: 4000 })
+    const detail = e.response?.data?.detail
+    // Aviso de nombre parecido (409 estructurado): se puede confirmar y crear
+    // igual. Distinto de un choque real de columna unica (detail es un string).
+    if (e.response?.status === 409 && detail?.duplicado_nombre) {
+      duplicadoInfo.value = detail
+      pendingCreatePayload.value = body
+      duplicadoVisible.value = true
+      return
+    }
+    toast.add({ severity: 'error', summary: 'Error', detail: typeof detail === 'string' ? detail : 'No se pudo crear la frontera', life: 4000 })
   } finally {
     creating.value = false
+  }
+}
+
+async function crearFronteraForzado() {
+  forzando.value = true
+  try {
+    await api.post('/fronteras', pendingCreatePayload.value, { params: { forzar: true } })
+    toast.add({ severity: 'success', summary: 'Frontera creada', life: 2500 })
+    duplicadoVisible.value = false
+    showCreate.value = false
+    await loadData()
+  } catch (e) {
+    const detail = e.response?.data?.detail
+    toast.add({ severity: 'error', summary: 'Error', detail: typeof detail === 'string' ? detail : 'No se pudo crear la frontera', life: 4000 })
+  } finally {
+    forzando.value = false
   }
 }
 
