@@ -590,6 +590,8 @@ async function guardarIPC() {
     // Calcular cambios para notificación
     const afectados = []
     filas.value.forEach(f => {
+      // #5: los meses facturados quedan congelados — la nueva tasa IPC no los afecta.
+      if (f.facturado) return
       const antes = filasAntes.find(x => x.contrato_id === f.contrato_id)
       if (antes && antes.valor != null && f.valor_a_facturar != null && antes.valor !== f.valor_a_facturar) {
         const diff_cop = f.valor_a_facturar - antes.valor
