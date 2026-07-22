@@ -292,8 +292,10 @@ function fmtFecha(iso) {
 }
 
 async function cargarFactura() {
+  const periodoReq = periodoActual.value
   try {
-    const { data } = await api.get(`/om/factura/${periodoActual.value}`)
+    const { data } = await api.get(`/om/factura/${periodoReq}`)
+    if (periodoReq !== periodoActual.value) return   // respuesta obsoleta
     factura.value = data
     sinMatchPendientes.value = data.sin_match_pendientes ?? []
   } catch { /* silencioso — no hay factura aún */ }
@@ -377,14 +379,17 @@ function formatCOP(v) {
 }
 
 async function cargarDatos() {
+  const periodoReq = periodoActual.value
   loading.value = true
   try {
-    const res = await api.get(`/om/calculo/${periodoActual.value}`)
+    const res = await api.get(`/om/calculo/${periodoReq}`)
+    if (periodoReq !== periodoActual.value) return   // respuesta obsoleta: ya se cambió de mes
     filas.value = res.data.filas.filter(f => f.incluido && f.habilitado)
   } catch {
+    if (periodoReq !== periodoActual.value) return
     toast.add({ severity: 'error', summary: 'Error al cargar', life: 3000 })
   } finally {
-    loading.value = false
+    if (periodoReq === periodoActual.value) loading.value = false
   }
 }
 
