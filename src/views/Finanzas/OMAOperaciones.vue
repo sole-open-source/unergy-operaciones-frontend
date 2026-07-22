@@ -376,7 +376,7 @@
 </template>
 
 <script setup>
-import { ref, computed, reactive, onMounted, watch } from 'vue'
+import { ref, computed, reactive, onMounted, onBeforeUnmount, watch } from 'vue'
 import Button        from 'primevue/button'
 import Tag           from 'primevue/tag'
 import ProgressSpinner from 'primevue/progressspinner'
@@ -681,4 +681,17 @@ watch(periodoActual, () => {
   cargarFacturaProveedor()
 })
 onMounted(() => { cargarDatos(); cargarFacturaProveedor() })
+
+onBeforeUnmount(() => {
+  // Al cambiar de sub-tab (Operaciones/Proveedor) el v-if desmonta este componente y
+  // se perderían las ediciones inline sin guardar. Avisamos, igual que al cambiar de mes.
+  if (Object.values(overrides).some(o => o.dirty)) {
+    toast.add({
+      severity: 'warn',
+      summary: 'Ediciones sin guardar descartadas',
+      detail: 'Saliste de esta vista sin guardar — los valores editados no se aplicaron.',
+      life: 4000,
+    })
+  }
+})
 </script>
