@@ -190,6 +190,15 @@ function columnasDe() {
 function erConFacturas(col) { return col?.er }
 
 // Tabla angosta (Concepto · Valor · Soporte) para un estado de resultados.
+// Subtotales "Valor a pagar" que se insertan tras cada bloque contable
+// (Mandato = Ingresos−Comercialización, Costos, Facturas), espejo de los
+// mismos 3 checkpoints que muestra el Panel Contable.
+const SUBTOT_TRAS_GRUPO = {
+  comercializacion: (er) => ({ label: 'Valor a pagar (Ingresos − Comercialización)', valor: er.valorAPagar }),
+  costos: (er) => ({ label: 'Valor a pagar (Costos Operativos)', valor: -Math.abs(er.costosOperativos || 0) }),
+  facturas: (er) => ({ label: 'Valor a pagar (Facturas de Servicio)', valor: -Math.abs(er.facturasTotal || 0) }),
+}
+
 function detalleHtml(er) {
   const filas = er.grupos.map(g => {
     const neg = g.sign < 0
@@ -203,7 +212,11 @@ function detalleHtml(er) {
       return `<tr class="rpt-ln"><td class="rpt-c-con rpt-indent">${esc(ln.label)}</td>` +
         `<td class="rpt-c-val">${fmtCOP(ln.valor)}</td><td class="rpt-c-sop">${sop}</td></tr>`
     }).join('')
-    return sub + lineas
+    const mkSub = SUBTOT_TRAS_GRUPO[g.key]
+    const subtot = mkSub ? (({ label, valor }) =>
+      `<tr class="rpt-subtot"><td class="rpt-c-con">${esc(label)}</td>` +
+      `<td class="rpt-c-val">${fmtCOP(valor)}</td><td class="rpt-c-sop"></td></tr>`)(mkSub(er)) : ''
+    return sub + lineas + subtot
   }).join('')
   const neto = `<tr class="rpt-neto"><td class="rpt-c-con">Valor a pagar</td><td class="rpt-c-val">${fmtCOP(er.neto)}</td><td class="rpt-c-sop"></td></tr>`
   return `<table class="rpt-detail"><thead><tr><th class="rpt-c-con">Concepto</th><th class="rpt-c-val">Valor</th><th class="rpt-c-sop">Soporte</th></tr></thead><tbody>${filas}${neto}</tbody></table>`
@@ -711,6 +724,9 @@ const REPORT_CSS = `
 .rpt-neto td{border-top:2px solid #915BD8;background:rgba(145,91,216,0.08);font-weight:800;}
 .rpt-neto .rpt-c-con{color:#2C2039;}
 .rpt-neto .rpt-c-val{color:#6E3FB8;}
+.rpt-subtot td{border-top:1px dashed #d8cdec;font-style:italic;font-size:10px;}
+.rpt-subtot .rpt-c-con{color:#6b6380;}
+.rpt-subtot .rpt-c-val{color:#6b6380;font-weight:700;}
 .rpt-sop{font-size:9px;color:#6E3FB8;text-decoration:none;}
 .rpt-sop-muted{font-size:9px;color:#bba8d4;}
 .rpt-obs{background:#faf7ff;border-left:3px solid #4ADE80;border-radius:8px;padding:10px 12px;color:#3d3550;font-size:11px;}

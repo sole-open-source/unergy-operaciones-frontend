@@ -716,6 +716,23 @@
 
         <!-- a. PPA Venta (UNGG) -->
         <template v-if="pcMode === 'ppa_venta_ungg'">
+          <!-- Filtro por modalidad de suministro: propio / compra en bolsa / uso del recurso -->
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <span class="text-[10px] font-semibold uppercase tracking-wider mr-1" style="color: #9b89b5;">Modalidad</span>
+            <button @click="pcModalidad = null" class="cv-btn"
+              :style="pcModalidad === null ? 'border-color:#915BD8; background:rgba(145,91,216,0.10); color:#915BD8; font-weight:700;' : ''"
+              v-tooltip.bottom="'Todas las plantas del contrato de venta'">
+              Todas <b class="ml-0.5">{{ pcVentaDupInfo.total }}</b>
+            </button>
+            <button v-for="f in PC_MODALIDAD_FILTROS" :key="f.key"
+              @click="pcModalidad = pcModalidad === f.key ? null : f.key" class="cv-btn"
+              :style="pcModalidad === f.key ? `border-color:${f.color}; background:${f.color}1f; color:${f.color}; font-weight:700;` : ''"
+              v-tooltip.bottom="f.tip">
+              <span class="inline-block rounded-full" :style="`width:8px; height:8px; background:${f.color};`"></span>
+              {{ f.label }} <b class="ml-0.5">{{ pcModalidadCounts[f.key] }}</b>
+            </button>
+          </div>
+
           <!-- Resumen de modalidades: duplicados (compra en bolsa) y uso del recurso -->
           <div v-if="pcVentaDupInfo.dup || pcVentaDupInfo.ur" class="flex flex-col gap-1 px-4 py-2.5 rounded-lg text-xs"
             style="background: rgba(44,32,57,0.03); border: 1px solid rgba(44,32,57,0.12); color: #2C2039;">
@@ -733,7 +750,11 @@
               Duplicados y uso del recurso también aparecen en «Compra en bolsa (UNGG)» — el duplicado se compra en bolsa (genera garantías); el uso del recurso se le paga al cliente a precio bolsa (sin garantías).
             </span>
           </div>
-          <div v-for="c in pcPools.ppa_venta_ungg" :key="c.id" class="cv-card">
+          <div v-if="!ppaVentaFiltrado.length" class="text-center py-12 text-sm" style="color: #7a6e8a;">
+            <template v-if="pcModalidad">No hay plantas de «{{ PC_MODALIDAD_FILTROS.find(f => f.key === pcModalidad)?.label }}» en {{ MESES[pcMonth - 1] }} {{ pcYear }}.</template>
+            <template v-else>No hay contratos de venta (UNGG) vigentes en {{ MESES[pcMonth - 1] }} {{ pcYear }}.</template>
+          </div>
+          <div v-for="c in ppaVentaFiltrado" :key="c.id" class="cv-card">
             <div class="px-4 py-3 flex items-center justify-between cv-row-click"
               style="background: rgba(145,91,216,0.04); border-bottom: 1px solid rgba(44,32,57,0.07);"
               @click="abrirDetalleContrato(c, 'ppa_venta_ungg')"
@@ -1883,6 +1904,34 @@ const pcVentaDupInfo = computed(() => {
     }
   }
   return { total, dup, ur }
+})
+
+// ── Filtro por modalidad de suministro en Venta·UNGG (a) ─────────────────────
+// null = todas. Las tres modalidades son excluyentes y usan las MISMAS reglas
+// que los badges de la fila: uso del recurso tiene prioridad sobre duplicado.
+const pcModalidad = ref(null)
+const PC_MODALIDAD_FILTROS = [
+  { key: 'propio',      label: 'Suministro propio', color: '#7a6e8a', tip: 'Plantas con suministro propio (sin compra en bolsa ni uso del recurso)' },
+  { key: 'duplicado',   label: 'Compra en bolsa',   color: '#9a6700', tip: 'Plantas duplicadas: aportan al contrato con origen bolsa (genera garantías)' },
+  { key: 'uso_recurso', label: 'Uso del recurso',   color: '#0369a1', tip: 'Plantas en bolsa que se pagan al cliente a precio bolsa (sin garantías)' },
+]
+function modalidadPlanta(p) {
+  if (p.uso_del_recurso) return 'uso_recurso'
+  if (p.es_duplicado) return 'duplicado'
+  return 'propio'
+}
+const pcModalidadCounts = computed(() => {
+  const { total, dup, ur } = pcVentaDupInfo.value
+  return { propio: total - dup - ur, duplicado: dup, uso_recurso: ur }
+})
+// Piscina de venta filtrada: filtra las plantas de cada contrato por modalidad y
+// oculta los contratos que queden sin plantas que cumplan el filtro.
+const ppaVentaFiltrado = computed(() => {
+  const pools = pcPools.value.ppa_venta_ungg || []
+  if (!pcModalidad.value) return pools
+  return pools
+    .map(c => ({ ...c, plantas: (c.plantas || []).filter(p => modalidadPlanta(p) === pcModalidad.value) }))
+    .filter(c => c.plantas.length)
 })
 
 // Contratos de compra externa sin plantas vinculadas: no sabemos a qué planta

@@ -25,19 +25,23 @@
       </div>
       <p class="slc-hint">
         Umbral SLA: <b>{{ metrics?.slaThresholdPct ?? 90 }}%</b> ·
-        Déficit: <b>{{ mwh(metrics?.underGenerationMWh) }}</b> ·
-        Tasa: <b>{{ fmt(metrics?.penaltyRate) }}/MWh</b>
+        Déficit: <b>{{ mwh(metrics?.underGenerationMWh) }}</b>
+        <template v-if="tieneTasa"> · Tasa: <b>{{ fmt(metrics?.penaltyRate) }}/MWh</b></template>
       </p>
 
       <!-- Caja de multa (solo si incumple) -->
       <div v-if="metrics?.breached" class="slc-fine">
         <div class="slc-fine-item">
-          <span class="slc-fine-label">Multa estimada (mes)</span>
+          <span class="slc-fine-label">{{ tieneTasa ? 'Multa estimada (mes)' : 'Costo de cubrir déficit (bolsa)' }}</span>
           <span class="slc-fine-value">{{ fmt(metrics?.fineEstimated) }}</span>
         </div>
-        <div class="slc-fine-item">
+        <div v-if="tieneTasa" class="slc-fine-item">
           <span class="slc-fine-label">Multa acumulada YTD</span>
           <span class="slc-fine-value">{{ fmt(metrics?.fineYtd) }}</span>
+        </div>
+        <div v-else class="slc-fine-item">
+          <span class="slc-fine-label">Origen</span>
+          <span class="slc-fine-note">Compra de energía en bolsa para cubrir la obligación mínima del PPA.</span>
         </div>
       </div>
       <div v-else class="slc-okmsg">
@@ -61,6 +65,11 @@ const props = defineProps({
 const fmt = (v) => formatCurrency(v)
 const mwh = (v) => formatMWh(v)
 const pct = (v) => (v == null ? '—' : `${v.toFixed(1)}%`)
+
+// Con tasa de penalización contractual (modo mock) la multa = déficit × tasa y
+// hay acumulado YTD. Sin tasa (modo real), el "costo" es la compra en bolsa para
+// cubrir el déficit; no mostramos una tasa $0 ni un YTD que no aplica.
+const tieneTasa = computed(() => Number(props.metrics?.penaltyRate) > 0)
 
 const barWidth = computed(() => {
   const v = props.metrics?.compliancePct
@@ -123,6 +132,7 @@ const thresholdLeft = computed(() => {
 .slc-fine-item { display: flex; flex-direction: column; gap: 3px; }
 .slc-fine-label { font-size: 10px; text-transform: uppercase; letter-spacing: .03em; color: #92650B; font-weight: 600; }
 .slc-fine-value { font-size: 16px; font-weight: 800; color: #B45309; font-variant-numeric: tabular-nums; }
+.slc-fine-note { font-size: 10.5px; color: #92650B; line-height: 1.35; }
 
 .slc-okmsg {
   margin-top: 12px; padding: 8px 12px; border-radius: 10px;

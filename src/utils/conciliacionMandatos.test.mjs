@@ -13,8 +13,8 @@ import { dirname, join } from 'path'
 const here = dirname(fileURLToPath(import.meta.url))
 let src = fs.readFileSync(join(here, 'conciliacionMandatos.js'), 'utf8')
 src = src.replace(/export const /g, 'const ').replace(/export function /g, 'function ')
-const api = new Function(src + '\nreturn { parseAsientos, extractMandate, suggestTag, reconciliar, plantaDesdeEtiqueta, parseIngresos, matchIngresoContab, parseMandatoNumber, parseAsientoNumber, normalizarCifra, expandirAbreviaturas };')()
-const { parseAsientos, extractMandate, suggestTag, reconciliar, plantaDesdeEtiqueta, parseIngresos, matchIngresoContab, parseMandatoNumber, parseAsientoNumber, normalizarCifra, expandirAbreviaturas } = api
+const api = new Function(src + '\nreturn { parseAsientos, extractMandate, suggestTag, reconciliar, plantaDesdeEtiqueta, parseIngresos, matchIngresoContab, parseMandatoNumber, parseAsientoNumber, normalizarCifra, expandirAbreviaturas, conceptoDesdeEtiqueta, parseIngresosPorConcepto, matchIngresoConceptos };')()
+const { parseAsientos, extractMandate, suggestTag, reconciliar, plantaDesdeEtiqueta, parseIngresos, matchIngresoContab, parseMandatoNumber, parseAsientoNumber, normalizarCifra, expandirAbreviaturas, conceptoDesdeEtiqueta, parseIngresosPorConcepto, matchIngresoConceptos } = api
 
 let ok = true
 const assert = (cond, msg) => { console.log((cond ? '✅' : '❌') + ' ' + msg); if (!cond) ok = false }
@@ -339,6 +339,180 @@ VALOR A PAGAR $ 238,000.00`
   // El bug original de "Auditoría PDFs": $2,011,510.00 (US) NO debe leerse como 2.011
   assert(normalizarCifra('2,011,510.00') !== 2.011, 'regresión Auditoría: US con comas no se lee como 2.011')
 }
+
+// 15) BUG jun-2026 — conceptos y clasificadores nuevos del soporte de INGRESOS.
+//     El batch de junio trajo conceptos que la regex vieja no reconocía, así que
+//     plantaDesdeEtiqueta NO les quitaba el prefijo y cada línea quedaba como una
+//     "planta" distinta (382 grupos en vez de ~70) → el match se quedaba con el
+//     bruto sin restar costos (~3% de diferencia falsa). Cada concepto/clasificador
+//     nuevo debe colapsar a la MISMA planta que INGRESO BRUTO.
+const URU = 'MINIGRANJA SOLAR URUACO'
+const etq = (concepto) => `${concepto} MINIGRANJA SOLAR URUACO JUNIO 2026 TERPEL`
+for (const concepto of [
+  'SERVICIOS DESPACHO Y COORDINACION CND',
+  'DESPACHO',
+  'ENERGIA EN BOLSA',
+  'ARRANQUE Y PARADA',
+  'SERVICIOS DE ADMINISTRACION SIC',
+  'I.V.A. SIC 19',
+  'CARGO POR CONFIABILIDAD',
+  'FAZNI',
+]) {
+  assert(plantaDesdeEtiqueta(etq(concepto)) === URU,
+    `plantaDesdeEtiqueta "${concepto}" → "${plantaDesdeEtiqueta(etq(concepto))}" (esperado "${URU}")`)
+}
+// Clasificadores nuevos entre el concepto y la planta (antes solo BIAC/UNGC/PPA):
+assert(plantaDesdeEtiqueta('INGRESO BRUTO TERPEL 1 MINIGRANJA SOLAR URUACO JUNIO 2026 TERPEL') === URU,
+  `plantaDesdeEtiqueta quita "TERPEL 1" = "${plantaDesdeEtiqueta('INGRESO BRUTO TERPEL 1 MINIGRANJA SOLAR URUACO JUNIO 2026 TERPEL')}"`)
+assert(plantaDesdeEtiqueta('INGRESO BRUTO TERPEL 2 MINIGRANJA SOLAR URUACO JUNIO 2026 TERPEL') === URU,
+  `plantaDesdeEtiqueta quita "TERPEL 2" = "${plantaDesdeEtiqueta('INGRESO BRUTO TERPEL 2 MINIGRANJA SOLAR URUACO JUNIO 2026 TERPEL')}"`)
+assert(plantaDesdeEtiqueta('INGRESO BRUTO UNGG MINIGRANJA SOLAR URUACO JUNIO 2026 TERPEL') === URU,
+  `plantaDesdeEtiqueta quita "UNGG" = "${plantaDesdeEtiqueta('INGRESO BRUTO UNGG MINIGRANJA SOLAR URUACO JUNIO 2026 TERPEL')}"`)
+// Sufijo COP/GENERADOR/COMERCIALIZADOR tras el concepto también debe quedar fuera:
+assert(plantaDesdeEtiqueta('ENERGIA EN BOLSA COP GENERADOR MINIGRANJA SOLAR URUACO JUNIO 2026') === URU,
+  `plantaDesdeEtiqueta sufijo COP/GENERADOR = "${plantaDesdeEtiqueta('ENERGIA EN BOLSA COP GENERADOR MINIGRANJA SOLAR URUACO JUNIO 2026')}"`)
+
+// 16) BUG jun-2026 — colapso en parseIngresos: las 6 líneas de Uruaco de junio
+//     (con conceptos nuevos) deben agrupar en UN solo grupo cuyo neto (débito −
+//     crédito) = 44.345.428, NO el bruto 45.786.907 (income sin restar costos).
+//     NOTA: no se entregaron las 6 líneas crudas; los importes por línea son
+//     representativos, elegidos para reproducir los totales reportados de junio
+//     (bruto 45.786.907 / neto 44.345.428). Lo que fija la regresión es (a) que
+//     todas colapsen a UN grupo y (b) que el neto reste los costos de conceptos
+//     nuevos. Reemplazar por las líneas reales del Excel cuando estén disponibles.
+const AC = '28150505 INGRESO DE ENERGIA'
+const ASO = 'RODRIGUEZ VELEZ BEATRIZ'
+const ingJun = [
+  ['Asiento contable', 'Cuenta', 'Asociado', 'Etiqueta', 'Debe', 'Haber'],
+  // Ingresos (haber) — bruto = 44.000.000 + 1.500.000 + 286.907 = 45.786.907
+  ['CM/6', AC, ASO, 'INGRESO BRUTO TERPEL 1 MINIGRANJA SOLAR URUACO JUNIO 2026 TERPEL', 0, 44000000],
+  ['CM/6', AC, ASO, 'CARGO POR CONFIABILIDAD MINIGRANJA SOLAR URUACO JUNIO 2026 TERPEL', 0, 1500000],
+  ['CM/6', AC, ASO, 'FAZNI MINIGRANJA SOLAR URUACO JUNIO 2026 TERPEL', 0, 286907],
+  // Costos (debe) — total = 900.000 + 400.000 + 141.479 = 1.441.479
+  ['CM/6', AC, ASO, 'COMERCIALIZACION MINIGRANJA SOLAR URUACO JUNIO 2026 TERPEL', 900000, 0],
+  ['CM/6', AC, ASO, 'ARRANQUE Y PARADA MINIGRANJA SOLAR URUACO JUNIO 2026 TERPEL', 400000, 0],
+  ['CM/6', AC, ASO, 'I.V.A. SIC 19 MINIGRANJA SOLAR URUACO JUNIO 2026 TERPEL', 141479, 0],
+]
+const ingJunRes = parseIngresos(ingJun)
+assert(ingJunRes.length === 1,
+  `parseIngresos jun-2026: 6 líneas → 1 grupo (colapso) — fue ${ingJunRes.length} grupos`)
+assert(ingJunRes[0] && Math.round(Math.abs(ingJunRes[0].valor_contabilidad)) === 44345428,
+  `parseIngresos jun-2026: neto = ${ingJunRes[0] && Math.round(Math.abs(ingJunRes[0].valor_contabilidad))} (esperado 44345428, NO bruto 45786907)`)
+
+// 17) BUG jun-2026 — mandante ABREVIADO en la contabilidad (caso Sol de la Sierra).
+//     El PDF trae "PATRIMONIOS AUTONOMOS FIDUCIARIA BANCOLOMBIA ... 17844 SOL DE LA
+//     SIERRA" pero el asiento abrevia el PA a "PA 17844 SOL DE LA SIERRA" (sin
+//     FIDUCIARIA/BANCOLOMBIA). Comparten el código de portafolio 17844 → es el mismo
+//     PA. Antes matchIngresoContab exigía TODOS los tokens del mandante en el asociado
+//     y las 8 plantas de Sol de la Sierra quedaban SIN match (verificado con datos
+//     reales de junio: valor a pagar La Paz Leyenda = 66.407.637 = neto contable).
+const MSIERRA = 'PATRIMONIOS AUTONOMOS FIDUCIARIA BANCOLOMBIA S A SOCIEDAD FIDUCIARIA - 17844 SOL DE LA SIERRA'
+const gSierra = [
+  { asociado: 'PA 17844 SOL DE LA SIERRA', planta: 'MINIGRANJA SOLAR LA PAZ LEYENDA', valor_contabilidad: -66407637 },
+  { asociado: 'PA 17844 SOL DE LA SIERRA', planta: 'MINIGRANJA SOLAR SAN DIEGO SUR', valor_contabilidad: -57570713 },
+  // Decoy: otro fondo (18254) con el MISMO nombre de planta NO debe robar el match.
+  { asociado: 'PA 18254 OTRO FONDO', planta: 'MINIGRANJA SOLAR LA PAZ LEYENDA', valor_contabilidad: -999 },
+]
+const mLPL = matchIngresoContab({ mandante: MSIERRA, projName: 'Minigranja Solar La Paz Leyenda' }, gSierra)
+assert(mLPL && mLPL.asociado === 'PA 17844 SOL DE LA SIERRA' && Math.round(mLPL.valor_contabilidad) === -66407637,
+  `matchIngresoContab Sol de la Sierra/La Paz Leyenda (abrev. por código 17844) → ${mLPL ? mLPL.asociado + ' ' + Math.round(mLPL.valor_contabilidad) : 'SIN MATCH'} (esperado 'PA 17844 SOL DE LA SIERRA' -66407637)`)
+const mSDS = matchIngresoContab({ mandante: MSIERRA, projName: 'Minigranja Solar San Diego Sur' }, gSierra)
+assert(mSDS && mSDS.planta === 'MINIGRANJA SOLAR SAN DIEGO SUR',
+  `matchIngresoContab Sol de la Sierra/San Diego Sur → "${mSDS && mSDS.planta}" (esperado SAN DIEGO SUR)`)
+// El código distinto (18254) NO debe emparejar contra el fondo 17844 aunque compartan
+// el nombre de planta: al pedir el fondo 18254, el único grupo 17844/San Diego Sur no aplica.
+const mOtro = matchIngresoContab({ mandante: 'PATRIMONIOS AUTONOMOS X - 18254 OTRO FONDO', projName: 'Minigranja Solar San Diego Sur' }, gSierra)
+assert(!mOtro, `matchIngresoContab fondo 18254 no roba San Diego Sur del 17844 → ${mOtro ? mOtro.asociado : 'SIN MATCH (correcto)'}`)
+
+// 18) INGRESOS POR CONCEPTO (jun-2026) — desglose para el validador de ingresos.
+//     El mandato lista Ingreso Bruto (suma) + costos (resta) y "Valor a pagar".
+//     La contabilidad trae los mismos conceptos como líneas del 28150505. El
+//     validador debe cruzar CONCEPTO a CONCEPTO, no solo el total.
+// 18a) conceptoDesdeEtiqueta: clave canónica del concepto desde la etiqueta.
+assert(conceptoDesdeEtiqueta('INGRESO BRUTO MINIGRANJA SOLAR URUACO JUNIO 2026 TERPEL') === 'INGRESO BRUTO',
+  `conceptoDesdeEtiqueta INGRESO BRUTO = "${conceptoDesdeEtiqueta('INGRESO BRUTO MINIGRANJA SOLAR URUACO JUNIO 2026 TERPEL')}"`)
+assert(conceptoDesdeEtiqueta('ARRANQUE Y PARADA (COP) MINIGRANJA SOLAR URUACO JUNIO 2026 TERPEL') === 'ARRANQUE Y PARADA',
+  `conceptoDesdeEtiqueta ARRANQUE Y PARADA = "${conceptoDesdeEtiqueta('ARRANQUE Y PARADA (COP) MINIGRANJA SOLAR URUACO JUNIO 2026 TERPEL')}"`)
+assert(conceptoDesdeEtiqueta('I.V.A. SIC (19%) (COP) (GENERADOR) MINIGRANJA SOLAR URUACO JUNIO 2026') === 'I V A SIC',
+  `conceptoDesdeEtiqueta I.V.A. SIC = "${conceptoDesdeEtiqueta('I.V.A. SIC (19%) (COP) (GENERADOR) MINIGRANJA SOLAR URUACO JUNIO 2026')}"`)
+assert(conceptoDesdeEtiqueta('SERVICIOS DESPACHO Y COORDINACIÓN CND (COP) (GENERADOR) MINIGRANJA SOLAR URUACO JUNIO 2026') === 'SERVICIOS DESPACHO Y COORDINACION CND',
+  `conceptoDesdeEtiqueta SERVICIOS DESPACHO CND = "${conceptoDesdeEtiqueta('SERVICIOS DESPACHO Y COORDINACIÓN CND (COP) (GENERADOR) MINIGRANJA SOLAR URUACO JUNIO 2026')}"`)
+assert(conceptoDesdeEtiqueta('SERVICIOS DE ADMINISTRACIÓN SIC (COP) (GENERADOR) MINIGRANJA SOLAR URUACO JUNIO 2026') === 'SERVICIOS DE ADMINISTRACION SIC',
+  `conceptoDesdeEtiqueta SERVICIOS ADMIN SIC = "${conceptoDesdeEtiqueta('SERVICIOS DE ADMINISTRACIÓN SIC (COP) (GENERADOR) MINIGRANJA SOLAR URUACO JUNIO 2026')}"`)
+
+// 18b) parseIngresosPorConcepto: neto por concepto del 28150505 (ignora contra 28151001).
+const ingC = [
+  ['Asiento contable', 'Cuenta', 'Asociado', 'Etiqueta', 'Debe', 'Haber'],
+  ['CM/6', '28150505 INGRESO DE ENERGIA', 'PA 17844 SOL DE LA SIERRA', 'INGRESO BRUTO MINIGRANJA SOLAR URUACO JUNIO 2026 TERPEL', 0, 45786907],
+  ['CM/6', '28150505 INGRESO DE ENERGIA', 'PA 17844 SOL DE LA SIERRA', 'ARRANQUE Y PARADA (COP) MINIGRANJA SOLAR URUACO JUNIO 2026 TERPEL', 612972, 0],
+  ['CM/6', '28151001 FACTURAS DE COMERCIALIZACION', 'PA 17844 SOL DE LA SIERRA', 'ARRANQUE Y PARADA (COP) MINIGRANJA SOLAR URUACO JUNIO 2026 TERPEL', 0, 612972],
+  ['CM/6', '28150505 INGRESO DE ENERGIA', 'PA 17844 SOL DE LA SIERRA', 'I.V.A. SIC (19%) (COP) (GENERADOR) MINIGRANJA SOLAR URUACO JUNIO 2026', 26283, 0],
+]
+const gC = parseIngresosPorConcepto(ingC)
+assert(gC.length === 1, `parseIngresosPorConcepto: 1 grupo — fue ${gC.length}`)
+assert(gC[0] && Math.round(gC[0].conceptos['INGRESO BRUTO']) === -45786907,
+  `parseIngresosPorConcepto INGRESO BRUTO neto = ${gC[0] && Math.round(gC[0].conceptos['INGRESO BRUTO'])} (esperado -45786907)`)
+assert(gC[0] && Math.round(gC[0].conceptos['ARRANQUE Y PARADA']) === 612972,
+  `parseIngresosPorConcepto ARRANQUE Y PARADA = ${gC[0] && Math.round(gC[0].conceptos['ARRANQUE Y PARADA'])} (esperado 612972, solo 28150505)`)
+assert(gC[0] && Math.round(gC[0].conceptos['I V A SIC']) === 26283,
+  `parseIngresosPorConcepto I V A SIC = ${gC[0] && Math.round(gC[0].conceptos['I V A SIC'])} (esperado 26283)`)
+
+// 18c) matchIngresoConceptos: cruza PDF vs contab, marca OK/DIFERENCIA/faltante/sobrante.
+const valsPdf = { 'INGRESO BRUTO': 45786907, 'ARRANQUE Y PARADA': 612972, 'I V A SIC': 26283, 'FAZNI': 5000 }
+const contabConc = { 'INGRESO BRUTO': -45786907, 'ARRANQUE Y PARADA': 613500, 'I V A SIC': 26283, 'COMERCIALIZACION': 1000 }
+const filas = matchIngresoConceptos(valsPdf, contabConc, 200)
+const byK = Object.fromEntries(filas.map((f) => [f.concepto, f]))
+assert(byK['INGRESO BRUTO'] && byK['INGRESO BRUTO'].estado === 'OK', `matchIngresoConceptos INGRESO BRUTO estado = ${byK['INGRESO BRUTO'] && byK['INGRESO BRUTO'].estado} (esperado OK)`)
+assert(byK['ARRANQUE Y PARADA'] && byK['ARRANQUE Y PARADA'].estado === 'DIFERENCIA', `matchIngresoConceptos ARRANQUE Y PARADA (dif 528>tol) = ${byK['ARRANQUE Y PARADA'] && byK['ARRANQUE Y PARADA'].estado} (esperado DIFERENCIA)`)
+assert(byK['FAZNI'] && byK['FAZNI'].estado === 'FALTA_CONTAB', `matchIngresoConceptos FAZNI (en PDF, no en contab) = ${byK['FAZNI'] && byK['FAZNI'].estado} (esperado FALTA_CONTAB)`)
+assert(byK['COMERCIALIZACION'] && byK['COMERCIALIZACION'].estado === 'SOBRA_CONTAB', `matchIngresoConceptos COMERCIALIZACION (en contab, no en PDF) = ${byK['COMERCIALIZACION'] && byK['COMERCIALIZACION'].estado} (esperado SOBRA_CONTAB)`)
+
+// 18d) extractMandate parsea los conceptos de ingreso a vals con las claves canónicas.
+const pdfTxt = [
+  'Concepto Valor',
+  'Ingreso Bruto (COP) (Suma) (**) $ 45,786,907',
+  'Arranque y parada (COP) (Resta) $ 612,972',
+  'Energía en Bolsa (Generador) (COP) (Resta) $ 276,566',
+  'Servicios Despacho y Coordinación CND (Generador) (COP) (Resta) $ 387,327',
+  'Servicios de Administración SIC (Generador) (COP) (Resta) $ 138,331',
+  'I.V.A. SIC (19%) (Generador) (COP) (Resta) $ 26,283',
+  'Valor a pagar $ 44,345,428',
+].join('\n')
+const mIng = extractMandate(pdfTxt, 'CMU1053-Mandato-Minigranja Solar Uruaco-X.pdf')
+assert(mIng.total === 44345428, `extractMandate ingreso total = ${mIng.total} (esperado 44345428)`)
+assert(mIng.vals['INGRESO BRUTO'] === 45786907, `extractMandate vals INGRESO BRUTO = ${mIng.vals['INGRESO BRUTO']} (esperado 45786907)`)
+assert(mIng.vals['ARRANQUE Y PARADA'] === 612972, `extractMandate vals ARRANQUE Y PARADA = ${mIng.vals['ARRANQUE Y PARADA']} (esperado 612972)`)
+assert(mIng.vals['SERVICIOS DESPACHO Y COORDINACION CND'] === 387327, `extractMandate vals SERV DESPACHO CND = ${mIng.vals['SERVICIOS DESPACHO Y COORDINACION CND']} (esperado 387327)`)
+assert(mIng.vals['I V A SIC'] === 26283, `extractMandate vals I V A SIC = ${mIng.vals['I V A SIC']} (esperado 26283)`)
+
+// 19) jun-2026 — costos operativos bajo OTRO asociado (el operador: XM, NEU, …) se
+//     atribuyen al inversionista de la MISMA planta. La contabilidad a veces carga
+//     Arranque/Energía/Despacho CND/Admin SIC/IVA en 28150505 con el asociado del
+//     operador (net POSITIVO = solo costos), mientras el ingreso está bajo el
+//     inversionista (net NEGATIVO). Antes cada asociado era un grupo → el mandante
+//     quedaba sin sus costos y salían diferencias/"falta en contab" falsas.
+const ingOp = [
+  ['Asiento contable', 'Cuenta', 'Asociado', 'Etiqueta', 'Debe', 'Haber'],
+  ['CM/6', '28150505 INGRESO', 'FONSAR SAS', 'INGRESO BRUTO GD AGUSTIN 2 JUNIO 2026 XM', 0, 58238467],
+  ['CM/6', '28150505 INGRESO', 'XM COMPANIA DE EXPERTOS EN MERCADOS', 'ARRANQUE Y PARADA (COP) GD AGUSTIN 2 JUNIO 2026 XM', 675783, 0],
+  ['CM/6', '28150505 INGRESO', 'XM COMPANIA DE EXPERTOS EN MERCADOS', 'SERVICIOS DESPACHO Y COORDINACION CND (COP) GD AGUSTIN 2 JUNIO 2026 XM', 498739, 0],
+]
+const gOp = parseIngresos(ingOp)
+assert(gOp.length === 1, `parseIngresos fusiona operador al inversionista: 1 grupo — fue ${gOp.length}`)
+assert(gOp[0] && /FONSAR/.test(gOp[0].asociado), `grupo fusionado queda bajo el inversionista = "${gOp[0] && gOp[0].asociado}" (esperado FONSAR)`)
+assert(gOp[0] && Math.round(Math.abs(gOp[0].valor_contabilidad)) === 57063945,
+  `neto fusionado = ${gOp[0] && Math.round(Math.abs(gOp[0].valor_contabilidad))} (esperado 57063945 = 58238467-675783-498739)`)
+const gcOp = parseIngresosPorConcepto(ingOp)
+assert(gcOp.length === 1 && Math.round(gcOp[0].conceptos['ARRANQUE Y PARADA']) === 675783 && Math.round(gcOp[0].conceptos['SERVICIOS DESPACHO Y COORDINACION CND']) === 498739,
+  `parseIngresosPorConcepto fusiona los conceptos del operador en el inversionista (len=${gcOp.length}, arr=${gcOp[0] && gcOp[0].conceptos['ARRANQUE Y PARADA']})`)
+
+// Multi-inversionista (misma planta, varios net<0): NO se fusiona (cada uno su grupo).
+const ingMI = [
+  ['Asiento contable', 'Cuenta', 'Asociado', 'Etiqueta', 'Debe', 'Haber'],
+  ['CM/6', '28150505 INGRESO', 'PA 17844 BANCOLOMBIA', 'INGRESO BRUTO MINIGRANJA SOLAR URUACO JUNIO 2026 TERPEL', 0, 45786907],
+  ['CM/6', '28150505 INGRESO', 'SUNO ACTIVOS SOSTENIBLES S A S', 'INGRESO BRUTO MINIGRANJA SOLAR URUACO JUNIO 2026 TERPEL', 0, 6969547],
+]
+assert(parseIngresos(ingMI).length === 2, `multi-inversionista URUACO no se fusiona: 2 grupos — fue ${parseIngresos(ingMI).length}`)
 
 console.log(ok ? '\nTODOS LOS TESTS PASARON' : '\nHAY FALLOS')
 process.exit(ok ? 0 : 1)

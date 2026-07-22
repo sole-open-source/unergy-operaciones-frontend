@@ -4,10 +4,35 @@
       <i class="pi pi-wallet text-sm" style="color:#915BD8" />
       <h3 class="fic-title">Impacto financiero</h3>
       <i class="pi pi-info-circle fic-info"
-         v-tooltip.top="'Neto = Ingresos PPA + Liquidaciones XM − Multas SLA (proyectadas). Las liquidaciones XM pueden ser positivas (spot > PPA) o negativas.'" />
+         v-tooltip.top="data?.liquidada
+           ? 'Estado de Resultados (espejo del Panel Contable del período). Ingreso neto = Ingresos − Costos totales.'
+           : 'Neto = Ingresos PPA + Liquidaciones XM − Multas SLA (proyectadas). Las liquidaciones XM pueden ser positivas (spot > PPA) o negativas.'" />
     </div>
 
-    <div class="fic-grid">
+    <!-- Desglose del Estado de Resultados (espejo del Panel Contable) -->
+    <div v-if="data?.liquidada" class="fic-grid">
+      <div class="fic-item">
+        <span class="fic-label">Ingresos de energía (PPA)</span>
+        <span class="fic-value fic-pos">{{ fmt(data?.ingresoPPA) }}</span>
+      </div>
+      <div class="fic-item">
+        <span class="fic-label">Costos totales</span>
+        <span class="fic-value" :class="(data?.costosTotales || 0) > 0 ? 'fic-neg' : 'fic-muted'">
+          {{ (data?.costosTotales || 0) > 0 ? '−' + fmt(data.costosTotales) : fmt(0) }}
+        </span>
+      </div>
+      <div class="fic-item">
+        <span class="fic-label">Margen</span>
+        <span class="fic-value fic-pos">{{ margenPct }}</span>
+      </div>
+      <div class="fic-item fic-item--net">
+        <span class="fic-label">Ingreso neto (Estado de Resultados)</span>
+        <span class="fic-value fic-value--net" :class="signCls(data?.neto)">{{ fmt(data?.neto) }}</span>
+      </div>
+    </div>
+
+    <!-- Desglose estimado (mock, o real sin liquidación cargada) -->
+    <div v-else class="fic-grid">
       <!-- Ingresos PPA -->
       <div class="fic-item">
         <span class="fic-label">Total Ingresos PPA</span>
@@ -38,15 +63,24 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { formatCurrency } from '@/utils/financialCalculations'
 
-defineProps({
-  // { ingresoPPA, liquidacionXM, multaSLA, neto }
+const props = defineProps({
+  // Mock: { ingresoPPA, liquidacionXM, multaSLA, neto }
+  // Real (Panel Contable): { ingresoPPA, costosTotales, neto, liquidada }
   data: { type: Object, default: () => ({}) },
 })
 
 const fmt = (v) => formatCurrency(v ?? 0)
 const signCls = (v) => (Number(v) < 0 ? 'fic-neg' : 'fic-pos')
+
+// Margen = neto / ingresos (Estado de Resultados). '—' si no hay ingreso.
+const margenPct = computed(() => {
+  const ing = Number(props.data?.ingresoPPA) || 0
+  if (ing <= 0) return '—'
+  return `${((Number(props.data?.neto) || 0) / ing * 100).toFixed(1)}%`
+})
 </script>
 
 <style scoped>

@@ -93,6 +93,27 @@ export const expandirAbreviaturas = (s) => norm(s).replace(/\bPA\b/g, 'PATRIMONI
 export const nameTokenSet = (s) => new Set(expandirAbreviaturas(s).split(' ').filter((w) => w.length >= 3 && !STOP.has(w)))
 
 /**
+ * ¿El asociado del asiento corresponde al mandante del PDF? Coincide si los tokens
+ * distintivos de uno son SUBCONJUNTO de los del otro (con intersección no vacía). El
+ * asiento suele abreviar el nombre corporativo del PA omitiendo las palabras genéricas
+ * — p. ej. "PA 17844 SOL DE LA SIERRA" vs. el mandante completo "PATRIMONIOS AUTONOMOS
+ * FIDUCIARIA BANCOLOMBIA ... 17844 SOL DE LA SIERRA": comparten el código de portafolio
+ * (17844) + fondo, pero el asiento no trae FIDUCIARIA/BANCOLOMBIA. Exigir TODOS los
+ * tokens del mandante fallaba (0 líneas / sin match). Distingue fondos distintos por su
+ * token distintivo (17844 vs 18254) y NO reintroduce STRADA⊂ESTRADA (por palabra
+ * completa no comparten tokens). Usado por reconciliar (costos) y matchIngresoContab.
+ * @param {string[]} mandTok  Tokens del mandante (nameTokenSet del mandato).
+ * @param {string} aso        Asociado del asiento.
+ */
+export const asociadoCoincideMandante = (mandTok, aso) => {
+  const aset = nameTokenSet(aso)
+  if (!mandTok.length || !aset.size) return false
+  let inter = 0
+  for (const t of mandTok) if (aset.has(t)) inter++
+  return inter > 0 && (inter === mandTok.length || inter === aset.size)
+}
+
+/**
  * Normaliza un string monetario a "cuerpo numérico" y signo: quita $, espacios,
  * y detecta negativo por signo menos o paréntesis contables "(1.234)".
  * @returns {{body: string, neg: boolean} | null}  null si queda vacío.
@@ -301,6 +322,12 @@ export function extractMandate(text, filename = '') {
         vals[key] = (vals[key] || 0) + v; return
       }
     }
+    // Conceptos de INGRESO (Ingreso Bruto, Arranque y Parada, Energía en Bolsa,
+    // Servicios Despacho CND / Admin SIC, I.V.A. SIC, etc.). Disjuntos de los de
+    // costos, así que es aditivo. Alimenta la conciliación por concepto de ingresos.
+    for (const c of INGRESO_CONCEPTOS) {
+      if (c.re.test(label)) { vals[c.key] = (vals[c.key] || 0) + v; return }
+    }
   })
   return { cmu, projName: proj, mandante, nit, vals, total }
 }
@@ -349,25 +376,10 @@ export function reconciliar(mandato, details, tag) {
     return { status: 'bad', flags: [{ lvl: 'bad', code: 'SIN_TAG', txt: 'No se asignó etiqueta analítica; no se puede verificar.' }], sums: {}, lines: [] }
   }
 
-  // Mandante por PALABRA COMPLETA (fix STRADA/ESTRADA) pero tolerando abreviaturas.
+  // Mandante por PALABRA COMPLETA (fix STRADA/ESTRADA) pero tolerando abreviaturas
+  // del PA en el asiento (ver asociadoCoincideMandante).
   const mandTok = [...nameTokenSet(mandato.mandante)]
-  const asociadoMatch = (aso) => {
-    // Coincide si uno de los nombres es SUBCONJUNTO del otro. El asiento suele
-    // abreviar el mandante omitiendo las palabras corporativas — p. ej.
-    // "PA 17844 SOL DE LA SIERRA" vs. el mandante completo "PATRIMONIOS AUTONOMOS
-    // FIDUCIARIA BANCOLOMBIA ... 17844 SOL DE LA SIERRA": comparten patrimonio +
-    // fondo pero el asiento no trae FIDUCIARIA/BANCOLOMBIA. Exigir TODOS los
-    // tokens del mandante fallaba (0 líneas). Se exige que TODOS los tokens del
-    // conjunto MÁS PEQUEÑO estén en el otro, con intersección no vacía. NO
-    // reintroduce STRADA⊂ESTRADA (por palabra completa no comparten tokens) y
-    // distingue fondos distintos por su token distintivo (17844 vs 18254).
-    const aset = nameTokenSet(aso)
-    if (!mandTok.length || !aset.size) return false
-    let inter = 0
-    for (const t of mandTok) if (aset.has(t)) inter++
-    return inter > 0 && (inter === mandTok.length || inter === aset.size)
-  }
-  const lines = details.filter((d) => d.proj === tag && asociadoMatch(d.asociado))
+  const lines = details.filter((d) => d.proj === tag && asociadoCoincideMandante(mandTok, d.asociado))
 
   // Sumar por concepto el DÉBITO de la cuenta de costo (NUNCA el neto debe − haber).
   // En arriendo el mandante (la fiduciaria) aparece en AMBOS lados del asiento, con el
@@ -455,8 +467,8 @@ export function reconciliar(mandato, details, tag) {
 export const INGRESO_ACC_PREFIX = '28150505'
 
 const MESES_RE = /\b(ENERO|FEBRERO|MARZO|ABRIL|MAYO|JUNIO|JULIO|AGOSTO|SEPTIEMBRE|OCTUBRE|NOVIEMBRE|DICIEMBRE)\b.*$/
-const CONCEPTO_RE = /^(INGRESO BRUTO|COMERCIALIZACION|DESPACHO|VENTAS EN BOLSA|COMPRAS EN BOLSA|REDISTRIBUCION DE INGRESOS DE ACUERDO AL PROTOCOLO|REDISTRIBUCION)\s+/
-const CLASIF_RE = /^(BIAC|UNGC|PPA)\s+/
+const CONCEPTO_RE = /^(INGRESO BRUTO|COMERCIALIZACION|SERVICIOS DESPACHO Y COORDINACION CND|DESPACHO|VENTAS EN BOLSA|COMPRAS EN BOLSA|ENERGIA EN BOLSA|REDISTRIBUCION DE INGRESOS DE ACUERDO AL PROTOCOLO|REDISTRIBUCION|ARRANQUE Y PARADA|SERVICIOS DE ADMINISTRACION SIC|I V A SIC(?: 19)?|CARGO POR CONFIABILIDAD|FAZNI)\s*(?:19\s*)?(?:COP\s*)?(?:GENERADOR|COMERCIALIZADOR)?\s*/
+const CLASIF_RE = /^(BIAC|UNGC|UNGG|PPA|TERPEL\s?\d?)\s+/
 
 /**
  * Nombre de planta normalizado a partir de la columna ETIQUETA. Quita el
@@ -488,19 +500,73 @@ export const plantaTokens = (s) =>
  * @param {string} accPrefix   Prefijo de cuenta a sumar (def. 28150505).
  * @returns {Array<{asociado, planta, valor_contabilidad}>}  valor_contabilidad<0 = a pagar.
  */
-export function parseIngresos(rows, accPrefix = INGRESO_ACC_PREFIX) {
+/**
+ * Núcleo de agrupación de INGRESOS. Agrupa el neto (débito − crédito) de la cuenta
+ * de ingreso por (asociado, planta), guardando total y desglose por concepto, y
+ * FUSIONA los costos del operador al inversionista de la misma planta.
+ *
+ * Motivo: la contabilidad a veces carga los costos operativos (Arranque y Parada,
+ * Energía en Bolsa, Servicios Despacho CND / Admin SIC, I.V.A. SIC…) en 28150505
+ * con el asociado del OPERADOR (XM, NEU, comercializador) en vez del inversionista
+ * (caso Agustín/Ibirico), mientras el Ingreso Bruto va bajo el inversionista.
+ * Señal robusta: el inversionista tiene neto NEGATIVO (recibe = valor a pagar) y el
+ * operador POSITIVO (solo cobra costos). Si una planta tiene UN inversionista y uno
+ * o más operadores, se fusionan al inversionista. Con VARIOS inversionistas (planta
+ * multi-inversionista, p. ej. Uruaco: Bancolombia + SUNO + RODRIGUEZ, cada uno
+ * auto-contenido) NO se fusiona: cada inversionista queda como su propio grupo.
+ * @returns {Array<{asociado, planta, valor_contabilidad, conceptos}>}
+ */
+function _gruposIngresos(rows, accPrefix = INGRESO_ACC_PREFIX) {
   const { details } = parseAsientos(rows)
-  const map = new Map()
+  const map = new Map()   // asociado|||planta → grupo
   for (const d of details) {
     if (!d.acc || !d.acc.startsWith(accPrefix)) continue
     const planta = plantaDesdeEtiqueta(d.etiqueta || d.proj)
     if (!planta || !d.asociado) continue
     const key = norm(d.asociado) + '|||' + planta
-    const cur = map.get(key) || { asociado: d.asociado, planta, valor_contabilidad: 0 }
-    cur.valor_contabilidad += d.debe - d.haber
+    const cur = map.get(key) || { asociado: d.asociado, planta, valor_contabilidad: 0, conceptos: {} }
+    const neto = d.debe - d.haber
+    cur.valor_contabilidad += neto
+    const con = conceptoDesdeEtiqueta(d.etiqueta || d.proj)
+    if (con) cur.conceptos[con] = (cur.conceptos[con] || 0) + neto
     map.set(key, cur)
   }
-  return [...map.values()].filter((g) => Math.abs(g.valor_contabilidad) > 1)
+  // Fusión operador → inversionista, por planta.
+  const porPlanta = new Map()
+  for (const g of map.values()) {
+    if (!porPlanta.has(g.planta)) porPlanta.set(g.planta, [])
+    porPlanta.get(g.planta).push(g)
+  }
+  const out = []
+  for (const grupos of porPlanta.values()) {
+    const inversionistas = grupos.filter((g) => g.valor_contabilidad < 0)
+    const operadores = grupos.filter((g) => g.valor_contabilidad >= 0)
+    if (inversionistas.length === 1 && operadores.length) {
+      const base = inversionistas[0]
+      for (const o of operadores) {
+        base.valor_contabilidad += o.valor_contabilidad
+        for (const [k, v] of Object.entries(o.conceptos)) base.conceptos[k] = (base.conceptos[k] || 0) + v
+      }
+      out.push(base)
+    } else {
+      out.push(...grupos)   // 0 o >1 inversionistas: sin fusión
+    }
+  }
+  return out
+}
+
+/**
+ * Agrupa el soporte de INGRESOS por (asociado, planta) sumando el neto
+ * (débito − crédito) de la cuenta de ingreso, con fusión operador→inversionista
+ * (ver _gruposIngresos). Reutiliza parseAsientos para detectar columnas.
+ * @param {Array<Array>} rows  Filas del Excel incluida cabecera (sheet_to_json {header:1}).
+ * @param {string} accPrefix   Prefijo de cuenta a sumar (def. 28150505).
+ * @returns {Array<{asociado, planta, valor_contabilidad}>}  valor_contabilidad<0 = a pagar.
+ */
+export function parseIngresos(rows, accPrefix = INGRESO_ACC_PREFIX) {
+  return _gruposIngresos(rows, accPrefix)
+    .map((g) => ({ asociado: g.asociado, planta: g.planta, valor_contabilidad: g.valor_contabilidad }))
+    .filter((g) => Math.abs(g.valor_contabilidad) > 1)
 }
 
 /**
@@ -518,11 +584,10 @@ export function matchIngresoContab(mandato, grupos) {
   if (!ptk.length) return null
   let best = null, bestSc = 0
   for (const g of grupos) {
-    // Asociado: todas las palabras distintivas del mandante presentes (si las hay)
-    if (mandTok.length) {
-      const aset = nameTokenSet(g.asociado)
-      if (!mandTok.every((t) => aset.has(t))) continue
-    }
+    // Asociado: mismo criterio robusto que costos — tolera que el asiento abrevie el
+    // PA (p. ej. "PA 17844 SOL DE LA SIERRA" vs. el mandante completo con FIDUCIARIA
+    // BANCOLOMBIA) emparejando por identidad distintiva compartida (código 17844).
+    if (mandTok.length && !asociadoCoincideMandante(mandTok, g.asociado)) continue
     // Planta: score por tokens compartidos (incluye dígitos)
     const gtk = new Set(plantaTokens(g.planta))
     if (!gtk.size) continue
@@ -532,4 +597,78 @@ export function matchIngresoContab(mandato, grupos) {
     if (sc > bestSc) { bestSc = sc; best = g }
   }
   return best
+}
+
+// ===================== INGRESOS: DESGLOSE POR CONCEPTO =====================
+//
+// El mandato (PDF) de ingresos lista el "Valor a Pagar" como Ingreso Bruto (SUMA)
+// menos varios costos (RESTA): Arranque y Parada, Energía en Bolsa, Servicios
+// Despacho y Coordinación CND, Servicios de Administración SIC, I.V.A. SIC, etc.
+// La contabilidad trae los MISMOS conceptos como líneas del 28150505. Para
+// conciliar concepto a concepto (no solo el total) se normaliza cada concepto a
+// una clave canónica común a ambas fuentes. `rol` documenta si suma o resta al
+// valor a pagar (informativo; el cruce compara magnitudes absolutas por concepto).
+
+/** Conceptos de ingreso reconocidos, en orden de especificidad (el 1º que casa gana). */
+export const INGRESO_CONCEPTOS = [
+  { key: 'INGRESO BRUTO', rol: 'suma', re: /^INGRESO BRUTO\b/ },
+  { key: 'COMERCIALIZACION', rol: 'resta', re: /^COMERCIALIZACION\b/ },
+  { key: 'SERVICIOS DESPACHO Y COORDINACION CND', rol: 'resta', re: /^SERVICIOS DESPACHO Y COORDINACION CND\b/ },
+  { key: 'DESPACHO', rol: 'resta', re: /^DESPACHO\b/ },
+  { key: 'ENERGIA EN BOLSA', rol: 'resta', re: /^ENERGIA EN BOLSA\b/ },
+  { key: 'VENTAS EN BOLSA', rol: 'resta', re: /^VENTAS EN BOLSA\b/ },
+  { key: 'COMPRAS EN BOLSA', rol: 'resta', re: /^COMPRAS EN BOLSA\b/ },
+  { key: 'REDISTRIBUCION', rol: 'resta', re: /^REDISTRIBUCION\b/ },
+  { key: 'ARRANQUE Y PARADA', rol: 'resta', re: /^ARRANQUE Y PARADA\b/ },
+  { key: 'SERVICIOS DE ADMINISTRACION SIC', rol: 'resta', re: /^SERVICIOS DE ADMINISTRACION SIC\b/ },
+  { key: 'I V A SIC', rol: 'resta', re: /^I V A SIC\b/ },
+  { key: 'CARGO POR CONFIABILIDAD', rol: 'resta', re: /^CARGO POR CONFIABILIDAD\b/ },
+  { key: 'FAZNI', rol: 'resta', re: /^FAZNI\b/ },
+]
+
+/** Tolerancia por concepto (pesos) al conciliar mandato vs contabilidad. */
+export const TOL_CONCEPTO = 200
+
+/**
+ * Clave canónica del concepto a partir de la ETIQUETA del asiento (o del label del
+ * PDF ya normalizado). Devuelve null si no reconoce ningún concepto de ingreso.
+ */
+export function conceptoDesdeEtiqueta(etiqueta) {
+  const n = norm(etiqueta)
+  for (const c of INGRESO_CONCEPTOS) if (c.re.test(n)) return c.key
+  return null
+}
+
+/**
+ * Agrupa el soporte de INGRESOS por (asociado, planta) devolviendo el neto
+ * (débito − crédito) del 28150505 DESGLOSADO POR CONCEPTO. Ignora los contra-
+ * asientos (28151001/28151005/…) igual que parseIngresos.
+ * @returns {Array<{asociado, planta, conceptos: Object<string,number>}>}
+ */
+export function parseIngresosPorConcepto(rows, accPrefix = INGRESO_ACC_PREFIX) {
+  return _gruposIngresos(rows, accPrefix)
+    .map((g) => ({ asociado: g.asociado, planta: g.planta, conceptos: g.conceptos }))
+}
+
+/**
+ * Cruza los conceptos del mandato (PDF) contra los de la contabilidad, concepto a
+ * concepto. Compara MAGNITUDES absolutas con tolerancia. Marca cada concepto como
+ * OK, DIFERENCIA, FALTA_CONTAB (en el PDF pero no en el asiento) o SOBRA_CONTAB
+ * (en el asiento pero no en el PDF).
+ * @param {Object<string,number>} valsPdf         Conceptos del PDF (magnitudes, de extractMandate.vals).
+ * @param {Object<string,number>} conceptosContab Netos por concepto (de parseIngresosPorConcepto).
+ * @returns {Array<{concepto, rol, pdf, contab, dif, estado}>}
+ */
+export function matchIngresoConceptos(valsPdf = {}, conceptosContab = {}, tol = TOL_CONCEPTO) {
+  return INGRESO_CONCEPTOS
+    .filter((c) => valsPdf[c.key] !== undefined || conceptosContab[c.key] !== undefined)
+    .map((c) => {
+      const pdf = valsPdf[c.key] !== undefined ? valsPdf[c.key] : null
+      const contab = conceptosContab[c.key] !== undefined ? Math.abs(conceptosContab[c.key]) : null
+      let estado
+      if (pdf === null) estado = 'SOBRA_CONTAB'
+      else if (contab === null) estado = 'FALTA_CONTAB'
+      else estado = Math.abs(pdf - contab) <= tol ? 'OK' : 'DIFERENCIA'
+      return { concepto: c.key, rol: c.rol, pdf, contab, dif: (pdf !== null && contab !== null) ? Math.round(pdf - contab) : null, estado }
+    })
 }
