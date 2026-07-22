@@ -13,15 +13,25 @@
                   placeholder="Proyecto" class="w-48" showClear filter />
         <Dropdown v-model="operadorFilter" :options="operadorOptions" optionLabel="label" optionValue="value"
                   placeholder="Operador" class="w-40" showClear />
-        <Button icon="pi pi-chart-scatter" label="Diagrama Fasorial" size="small"
-                @click="showFasorial = true"
-                style="background: #915BD8; border-color: #915BD8;"
-                class="whitespace-nowrap" />
-        <Button icon="pi pi-plus" label="Nueva Frontera" size="small"
+        <Button icon="pi pi-plus" label="Nueva Frontera"
                 @click="abrirCrear"
-                class="whitespace-nowrap" />
+                class="w-48 justify-center whitespace-nowrap" />
       </template>
     </PageHeader>
+
+    <!-- Resumen Card -->
+    <div class="flex flex-wrap gap-4">
+      <div v-for="stat in stats" :key="stat.label"
+           class="bg-white rounded-xl shadow-sm p-4 h-20 flex-1 min-w-[9rem] flex flex-col justify-center"
+           style="border: 1px solid #e8e0f0;">
+        <p class="text-xs uppercase tracking-wide font-semibold" style="color: #6b5a8a;">{{ stat.label }}</p>
+        <p class="text-2xl font-bold mt-1" :style="{ color: stat.color }">{{ stat.value }}</p>
+      </div>
+      <Button icon="pi pi-chart-scatter" label="Diagrama Fasorial" size="small"
+              @click="showFasorial = true"
+              style="background: #A78BDA; border-color: #A78BDA; color: #ffffff;"
+              class="h-20 flex-1 justify-center whitespace-nowrap" />
+    </div>
 
     <!-- Aviso: fronteras nuevas detectadas en Quoia -->
     <div v-if="pendientesQuoia.length" class="rounded-xl px-4 py-3 flex items-center justify-between gap-3"
@@ -31,15 +41,6 @@
         {{ pendientesQuoia.length }} {{ pendientesQuoia.length === 1 ? 'frontera nueva detectada' : 'fronteras nuevas detectadas' }} en Quoia, sin registrar aquí
       </span>
       <Button label="Revisar" size="small" text style="color: #D64455;" @click="abrirPendientes" />
-    </div>
-
-    <!-- Resumen Card -->
-    <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
-      <div v-for="stat in stats" :key="stat.label"
-           class="bg-white rounded-xl shadow-sm p-4" style="border: 1px solid #e8e0f0;">
-        <p class="text-xs uppercase tracking-wide font-semibold" style="color: #6b5a8a;">{{ stat.label }}</p>
-        <p class="text-2xl font-bold mt-1" :style="{ color: stat.color }">{{ stat.value }}</p>
-      </div>
     </div>
 
     <!-- Loading -->
@@ -57,7 +58,11 @@
             <span class="font-mono text-sm font-semibold" style="color: #915BD8;">{{ data.codigo_frontera || '—' }}</span>
           </template>
         </Column>
-        <Column field="nombre_frontera" header="Nombre" sortable style="min-width: 200px" />
+        <Column field="nombre_frontera" header="Nombre" sortable style="min-width: 200px">
+          <template #body="{ data }">
+            {{ formatearNombre(data.nombre_frontera) }}
+          </template>
+        </Column>
         <Column field="proyecto_nombre" header="Proyecto" sortable style="min-width: 180px">
           <template #body="{ data }">
             <RouterLink v-if="data.proyecto_id" :to="`/proyectos/${data.proyecto_id}`"
@@ -306,6 +311,7 @@ import Dropdown from 'primevue/dropdown'
 import Tag from 'primevue/tag'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
+import { formatearNombre } from '@/utils/nombreFormato'
 
 // ── Fasorial ──────────────────────────────────────────────────────────────────
 const fasColors  = ['#E84040', '#2ECC71', '#3B82F6']

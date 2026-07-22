@@ -53,6 +53,10 @@
 .p-dialog .p-dialog-header { padding: 0.85rem 1.1rem; }
 .p-dialog .p-dialog-content { padding: 0 1.1rem 1.1rem; }
 
+/* Tooltips (v-tooltip): el texto no debe partirse letra por letra cuando
+   el elemento que lo dispara es angosto (ej. botones de ícono en tablas). */
+.p-tooltip .p-tooltip-text { white-space: nowrap; }
+
 /* ── Responsive ───────────────────────────────────────────────────────────
    Adaptación a pantallas pequeñas sin tocar la lógica de cada vista.
    ────────────────────────────────────────────────────────────────────── */
