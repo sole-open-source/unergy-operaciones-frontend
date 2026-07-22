@@ -98,13 +98,12 @@
             </p>
           </div>
           <!-- Descargar si es archivo local -->
-          <a v-if="factura.tiene_archivo"
-            :href="`${apiBase}/om/factura/${periodoActual}/file`"
-            target="_blank" rel="noopener"
+          <button v-if="factura.tiene_archivo" type="button"
+            @click="descargarFacturaConsolidada"
             class="flex items-center gap-1 text-xs font-medium hover:underline flex-shrink-0"
-            style="color:#15803d">
+            style="color:#15803d;background:none;border:none;padding:0;cursor:pointer">
             <i class="pi pi-download text-xs"/>Descargar
-          </a>
+          </button>
           <!-- Abrir link externo -->
           <a v-else-if="factura.enlace_pdf"
             :href="factura.enlace_pdf" target="_blank" rel="noopener"
@@ -152,10 +151,10 @@
         </div>
       </div>
 
-      <!-- Resultado división PDF -->
+      <!-- Resultado división PDF (transitorio — solo hasta cambiar de período o cerrar) -->
       <div v-if="splitResult" class="mx-4 mb-3 rounded-lg border px-3 py-2.5 space-y-2"
-        :style="splitResult.sin_match?.length
-          ? 'background:#fffbeb;border-color:#fcd34d40'
+        :style="splitResult.error
+          ? 'background:#fef2f2;border-color:#fca5a5'
           : 'background:#f0fdf4;border-color:#bbf7d0'">
 
         <!-- Error de sistema -->
@@ -165,7 +164,7 @@
         </div>
 
         <!-- Proyectos asociados correctamente -->
-        <div>
+        <div v-else>
           <p class="text-xs font-semibold mb-1" style="color:#166534">
             <i class="pi pi-check-circle mr-1"/>
             {{ splitResult.procesados }} {{ splitResult.procesados === 1 ? 'proyecto asociado' : 'proyectos asociados' }} correctamente
@@ -183,29 +182,51 @@
           </div>
         </div>
 
-        <!-- Páginas sin match -->
-        <div v-if="splitResult.sin_match?.length" class="space-y-1.5 pt-1 border-t" style="border-color:#fcd34d60">
-          <p class="text-xs font-semibold" style="color:#92400e">
-            <i class="pi pi-exclamation-triangle mr-1"/>
-            {{ splitResult.sin_match.length }} {{ splitResult.sin_match.length === 1 ? 'página sin identificar' : 'páginas sin identificar' }}:
-          </p>
-          <div v-for="(item, i) in splitResult.sin_match" :key="i"
-            class="pl-3 py-1 rounded" style="background:#fef3c740">
-            <p class="text-[10px] font-semibold text-amber-800">
-              Pág. {{ item.pagina }}
-              <span v-if="item.numero_factura" class="font-mono font-normal text-gray-500"> · {{ item.numero_factura }}</span>
-            </p>
-            <p v-if="item.nombre_extraido" class="text-[10px] text-gray-700 mt-0.5">
-              Nombre extraído: <span class="font-medium">"{{ item.nombre_extraido }}"</span>
-            </p>
-            <p class="text-[10px] text-gray-500 mt-0.5">{{ item.razon }}</p>
-          </div>
-        </div>
-
         <button type="button" class="text-[10px] text-gray-400 hover:text-gray-600 mt-1"
           @click="splitResult = null">
           Cerrar
         </button>
+      </div>
+
+      <!-- Páginas sin match pendientes de asignar — persistente entre recargas -->
+      <div v-if="sinMatchPendientes.length" class="mx-4 mb-3 rounded-lg border px-3 py-2.5 space-y-2"
+        style="background:#fffbeb;border-color:#fcd34d40">
+        <p class="text-xs font-semibold" style="color:#92400e">
+          <i class="pi pi-exclamation-triangle mr-1"/>
+          {{ sinMatchPendientes.length }} {{ sinMatchPendientes.length === 1 ? 'página pendiente de asignar' : 'páginas pendientes de asignar' }}
+        </p>
+        <div v-for="item in sinMatchPendientes" :key="item.id"
+          class="pl-3 py-1.5 rounded space-y-1" style="background:#fef3c740">
+          <p class="text-[10px] font-semibold text-amber-800">
+            Pág. {{ item.pagina }}
+            <span v-if="item.numero_factura" class="font-mono font-normal text-gray-500"> · {{ item.numero_factura }}</span>
+            <span v-if="item.origen === 'backfill'"
+              class="ml-1 text-[9px] px-1 py-0.5 rounded-full font-medium" style="background:#e5e7eb;color:#4b5563">
+              histórico
+            </span>
+          </p>
+          <p v-if="item.nombre_extraido" class="text-[10px] text-gray-700">
+            Nombre extraído: <span class="font-medium">"{{ item.nombre_extraido }}"</span>
+          </p>
+          <p class="text-[10px] text-gray-500">{{ item.razon }}</p>
+          <div class="flex items-center gap-1.5 pt-0.5">
+            <select v-model.number="asignacionSeleccionada[item.id]"
+              class="text-[11px] border border-gray-200 rounded px-1.5 py-1 flex-1 max-w-[220px]">
+              <option :value="null" disabled>Asignar a proyecto…</option>
+              <option v-for="p in proyectosOM" :key="p.contrato_id" :value="p.contrato_id">
+                {{ p.nombre_proyecto }}
+              </option>
+            </select>
+            <button type="button"
+              :disabled="!asignacionSeleccionada[item.id] || asignando[item.id]"
+              class="text-[11px] font-semibold px-2 py-1 rounded"
+              style="background:#915BD8;color:#fff;border:none"
+              :style="!asignacionSeleccionada[item.id] || asignando[item.id] ? 'opacity:0.4' : 'cursor:pointer'"
+              @click="asignarSinMatch(item)">
+              {{ asignando[item.id] ? 'Asignando…' : 'Asignar' }}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -250,7 +271,12 @@ const archivoSeleccionado = ref(null)
 const linkExterno      = ref('')
 const subiendoFactura  = ref(false)
 const splitResult      = ref(null)
-const apiBase          = import.meta.env.VITE_API_URL?.replace(/\/$/, '') + '/api/v1'
+
+// ── Páginas sin match pendientes de asignación manual ────────────────────────
+const sinMatchPendientes    = ref([])
+const proyectosOM           = ref([])
+const asignacionSeleccionada = reactive({})   // { [sin_match_id]: contrato_id }
+const asignando              = reactive({})   // { [sin_match_id]: boolean }
 
 const puedeSubir = computed(() => !!(archivoSeleccionado.value || linkExterno.value.startsWith('http')))
 
@@ -269,7 +295,51 @@ async function cargarFactura() {
   try {
     const { data } = await api.get(`/om/factura/${periodoActual.value}`)
     factura.value = data
+    sinMatchPendientes.value = data.sin_match_pendientes ?? []
   } catch { /* silencioso — no hay factura aún */ }
+}
+
+async function cargarProyectosOM() {
+  try {
+    const { data } = await api.get('/om/proyectos')
+    proyectosOM.value = data
+  } catch { /* el selector de asignación queda vacío si falla */ }
+}
+
+async function asignarSinMatch(item) {
+  const contratoId = asignacionSeleccionada[item.id]
+  if (!contratoId) return
+  asignando[item.id] = true
+  try {
+    await api.patch(`/om/factura/${periodoActual.value}/sin-match/${item.id}/asignar`, {
+      contrato_id: contratoId,
+    })
+    sinMatchPendientes.value = sinMatchPendientes.value.filter(s => s.id !== item.id)
+    delete asignacionSeleccionada[item.id]
+    toast.add({ severity: 'success', summary: 'Página asignada correctamente', life: 2500 })
+    await cargarDatos()
+  } catch {
+    toast.add({ severity: 'error', summary: 'Error al asignar la página', life: 3000 })
+  } finally {
+    asignando[item.id] = false
+  }
+}
+
+// Usa el cliente axios central (inyecta el Bearer token vía interceptor) en vez de un
+// <a href> directo — VITE_API_URL no está definida en el build de producción, y aunque
+// lo estuviera, el endpoint exige Authorization: Bearer, que un <a> no puede enviar.
+async function descargarFacturaConsolidada() {
+  try {
+    const resp = await api.get(`/om/factura/${periodoActual.value}/file`, { responseType: 'blob' })
+    const url = URL.createObjectURL(resp.data)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = factura.value.nombre_archivo || `factura-${periodoActual.value}.pdf`
+    a.click()
+    setTimeout(() => URL.revokeObjectURL(url), 100)
+  } catch {
+    toast.add({ severity: 'error', summary: 'Error al descargar factura', life: 3000 })
+  }
 }
 
 async function subirFactura() {
@@ -331,5 +401,5 @@ async function toggleFacturado(fila) {
 }
 
 watch(periodoActual, () => { cargarDatos(); cargarFactura(); splitResult.value = null })
-onMounted(() => { cargarDatos(); cargarFactura() })
+onMounted(() => { cargarDatos(); cargarFactura(); cargarProyectosOM() })
 </script>

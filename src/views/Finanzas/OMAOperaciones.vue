@@ -240,13 +240,12 @@
               : 'El proveedor aún no ha subido la factura de este período.' }}
         </p>
       </div>
-      <a v-if="facturaProveedor.tiene_archivo"
-        :href="`${apiBaseFactura}/om/factura/${periodoActual}/file`"
-        target="_blank" rel="noopener"
+      <button v-if="facturaProveedor.tiene_archivo" type="button"
+        @click="descargarFacturaProveedor"
         class="flex items-center gap-1 text-xs font-medium hover:underline flex-shrink-0"
-        style="color:#15803d">
+        style="color:#15803d;background:none;border:none;padding:0;cursor:pointer">
         <i class="pi pi-download text-xs"/>Descargar
-      </a>
+      </button>
       <a v-else-if="facturaProveedor.enlace_pdf"
         :href="facturaProveedor.enlace_pdf" target="_blank" rel="noopener"
         class="flex items-center gap-1 text-xs font-medium hover:underline flex-shrink-0"
@@ -313,9 +312,9 @@
     <Dialog v-model:visible="showIPCDialog" modal header="Tasas IPC" :style="{ width: '420px' }">
       <div class="space-y-3 pt-1">
         <p class="text-xs text-gray-500">
-          La tasa del año N indexa la facturación de ese mismo año N. Se acumula desde
-          el año siguiente a la fecha base del contrato — max(suscripción, inicio de
-          operación) — y solo aplica si el contrato ya cumplió un año.
+          La tasa del año en que cae cada aniversario del contrato se aplica desde ese
+          aniversario, no desde enero. El aniversario se cuenta desde la fecha base —
+          max(suscripción, inicio de operación) — y solo indexa una vez que ya se cumplió.
         </p>
         <DataTable :value="ipcTasas" class="text-sm" stripedRows>
           <Column field="año" header="Año" style="width:80px" />
@@ -597,7 +596,6 @@ async function guardarIPC() {
 
 // ── Factura del proveedor (lectura desde Operaciones) ─────────────────────────
 const facturaProveedor = ref({ nombre_archivo: null, enlace_pdf: null, tiene_archivo: false, subido_en: null })
-const apiBaseFactura   = import.meta.env.VITE_API_URL?.replace(/\/$/, '') + '/api/v1'
 
 function fmtFechaFactura(iso) {
   if (!iso) return ''
@@ -610,6 +608,23 @@ async function cargarFacturaProveedor() {
     const { data } = await api.get(`/om/factura/${periodoActual.value}`)
     facturaProveedor.value = data
   } catch { facturaProveedor.value = { nombre_archivo: null, enlace_pdf: null, tiene_archivo: false, subido_en: null } }
+}
+
+// Usa el cliente axios central (inyecta el Bearer token vía interceptor) en vez de un
+// <a href> directo — VITE_API_URL no está definida en el build de producción, y aunque
+// lo estuviera, el endpoint exige Authorization: Bearer, que un <a> no puede enviar.
+async function descargarFacturaProveedor() {
+  try {
+    const resp = await api.get(`/om/factura/${periodoActual.value}/file`, { responseType: 'blob' })
+    const url = URL.createObjectURL(resp.data)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = facturaProveedor.value.nombre_archivo || `factura-${periodoActual.value}.pdf`
+    a.click()
+    setTimeout(() => URL.revokeObjectURL(url), 100)
+  } catch {
+    toast.add({ severity: 'error', summary: 'Error al descargar factura', life: 3000 })
+  }
 }
 
 async function descargarDocumento(fila) {
@@ -632,6 +647,23 @@ async function descargarDocumento(fila) {
   }
 }
 
-watch(periodoActual, () => { cargarDatos(); cargarFacturaProveedor() })
+watch(periodoActual, () => {
+  // overrides se indexa solo por contrato_id (no por período) — si no se limpia al
+  // cambiar de mes, un valor editado y sin guardar en el mes anterior queda "pegado"
+  // al mismo proyecto en el mes nuevo, y puede terminar guardándose ahí por error.
+  const habiaSinGuardar = Object.values(overrides).some(o => o.dirty)
+  Object.keys(overrides).forEach(k => delete overrides[k])
+  editando.value = null
+  if (habiaSinGuardar) {
+    toast.add({
+      severity: 'warn',
+      summary: 'Ediciones sin guardar descartadas',
+      detail: 'Cambiaste de período sin guardar — los valores editados de ese mes no se aplicaron.',
+      life: 4000,
+    })
+  }
+  cargarDatos()
+  cargarFacturaProveedor()
+})
 onMounted(() => { cargarDatos(); cargarFacturaProveedor() })
 </script>
