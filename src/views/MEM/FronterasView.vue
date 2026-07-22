@@ -17,6 +17,9 @@
                 @click="showFasorial = true"
                 style="background: #915BD8; border-color: #915BD8;"
                 class="whitespace-nowrap" />
+        <Button icon="pi pi-plus" label="Nueva Frontera" size="small"
+                @click="abrirCrear"
+                class="whitespace-nowrap" />
       </template>
     </PageHeader>
 
@@ -219,6 +222,46 @@
       </template>
     </Dialog>
 
+    <!-- Create Dialog -->
+    <Dialog v-model:visible="showCreate" header="Nueva Frontera" modal class="w-full max-w-lg">
+      <div class="space-y-4 pt-2">
+        <div class="grid grid-cols-2 gap-4">
+          <div class="col-span-2">
+            <label class="text-xs font-semibold uppercase block mb-1" style="color: #6b5a8a;">Proyecto</label>
+            <Dropdown v-model="createForm.proyecto_id" :options="proyectosAll" optionLabel="nombre_comercial"
+              optionValue="id" class="w-full" placeholder="Seleccionar" showClear filter />
+          </div>
+          <div>
+            <label class="text-xs font-semibold uppercase block mb-1" style="color: #6b5a8a;">Código frontera</label>
+            <InputText v-model="createForm.codigo_frontera" class="w-full" />
+          </div>
+          <div>
+            <label class="text-xs font-semibold uppercase block mb-1" style="color: #6b5a8a;">Nombre *</label>
+            <InputText v-model="createForm.nombre_frontera" class="w-full" />
+          </div>
+          <div>
+            <label class="text-xs font-semibold uppercase block mb-1" style="color: #6b5a8a;">Tipo *</label>
+            <Dropdown v-model="createForm.tipo_frontera" :options="tipoOptions" optionLabel="label"
+              optionValue="value" class="w-full" placeholder="Seleccionar" />
+          </div>
+          <div>
+            <label class="text-xs font-semibold uppercase block mb-1" style="color: #6b5a8a;">Estado</label>
+            <Dropdown v-model="createForm.estado" :options="estadoOptions" optionLabel="label" optionValue="value" class="w-full" />
+          </div>
+          <div>
+            <label class="text-xs font-semibold uppercase block mb-1" style="color: #6b5a8a;">Operador red</label>
+            <Dropdown v-model="createForm.operador_red_id" :options="operadoresRedOptions" optionLabel="label"
+              optionValue="id" class="w-full" placeholder="Seleccionar" showClear filter />
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <Button label="Cancelar" severity="secondary" text @click="showCreate = false" />
+        <Button label="Crear" :loading="creating" :disabled="!createForm.nombre_frontera || !createForm.tipo_frontera"
+          @click="crearFrontera" />
+      </template>
+    </Dialog>
+
     <!-- Pendientes de Quoia Dialog -->
     <Dialog v-model:visible="showPendientesDialog" header="Fronteras nuevas en Quoia" modal class="w-full max-w-3xl">
       <p class="text-sm mb-4" style="color: #6b5a8a;">
@@ -410,12 +453,34 @@ const operadorFilter = ref(null)
 const showEdit = ref(false)
 const editingFrontera = ref(null)
 const editForm = ref(null)
+function blankCreateForm() {
+  return {
+    proyecto_id: null,
+    codigo_frontera: '',
+    nombre_frontera: '',
+    tipo_frontera: null,
+    estado: 'activa',
+    operador_red_id: null,
+  }
+}
+
+const showCreate = ref(false)
+const creating = ref(false)
+const createForm = ref(blankCreateForm())
 
 const estadoOptions = [
   { label: 'Activa', value: 'activa' },
   { label: 'En registro', value: 'en_registro' },
   { label: 'En falla', value: 'en_falla' },
   { label: 'Cancelada', value: 'cancelada' },
+]
+
+const tipoOptions = [
+  { label: 'Generación', value: 'generacion' },
+  { label: 'Consumo', value: 'consumo' },
+  { label: 'Gen+Consumo', value: 'generacion_consumo' },
+  { label: 'Auxiliar', value: 'consumo_auxiliar' },
+  { label: 'Propio', value: 'consumo_propio' },
 ]
 
 const proyectoOptions = computed(() => {
@@ -505,6 +570,28 @@ async function saveFrontera() {
     toast.add({ severity: 'error', summary: 'Error', detail: e.response?.data?.detail || 'Error al guardar', life: 4000 })
   } finally {
     saving.value = false
+  }
+}
+
+function abrirCrear() {
+  createForm.value = blankCreateForm()
+  showCreate.value = true
+  loadProyectosAll()
+}
+
+async function crearFrontera() {
+  if (!createForm.value) return
+  creating.value = true
+  try {
+    const body = { ...createForm.value, codigo_frontera: createForm.value.codigo_frontera || null }
+    await api.post('/fronteras', body)
+    toast.add({ severity: 'success', summary: 'Frontera creada', life: 2500 })
+    showCreate.value = false
+    await loadData()
+  } catch (e) {
+    toast.add({ severity: 'error', summary: 'Error', detail: e.response?.data?.detail || 'No se pudo crear la frontera', life: 4000 })
+  } finally {
+    creating.value = false
   }
 }
 
