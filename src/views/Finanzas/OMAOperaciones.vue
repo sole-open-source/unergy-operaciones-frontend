@@ -107,10 +107,10 @@
           <tbody>
             <tr v-for="fila in filas" :key="fila.contrato_id"
               class="border-b border-gray-50 hover:bg-gray-50/50"
-              :class="!fila.habilitado ? 'opacity-40' : ''">
+              :class="(!fila.habilitado || !fila.aplica_este_mes) ? 'opacity-40' : ''">
               <td class="px-3 py-2 text-center">
                 <input type="checkbox"
-                  :disabled="!fila.habilitado"
+                  :disabled="!fila.habilitado || !fila.aplica_este_mes"
                   v-model="seleccion[fila.contrato_id]"
                   class="accent-purple-600" />
               </td>
@@ -121,6 +121,12 @@
                   style="background:#fef3c7; color:#92400e"
                   :title="fila.historial_indexaciones">
                   <i class="pi pi-exclamation-triangle text-[9px]" />{{ fila.historial_indexaciones }}
+                </span>
+                <span v-else-if="!fila.aplica_este_mes"
+                  class="inline-flex items-center gap-1 ml-1.5 text-[10px] font-normal px-1.5 py-0.5 rounded-full align-middle"
+                  style="background:#e5e7eb; color:#4b5563"
+                  title="Según su periodicidad, a este proyecto no le corresponde cobro este mes.">
+                  <i class="pi pi-clock text-[9px]" />no aplica este mes
                 </span>
               </td>
               <td class="px-3 py-2 font-mono text-xs text-gray-500">{{ fila.periodo }}</td>
@@ -451,7 +457,7 @@ const inputBuffer = ref('')        // texto crudo del input activo
 const infoPopover = ref(null)      // ref al <Popover>
 const filaInfo    = ref(null)      // fila cuyo desglose se muestra
 
-const filasHabilitadas   = computed(() => filas.value.filter(f => f.habilitado))
+const filasHabilitadas   = computed(() => filas.value.filter(f => f.habilitado && f.aplica_este_mes))
 const filasSeleccionadas = computed(() => filasHabilitadas.value.filter(f => seleccion[f.contrato_id]).length)
 const todosMarcados      = computed(() =>
   filasHabilitadas.value.length > 0 &&
@@ -537,7 +543,7 @@ async function cargarDatos() {
 
     filas.value.forEach(f => {
       if (seleccion[f.contrato_id] === undefined) {
-        seleccion[f.contrato_id] = f.incluido && f.habilitado
+        seleccion[f.contrato_id] = f.incluido && f.habilitado && f.aplica_este_mes
       }
     })
   } catch (e) {
