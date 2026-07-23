@@ -819,8 +819,13 @@ async function descargarFacturaProveedor() {
     a.download = facturaProveedor.value.nombre_archivo || `factura-${periodoActual.value}.pdf`
     a.click()
     setTimeout(() => URL.revokeObjectURL(url), 100)
-  } catch {
-    toast.add({ severity: 'error', summary: 'Error al descargar factura', life: 3000 })
+  } catch (e) {
+    if (e.response?.status === 404) {
+      toast.add({ severity: 'warn', summary: 'Archivo no disponible',
+        detail: 'La factura de este período ya no está en el servidor. Vuelve a subirla desde la pestaña Proveedor.', life: 6000 })
+    } else {
+      toast.add({ severity: 'error', summary: 'Error al descargar factura', life: 3000 })
+    }
   }
 }
 
@@ -853,8 +858,13 @@ async function descargarDocumento(fila) {
     a.download = `SOFV_${fila.nombre_proyecto}_${fila.periodo}_mantenimiento.pdf`
     a.click()
     setTimeout(() => URL.revokeObjectURL(url), 100)
-  } catch {
-    toast.add({ severity: 'error', summary: 'Error al descargar documento', life: 3000 })
+  } catch (e) {
+    if (e.response?.status === 404) {
+      toast.add({ severity: 'warn', summary: 'Archivo no disponible',
+        detail: 'El documento de este proyecto ya no está en el servidor. Vuelve a subir la factura del período desde Proveedor.', life: 6000 })
+    } else {
+      toast.add({ severity: 'error', summary: 'Error al descargar documento', life: 3000 })
+    }
   } finally {
     descargando[fila.contrato_id] = false
   }

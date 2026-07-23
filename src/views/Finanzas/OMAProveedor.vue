@@ -339,8 +339,13 @@ async function descargarFacturaConsolidada() {
     a.download = factura.value.nombre_archivo || `factura-${periodoActual.value}.pdf`
     a.click()
     setTimeout(() => URL.revokeObjectURL(url), 100)
-  } catch {
-    toast.add({ severity: 'error', summary: 'Error al descargar factura', life: 3000 })
+  } catch (e) {
+    if (e.response?.status === 404) {
+      toast.add({ severity: 'warn', summary: 'Archivo no disponible',
+        detail: 'La factura de este período ya no está en el servidor. Vuélvela a subir con "Reemplazar".', life: 6000 })
+    } else {
+      toast.add({ severity: 'error', summary: 'Error al descargar factura', life: 3000 })
+    }
   }
 }
 
