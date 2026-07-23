@@ -135,8 +135,7 @@
               </th>
               <th class="px-4 py-2.5 text-left font-medium text-gray-500 text-xs uppercase tracking-wide whitespace-nowrap">Proyecto</th>
               <th class="px-4 py-2.5 text-left font-medium text-gray-500 text-xs uppercase tracking-wide whitespace-nowrap">Estado contrato</th>
-              <th class="px-4 py-2.5 text-left font-medium text-gray-500 text-xs uppercase tracking-wide whitespace-nowrap">Período</th>
-              <th class="px-4 py-2.5 text-left font-medium text-gray-500 text-xs uppercase tracking-wide whitespace-nowrap">Mes / Año</th>
+              <th class="px-4 py-2.5 text-left font-medium text-gray-500 text-xs uppercase tracking-wide whitespace-nowrap">Periodo a facturar</th>
               <th v-if="colsVisibles.n_indexaciones"
                 class="px-4 py-2.5 text-right font-medium text-gray-500 text-xs uppercase tracking-wide whitespace-nowrap">N° IPC</th>
               <th class="px-4 py-2.5 text-right font-medium text-gray-500 text-xs uppercase tracking-wide whitespace-nowrap">Valor Base Anual</th>
@@ -188,8 +187,7 @@
                   {{ estadoContratoMeta(fila).label }}
                 </span>
               </td>
-              <td class="px-4 py-2 font-mono text-xs text-gray-500">{{ fila.periodo }}</td>
-              <td class="px-4 py-2 text-xs text-gray-600">{{ fila.mes_año }}</td>
+              <td class="px-4 py-2 text-xs text-gray-600 whitespace-nowrap">{{ fila.mes_año }}</td>
               <td v-if="colsVisibles.n_indexaciones" class="px-4 py-2 text-right text-xs text-gray-500">
                 {{ fila.n_indexaciones }}
               </td>
