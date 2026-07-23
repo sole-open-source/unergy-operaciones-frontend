@@ -107,13 +107,30 @@
       class="bg-white rounded-xl shadow-sm p-10 text-center text-sm text-gray-400 border" style="border-color:#ECE7F2">
       No se encontraron proyectos con los filtros aplicados.
     </div>
-    <div v-else class="bg-white rounded-xl shadow-sm overflow-hidden border" style="border-color:#ECE7F2">
+    <template v-else>
+     <div v-for="sec in secciones" :key="sec.tipo"
+       class="bg-white rounded-xl shadow-sm overflow-hidden border" style="border-color:#ECE7F2">
+
+      <!-- Cabecera de sección (colapsable) -->
+      <button type="button"
+        class="w-full flex items-center gap-3 px-4 py-2.5 text-left select-none hover:bg-gray-50 transition-colors duration-150"
+        @click="toggleSection(sec.tipo)">
+        <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" :style="{ background: sec.dot }" />
+        <span class="font-semibold text-gray-800 text-sm flex-1">{{ sec.label }}</span>
+        <span class="text-xs text-gray-400 font-medium">({{ sec.items.length }})</span>
+        <i class="pi pi-chevron-down text-gray-400 text-xs ml-2 transition-transform duration-200"
+          :class="{ 'rotate-180': openSections.has(sec.tipo) }" />
+      </button>
+
+      <!-- Tabla colapsable de la sección -->
+      <div class="section-collapse" :class="{ open: openSections.has(sec.tipo) }">
       <div class="overflow-x-auto">
         <table class="w-full text-sm border-collapse" style="min-width:900px">
           <thead>
-            <tr class="bg-gray-50 border-b border-gray-100">
+            <tr class="bg-gray-50 border-t border-b border-gray-100">
               <th class="px-4 py-2.5 text-left w-10">
-                <input type="checkbox" :checked="todosMarcados" @change="toggleTodos"
+                <input type="checkbox" :checked="todosMarcadosSeccion(sec.items)"
+                  @change="toggleTodosSeccion(sec.items, $event.target.checked)"
                   class="accent-purple-600" />
               </th>
               <th class="px-4 py-2.5 text-left font-medium text-gray-500 text-xs uppercase tracking-wide whitespace-nowrap">Proyecto</th>
@@ -141,7 +158,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="fila in filasFiltradas" :key="fila.contrato_id"
+            <tr v-for="fila in sec.items" :key="fila.contrato_id"
               class="border-t border-gray-100 hover:bg-gray-50/70 transition-colors duration-100 row-hover"
               :class="(!fila.habilitado || !fila.aplica_este_mes || !conContrato(fila)) ? 'opacity-40' : ''">
               <td class="px-4 py-2 text-center">
@@ -236,29 +253,23 @@
                   @click="descargarDocumento(fila)" />
               </td>
             </tr>
-            <!-- Fila total -->
-            <tr v-if="filas.length" class="bg-gray-50 border-t-2 border-gray-200">
-              <td colspan="4" class="px-4 py-2.5 text-xs font-semibold text-gray-600">
-                Total ({{ filasSeleccionadas }} proyectos seleccionados)
-              </td>
-              <td v-if="colsVisibles.n_indexaciones"></td>
-              <td></td>
-              <td v-if="colsVisibles.factor_acumulado"></td>
-              <td v-if="colsVisibles.valor_anual_indexado"></td>
-              <td v-if="colsVisibles.valor_mes_completo"></td>
-              <td v-if="colsVisibles.prorrateo"></td>
-              <td class="px-4 py-2.5 text-right font-bold tabular-nums"
-                style="color:#7c3aed">
-                {{ formatCOP(totalSeleccionado) }}
-              </td>
-              <td v-if="colsVisibles.historial"></td>
-              <td></td>
-              <td></td>
-            </tr>
           </tbody>
         </table>
       </div>
-    </div>
+      </div>
+     </div>
+
+      <!-- Total general (todas las secciones) -->
+      <div class="bg-white rounded-xl shadow-sm border px-4 py-3 flex items-center justify-between"
+        style="border-color:#ECE7F2">
+        <span class="text-xs font-semibold text-gray-600">
+          Total ({{ filasSeleccionadas }} proyectos seleccionados)
+        </span>
+        <span class="text-base font-bold tabular-nums" style="color:#7c3aed">
+          {{ formatCOP(totalSeleccionado) }}
+        </span>
+      </div>
+    </template>
 
     <!-- ── Factura consolidada del proveedor ──────────────────────────── -->
     <div class="flex items-center gap-3 p-3 rounded-xl border"
@@ -508,10 +519,6 @@ const filaInfo    = ref(null)      // fila cuyo desglose se muestra
 const conContrato = (f) => (f.estado_contrato || 'con_contrato') === 'con_contrato'
 const filasHabilitadas   = computed(() => filas.value.filter(f => f.habilitado && f.aplica_este_mes && conContrato(f)))
 const filasSeleccionadas = computed(() => filasHabilitadas.value.filter(f => seleccion[f.contrato_id]).length)
-const todosMarcados      = computed(() =>
-  filasHabilitadas.value.length > 0 &&
-  filasHabilitadas.value.every(f => seleccion[f.contrato_id])
-)
 const totalSeleccionado = computed(() =>
   filas.value
     .filter(f => f.habilitado && conContrato(f) && seleccion[f.contrato_id])
@@ -564,6 +571,50 @@ const ESTADO_CONTRATO_META = {
 }
 const estadoContratoMeta = (f) => ESTADO_CONTRATO_META[f.estado_contrato] || ESTADO_CONTRATO_META.con_contrato
 
+// ── Agrupación por tipo de proyecto (secciones colapsables, como Proyectos) ───
+const TIPO_LABELS = {
+  minigranja: 'Minigranja', autoconsumo: 'Autoconsumo', gd: 'GD',
+  movilidad_electrica: 'Movilidad', otro: 'Otro',
+}
+const TIPO_DOT = {
+  minigranja: '#10B981', autoconsumo: '#6366F1', gd: '#3B82F6',
+  movilidad_electrica: '#8B5CF6', otro: '#9CA3AF',
+}
+const TIPO_ORDER = ['minigranja', 'autoconsumo', 'gd', 'movilidad_electrica', 'otro']
+
+const secciones = computed(() => {
+  const groups = {}
+  for (const f of filasFiltradas.value) {
+    const t = f.tipo_proyecto || 'otro'
+    ;(groups[t] ||= []).push(f)
+  }
+  return TIPO_ORDER
+    .filter(t => groups[t]?.length)
+    .map(t => ({ tipo: t, label: TIPO_LABELS[t] || t, dot: TIPO_DOT[t] || '#9CA3AF', items: groups[t] }))
+})
+
+const openSections = ref(new Set())
+function toggleSection(tipo) {
+  const s = new Set(openSections.value)
+  s.has(tipo) ? s.delete(tipo) : s.add(tipo)
+  openSections.value = s
+}
+// Abrir la primera sección automáticamente cuando aún no hay ninguna abierta
+watch(secciones, (s) => {
+  if (openSections.value.size === 0 && s.length) openSections.value = new Set([s[0].tipo])
+}, { immediate: true })
+
+// Selección "marcar todo" por sección (solo filas facturables de esa sección)
+const seccionHabilitadas = (items) =>
+  items.filter(f => f.habilitado && f.aplica_este_mes && conContrato(f))
+const todosMarcadosSeccion = (items) => {
+  const h = seccionHabilitadas(items)
+  return h.length > 0 && h.every(f => seleccion[f.contrato_id])
+}
+function toggleTodosSeccion(items, checked) {
+  seccionHabilitadas(items).forEach(f => { seleccion[f.contrato_id] = checked })
+}
+
 function formatCOP(v) {
   if (v == null) return '—'
   return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(v)
@@ -584,10 +635,6 @@ function esManual(fila) {
   const ov = overrides[fila.contrato_id]
   if (ov && ov.dirty) return ov.valor != null
   return !!fila.editado_manual
-}
-
-function toggleTodos(e) {
-  filasHabilitadas.value.forEach(f => { seleccion[f.contrato_id] = e.target.checked })
 }
 
 function iniciarEdicion(fila) {
@@ -835,4 +882,15 @@ onBeforeUnmount(() => {
 
 /* Realce suave de fila al pasar el cursor (paralelo a Proyectos) */
 .row-hover { transition: background 0.1s; }
+
+/* Secciones colapsables por tipo (igual que Proyectos) */
+.section-collapse {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.35s ease-out;
+}
+.section-collapse.open {
+  max-height: 20000px;
+  transition: max-height 0.45s ease-in;
+}
 </style>
