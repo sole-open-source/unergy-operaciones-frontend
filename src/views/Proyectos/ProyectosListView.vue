@@ -129,9 +129,13 @@
                           :class="row.codigo_tsf ? 'text-gray-400' : 'text-gray-300'">
                       {{ row.codigo_tsf || '—' }}
                     </span>
-                    <span class="block text-sm text-gray-800 font-medium leading-snug mt-0.5">
+                    <button type="button"
+                            class="block text-left text-sm text-gray-800 font-medium leading-snug mt-0.5
+                                   proyecto-nombre-link"
+                            @click="goDetail(row)"
+                            v-tooltip.bottom="'Ver detalle'">
                       {{ formatearNombreProyecto(row.nombre_comercial) }}
-                    </span>
+                    </button>
                   </td>
 
                   <!-- Estado -->
@@ -727,6 +731,17 @@ function ignorarPendiente(p) {
 <style scoped>
 /* ── Misc ────────────────────────────────────────────────────────────────────── */
 .field-label { @apply block text-xs font-medium text-gray-600 mb-1; }
+
+/* Nombre del proyecto: clickeable -> abre el detalle */
+.proyecto-nombre-link {
+  cursor: pointer;
+  transition: color 0.12s;
+}
+.proyecto-nombre-link:hover {
+  color: #915BD8;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
 
 /* ── Sticky primera columna ──────────────────────────────────────────────────── */
 .sticky-col {
