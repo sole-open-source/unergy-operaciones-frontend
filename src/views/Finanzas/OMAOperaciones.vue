@@ -237,11 +237,15 @@
                 {{ fila.historial_indexaciones }}
               </td>
               <td class="px-4 py-2 text-center">
-                <span v-if="fila.facturado"
-                  class="inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full font-medium"
-                  style="background:#dcfce7;color:#166534">
-                  <i class="pi pi-check text-[10px]"/>Sí
-                </span>
+                <button v-if="conContrato(fila)" type="button" @click="toggleFacturado(fila)"
+                  class="inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full font-medium transition-colors"
+                  :class="togglingFacturado[fila.contrato_id] ? 'opacity-50 pointer-events-none' : ''"
+                  :style="fila.facturado ? 'background:#dcfce7;color:#166534' : 'background:#f3f4f6;color:#9ca3af'"
+                  :title="fila.facturado
+                    ? 'Facturado — clic para desmarcar (descongela y recalcula el valor)'
+                    : 'Clic para marcar como facturado (congela el valor de este mes)'">
+                  <i :class="fila.facturado ? 'pi pi-check' : 'pi pi-circle'" class="text-[10px]"/>{{ fila.facturado ? 'Sí' : 'No' }}
+                </button>
                 <span v-else class="text-xs text-gray-300">—</span>
               </td>
               <td class="px-4 py-2 text-center">
@@ -817,6 +821,22 @@ async function descargarFacturaProveedor() {
     setTimeout(() => URL.revokeObjectURL(url), 100)
   } catch {
     toast.add({ severity: 'error', summary: 'Error al descargar factura', life: 3000 })
+  }
+}
+
+// Marcar/desmarcar facturado desde el panel. Al desmarcar, el backend descongela
+// el valor y vuelve a calcularse; al marcar, lo congela al valor actual.
+const togglingFacturado = reactive({})
+async function toggleFacturado(fila) {
+  if (!conContrato(fila)) return
+  togglingFacturado[fila.contrato_id] = true
+  try {
+    await api.patch(`/om/seleccion/${periodoActual.value}/${fila.contrato_id}/facturado`)
+    await cargarDatos()
+  } catch {
+    toast.add({ severity: 'error', summary: 'No se pudo cambiar el estado facturado', life: 3000 })
+  } finally {
+    togglingFacturado[fila.contrato_id] = false
   }
 }
 
