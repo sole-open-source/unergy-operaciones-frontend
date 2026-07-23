@@ -65,6 +65,13 @@
         <option value="semestral">Semestral</option>
         <option value="anual">Anual</option>
       </select>
+      <select v-model="filtroEstadoContrato"
+        class="text-sm border border-gray-200 rounded-lg px-2 py-1.5 bg-white">
+        <option value="todos">Todo estado</option>
+        <option value="con_contrato">Con contrato</option>
+        <option value="en_tramite">En trámite</option>
+        <option value="sin_contrato">Sin contrato</option>
+      </select>
       <span class="text-xs text-gray-400">{{ filasFiltradas.length }} de {{ filas.length }}</span>
     </div>
 
@@ -105,6 +112,7 @@
                   class="accent-purple-600" />
               </th>
               <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500">Proyecto</th>
+              <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500">Estado contrato</th>
               <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500">Período</th>
               <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500">Mes / Año</th>
               <th v-if="colsVisibles.n_indexaciones"
@@ -130,16 +138,16 @@
           <tbody>
             <tr v-for="fila in filasFiltradas" :key="fila.contrato_id"
               class="border-b border-gray-50 hover:bg-gray-50/50"
-              :class="(!fila.habilitado || !fila.aplica_este_mes) ? 'opacity-40' : ''">
+              :class="(!fila.habilitado || !fila.aplica_este_mes || !conContrato(fila)) ? 'opacity-40' : ''">
               <td class="px-3 py-2 text-center">
                 <input type="checkbox"
-                  :disabled="!fila.habilitado || !fila.aplica_este_mes"
+                  :disabled="!fila.habilitado || !fila.aplica_este_mes || !conContrato(fila)"
                   v-model="seleccion[fila.contrato_id]"
                   class="accent-purple-600" />
               </td>
               <td class="px-3 py-2 font-medium" style="color:#2C2039; white-space:nowrap">
                 {{ fila.nombre_proyecto }}
-                <span v-if="!fila.habilitado"
+                <span v-if="!fila.habilitado && conContrato(fila)"
                   class="inline-flex items-center gap-1 ml-1.5 text-[10px] font-normal px-1.5 py-0.5 rounded-full align-middle"
                   style="background:#fef3c7; color:#92400e"
                   :title="fila.historial_indexaciones">
@@ -150,6 +158,12 @@
                   style="background:#e5e7eb; color:#4b5563"
                   title="Según su periodicidad, a este proyecto no le corresponde cobro este mes.">
                   <i class="pi pi-clock text-[9px]" />no aplica este mes
+                </span>
+              </td>
+              <td class="px-3 py-2 whitespace-nowrap">
+                <span class="inline-flex items-center text-[11px] font-medium px-2 py-0.5 rounded-full"
+                  :style="{ background: estadoContratoMeta(fila).bg, color: estadoContratoMeta(fila).fg }">
+                  {{ estadoContratoMeta(fila).label }}
                 </span>
               </td>
               <td class="px-3 py-2 font-mono text-xs text-gray-500">{{ fila.periodo }}</td>
@@ -483,7 +497,8 @@ const inputBuffer = ref('')        // texto crudo del input activo
 const infoPopover = ref(null)      // ref al <Popover>
 const filaInfo    = ref(null)      // fila cuyo desglose se muestra
 
-const filasHabilitadas   = computed(() => filas.value.filter(f => f.habilitado && f.aplica_este_mes))
+const conContrato = (f) => (f.estado_contrato || 'con_contrato') === 'con_contrato'
+const filasHabilitadas   = computed(() => filas.value.filter(f => f.habilitado && f.aplica_este_mes && conContrato(f)))
 const filasSeleccionadas = computed(() => filasHabilitadas.value.filter(f => seleccion[f.contrato_id]).length)
 const todosMarcados      = computed(() =>
   filasHabilitadas.value.length > 0 &&
@@ -491,7 +506,7 @@ const todosMarcados      = computed(() =>
 )
 const totalSeleccionado = computed(() =>
   filas.value
-    .filter(f => f.habilitado && seleccion[f.contrato_id])
+    .filter(f => f.habilitado && conContrato(f) && seleccion[f.contrato_id])
     .reduce((s, f) => s + (valorEfectivo(f) || 0), 0)
 )
 
@@ -499,6 +514,7 @@ const totalSeleccionado = computed(() =>
 const filtroTexto  = ref('')
 const filtroAplica = ref('todos')   // 'todos' | 'aplica' | 'no'
 const filtroPeriodicidad = ref('todos')
+const filtroEstadoContrato = ref('todos')   // 'todos' | 'con_contrato' | 'en_tramite' | 'sin_contrato'
 const filasFiltradas = computed(() => {
   const q = filtroTexto.value.trim().toLowerCase()
   return filas.value.filter(f => {
@@ -506,9 +522,18 @@ const filasFiltradas = computed(() => {
     if (filtroAplica.value === 'aplica' && !f.aplica_este_mes) return false
     if (filtroAplica.value === 'no' && f.aplica_este_mes) return false
     if (filtroPeriodicidad.value !== 'todos' && (f.periodicidad || 'mensual') !== filtroPeriodicidad.value) return false
+    if (filtroEstadoContrato.value !== 'todos' && (f.estado_contrato || 'con_contrato') !== filtroEstadoContrato.value) return false
     return true
   })
 })
+
+// Etiqueta/color del estado de contrato (para el badge en la tabla)
+const ESTADO_CONTRATO_META = {
+  con_contrato: { label: 'Con contrato', bg: '#dcfce7', fg: '#166534' },
+  en_tramite:   { label: 'En trámite',   bg: '#fef3c7', fg: '#92400e' },
+  sin_contrato: { label: 'Sin contrato', bg: '#e5e7eb', fg: '#4b5563' },
+}
+const estadoContratoMeta = (f) => ESTADO_CONTRATO_META[f.estado_contrato] || ESTADO_CONTRATO_META.con_contrato
 
 function formatCOP(v) {
   if (v == null) return '—'
@@ -605,7 +630,7 @@ const exclusionValida = computed(() =>
 async function guardarSeleccion() {
   // Proyectos que aplican este mes pero quedaron desmarcados → exigir motivo antes de guardar.
   const excluidos = filas.value.filter(
-    f => f.habilitado && f.aplica_este_mes && !seleccion[f.contrato_id]
+    f => f.habilitado && f.aplica_este_mes && conContrato(f) && !seleccion[f.contrato_id]
   )
   if (excluidos.length) {
     exclusionPendientes.value = excluidos.map(f => ({
@@ -627,7 +652,7 @@ function confirmarExclusiones() {
 async function _ejecutarGuardado(motivos) {
   guardando.value = true
   try {
-    const items = filas.value.map(f => {
+    const items = filas.value.filter(f => conContrato(f)).map(f => {
       const ov = overrides[f.contrato_id]
       let valor_manual = null
       if (ov && ov.dirty) valor_manual = ov.valor          // override local (o null si revertido)
