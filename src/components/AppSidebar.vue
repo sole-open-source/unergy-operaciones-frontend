@@ -315,6 +315,7 @@ const ALL_GROUPS = [
         ],
       },
       { to: '/liquidaciones/inversionista', label: 'Por Inversionista', icon: 'pi pi-users', roles: ['admin', 'liquidaciones'] },
+      { to: '/finanzas/ids-proyectos', label: 'IDs proyectos', icon: 'pi pi-id-card', roles: ['admin', 'liquidaciones'] },
       { to: '/panel-contable', label: 'Panel Contable', icon: 'pi pi-calculator', roles: ['admin', 'liquidaciones'] },
       { to: '/finanzas/costos', label: 'Costos', icon: 'pi pi-credit-card', roles: ['admin', 'liquidaciones'] },
       { to: '/validador-mandatos', label: 'Validador de Mandatos', icon: 'pi pi-file-check', roles: ['admin', 'liquidaciones'] },
