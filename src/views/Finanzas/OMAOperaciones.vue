@@ -45,6 +45,20 @@
       </div>
     </div>
 
+    <!-- ── Filtros ──────────────────────────────────────────────────────── -->
+    <div class="flex items-center gap-2 flex-wrap">
+      <input v-model="filtroTexto" type="text" placeholder="Buscar proyecto…"
+        class="text-sm border border-gray-200 rounded-lg px-3 py-1.5 w-56"
+        style="outline:none" />
+      <select v-model="filtroAplica"
+        class="text-sm border border-gray-200 rounded-lg px-2 py-1.5 bg-white">
+        <option value="todos">Todos</option>
+        <option value="aplica">Aplican este mes</option>
+        <option value="no">No aplican este mes</option>
+      </select>
+      <span class="text-xs text-gray-400">{{ filasFiltradas.length }} de {{ filas.length }}</span>
+    </div>
+
     <!-- ── Notificación de cambio IPC ─────────────────────────────────── -->
     <div v-if="notificacionIPC"
       class="rounded-xl border p-3 flex items-start gap-3"
@@ -105,7 +119,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="fila in filas" :key="fila.contrato_id"
+            <tr v-for="fila in filasFiltradas" :key="fila.contrato_id"
               class="border-b border-gray-50 hover:bg-gray-50/50"
               :class="(!fila.habilitado || !fila.aplica_este_mes) ? 'opacity-40' : ''">
               <td class="px-3 py-2 text-center">
@@ -468,6 +482,19 @@ const totalSeleccionado = computed(() =>
     .filter(f => f.habilitado && seleccion[f.contrato_id])
     .reduce((s, f) => s + (valorEfectivo(f) || 0), 0)
 )
+
+// ── Filtros de la tabla (Task 7a) ────────────────────────────────────────────
+const filtroTexto  = ref('')
+const filtroAplica = ref('todos')   // 'todos' | 'aplica' | 'no'
+const filasFiltradas = computed(() => {
+  const q = filtroTexto.value.trim().toLowerCase()
+  return filas.value.filter(f => {
+    if (q && !f.nombre_proyecto.toLowerCase().includes(q)) return false
+    if (filtroAplica.value === 'aplica' && !f.aplica_este_mes) return false
+    if (filtroAplica.value === 'no' && f.aplica_este_mes) return false
+    return true
+  })
+})
 
 function formatCOP(v) {
   if (v == null) return '—'
