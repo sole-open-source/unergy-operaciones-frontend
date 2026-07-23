@@ -88,7 +88,7 @@
                     <i class="pi pi-calendar text-xs" style="color:#f59e0b" />Fecha de inicio O&amp;M
                   </p>
                   <p class="text-sm font-semibold" style="color:#1c1917">
-                    {{ formatFecha(contratos.mantenimiento.fecha_inicio) || '—' }}
+                    {{ formatFecha(contratos.mantenimiento.fecha_inicio_om || contratos.mantenimiento.fecha_inicio) || '—' }}
                   </p>
                 </div>
                 <!-- Valor anual -->
@@ -971,10 +971,10 @@
         <div class="grid grid-cols-2 gap-4">
           <div class="flex flex-col gap-1">
             <label class="text-xs font-medium text-gray-600">Fecha de inicio O&amp;M <span class="text-red-400">*</span></label>
-            <DatePicker v-model="dialogMant.form.fecha_inicio" dateFormat="yy-mm-dd"
+            <DatePicker v-model="dialogMant.form.fecha_inicio_om" dateFormat="yy-mm-dd"
               class="w-full" showClear placeholder="aaaa-mm-dd" />
             <p class="text-xs text-gray-400">Es la fecha que Costos usa para indexar la tarifa.</p>
-            <p v-if="dialogMant.errores.fecha_inicio" class="text-xs text-red-400">{{ dialogMant.errores.fecha_inicio }}</p>
+            <p v-if="dialogMant.errores.fecha_inicio_om" class="text-xs text-red-400">{{ dialogMant.errores.fecha_inicio_om }}</p>
           </div>
           <div class="flex flex-col gap-1">
             <label class="text-xs font-medium text-gray-600">Estado <span class="text-red-400">*</span></label>
@@ -1360,7 +1360,7 @@ const dialogMant = reactive({
   form: {
     contratante_nombre: '',
     prestador_nombre: '',
-    fecha_inicio: null,
+    fecha_inicio_om: null,
     fecha_firma_contrato: null,
     tarifa_base: null,
     tarifa_mensual: null,
@@ -1555,7 +1555,8 @@ function openMantenimientoDialog(modo) {
     const c = contratos.mantenimiento
     dialogMant.form.contratante_nombre = c.contratante_nombre || ''
     dialogMant.form.prestador_nombre   = c.prestador_nombre   || ''
-    dialogMant.form.fecha_inicio       = c.fecha_inicio ? new Date(c.fecha_inicio) : null
+    dialogMant.form.fecha_inicio_om    = c.fecha_inicio_om ? new Date(c.fecha_inicio_om)
+                                        : (c.fecha_inicio ? new Date(c.fecha_inicio) : null)
     dialogMant.form.fecha_firma_contrato = c.fecha_firma_contrato ? new Date(c.fecha_firma_contrato) : null
     dialogMant.form.tarifa_base        = c.tarifa_base ?? null
     dialogMant.form.tarifa_mensual     = c.tarifa_mensual ?? (c.tarifa_base != null ? Math.round(c.tarifa_base / 12) : null)
@@ -1565,7 +1566,7 @@ function openMantenimientoDialog(modo) {
   } else {
     dialogMant.form.contratante_nombre = ''
     dialogMant.form.prestador_nombre   = ''
-    dialogMant.form.fecha_inicio       = null
+    dialogMant.form.fecha_inicio_om    = null
     dialogMant.form.fecha_firma_contrato = null
     dialogMant.form.tarifa_base        = null
     dialogMant.form.tarifa_mensual     = null
@@ -1580,7 +1581,7 @@ function validarFormMant() {
   const e = {}
   if (!dialogMant.form.contratante_nombre?.trim()) e.contratante_nombre = 'Campo requerido'
   if (!dialogMant.form.prestador_nombre?.trim())   e.prestador_nombre   = 'Campo requerido'
-  if (!dialogMant.form.fecha_inicio)                e.fecha_inicio       = 'Campo requerido'
+  if (!dialogMant.form.fecha_inicio_om)             e.fecha_inicio_om    = 'Campo requerido'
   if (dialogMant.form.tarifa_base == null)          e.tarifa_base        = 'Campo requerido'
   if (!dialogMant.form.estado)                      e.estado             = 'Campo requerido'
   const link = dialogMant.form.enlace_drive?.trim()
@@ -1597,7 +1598,7 @@ async function saveMantenimiento() {
     const payload = {
       contratante_nombre: dialogMant.form.contratante_nombre.trim(),
       prestador_nombre:   dialogMant.form.prestador_nombre.trim(),
-      fecha_inicio:       toISO(dialogMant.form.fecha_inicio),
+      fecha_inicio_om:    toISO(dialogMant.form.fecha_inicio_om),
       fecha_firma_contrato: toISO(dialogMant.form.fecha_firma_contrato),
       tarifa_base:        dialogMant.form.tarifa_base,
       tarifa_mensual:     dialogMant.form.tarifa_mensual ?? null,
@@ -1672,7 +1673,7 @@ async function cargarDesdeExcel(event) {
 
     dialogMant.form.contratante_nombre = String(fila['Contratante'] ?? '').trim()
     dialogMant.form.prestador_nombre   = String(fila['Prestador'] ?? '').trim()
-    dialogMant.form.fecha_inicio       = parseFecha(fila['Fecha de inicio O&M'])
+    dialogMant.form.fecha_inicio_om    = parseFecha(fila['Fecha de inicio O&M'])
     dialogMant.form.tarifa_base        = parseNum(fila['Valor O&M Anual (BASE)'])
     const mensualExcel                 = parseNum(fila['Valor mensual'])
     dialogMant.form.tarifa_mensual     = mensualExcel ?? (dialogMant.form.tarifa_base != null ? Math.round(dialogMant.form.tarifa_base / 12) : null)
