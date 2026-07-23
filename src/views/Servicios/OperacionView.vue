@@ -166,7 +166,7 @@
                       <tbody>
                         <tr v-if="!contratos.mantenimiento.indexacion_anual?.length">
                           <td colspan="4" class="px-4 py-6 text-center text-xs text-gray-400">
-                            Sin datos de indexación — carga un archivo JSON con el botón de abajo.
+                            Sin indexación aún — el contrato todavía no cumple un año desde la Fecha de inicio O&amp;M (o falta esa fecha / el valor base).
                           </td>
                         </tr>
                         <tr v-for="fila in (contratos.mantenimiento.indexacion_anual || [])" :key="fila.anio"
@@ -212,16 +212,9 @@
                         </tr>
                       </tbody>
                     </table>
-                    <div class="flex items-center justify-end px-4 py-2.5 border-t border-gray-100 bg-gray-50/60">
-                      <button type="button"
-                        class="flex items-center gap-1.5 text-xs font-medium hover:underline transition-colors"
-                        style="background:none;border:none;padding:0;cursor:pointer;color:#f59e0b"
-                        @click="idxInputAnualRef?.click()">
-                        <i class="pi pi-upload text-xs" />
-                        Cargar indexación anual desde JSON
-                      </button>
-                      <input ref="idxInputAnualRef" type="file" accept=".json" class="hidden"
-                        @change="e => importarIndexacion(e, 'anual')" />
+                    <div class="flex items-center gap-1.5 px-4 py-2 border-t border-gray-100 bg-gray-50/60 text-xs text-gray-400">
+                      <i class="pi pi-bolt text-xs" style="color:#f59e0b" />
+                      Calculado automáticamente desde la Fecha de inicio O&amp;M y el IPC por año.
                     </div>
                   </div>
                 </div>
@@ -249,7 +242,7 @@
                       <tbody>
                         <tr v-if="!contratos.mantenimiento.indexacion_mensual?.length">
                           <td colspan="4" class="px-4 py-6 text-center text-xs text-gray-400">
-                            Sin datos de indexación — carga un archivo JSON con el botón de abajo.
+                            Sin indexación aún — el contrato todavía no cumple un año desde la Fecha de inicio O&amp;M (o falta esa fecha / el valor base).
                           </td>
                         </tr>
                         <tr v-for="fila in (contratos.mantenimiento.indexacion_mensual || [])" :key="fila.anio"
@@ -295,16 +288,9 @@
                         </tr>
                       </tbody>
                     </table>
-                    <div class="flex items-center justify-end px-4 py-2.5 border-t border-gray-100 bg-gray-50/60">
-                      <button type="button"
-                        class="flex items-center gap-1.5 text-xs font-medium hover:underline transition-colors"
-                        style="background:none;border:none;padding:0;cursor:pointer;color:#f59e0b"
-                        @click="idxInputMensualRef?.click()">
-                        <i class="pi pi-upload text-xs" />
-                        Cargar indexación mensual desde JSON
-                      </button>
-                      <input ref="idxInputMensualRef" type="file" accept=".json" class="hidden"
-                        @change="e => importarIndexacion(e, 'mensual')" />
+                    <div class="flex items-center gap-1.5 px-4 py-2 border-t border-gray-100 bg-gray-50/60 text-xs text-gray-400">
+                      <i class="pi pi-bolt text-xs" style="color:#f59e0b" />
+                      Calculado automáticamente desde la Fecha de inicio O&amp;M y el IPC por año.
                     </div>
                   </div>
                 </div>
@@ -1244,8 +1230,6 @@ const guardandoPago    = ref(false)
 const guardandoContrato = ref(false)
 const guardandoMant      = ref(false)
 const excelInputRef      = ref(null)
-const idxInputAnualRef   = ref(null)
-const idxInputMensualRef = ref(null)
 const ANIO_ACTUAL        = new Date().getFullYear()
 const showIndexacion          = reactive({ anual: false, mensual: false })
 const showIndexacionArriendo  = reactive({ anual: false, mensual: false })
@@ -1413,6 +1397,7 @@ onMounted(async () => {
     contratos.arriendo      = arrRes.status  === 'fulfilled' && arrRes.value.data.length  ? arrRes.value.data[0]  : null
     contratos.internet      = netRes.status  === 'fulfilled' && netRes.value.data.length  ? netRes.value.data[0]  : null
 
+    await cargarIndexacionOM()
     await loadPagos('mantenimiento')
   } catch (e) {
     toast.add({ severity: 'error', summary: 'Error al cargar', detail: e.message, life: 4000 })
@@ -1618,6 +1603,8 @@ async function saveMantenimiento() {
       const { data } = await api.patch(`/contratos-servicio/${contratos.mantenimiento.id}`, payload)
       contratos.mantenimiento = { ...contratos.mantenimiento, ...data }
     }
+    // Recalcular la indexación automática (cambió tarifa/fecha inicio O&M)
+    await cargarIndexacionOM()
     dialogMant.visible = false
     toast.add({ severity: 'success', summary: dialogMant.modo === 'crear' ? 'Contrato creado' : 'Contrato actualizado', life: 2500 })
   } catch (e) {
@@ -1695,34 +1682,19 @@ function getValorVigente(filas) {
   return filas.find(f => f.anio === ANIO_ACTUAL) ?? filas[filas.length - 1]
 }
 
-async function importarIndexacion(event, tipo) {
-  const file = event.target.files?.[0]
-  if (!file) return
-  event.target.value = ''
+// Indexación O&M automática: la calcula el backend (mismo motor que Costos:
+// aniversario desde la Fecha de inicio O&M + IPC por año). Reemplaza la carga
+// manual por JSON. Inyecta la serie en el contrato para que la usen las tablas
+// y el valor vigente de la ficha.
+async function cargarIndexacionOM() {
+  if (!contratos.mantenimiento?.id) return
   try {
-    const text = await file.text()
-    const data = JSON.parse(text)
-    const { data: result } = await api.post('/contratos-servicio/importar-indexacion', data, {
-      params: { tipo },
-    })
-    // Recargar el contrato para reflejar los nuevos datos de indexación
-    const { data: contratoData } = await api.get('/contratos-servicio', {
-      params: { tipo: 'mantenimiento', proyecto_id: route.params.id },
-    })
-    contratos.mantenimiento = contratoData.length ? contratoData[0] : null
-    const total       = result.actualizados?.length ?? 0
-    const sinEncontrar = result.no_encontrados ?? []
-    const detalle = sinEncontrar.length
-      ? `${sinEncontrar.length} no encontrado${sinEncontrar.length > 1 ? 's' : ''}: ${sinEncontrar.slice(0, 4).join(', ')}${sinEncontrar.length > 4 ? '…' : ''}`
-      : undefined
-    toast.add({
-      severity: 'success',
-      summary: `✓ ${total} proyecto${total !== 1 ? 's' : ''} actualizado${total !== 1 ? 's' : ''}`,
-      detail: detalle,
-      life: 6000,
-    })
-  } catch (e) {
-    toast.add({ severity: 'error', summary: 'Error al importar indexación', detail: e.message, life: 4000 })
+    const { data } = await api.get(`/om/indexacion/${contratos.mantenimiento.id}`)
+    contratos.mantenimiento.indexacion_anual   = data.anual   || []
+    contratos.mantenimiento.indexacion_mensual = data.mensual || []
+  } catch {
+    contratos.mantenimiento.indexacion_anual   = []
+    contratos.mantenimiento.indexacion_mensual = []
   }
 }
 
