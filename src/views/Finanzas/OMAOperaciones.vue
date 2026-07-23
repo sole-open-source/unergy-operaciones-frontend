@@ -265,6 +265,25 @@
       </a>
     </div>
 
+    <!-- ── Diálogo: motivo de exclusión (Task 7d) ─────────────────────── -->
+    <Dialog v-model:visible="showExclusionDialog" modal header="Motivo de exclusión"
+      :style="{ width: '30rem' }">
+      <p class="text-sm text-gray-600 mb-3">
+        Estos proyectos <b>aplican este mes</b> pero los desmarcaste. Indica el motivo de cada exclusión (queda registrado):
+      </p>
+      <div v-for="e in exclusionPendientes" :key="e.contrato_id" class="mb-3">
+        <label class="text-xs font-semibold text-gray-700">{{ e.nombre }}</label>
+        <textarea v-model="e.motivo" rows="2"
+          class="w-full text-sm border border-gray-200 rounded-lg px-2 py-1.5 mt-1"
+          placeholder="Motivo de la exclusión…"></textarea>
+      </div>
+      <template #footer>
+        <Button label="Cancelar" text @click="showExclusionDialog = false" />
+        <Button label="Guardar" :disabled="!exclusionValida" @click="confirmarExclusiones"
+          style="background:#915BD8;border-color:#915BD8" />
+      </template>
+    </Dialog>
+
     <!-- ── Popover: desglose del cálculo ──────────────────────────────── -->
     <Popover ref="infoPopover">
       <div v-if="filaInfo" class="text-xs" style="min-width:280px; color:#2C2039">
@@ -565,7 +584,36 @@ async function cargarDatos() {
   }
 }
 
+// #7d: exclusión con observación obligatoria por proyecto
+const showExclusionDialog = ref(false)
+const exclusionPendientes = ref([])   // [{contrato_id, nombre, motivo}]
+const exclusionValida = computed(() =>
+  exclusionPendientes.value.every(e => e.motivo.trim().length > 0)
+)
+
 async function guardarSeleccion() {
+  // Proyectos que aplican este mes pero quedaron desmarcados → exigir motivo antes de guardar.
+  const excluidos = filas.value.filter(
+    f => f.habilitado && f.aplica_este_mes && !seleccion[f.contrato_id]
+  )
+  if (excluidos.length) {
+    exclusionPendientes.value = excluidos.map(f => ({
+      contrato_id: f.contrato_id, nombre: f.nombre_proyecto, motivo: '',
+    }))
+    showExclusionDialog.value = true
+    return
+  }
+  await _ejecutarGuardado({})
+}
+
+function confirmarExclusiones() {
+  const motivos = {}
+  exclusionPendientes.value.forEach(e => { motivos[e.contrato_id] = e.motivo.trim() })
+  showExclusionDialog.value = false
+  _ejecutarGuardado(motivos)
+}
+
+async function _ejecutarGuardado(motivos) {
   guardando.value = true
   try {
     const items = filas.value.map(f => {
@@ -577,6 +625,7 @@ async function guardarSeleccion() {
         contrato_id: f.contrato_id,
         incluido: !!(seleccion[f.contrato_id] && f.habilitado),
         valor_manual,
+        motivo_exclusion: motivos[f.contrato_id] || null,
       }
     })
     await api.post(`/om/seleccion/${periodoActual.value}`, { items })
