@@ -973,6 +973,7 @@
             <label class="text-xs font-medium text-gray-600">Fecha de inicio O&amp;M <span class="text-red-400">*</span></label>
             <DatePicker v-model="dialogMant.form.fecha_inicio" dateFormat="yy-mm-dd"
               class="w-full" showClear placeholder="aaaa-mm-dd" />
+            <p class="text-xs text-gray-400">Es la fecha que Costos usa para indexar la tarifa.</p>
             <p v-if="dialogMant.errores.fecha_inicio" class="text-xs text-red-400">{{ dialogMant.errores.fecha_inicio }}</p>
           </div>
           <div class="flex flex-col gap-1">
@@ -980,6 +981,15 @@
             <Select v-model="dialogMant.form.estado" :options="ESTADOS_MANT"
               optionLabel="label" optionValue="value" class="w-full" />
             <p v-if="dialogMant.errores.estado" class="text-xs text-red-400">{{ dialogMant.errores.estado }}</p>
+          </div>
+        </div>
+        <!-- Fecha de suscripción (informativa; no interviene en la indexación) -->
+        <div class="grid grid-cols-2 gap-4">
+          <div class="flex flex-col gap-1">
+            <label class="text-xs font-medium text-gray-600">Fecha de suscripción del contrato</label>
+            <DatePicker v-model="dialogMant.form.fecha_firma_contrato" dateFormat="yy-mm-dd"
+              class="w-full" showClear placeholder="aaaa-mm-dd" />
+            <p class="text-xs text-gray-400">Solo informativa. La indexación usa la Fecha de inicio O&amp;M.</p>
           </div>
         </div>
         <!-- Periodicidad de cobro -->
@@ -1351,6 +1361,7 @@ const dialogMant = reactive({
     contratante_nombre: '',
     prestador_nombre: '',
     fecha_inicio: null,
+    fecha_firma_contrato: null,
     tarifa_base: null,
     tarifa_mensual: null,
     enlace_drive: '',
@@ -1545,6 +1556,7 @@ function openMantenimientoDialog(modo) {
     dialogMant.form.contratante_nombre = c.contratante_nombre || ''
     dialogMant.form.prestador_nombre   = c.prestador_nombre   || ''
     dialogMant.form.fecha_inicio       = c.fecha_inicio ? new Date(c.fecha_inicio) : null
+    dialogMant.form.fecha_firma_contrato = c.fecha_firma_contrato ? new Date(c.fecha_firma_contrato) : null
     dialogMant.form.tarifa_base        = c.tarifa_base ?? null
     dialogMant.form.tarifa_mensual     = c.tarifa_mensual ?? (c.tarifa_base != null ? Math.round(c.tarifa_base / 12) : null)
     dialogMant.form.enlace_drive       = c.enlace_drive || ''
@@ -1554,6 +1566,7 @@ function openMantenimientoDialog(modo) {
     dialogMant.form.contratante_nombre = ''
     dialogMant.form.prestador_nombre   = ''
     dialogMant.form.fecha_inicio       = null
+    dialogMant.form.fecha_firma_contrato = null
     dialogMant.form.tarifa_base        = null
     dialogMant.form.tarifa_mensual     = null
     dialogMant.form.enlace_drive       = ''
@@ -1585,6 +1598,7 @@ async function saveMantenimiento() {
       contratante_nombre: dialogMant.form.contratante_nombre.trim(),
       prestador_nombre:   dialogMant.form.prestador_nombre.trim(),
       fecha_inicio:       toISO(dialogMant.form.fecha_inicio),
+      fecha_firma_contrato: toISO(dialogMant.form.fecha_firma_contrato),
       tarifa_base:        dialogMant.form.tarifa_base,
       tarifa_mensual:     dialogMant.form.tarifa_mensual ?? null,
       enlace_drive:       dialogMant.form.enlace_drive?.trim() || null,
