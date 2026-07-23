@@ -982,6 +982,15 @@
             <p v-if="dialogMant.errores.estado" class="text-xs text-red-400">{{ dialogMant.errores.estado }}</p>
           </div>
         </div>
+        <!-- Periodicidad de cobro -->
+        <div class="grid grid-cols-2 gap-4">
+          <div class="flex flex-col gap-1">
+            <label class="text-xs font-medium text-gray-600">Periodicidad de cobro <span class="text-red-400">*</span></label>
+            <Select v-model="dialogMant.form.periodicidad_pago" :options="PERIODICIDADES"
+              optionLabel="label" optionValue="value" class="w-full" placeholder="Selecciona…" />
+            <p class="text-xs text-gray-400">Define en qué meses se cobra en el panel de Mantenimiento.</p>
+          </div>
+        </div>
         <!-- Valor anual / Valor mensual -->
         <div class="grid grid-cols-2 gap-4">
           <div class="flex flex-col gap-1">
@@ -1205,6 +1214,14 @@ const ESTADOS_MANT = [
   { label: 'En revisión', value: 'en_revision' },
 ]
 
+const PERIODICIDADES = [
+  { label: 'Mensual',    value: 'mensual' },
+  { label: 'Bimestral',  value: 'bimestral' },
+  { label: 'Trimestral', value: 'trimestral' },
+  { label: 'Semestral',  value: 'semestral' },
+  { label: 'Anual',      value: 'anual' },
+]
+
 const TABS_TIPOS = ['mantenimiento', 'arriendo', 'internet']
 
 const DIALOG_EDIT_COLOR = { mantenimiento: '#f59e0b', arriendo: '#8b5cf6', internet: '#06b6d4' }
@@ -1338,6 +1355,7 @@ const dialogMant = reactive({
     tarifa_mensual: null,
     enlace_drive: '',
     estado: 'vigente',
+    periodicidad_pago: 'mensual',
   },
   errores: {},
 })
@@ -1531,6 +1549,7 @@ function openMantenimientoDialog(modo) {
     dialogMant.form.tarifa_mensual     = c.tarifa_mensual ?? (c.tarifa_base != null ? Math.round(c.tarifa_base / 12) : null)
     dialogMant.form.enlace_drive       = c.enlace_drive || ''
     dialogMant.form.estado             = c.estado || 'vigente'
+    dialogMant.form.periodicidad_pago  = c.periodicidad_pago || 'mensual'
   } else {
     dialogMant.form.contratante_nombre = ''
     dialogMant.form.prestador_nombre   = ''
@@ -1539,6 +1558,7 @@ function openMantenimientoDialog(modo) {
     dialogMant.form.tarifa_mensual     = null
     dialogMant.form.enlace_drive       = ''
     dialogMant.form.estado             = 'vigente'
+    dialogMant.form.periodicidad_pago  = 'mensual'
   }
   dialogMant.visible = true
 }
@@ -1569,6 +1589,7 @@ async function saveMantenimiento() {
       tarifa_mensual:     dialogMant.form.tarifa_mensual ?? null,
       enlace_drive:       dialogMant.form.enlace_drive?.trim() || null,
       estado:             dialogMant.form.estado,
+      periodicidad_pago:  dialogMant.form.periodicidad_pago,
     }
     if (dialogMant.modo === 'crear') {
       const proyId = route.params.id
