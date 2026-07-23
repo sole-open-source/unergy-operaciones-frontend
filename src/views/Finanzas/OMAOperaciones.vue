@@ -56,6 +56,15 @@
         <option value="aplica">Aplican este mes</option>
         <option value="no">No aplican este mes</option>
       </select>
+      <select v-model="filtroPeriodicidad"
+        class="text-sm border border-gray-200 rounded-lg px-2 py-1.5 bg-white">
+        <option value="todos">Toda periodicidad</option>
+        <option value="mensual">Mensual</option>
+        <option value="bimestral">Bimestral</option>
+        <option value="trimestral">Trimestral</option>
+        <option value="semestral">Semestral</option>
+        <option value="anual">Anual</option>
+      </select>
       <span class="text-xs text-gray-400">{{ filasFiltradas.length }} de {{ filas.length }}</span>
     </div>
 
@@ -489,12 +498,14 @@ const totalSeleccionado = computed(() =>
 // ── Filtros de la tabla (Task 7a) ────────────────────────────────────────────
 const filtroTexto  = ref('')
 const filtroAplica = ref('todos')   // 'todos' | 'aplica' | 'no'
+const filtroPeriodicidad = ref('todos')
 const filasFiltradas = computed(() => {
   const q = filtroTexto.value.trim().toLowerCase()
   return filas.value.filter(f => {
     if (q && !f.nombre_proyecto.toLowerCase().includes(q)) return false
     if (filtroAplica.value === 'aplica' && !f.aplica_este_mes) return false
     if (filtroAplica.value === 'no' && f.aplica_este_mes) return false
+    if (filtroPeriodicidad.value !== 'todos' && (f.periodicidad || 'mensual') !== filtroPeriodicidad.value) return false
     return true
   })
 })
