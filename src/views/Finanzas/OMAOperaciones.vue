@@ -45,6 +45,29 @@
       </div>
     </div>
 
+    <!-- ── Filtros ──────────────────────────────────────────────────────── -->
+    <div class="flex items-center gap-2 flex-wrap">
+      <input v-model="filtroTexto" type="text" placeholder="Buscar proyecto…"
+        class="text-sm border border-gray-200 rounded-lg px-3 py-1.5 w-56"
+        style="outline:none" />
+      <select v-model="filtroAplica"
+        class="text-sm border border-gray-200 rounded-lg px-2 py-1.5 bg-white">
+        <option value="todos">Todos</option>
+        <option value="aplica">Aplican este mes</option>
+        <option value="no">No aplican este mes</option>
+      </select>
+      <select v-model="filtroPeriodicidad"
+        class="text-sm border border-gray-200 rounded-lg px-2 py-1.5 bg-white">
+        <option value="todos">Toda periodicidad</option>
+        <option value="mensual">Mensual</option>
+        <option value="bimestral">Bimestral</option>
+        <option value="trimestral">Trimestral</option>
+        <option value="semestral">Semestral</option>
+        <option value="anual">Anual</option>
+      </select>
+      <span class="text-xs text-gray-400">{{ filasFiltradas.length }} de {{ filas.length }}</span>
+    </div>
+
     <!-- ── Notificación de cambio IPC ─────────────────────────────────── -->
     <div v-if="notificacionIPC"
       class="rounded-xl border p-3 flex items-start gap-3"
@@ -105,12 +128,12 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="fila in filas" :key="fila.contrato_id"
+            <tr v-for="fila in filasFiltradas" :key="fila.contrato_id"
               class="border-b border-gray-50 hover:bg-gray-50/50"
-              :class="!fila.habilitado ? 'opacity-40' : ''">
+              :class="(!fila.habilitado || !fila.aplica_este_mes) ? 'opacity-40' : ''">
               <td class="px-3 py-2 text-center">
                 <input type="checkbox"
-                  :disabled="!fila.habilitado"
+                  :disabled="!fila.habilitado || !fila.aplica_este_mes"
                   v-model="seleccion[fila.contrato_id]"
                   class="accent-purple-600" />
               </td>
@@ -121,6 +144,12 @@
                   style="background:#fef3c7; color:#92400e"
                   :title="fila.historial_indexaciones">
                   <i class="pi pi-exclamation-triangle text-[9px]" />{{ fila.historial_indexaciones }}
+                </span>
+                <span v-else-if="!fila.aplica_este_mes"
+                  class="inline-flex items-center gap-1 ml-1.5 text-[10px] font-normal px-1.5 py-0.5 rounded-full align-middle"
+                  style="background:#e5e7eb; color:#4b5563"
+                  title="Según su periodicidad, a este proyecto no le corresponde cobro este mes.">
+                  <i class="pi pi-clock text-[9px]" />no aplica este mes
                 </span>
               </td>
               <td class="px-3 py-2 font-mono text-xs text-gray-500">{{ fila.periodo }}</td>
@@ -145,28 +174,14 @@
               </td>
               <td class="px-3 py-2 text-right bg-purple-50/30 group"
                 style="position:relative; min-width:150px">
-                <!-- Modo edición -->
-                <input v-if="editando === fila.contrato_id"
-                  v-model="inputBuffer"
-                  type="text" inputmode="numeric"
-                  class="w-full text-right text-sm tabular-nums font-semibold rounded-md px-1.5 py-0.5 outline-none"
-                  style="border:1.5px solid #915BD8; color:#7c3aed"
-                  @keydown.enter.prevent="confirmarEdicion(fila)"
-                  @keydown.esc.prevent="cancelarEdicion()"
-                  @blur="confirmarEdicion(fila)"
-                  v-focus />
-                <!-- Modo display -->
-                <div v-else class="flex items-center justify-end gap-1.5">
-                  <!-- Íconos en hover -->
+                <!-- Valor a facturar: SOLO LECTURA (se edita en Proyecto>Detalle>Servicios) -->
+                <div class="flex items-center justify-end gap-1.5">
                   <span class="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
-                    <i v-if="fila.habilitado" class="pi pi-pencil text-[11px] cursor-pointer"
-                      style="color:#915BD8" title="Editar valor"
-                      @click="iniciarEdicion(fila)" />
                     <i v-if="fila.habilitado" class="pi pi-info-circle text-[11px] cursor-pointer"
                       style="color:#915BD8" title="Ver cálculo"
                       @click="mostrarInfo($event, fila)" />
                   </span>
-                  <!-- Indicador de modificación manual -->
+                  <!-- Indicador de modificación manual (histórico) -->
                   <span v-if="esManual(fila)" title="Valor modificado manualmente"
                     style="color:#f59e0b; font-size:12px; line-height:1">●</span>
                   <!-- Avisos: IPC incompleto (#5) y override desactualizado (#6) -->
@@ -176,10 +191,8 @@
                   <i v-if="fila.valor_manual_desactualizado" class="pi pi-exclamation-triangle text-[10px]"
                     style="color:#dc2626"
                     title="El valor manual difiere del recalculado; revísalo tras el cambio de IPC." />
-                  <!-- Valor -->
-                  <span class="font-semibold tabular-nums cursor-text"
-                    :style="(fila.incluido && fila.habilitado) ? 'color:#7c3aed' : 'color:#9ca3af'"
-                    @click="iniciarEdicion(fila)">
+                  <span class="font-semibold tabular-nums"
+                    :style="(fila.incluido && fila.habilitado) ? 'color:#7c3aed' : 'color:#9ca3af'">
                     {{ valorEfectivo(fila) != null ? formatCOP(valorEfectivo(fila)) : '—' }}
                   </span>
                 </div>
@@ -260,6 +273,25 @@
         <i class="pi pi-external-link text-xs"/>Ver
       </a>
     </div>
+
+    <!-- ── Diálogo: motivo de exclusión (Task 7d) ─────────────────────── -->
+    <Dialog v-model:visible="showExclusionDialog" modal header="Motivo de exclusión"
+      :style="{ width: '30rem' }">
+      <p class="text-sm text-gray-600 mb-3">
+        Estos proyectos <b>aplican este mes</b> pero los desmarcaste. Indica el motivo de cada exclusión (queda registrado):
+      </p>
+      <div v-for="e in exclusionPendientes" :key="e.contrato_id" class="mb-3">
+        <label class="text-xs font-semibold text-gray-700">{{ e.nombre }}</label>
+        <textarea v-model="e.motivo" rows="2"
+          class="w-full text-sm border border-gray-200 rounded-lg px-2 py-1.5 mt-1"
+          placeholder="Motivo de la exclusión…"></textarea>
+      </div>
+      <template #footer>
+        <Button label="Cancelar" text @click="showExclusionDialog = false" />
+        <Button label="Guardar" :disabled="!exclusionValida" @click="confirmarExclusiones"
+          style="background:#915BD8;border-color:#915BD8" />
+      </template>
+    </Dialog>
 
     <!-- ── Popover: desglose del cálculo ──────────────────────────────── -->
     <Popover ref="infoPopover">
@@ -451,7 +483,7 @@ const inputBuffer = ref('')        // texto crudo del input activo
 const infoPopover = ref(null)      // ref al <Popover>
 const filaInfo    = ref(null)      // fila cuyo desglose se muestra
 
-const filasHabilitadas   = computed(() => filas.value.filter(f => f.habilitado))
+const filasHabilitadas   = computed(() => filas.value.filter(f => f.habilitado && f.aplica_este_mes))
 const filasSeleccionadas = computed(() => filasHabilitadas.value.filter(f => seleccion[f.contrato_id]).length)
 const todosMarcados      = computed(() =>
   filasHabilitadas.value.length > 0 &&
@@ -462,6 +494,21 @@ const totalSeleccionado = computed(() =>
     .filter(f => f.habilitado && seleccion[f.contrato_id])
     .reduce((s, f) => s + (valorEfectivo(f) || 0), 0)
 )
+
+// ── Filtros de la tabla (Task 7a) ────────────────────────────────────────────
+const filtroTexto  = ref('')
+const filtroAplica = ref('todos')   // 'todos' | 'aplica' | 'no'
+const filtroPeriodicidad = ref('todos')
+const filasFiltradas = computed(() => {
+  const q = filtroTexto.value.trim().toLowerCase()
+  return filas.value.filter(f => {
+    if (q && !f.nombre_proyecto.toLowerCase().includes(q)) return false
+    if (filtroAplica.value === 'aplica' && !f.aplica_este_mes) return false
+    if (filtroAplica.value === 'no' && f.aplica_este_mes) return false
+    if (filtroPeriodicidad.value !== 'todos' && (f.periodicidad || 'mensual') !== filtroPeriodicidad.value) return false
+    return true
+  })
+})
 
 function formatCOP(v) {
   if (v == null) return '—'
@@ -537,7 +584,7 @@ async function cargarDatos() {
 
     filas.value.forEach(f => {
       if (seleccion[f.contrato_id] === undefined) {
-        seleccion[f.contrato_id] = f.incluido && f.habilitado
+        seleccion[f.contrato_id] = f.incluido && f.habilitado && f.aplica_este_mes
       }
     })
   } catch (e) {
@@ -548,7 +595,36 @@ async function cargarDatos() {
   }
 }
 
+// #7d: exclusión con observación obligatoria por proyecto
+const showExclusionDialog = ref(false)
+const exclusionPendientes = ref([])   // [{contrato_id, nombre, motivo}]
+const exclusionValida = computed(() =>
+  exclusionPendientes.value.every(e => e.motivo.trim().length > 0)
+)
+
 async function guardarSeleccion() {
+  // Proyectos que aplican este mes pero quedaron desmarcados → exigir motivo antes de guardar.
+  const excluidos = filas.value.filter(
+    f => f.habilitado && f.aplica_este_mes && !seleccion[f.contrato_id]
+  )
+  if (excluidos.length) {
+    exclusionPendientes.value = excluidos.map(f => ({
+      contrato_id: f.contrato_id, nombre: f.nombre_proyecto, motivo: '',
+    }))
+    showExclusionDialog.value = true
+    return
+  }
+  await _ejecutarGuardado({})
+}
+
+function confirmarExclusiones() {
+  const motivos = {}
+  exclusionPendientes.value.forEach(e => { motivos[e.contrato_id] = e.motivo.trim() })
+  showExclusionDialog.value = false
+  _ejecutarGuardado(motivos)
+}
+
+async function _ejecutarGuardado(motivos) {
   guardando.value = true
   try {
     const items = filas.value.map(f => {
@@ -560,6 +636,7 @@ async function guardarSeleccion() {
         contrato_id: f.contrato_id,
         incluido: !!(seleccion[f.contrato_id] && f.habilitado),
         valor_manual,
+        motivo_exclusion: motivos[f.contrato_id] || null,
       }
     })
     await api.post(`/om/seleccion/${periodoActual.value}`, { items })
