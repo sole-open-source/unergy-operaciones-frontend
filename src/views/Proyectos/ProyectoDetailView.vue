@@ -23,7 +23,7 @@
     </div>
 
     <!-- Tabs -->
-    <TabView>
+    <TabView v-model:activeIndex="activeTab">
       <!-- ══ GENERAL ══ -->
       <TabPanel header="General">
         <div class="grid grid-cols-2 md:grid-cols-3 gap-4 p-4 text-sm">
@@ -864,6 +864,25 @@ const SERVICIOS_FLAGS = [
 ]
 const ESTADO_LABELS_SRV = { vigente: 'Vigente', vencido: 'Vencido', terminado: 'Terminado', en_renovacion: 'En renovación' }
 const ESTADO_SEVERITY_SRV = { vigente: 'success', vencido: 'danger', terminado: 'secondary', en_renovacion: 'warn' }
+
+// ── Pestaña activa ──────────────────────────────────────────────────────────
+// Se puede abrir el detalle directo en una pestaña vía ?tab=... (ej. desde la
+// vista "IDs proyectos", que enlaza a las pestañas de IDs).
+const TAB_INDEX = {
+  'general': 0,
+  'tecnico': 1,
+  'simulacion': 2,
+  'inversionistas': 3,
+  'contactos': 4,
+  'servicios': 5,
+  'datos-externos': 6,
+  'id-liquidaciones': 7,
+  'id-quoia': 8,
+}
+const activeTab = ref(0)
+watch(() => route.query.tab, (t) => {
+  if (t && TAB_INDEX[t] != null) activeTab.value = TAB_INDEX[t]
+}, { immediate: true })
 
 // ── Estado base ───────────────────────────────────────────────────────────────
 const proyecto = ref(null)

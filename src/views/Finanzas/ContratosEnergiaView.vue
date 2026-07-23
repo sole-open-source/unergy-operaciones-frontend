@@ -85,7 +85,9 @@
           </div>
           <div>
             <label class="field-label">Comercializador</label>
-            <InputText v-model="f.comercializador" class="w-full" placeholder="ej: UNERGY ENERGIA DIGITAL S.A.S ESP" />
+            <Select v-model="f.comercializador" :options="comercializadoresOptions" optionLabel="label" optionValue="id"
+                    class="w-full" placeholder="Seleccionar" filter showClear
+                    v-tooltip.bottom="'Se conectará a la API próximamente'" />
           </div>
 
           <div>
@@ -199,9 +201,10 @@ const ESTADO_OPERATIVA = 'en_operacion'
 
 // ── Estado ─────────────────────────────────────────────────────────────────────
 const q = ref('')
-const contratos = ref([])          // se llenará con la API más adelante
+const contratos = ref([])                // se llenará con la API más adelante
 const proyectos = ref([])
-const preciosEnergiaOptions = ref([])  // se llenará con la API más adelante
+const comercializadoresOptions = ref([]) // se llenará con la API más adelante
+const preciosEnergiaOptions = ref([])    // se llenará con la API más adelante
 
 const proyectosOptions = computed(() =>
   proyectos.value
@@ -231,7 +234,7 @@ const f = reactive({
   fecha_desde: null,
   fecha_hasta: null,
   codigo: '',
-  comercializador: '',
+  comercializador: null,
   tipo_contrato: null,
   tipo_tarifa: null,
   porcentaje: null,
@@ -250,7 +253,7 @@ watch(() => f.tipo_contrato, (nuevo) => {
 
 function abrirFormulario() {
   Object.assign(f, {
-    fecha_desde: null, fecha_hasta: null, codigo: '', comercializador: '',
+    fecha_desde: null, fecha_hasta: null, codigo: '', comercializador: null,
     tipo_contrato: null, tipo_tarifa: null, porcentaje: null,
     proyectos: [{ proyecto_id: null, precio_energia_id: null }],
   })

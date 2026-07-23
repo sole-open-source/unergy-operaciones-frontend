@@ -74,7 +74,7 @@
                 <td v-for="col in COLUMNS" :key="col.key"
                     class="px-3 py-2 text-center cursor-pointer id-cell"
                     :style="col.groupStart ? 'border-left:1px solid #F1F1F1;' : ''"
-                    @click="irAlDetalle(row.id)"
+                    @click="irAlDetalle(row.id, col.tab)"
                     v-tooltip.bottom="tieneValor(row[col.key]) ? String(row[col.key]) : 'Sin registrar · clic para agregar'">
                   <i v-if="tieneValor(row[col.key])" class="pi pi-check-circle"
                      style="color:#10B981; font-size:1rem;" />
@@ -107,11 +107,11 @@ const TIPO_LABELS = { minigranja: 'Minigranja', gd: 'GD' }
 
 // Las 5 IDs: 3 de Quoia + 2 de liquidación (códigos SIC).
 const COLUMNS = [
-  { key: 'quoia_reporte_generacion_id', short: 'Rep. Gen.',     groupStart: true },
-  { key: 'quoia_reporte_consumo_id',    short: 'Rep. Consumo',  groupStart: false },
-  { key: 'quoia_nodo_id',               short: 'Nodo',          groupStart: false },
-  { key: 'codigo_sic_generacion',       short: 'SIC gen.',      groupStart: true },
-  { key: 'codigo_sic_consumo',          short: 'SIC con.',      groupStart: false },
+  { key: 'quoia_reporte_generacion_id', short: 'Rep. Gen.',     groupStart: true,  tab: 'id-quoia' },
+  { key: 'quoia_reporte_consumo_id',    short: 'Rep. Consumo',  groupStart: false, tab: 'id-quoia' },
+  { key: 'quoia_nodo_id',               short: 'Nodo',          groupStart: false, tab: 'id-quoia' },
+  { key: 'codigo_sic_generacion',       short: 'SIC gen.',      groupStart: true,  tab: 'id-liquidaciones' },
+  { key: 'codigo_sic_consumo',          short: 'SIC con.',      groupStart: false, tab: 'id-liquidaciones' },
 ]
 
 const loading = ref(true)
@@ -127,8 +127,10 @@ function tipoStyle(tipo) {
   return `background:${c}18; color:${c};`
 }
 
-function irAlDetalle(id) {
-  router.push(`/proyectos/${id}?edit=true`)
+function irAlDetalle(id, tab) {
+  const query = { edit: 'true' }
+  if (tab) query.tab = tab
+  router.push({ path: `/proyectos/${id}`, query })
 }
 
 const filtrados = computed(() => {
