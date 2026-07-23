@@ -165,28 +165,14 @@
               </td>
               <td class="px-3 py-2 text-right bg-purple-50/30 group"
                 style="position:relative; min-width:150px">
-                <!-- Modo edición -->
-                <input v-if="editando === fila.contrato_id"
-                  v-model="inputBuffer"
-                  type="text" inputmode="numeric"
-                  class="w-full text-right text-sm tabular-nums font-semibold rounded-md px-1.5 py-0.5 outline-none"
-                  style="border:1.5px solid #915BD8; color:#7c3aed"
-                  @keydown.enter.prevent="confirmarEdicion(fila)"
-                  @keydown.esc.prevent="cancelarEdicion()"
-                  @blur="confirmarEdicion(fila)"
-                  v-focus />
-                <!-- Modo display -->
-                <div v-else class="flex items-center justify-end gap-1.5">
-                  <!-- Íconos en hover -->
+                <!-- Valor a facturar: SOLO LECTURA (se edita en Proyecto>Detalle>Servicios) -->
+                <div class="flex items-center justify-end gap-1.5">
                   <span class="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
-                    <i v-if="fila.habilitado" class="pi pi-pencil text-[11px] cursor-pointer"
-                      style="color:#915BD8" title="Editar valor"
-                      @click="iniciarEdicion(fila)" />
                     <i v-if="fila.habilitado" class="pi pi-info-circle text-[11px] cursor-pointer"
                       style="color:#915BD8" title="Ver cálculo"
                       @click="mostrarInfo($event, fila)" />
                   </span>
-                  <!-- Indicador de modificación manual -->
+                  <!-- Indicador de modificación manual (histórico) -->
                   <span v-if="esManual(fila)" title="Valor modificado manualmente"
                     style="color:#f59e0b; font-size:12px; line-height:1">●</span>
                   <!-- Avisos: IPC incompleto (#5) y override desactualizado (#6) -->
@@ -196,10 +182,8 @@
                   <i v-if="fila.valor_manual_desactualizado" class="pi pi-exclamation-triangle text-[10px]"
                     style="color:#dc2626"
                     title="El valor manual difiere del recalculado; revísalo tras el cambio de IPC." />
-                  <!-- Valor -->
-                  <span class="font-semibold tabular-nums cursor-text"
-                    :style="(fila.incluido && fila.habilitado) ? 'color:#7c3aed' : 'color:#9ca3af'"
-                    @click="iniciarEdicion(fila)">
+                  <span class="font-semibold tabular-nums"
+                    :style="(fila.incluido && fila.habilitado) ? 'color:#7c3aed' : 'color:#9ca3af'">
                     {{ valorEfectivo(fila) != null ? formatCOP(valorEfectivo(fila)) : '—' }}
                   </span>
                 </div>
