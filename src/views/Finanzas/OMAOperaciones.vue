@@ -2,7 +2,7 @@
   <div class="space-y-4 pt-3">
 
     <!-- ── Barra superior: periodo + guardar + columnas + IPC ──────────── -->
-    <div class="flex items-center justify-between flex-wrap gap-2">
+    <div class="bg-white rounded-xl shadow-sm p-3 flex items-center justify-between flex-wrap gap-2 border" style="border-color:#ECE7F2">
       <div class="flex items-center gap-3">
         <div class="flex items-center gap-2">
           <button type="button" @click="cambiarMes(-1)"
@@ -46,33 +46,32 @@
     </div>
 
     <!-- ── Filtros ──────────────────────────────────────────────────────── -->
-    <div class="flex items-center gap-2 flex-wrap">
-      <input v-model="filtroTexto" type="text" placeholder="Buscar proyecto…"
-        class="text-sm border border-gray-200 rounded-lg px-3 py-1.5 w-56"
-        style="outline:none" />
-      <select v-model="filtroAplica"
-        class="text-sm border border-gray-200 rounded-lg px-2 py-1.5 bg-white">
-        <option value="todos">Todos</option>
-        <option value="aplica">Aplican este mes</option>
-        <option value="no">No aplican este mes</option>
-      </select>
-      <select v-model="filtroPeriodicidad"
-        class="text-sm border border-gray-200 rounded-lg px-2 py-1.5 bg-white">
-        <option value="todos">Toda periodicidad</option>
-        <option value="mensual">Mensual</option>
-        <option value="bimestral">Bimestral</option>
-        <option value="trimestral">Trimestral</option>
-        <option value="semestral">Semestral</option>
-        <option value="anual">Anual</option>
-      </select>
-      <select v-model="filtroEstadoContrato"
-        class="text-sm border border-gray-200 rounded-lg px-2 py-1.5 bg-white">
-        <option value="todos">Todo estado</option>
-        <option value="con_contrato">Con contrato</option>
-        <option value="en_tramite">En trámite</option>
-        <option value="sin_contrato">Sin contrato</option>
-      </select>
-      <span class="text-xs text-gray-400">{{ filasFiltradas.length }} de {{ filas.length }}</span>
+    <div class="bg-white rounded-xl shadow-sm p-3 flex flex-wrap gap-3 items-end border" style="border-color:#ECE7F2">
+      <div>
+        <label class="field-label">Buscar</label>
+        <IconField>
+          <InputIcon class="pi pi-search" />
+          <InputText v-model="filtroTexto" placeholder="Nombre del proyecto…" class="w-56" />
+        </IconField>
+      </div>
+      <div>
+        <label class="field-label">Aplica este mes</label>
+        <Select v-model="filtroAplica" :options="APLICA_OPTIONS" optionLabel="label" optionValue="value"
+                class="w-48" />
+      </div>
+      <div>
+        <label class="field-label">Periodicidad</label>
+        <Select v-model="filtroPeriodicidad" :options="PERIODICIDAD_OPTIONS" optionLabel="label" optionValue="value"
+                class="w-44" />
+      </div>
+      <div>
+        <label class="field-label">Estado contrato</label>
+        <Select v-model="filtroEstadoContrato" :options="ESTADO_CONTRATO_OPTIONS" optionLabel="label" optionValue="value"
+                class="w-44" />
+      </div>
+      <div class="ml-auto pb-1.5 text-xs text-gray-400">
+        {{ filasFiltradas.length }} de {{ filas.length }}
+      </div>
     </div>
 
     <!-- ── Notificación de cambio IPC ─────────────────────────────────── -->
@@ -101,51 +100,57 @@
     </div>
 
     <!-- ── Tabla ──────────────────────────────────────────────────────── -->
-    <div v-if="loading" class="flex justify-center py-10"><ProgressSpinner /></div>
-    <div v-else class="rounded-xl border border-gray-100 overflow-hidden">
+    <div v-if="loading" class="bg-white rounded-xl shadow-sm p-10 flex justify-center border" style="border-color:#ECE7F2">
+      <i class="pi pi-spin pi-spinner text-2xl text-gray-400" />
+    </div>
+    <div v-else-if="!filasFiltradas.length"
+      class="bg-white rounded-xl shadow-sm p-10 text-center text-sm text-gray-400 border" style="border-color:#ECE7F2">
+      No se encontraron proyectos con los filtros aplicados.
+    </div>
+    <div v-else class="bg-white rounded-xl shadow-sm overflow-hidden border" style="border-color:#ECE7F2">
       <div class="overflow-x-auto">
         <table class="w-full text-sm border-collapse" style="min-width:900px">
           <thead>
             <tr class="bg-gray-50 border-b border-gray-100">
-              <th class="px-3 py-2.5 text-left w-10">
+              <th class="px-4 py-2.5 text-left w-10">
                 <input type="checkbox" :checked="todosMarcados" @change="toggleTodos"
                   class="accent-purple-600" />
               </th>
-              <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500">Proyecto</th>
-              <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500">Estado contrato</th>
-              <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500">Período</th>
-              <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500">Mes / Año</th>
+              <th class="px-4 py-2.5 text-left font-medium text-gray-500 text-xs uppercase tracking-wide whitespace-nowrap">Proyecto</th>
+              <th class="px-4 py-2.5 text-left font-medium text-gray-500 text-xs uppercase tracking-wide whitespace-nowrap">Estado contrato</th>
+              <th class="px-4 py-2.5 text-left font-medium text-gray-500 text-xs uppercase tracking-wide whitespace-nowrap">Período</th>
+              <th class="px-4 py-2.5 text-left font-medium text-gray-500 text-xs uppercase tracking-wide whitespace-nowrap">Mes / Año</th>
               <th v-if="colsVisibles.n_indexaciones"
-                class="px-3 py-2.5 text-right text-xs font-semibold text-gray-500">N° IPC</th>
-              <th class="px-3 py-2.5 text-right text-xs font-semibold text-gray-500">Valor Base Anual</th>
+                class="px-4 py-2.5 text-right font-medium text-gray-500 text-xs uppercase tracking-wide whitespace-nowrap">N° IPC</th>
+              <th class="px-4 py-2.5 text-right font-medium text-gray-500 text-xs uppercase tracking-wide whitespace-nowrap">Valor Base Anual</th>
               <th v-if="colsVisibles.factor_acumulado"
-                class="px-3 py-2.5 text-right text-xs font-semibold text-gray-500">Factor Acum.</th>
+                class="px-4 py-2.5 text-right font-medium text-gray-500 text-xs uppercase tracking-wide whitespace-nowrap">Factor Acum.</th>
               <th v-if="colsVisibles.valor_anual_indexado"
-                class="px-3 py-2.5 text-right text-xs font-semibold text-gray-500">Val. Anual Indexado</th>
+                class="px-4 py-2.5 text-right font-medium text-gray-500 text-xs uppercase tracking-wide whitespace-nowrap">Val. Anual Indexado</th>
               <th v-if="colsVisibles.valor_mes_completo"
-                class="px-3 py-2.5 text-right text-xs font-semibold text-gray-500">Mes Completo</th>
+                class="px-4 py-2.5 text-right font-medium text-gray-500 text-xs uppercase tracking-wide whitespace-nowrap">Mes Completo</th>
               <th v-if="colsVisibles.prorrateo"
-                class="px-3 py-2.5 text-center text-xs font-semibold text-gray-500">Prorrateo</th>
-              <th class="px-3 py-2.5 text-right text-xs font-semibold text-gray-500 bg-purple-50">
+                class="px-4 py-2.5 text-center font-medium text-gray-500 text-xs uppercase tracking-wide whitespace-nowrap">Prorrateo</th>
+              <th class="px-4 py-2.5 text-right font-semibold text-xs uppercase tracking-wide bg-purple-50 whitespace-nowrap" style="color:#7c3aed">
                 Valor a Facturar
               </th>
               <th v-if="colsVisibles.historial"
-                class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500">Historial IPC</th>
-              <th class="px-3 py-2.5 text-center text-xs font-semibold text-gray-500">Facturado</th>
-              <th class="px-3 py-2.5 text-center text-xs font-semibold text-gray-500">Documento</th>
+                class="px-4 py-2.5 text-left font-medium text-gray-500 text-xs uppercase tracking-wide whitespace-nowrap">Historial IPC</th>
+              <th class="px-4 py-2.5 text-center font-medium text-gray-500 text-xs uppercase tracking-wide whitespace-nowrap">Facturado</th>
+              <th class="px-4 py-2.5 text-center font-medium text-gray-500 text-xs uppercase tracking-wide whitespace-nowrap">Documento</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="fila in filasFiltradas" :key="fila.contrato_id"
-              class="border-b border-gray-50 hover:bg-gray-50/50"
+              class="border-t border-gray-100 hover:bg-gray-50/70 transition-colors duration-100 row-hover"
               :class="(!fila.habilitado || !fila.aplica_este_mes || !conContrato(fila)) ? 'opacity-40' : ''">
-              <td class="px-3 py-2 text-center">
+              <td class="px-4 py-2 text-center">
                 <input type="checkbox"
                   :disabled="!fila.habilitado || !fila.aplica_este_mes || !conContrato(fila)"
                   v-model="seleccion[fila.contrato_id]"
                   class="accent-purple-600" />
               </td>
-              <td class="px-3 py-2 font-medium" style="color:#2C2039; white-space:nowrap">
+              <td class="px-4 py-2 font-medium" style="color:#2C2039; white-space:nowrap">
                 {{ fila.nombre_proyecto }}
                 <span v-if="!fila.habilitado && conContrato(fila)"
                   class="inline-flex items-center gap-1 ml-1.5 text-[10px] font-normal px-1.5 py-0.5 rounded-full align-middle"
@@ -160,33 +165,33 @@
                   <i class="pi pi-clock text-[9px]" />no aplica este mes
                 </span>
               </td>
-              <td class="px-3 py-2 whitespace-nowrap">
+              <td class="px-4 py-2 whitespace-nowrap">
                 <span class="inline-flex items-center text-[11px] font-medium px-2 py-0.5 rounded-full"
                   :style="{ background: estadoContratoMeta(fila).bg, color: estadoContratoMeta(fila).fg }">
                   {{ estadoContratoMeta(fila).label }}
                 </span>
               </td>
-              <td class="px-3 py-2 font-mono text-xs text-gray-500">{{ fila.periodo }}</td>
-              <td class="px-3 py-2 text-xs text-gray-600">{{ fila.mes_año }}</td>
-              <td v-if="colsVisibles.n_indexaciones" class="px-3 py-2 text-right text-xs text-gray-500">
+              <td class="px-4 py-2 font-mono text-xs text-gray-500">{{ fila.periodo }}</td>
+              <td class="px-4 py-2 text-xs text-gray-600">{{ fila.mes_año }}</td>
+              <td v-if="colsVisibles.n_indexaciones" class="px-4 py-2 text-right text-xs text-gray-500">
                 {{ fila.n_indexaciones }}
               </td>
-              <td class="px-3 py-2 text-right font-mono text-xs text-gray-600">
+              <td class="px-4 py-2 text-right font-mono text-xs text-gray-600">
                 {{ fila.valor_base_anual != null ? formatCOP(fila.valor_base_anual) : '—' }}
               </td>
-              <td v-if="colsVisibles.factor_acumulado" class="px-3 py-2 text-right font-mono text-xs">
+              <td v-if="colsVisibles.factor_acumulado" class="px-4 py-2 text-right font-mono text-xs">
                 {{ fila.habilitado ? fila.factor_acumulado.toFixed(6) : '—' }}
               </td>
-              <td v-if="colsVisibles.valor_anual_indexado" class="px-3 py-2 text-right font-mono text-xs">
+              <td v-if="colsVisibles.valor_anual_indexado" class="px-4 py-2 text-right font-mono text-xs">
                 {{ fila.valor_anual_indexado != null ? formatCOP(fila.valor_anual_indexado) : '—' }}
               </td>
-              <td v-if="colsVisibles.valor_mes_completo" class="px-3 py-2 text-right font-mono text-xs">
+              <td v-if="colsVisibles.valor_mes_completo" class="px-4 py-2 text-right font-mono text-xs">
                 {{ fila.valor_mes_completo != null ? formatCOP(fila.valor_mes_completo) : '—' }}
               </td>
-              <td v-if="colsVisibles.prorrateo" class="px-3 py-2 text-center text-xs text-gray-500">
+              <td v-if="colsVisibles.prorrateo" class="px-4 py-2 text-center text-xs text-gray-500">
                 {{ fila.prorrateo_label }}
               </td>
-              <td class="px-3 py-2 text-right bg-purple-50/30 group"
+              <td class="px-4 py-2 text-right bg-purple-50/30 group"
                 style="position:relative; min-width:150px">
                 <!-- Valor a facturar: SOLO LECTURA (se edita en Proyecto>Detalle>Servicios) -->
                 <div class="flex items-center justify-end gap-1.5">
@@ -211,12 +216,12 @@
                   </span>
                 </div>
               </td>
-              <td v-if="colsVisibles.historial" class="px-3 py-2 text-xs text-gray-400"
+              <td v-if="colsVisibles.historial" class="px-4 py-2 text-xs text-gray-400"
                 style="white-space:nowrap;max-width:280px;overflow:hidden;text-overflow:ellipsis"
                 :title="fila.historial_indexaciones">
                 {{ fila.historial_indexaciones }}
               </td>
-              <td class="px-3 py-2 text-center">
+              <td class="px-4 py-2 text-center">
                 <span v-if="fila.facturado"
                   class="inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full font-medium"
                   style="background:#dcfce7;color:#166534">
@@ -224,7 +229,7 @@
                 </span>
                 <span v-else class="text-xs text-gray-300">—</span>
               </td>
-              <td class="px-3 py-2 text-center">
+              <td class="px-4 py-2 text-center">
                 <DocumentoIcon
                   :doc="fila.documento_disponible ? { nombre_archivo: fila.documento_nombre || fila.nombre_proyecto } : null"
                   :tooltip="fila.documento_disponible ? (fila.documento_nombre || fila.nombre_proyecto) : null"
@@ -233,7 +238,7 @@
             </tr>
             <!-- Fila total -->
             <tr v-if="filas.length" class="bg-gray-50 border-t-2 border-gray-200">
-              <td colspan="4" class="px-3 py-2.5 text-xs font-semibold text-gray-600">
+              <td colspan="4" class="px-4 py-2.5 text-xs font-semibold text-gray-600">
                 Total ({{ filasSeleccionadas }} proyectos seleccionados)
               </td>
               <td v-if="colsVisibles.n_indexaciones"></td>
@@ -242,7 +247,7 @@
               <td v-if="colsVisibles.valor_anual_indexado"></td>
               <td v-if="colsVisibles.valor_mes_completo"></td>
               <td v-if="colsVisibles.prorrateo"></td>
-              <td class="px-3 py-2.5 text-right font-bold tabular-nums"
+              <td class="px-4 py-2.5 text-right font-bold tabular-nums"
                 style="color:#7c3aed">
                 {{ formatCOP(totalSeleccionado) }}
               </td>
@@ -431,6 +436,9 @@ import DataTable     from 'primevue/datatable'
 import Column        from 'primevue/column'
 import InputNumber   from 'primevue/inputnumber'
 import InputText     from 'primevue/inputtext'
+import Select        from 'primevue/select'
+import IconField     from 'primevue/iconfield'
+import InputIcon     from 'primevue/inputicon'
 import Popover       from 'primevue/popover'
 import { useToast }  from 'primevue/usetoast'
 import api           from '@/api/client'
@@ -515,6 +523,27 @@ const filtroTexto  = ref('')
 const filtroAplica = ref('todos')   // 'todos' | 'aplica' | 'no'
 const filtroPeriodicidad = ref('todos')
 const filtroEstadoContrato = ref('todos')   // 'todos' | 'con_contrato' | 'en_tramite' | 'sin_contrato'
+
+// Opciones legibles para los Select de filtro (estilo Proyectos)
+const APLICA_OPTIONS = [
+  { value: 'todos',  label: 'Todos' },
+  { value: 'aplica', label: 'Aplican este mes' },
+  { value: 'no',     label: 'No aplican este mes' },
+]
+const PERIODICIDAD_OPTIONS = [
+  { value: 'todos',      label: 'Toda periodicidad' },
+  { value: 'mensual',    label: 'Mensual' },
+  { value: 'bimestral',  label: 'Bimestral' },
+  { value: 'trimestral', label: 'Trimestral' },
+  { value: 'semestral',  label: 'Semestral' },
+  { value: 'anual',      label: 'Anual' },
+]
+const ESTADO_CONTRATO_OPTIONS = [
+  { value: 'todos',        label: 'Todo estado' },
+  { value: 'con_contrato', label: 'Con contrato' },
+  { value: 'en_tramite',   label: 'En trámite' },
+  { value: 'sin_contrato', label: 'Sin contrato' },
+]
 const filasFiltradas = computed(() => {
   const q = filtroTexto.value.trim().toLowerCase()
   return filas.value.filter(f => {
@@ -799,3 +828,11 @@ onBeforeUnmount(() => {
   }
 })
 </script>
+
+<style scoped>
+/* Coincide con la estética de la vista Proyectos */
+.field-label { @apply block text-xs font-medium text-gray-600 mb-1; }
+
+/* Realce suave de fila al pasar el cursor (paralelo a Proyectos) */
+.row-hover { transition: background 0.1s; }
+</style>
