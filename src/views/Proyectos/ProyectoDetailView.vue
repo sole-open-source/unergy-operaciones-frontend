@@ -774,6 +774,31 @@
           </template>
         </div>
       </TabPanel>
+
+      <!-- ══ ID QUOIA ══ -->
+      <TabPanel header="ID Quoia">
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-4 p-4 text-sm">
+          <template v-if="!isEditMode">
+            <InfoField label="ID Reporte Generación Quoia" :value="proyecto.quoia_reporte_generacion_id" />
+            <InfoField label="ID Reporte Consumo Quoia" :value="proyecto.quoia_reporte_consumo_id" />
+            <InfoField label="ID de Nodo Quoia" :value="proyecto.quoia_nodo_id" />
+          </template>
+          <template v-else>
+            <div class="flex flex-col gap-1">
+              <label class="field-label">ID Reporte Generación Quoia</label>
+              <InputNumber v-model="editForm.quoia_reporte_generacion_id" :useGrouping="false" class="w-full" />
+            </div>
+            <div class="flex flex-col gap-1">
+              <label class="field-label">ID Reporte Consumo Quoia</label>
+              <InputNumber v-model="editForm.quoia_reporte_consumo_id" :useGrouping="false" class="w-full" />
+            </div>
+            <div class="flex flex-col gap-1">
+              <label class="field-label">ID de Nodo Quoia</label>
+              <InputNumber v-model="editForm.quoia_nodo_id" :useGrouping="false" class="w-full" />
+            </div>
+          </template>
+        </div>
+      </TabPanel>
     </TabView>
 
   </div>
@@ -895,6 +920,9 @@ const editForm = reactive({
   codigo_tsf: null,
   codigo_sic_generacion: null,
   codigo_sic_consumo: null,
+  quoia_reporte_generacion_id: null,
+  quoia_reporte_consumo_id: null,
+  quoia_nodo_id: null,
   cantidad_total_paneles: null,
   produccion_especifica_kwh_kwp: null,
   es_comunidad_energetica: false,
