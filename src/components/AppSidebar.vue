@@ -313,6 +313,7 @@ const ALL_GROUPS = [
           { to: '/liquidaciones?tipo=minigranja', label: 'Minigranjas' },
           { to: '/liquidaciones?tipo=autoconsumo', label: 'Autoconsumo' },
           { to: '/finanzas/ids-proyectos', label: 'IDs proyectos' },
+          { to: '/finanzas/contratos-energia', label: 'Contratos de energía' },
         ],
       },
       { to: '/liquidaciones/inversionista', label: 'Por Inversionista', icon: 'pi pi-users', roles: ['admin', 'liquidaciones'] },

@@ -59,6 +59,7 @@ const routes = [
   { path: '/validador-mandatos',          name: 'ValidadorMandatos',          component: () => import('@/views/Finanzas/ValidadorMandatosView.vue'),                     meta: { roles: ['admin', 'liquidaciones'] } },
   { path: '/finanzas/descarga-xm',     name: 'DescargaXM',     component: () => import('@/views/Finanzas/DescargaXMView.vue'),        meta: { roles: ['admin', 'liquidaciones'] } },
   { path: '/finanzas/ids-proyectos',   name: 'IdsProyectos',   component: () => import('@/views/Finanzas/IdsProyectosView.vue'),      meta: { roles: ['admin', 'liquidaciones'] } },
+  { path: '/finanzas/contratos-energia', name: 'ContratosEnergia', component: () => import('@/views/Finanzas/ContratosEnergiaView.vue'), meta: { roles: ['admin', 'liquidaciones'] } },
   { path: '/panel-contable',              name: 'PanelContable',              component: () => import('@/views/PanelContable/PanelContableView.vue'),                    meta: { roles: ['admin', 'liquidaciones'] } },
   { path: '/liquidaciones/minigranjas',   redirect: '/liquidaciones' },
   { path: '/liquidaciones/:id',           name: 'LiquidacionDetalle',         component: () => import('@/views/Liquidaciones/LiquidacionDetailView.vue'),           meta: { roles: ['admin', 'liquidaciones'] } },

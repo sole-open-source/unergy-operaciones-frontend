@@ -1,7 +1,7 @@
 <template>
   <div class="space-y-4">
     <PageHeader title="IDs proyectos"
-                subtitle="Cobertura de IDs de Quoia y liquidación · solo GD y minigranjas" />
+                subtitle="Cobertura de IDs de Quoia y liquidación · GD y minigranjas en operación" />
 
     <!-- Filtro de búsqueda -->
     <div class="bg-white rounded-xl shadow-sm p-3 flex flex-wrap gap-3 items-end border" style="border-color:#ECE7F2">
@@ -100,8 +100,9 @@ import { formatearNombreProyecto } from '@/views/Proyectos/proyectosUi'
 
 const router = useRouter()
 
-// Solo GD y minigranjas (sin autoconsumo ni ningún otro tipo).
+// Solo GD y minigranjas (sin autoconsumo ni ningún otro tipo) y solo operativas.
 const TIPOS_INCLUIDOS = ['gd', 'minigranja']
+const ESTADO_OPERATIVA = 'en_operacion'
 const TIPO_LABELS = { minigranja: 'Minigranja', gd: 'GD' }
 
 // Las 5 IDs: 3 de Quoia + 2 de liquidación (códigos SIC).
@@ -134,6 +135,7 @@ const filtrados = computed(() => {
   const term = q.value.trim().toLowerCase()
   return proyectos.value
     .filter(p => TIPOS_INCLUIDOS.includes(p.tipo_proyecto))
+    .filter(p => p.estado === ESTADO_OPERATIVA)
     .filter(p => !term || (p.nombre_comercial || '').toLowerCase().includes(term))
     .sort((a, b) => (a.nombre_comercial || '').localeCompare(b.nombre_comercial || ''))
 })
